@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
@@ -56,6 +58,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   const [amendments, setAmendments] = useState<Amendment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState('');
+  const [newType, setNewType] = useState<'improvement' | 'counter_proposal'>('improvement');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -74,10 +77,12 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
     setSubmitError(null);
     try {
       const resp = await api.post<Amendment>(`/api/proposals/${proposalId}/amendments`, {
+        type: newType,
         text: newText.trim(),
       });
       setAmendments(prev => [...prev, resp.data]);
       setNewText('');
+      setNewType('improvement');
     } catch (error) {
       setSubmitError(error instanceof ApiError ? error.message : t('workspace.amendments.submitFailed'));
     } finally {
@@ -107,7 +112,19 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
         <CardContent>
           <p className="text-muted-foreground text-center py-4">{t('workspace.amendments.empty')}</p>
           {canSubmit && user && (
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="amendment-type">{t('workspace.amendments.typeLabel') || 'Τύπος'}</Label>
+                <Select value={newType} onValueChange={(v) => setNewType(v as 'improvement' | 'counter_proposal')}>
+                  <SelectTrigger id="amendment-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="improvement">{t('workspace.amendments.type.improvement') || 'Βελτίωση'}</SelectItem>
+                    <SelectItem value="counter_proposal">{t('workspace.amendments.type.counter_proposal') || 'Αντιπρόταση'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Textarea
                 placeholder={t('workspace.amendments.placeholder') || 'Προτείνετε τροπολογία...'}
                 value={newText}
@@ -210,7 +227,19 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
         ))}
 
         {canSubmit && user && (
-          <div className="pt-4 border-t space-y-2">
+          <div className="pt-4 border-t space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="amendment-type-2">{t('workspace.amendments.typeLabel') || 'Τύπος'}</Label>
+              <Select value={newType} onValueChange={(v) => setNewType(v as 'improvement' | 'counter_proposal')}>
+                <SelectTrigger id="amendment-type-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="improvement">{t('workspace.amendments.type.improvement') || 'Βελτίωση'}</SelectItem>
+                  <SelectItem value="counter_proposal">{t('workspace.amendments.type.counter_proposal') || 'Αντιπρόταση'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Textarea
               id="new-amendment"
               placeholder={t('workspace.amendments.placeholder') || 'Προτείνετε τροπολογία...'}
