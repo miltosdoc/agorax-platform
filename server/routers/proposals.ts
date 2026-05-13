@@ -422,6 +422,41 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update attendance" });
     }
   });
+  // Preview or recompute the AI-merged final text. Anyone can read; the
+  // POST variant persists the result to finalText (author or admin only).
+  app.get("/api/proposals/:id/merge-preview", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const { aiMergeAmendments } = await import('../utils/ai-merger');
+      const result = await aiMergeAmendments(proposalId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to compute merge preview" });
+    }
+  });
+
+  app.post("/api/proposals/:id/merge", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
+        if (role !== 'admin' && role !== 'founder') {
+          return res.status(403).json({ message: "Only the author or an admin can recompute the merge" });
+        }
+      }
+      const { saveAiMergedFinalText } = await import('../utils/ai-merger');
+      const result = await saveAiMergedFinalText(proposalId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to save merge" });
+    }
+  });
+
   app.delete("/api/proposals/:id", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);

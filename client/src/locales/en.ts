@@ -131,6 +131,9 @@ const en: TranslationDictionary = {
   'proposal.community_label': 'Community',
   'proposal.community_hint': 'Only communities where you are a member.',
   'proposal.no_communities': 'You are not a member of any community. Join one first.',
+  'proposal.mergedFinalText': 'Final text (after amendments)',
+  'proposal.mergedFinalTextHint': 'Generated automatically or by the sortition body. The original text above is unchanged.',
+  'proposal.regenerateMerge': 'Regenerate merge',
 
   // Proposal Detail
   'proposal.notFound': 'Proposal not found',
@@ -364,6 +367,8 @@ const en: TranslationDictionary = {
   'community.demote': 'Demote to member',
   'community.latest_proposal': 'Latest',
   'community.most_popular': 'Most popular',
+  'community.amendment_inclusion_threshold': 'Popularity inclusion threshold',
+  'community.amendment_inclusion_threshold_help': 'Popularity ratio (0-1) above which an amendment is pulled into the final text even without explicit author acceptance. 1 = author-accepted only.',
   'community.tab_merge': 'Merge',
   'community.merge_title': 'Merge Communities',
   'community.merge_description': 'Merge this community into another. Members and proposals will be transferred.',

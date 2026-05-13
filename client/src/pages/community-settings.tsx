@@ -34,6 +34,7 @@ interface CommunitySettingsForm {
   sortitionMode: CommunitySortitionMode;
   sortitionResponseHours: number;
   amendmentThreshold: string;
+  amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
 }
@@ -50,6 +51,7 @@ function toForm(community: Community): CommunitySettingsForm {
     sortitionMode: (community.sortitionMode as CommunitySortitionMode) || 'absolute',
     sortitionResponseHours: community.sortitionResponseHours ?? 72,
     amendmentThreshold: String(community.amendmentThreshold ?? '0.5'),
+    amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '1'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
     requireGovgrVerification: community.requireGovgrVerification ?? false,
   };
@@ -92,6 +94,7 @@ export default function CommunitySettingsPage() {
         ...form,
         minParticipationPct: form.minParticipationPct.trim(),
         amendmentThreshold: form.amendmentThreshold.trim(),
+        amendmentInclusionThreshold: form.amendmentInclusionThreshold.trim(),
       };
 
       const resp = await api.patch<Community>(`/api/communities/${communityId}`, payload);
@@ -215,6 +218,11 @@ export default function CommunitySettingsPage() {
                       <Label htmlFor="maxAmendmentsPerProposal">{t('community.max_amendments')}</Label>
                       <Input id="maxAmendmentsPerProposal" type="number" value={form.maxAmendmentsPerProposal} onChange={(e) => update('maxAmendmentsPerProposal', Number(e.target.value))} />
                       <p className="text-xs text-muted-foreground">{t('community.unlimited_hint')}</p>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="amendmentInclusionThreshold">{t('community.amendment_inclusion_threshold') || 'Όριο συμπερίληψης βάσει δημοφιλίας'}</Label>
+                      <Input id="amendmentInclusionThreshold" type="number" min="0" max="1" step="0.05" value={form.amendmentInclusionThreshold} onChange={(e) => update('amendmentInclusionThreshold', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">{t('community.amendment_inclusion_threshold_help') || 'Όριο δημοφιλίας (0–1) πάνω από το οποίο μια τροπολογία εντάσσεται στο τελικό κείμενο ακόμη και χωρίς ρητή αποδοχή από τον συγγραφέα. Το 1 σημαίνει "μόνο όσες αποδέχτηκε ο συγγραφέας".'}</p>
                     </div>
                   </div>
                 </section>

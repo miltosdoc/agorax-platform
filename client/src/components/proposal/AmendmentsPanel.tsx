@@ -31,12 +31,18 @@ interface Amendment {
   proposalId: number;
   authorId: number;
   authorName?: string;
+  type?: string;
   text: string;
   status: 'pending' | 'accepted' | 'rejected' | 'flagged';
   createdAt: string;
   duplicateGroupId?: number | null;
   siblingIds?: number[];
   communitySignal?: number | null;
+  upvotes?: number;
+  downvotes?: number;
+  popularityScore?: number;
+  popularityRatio?: number;
+  userVote?: number;
 }
 
 const STATUS_CONFIG = {
@@ -61,13 +67,34 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   const [newType, setNewType] = useState<'improvement' | 'counter_proposal'>('improvement');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [voting, setVoting] = useState<Record<number, boolean>>({});
 
-  useEffect(() => {
+  const refresh = () =>
     api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`)
       .then(resp => setAmendments(resp.data))
-      .catch(() => setAmendments([]))
-      .finally(() => setLoading(false));
+      .catch(() => setAmendments([]));
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false));
   }, [proposalId]);
+
+  async function castVote(amendmentId: number, vote: 1 | -1, current: number) {
+    if (!user || voting[amendmentId]) return;
+    setVoting(prev => ({ ...prev, [amendmentId]: true }));
+    try {
+      // Toggle off if clicking the same vote again.
+      const next = current === vote ? 0 : vote;
+      if (next !== 0) {
+        await api.post(`/api/amendments/${amendmentId}/vote`, { vote: next });
+      }
+      // Optimistic refresh from server for accurate counts
+      await refresh();
+    } catch {
+      // ignore — UI stays as it was
+    } finally {
+      setVoting(prev => ({ ...prev, [amendmentId]: false }));
+    }
+  }
 
   const canSubmit = ['draft', 'author_review', 'community_signal'].includes(proposalStatus);
 
@@ -145,9 +172,14 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
     );
   }
 
+  // Sort by popularity (highest score first) so the most-supported amendments
+  // sit at the top of each duplicate-group cluster.
+  const sortedAmendments = [...amendments].sort(
+    (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
+  );
   // Group by duplicate group
   const groups = new Map<number | null, Amendment[]>();
-  for (const a of amendments) {
+  for (const a of sortedAmendments) {
     const key = a.duplicateGroupId ?? null;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(a);
@@ -207,18 +239,41 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                     </span>
                   </div>
                   <p className="text-sm whitespace-pre-wrap">{amendment.text}</p>
-                  <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground gap-2 flex-wrap">
                     <span>
                       {amendment.authorName || t('proposal.userWithId', { id: amendment.authorId })}
                     </span>
-                    {amendment.communitySignal !== null && amendment.communitySignal !== undefined && (
-                      <div className="flex items-center gap-1">
-                        {amendment.communitySignal > 0 ? <TrendingUp className="w-3 h-3 text-green-600" /> :
-                         amendment.communitySignal < 0 ? <TrendingDown className="w-3 h-3 text-red-600" /> :
-                         <MinusCircle className="w-3 h-3" />}
-                        <span>{t('workspace.amendments.signalNet')}: {amendment.communitySignal > 0 ? '+' : ''}{amendment.communitySignal}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {user && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant={amendment.userVote === 1 ? 'default' : 'outline'}
+                            className={`h-7 px-2 ${amendment.userVote === 1 ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                            onClick={() => castVote(amendment.id, 1, amendment.userVote ?? 0)}
+                            disabled={!!voting[amendment.id]}
+                          >
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            {amendment.upvotes ?? 0}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={amendment.userVote === -1 ? 'default' : 'outline'}
+                            className={`h-7 px-2 ${amendment.userVote === -1 ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                            onClick={() => castVote(amendment.id, -1, amendment.userVote ?? 0)}
+                            disabled={!!voting[amendment.id]}
+                          >
+                            <TrendingDown className="w-3 h-3 mr-1" />
+                            {amendment.downvotes ?? 0}
+                          </Button>
+                        </div>
+                      )}
+                      {(amendment.popularityScore ?? 0) !== 0 && (
+                        <span className={amendment.popularityScore! > 0 ? 'text-green-700' : 'text-red-700'}>
+                          {amendment.popularityScore! > 0 ? '+' : ''}{amendment.popularityScore} ({Math.round((amendment.popularityRatio ?? 0) * 100)}%)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

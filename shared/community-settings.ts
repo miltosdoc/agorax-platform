@@ -18,6 +18,7 @@ export interface CommunitySettingsInput {
   sortitionMode?: unknown;
   sortitionResponseHours?: unknown;
   amendmentThreshold?: unknown;
+  amendmentInclusionThreshold?: unknown;
   maxAmendmentsPerProposal?: unknown;
   requireGovgrVerification?: unknown;
 }
@@ -36,6 +37,7 @@ export interface CommunityCreateSettings {
   sortitionMode: CommunitySortitionMode;
   sortitionResponseHours: number;
   amendmentThreshold: string;
+  amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
 }
@@ -51,6 +53,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   sortitionMode: 'absolute',
   sortitionResponseHours: 72,
   amendmentThreshold: '0.5',
+  amendmentInclusionThreshold: '1',
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
 } as const;
@@ -148,6 +151,7 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     sortitionMode: enumValue(input.sortitionMode, COMMUNITY_SORTITION_MODES, DEFAULT_COMMUNITY_SETTINGS.sortitionMode ?? 'absolute', 'Invalid sortition mode'),
     sortitionResponseHours: integerValue(input.sortitionResponseHours, DEFAULT_COMMUNITY_SETTINGS.sortitionResponseHours ?? 72, 1, 720, 'sortitionResponseHours must be between 1 and 720'),
     amendmentThreshold: decimalString(input.amendmentThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentThreshold ?? '0.5', 0, 1, 'amendmentThreshold must be between 0 and 1'),
+    amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold ?? '1', 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
   };
@@ -184,6 +188,8 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const amendmentThreshold = optionalDecimalString(input.amendmentThreshold, 0, 1, 'amendmentThreshold must be between 0 and 1');
   if (amendmentThreshold !== undefined) updates.amendmentThreshold = amendmentThreshold;
+  const amendmentInclusionThreshold = optionalDecimalString(input.amendmentInclusionThreshold, 0, 1, 'amendmentInclusionThreshold must be between 0 and 1');
+  if (amendmentInclusionThreshold !== undefined) updates.amendmentInclusionThreshold = amendmentInclusionThreshold;
 
   const maxAmendmentsPerProposal = optionalUnlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, 'maxAmendmentsPerProposal must be -1 or greater than 0');
   if (maxAmendmentsPerProposal !== undefined) updates.maxAmendmentsPerProposal = maxAmendmentsPerProposal;

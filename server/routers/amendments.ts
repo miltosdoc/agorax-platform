@@ -16,10 +16,39 @@ import {
 } from '../utils/amendment-processor';
 
 export function registerAmendmentsRoutes(app: Express): void {
-  app.get("/api/proposals/:id/amendments", async (req, res) => {
+  app.get("/api/proposals/:id/amendments", async (req: any, res) => {
     try {
       const amendments = await amendmentRepo.getAmendments(parseInt(req.params.id));
-      res.json(amendments);
+      const userId = req.user?.id;
+      let userVotes = new Map<number, number>();
+      if (userId && amendments.length > 0) {
+        const { db } = await import('../db');
+        const { amendmentRejectionVotes } = await import('@shared/schema');
+        const { inArray, and, eq } = await import('drizzle-orm');
+        const rows = await db
+          .select({ amendmentId: amendmentRejectionVotes.amendmentId, vote: amendmentRejectionVotes.vote })
+          .from(amendmentRejectionVotes)
+          .where(and(
+            eq(amendmentRejectionVotes.userId, userId),
+            inArray(amendmentRejectionVotes.amendmentId, amendments.map((a: any) => a.id)),
+          ));
+        userVotes = new Map(rows.map(r => [r.amendmentId, r.vote]));
+      }
+      const enriched = amendments.map((a: any) => {
+        const up = a.rejectionUpvotes ?? 0;
+        const down = a.rejectionDownvotes ?? 0;
+        const total = up + down;
+        return {
+          ...a,
+          // Reuse rejection-vote aggregates as general amendment popularity.
+          upvotes: up,
+          downvotes: down,
+          popularityScore: up - down,
+          popularityRatio: total > 0 ? up / total : 0,
+          userVote: userVotes.get(a.id) ?? 0,
+        };
+      });
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch amendments" });
     }
@@ -93,7 +122,10 @@ export function registerAmendmentsRoutes(app: Express): void {
     }
   });
   // ─── Amendment Review: Community votes on rejected amendments ───────────────
-  app.post("/api/amendments/:id/rejection-vote", requireAuth, async (req: any, res) => {
+  // General amendment popularity vote — available in any phase.
+  // (The old /rejection-vote alias is kept for backward compatibility but
+  // no longer restricted to rejected amendments.)
+  const handleAmendmentVote = async (req: any, res: any) => {
     try {
       const amendmentId = parseInt(req.params.id);
       const { vote } = req.body;
@@ -102,16 +134,18 @@ export function registerAmendmentsRoutes(app: Express): void {
       }
       const amendment = await amendmentRepo.getAmendment(amendmentId);
       if (!amendment) return res.status(404).json({ message: "Amendment not found" });
-      // Only rejected amendments can be voted on
-      if (amendment.authorDecision !== 'rejected') {
-        return res.status(400).json({ message: "Only rejected amendments can be voted on" });
-      }
+      const proposal = await proposalRepo.getProposal(amendment.proposalId);
+      if (!proposal) return res.status(404).json({ message: "Parent proposal not found" });
+      const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
+      if (!isMember) return res.status(403).json({ message: "Must be a community member" });
       await castRejectionVote(amendmentId, req.user.id, vote as 1 | -1);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to cast vote" });
     }
-  });
+  };
+  app.post("/api/amendments/:id/vote", requireAuth, handleAmendmentVote);
+  app.post("/api/amendments/:id/rejection-vote", requireAuth, handleAmendmentVote);
   // ─── Amendment Duplicates: Flag overlapping amendments for author review ────
   app.get("/api/proposals/:id/amendments/duplicates", async (req, res) => {
     try {

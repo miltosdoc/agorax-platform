@@ -206,11 +206,23 @@ export async function triggerSideEffects(
     case 'community_signal->sortition_synthesis':
       // Create sortition body for text synthesis
       await enqueueCreateSortition(proposal.communityId, 12, proposal.id, 'text_synthesis');
+      // Pre-fill finalText with the AI merge so the jury has a baseline.
+      try {
+        const { saveAiMergedFinalText } = await import('./ai-merger');
+        await saveAiMergedFinalText(proposal.id);
+      } catch { /* best-effort */ }
       break;
-    
+
     case 'sortition_synthesis->voting':
+    case 'community_signal->voting':
       // Recalculate democracy score when voting opens
       await enqueueRecalculateScore(proposal.communityId);
+      // If we skipped sortition (no flagged amendments), run the AI merge
+      // now so the vote happens on the integrated text, not the raw draft.
+      try {
+        const { saveAiMergedFinalText } = await import('./ai-merger');
+        await saveAiMergedFinalText(proposal.id);
+      } catch { /* best-effort */ }
       break;
 
     default:

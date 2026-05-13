@@ -198,6 +198,9 @@ export const communities = pgTable("communities", {
 
   // Amendment parameters (per-community config)
   amendmentThreshold: numeric("amendment_threshold").default("0.5"), // upvote ratio to flag rejected amendments
+  // Popularity ratio (0..1) above which the AI merge will include an
+  // amendment the author did NOT explicitly accept. 1 = author-only.
+  amendmentInclusionThreshold: numeric("amendment_inclusion_threshold").default("1"),
   maxAmendmentsPerProposal: integer("max_amendments_per_proposal").default(-1), // -1 = unlimited
 
   // Merge tracking (self-reference — defined without FK to avoid circular init)

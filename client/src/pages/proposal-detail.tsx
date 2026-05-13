@@ -234,9 +234,26 @@ export default function ProposalDetailPage() {
             <h4 className="text-sm font-medium text-muted-foreground">{t('proposal.proposedSolution')}</h4>
             <p className="whitespace-pre-wrap">{proposal.solution}</p>
 
-            {proposal.finalText && (
-              <div className="mt-4 p-4 bg-muted rounded">
-                <h4 className="text-sm font-medium mb-2">{t('proposal.finalTextSortition')}</h4>
+            {proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
+              <div className="mt-4 p-4 bg-muted rounded space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-medium">{t('proposal.mergedFinalText') || 'Τελικό κείμενο (μετά τις τροπολογίες)'}</h4>
+                  {userIsAuthor && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const resp = await fetch(`/api/proposals/${proposal.id}/merge`, { method: 'POST', credentials: 'include' });
+                          if (resp.ok) window.location.reload();
+                        } catch {}
+                      }}
+                    >
+                      {t('proposal.regenerateMerge') || 'Επανεκτέλεση συγχώνευσης'}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{t('proposal.mergedFinalTextHint') || 'Παράγεται αυτόματα ή από το κληρωτό σώμα. Το αρχικό κείμενο παραμένει αμετάβλητο πιο πάνω.'}</p>
                 <p className="whitespace-pre-wrap">{proposal.finalText}</p>
               </div>
             )}

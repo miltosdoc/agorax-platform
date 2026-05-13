@@ -131,6 +131,9 @@ const el: TranslationDictionary = {
   'proposal.community_label': 'Κοινότητα',
   'proposal.community_hint': 'Μόνο κοινότητες όπου είστε μέλος.',
   'proposal.no_communities': 'Δεν είστε μέλος σε καμία κοινότητα. Εγγραφείτε πρώτα σε μία.',
+  'proposal.mergedFinalText': 'Τελικό κείμενο (μετά τις τροπολογίες)',
+  'proposal.mergedFinalTextHint': 'Παράγεται αυτόματα ή από το κληρωτό σώμα. Το αρχικό κείμενο πιο πάνω παραμένει αμετάβλητο.',
+  'proposal.regenerateMerge': 'Επανεκτέλεση συγχώνευσης',
 
   // Proposal Detail
   'proposal.notFound': 'Η πρόταση δεν βρέθηκε',
@@ -364,6 +367,8 @@ const el: TranslationDictionary = {
   'community.demote': 'Υποβιβασμός σε μέλος',
   'community.latest_proposal': 'Πιο πρόσφατη',
   'community.most_popular': 'Πιο δημοφιλής',
+  'community.amendment_inclusion_threshold': 'Όριο συμπερίληψης βάσει δημοφιλίας',
+  'community.amendment_inclusion_threshold_help': 'Όριο δημοφιλίας (0–1) πάνω από το οποίο μια τροπολογία εντάσσεται στο τελικό κείμενο ακόμη και χωρίς ρητή αποδοχή από τον συγγραφέα. Το 1 σημαίνει «μόνο όσες αποδέχτηκε ο συγγραφέας».',
   'community.tab_merge': 'Ενσωμάτωση',
   'community.merge_title': 'Ενσωμάτωση Κοινοτήτων',
   'community.merge_description': 'Ενσωματώστε αυτή την κοινότητα σε άλλη. Τα μέλη και οι προτάσεις θα μεταφερθούν.',
