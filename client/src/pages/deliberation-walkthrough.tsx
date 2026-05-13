@@ -151,7 +151,7 @@ function StepValidation() {
             <span className="ml-2 font-medium">8/10</span>
           </div>
           <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_transparency')}:</span>
+            <span className="text-muted-foreground">{t('walkthrough.score_clarity')}:</span>
             <span className="ml-2 font-medium">9/10</span>
           </div>
           <div className="p-2 bg-white rounded">
@@ -327,8 +327,10 @@ function StepCommunitySignal() {
       {rejectedAmendments.map(amendment => {
         const netScore = amendment.upvotes - amendment.downvotes;
         const totalVotes = amendment.upvotes + amendment.downvotes;
-        const ratio = totalVotes > 0 ? netScore / totalVotes : 0;
-        const flagged = ratio >= amendment.threshold && totalVotes >= 3;
+        // Matches server/utils/amendment-processor.ts: upvote share above
+        // the community's amendmentThreshold flags the amendment for sortition.
+        const ratio = totalVotes > 0 ? amendment.upvotes / totalVotes : 0;
+        const flagged = ratio >= amendment.threshold;
         const userUpvoted = upvoted.includes(amendment.id);
 
         return (
@@ -398,7 +400,7 @@ function StepSortitionSynthesis() {
         </p>
       </div>
 
-      {/* Sortition body info */}
+      {/* Sortition body info — illustrative; actual size = community.sortitionSize */}
       <div className="p-4 border rounded-lg bg-muted/30">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium">{t('walkthrough.sortition_body_info')}</span>
@@ -406,20 +408,36 @@ function StepSortitionSynthesis() {
         </div>
         <div className="grid grid-cols-3 gap-2 text-sm">
           <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">5</div>
+            <div className="font-bold text-lg">12</div>
             <div className="text-muted-foreground text-xs">{t('walkthrough.selected_citizens')}</div>
           </div>
           <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">4/5</div>
+            <div className="font-bold text-lg">9/12</div>
             <div className="text-muted-foreground text-xs">{t('walkthrough.responded')}</div>
           </div>
           <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">48h</div>
+            <div className="font-bold text-lg">72h</div>
             <div className="text-muted-foreground text-xs">{t('walkthrough.remaining')}</div>
           </div>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {t('walkthrough.sortition_size_note') || 'Το μέγεθος και το χρονικό περιθώριο ορίζονται ανά κοινότητα στις Ρυθμίσεις. Default: 12 μέλη, 72 ώρες.'}
+        </p>
       </div>
-      
+
+      {/* AI pre-merge baseline (Phase 2 of the merge pipeline) */}
+      <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-medium text-purple-800">
+            {t('walkthrough.ai_premerge_title') || 'AI-merged baseline (αυτόματη αφετηρία)'}
+          </span>
+        </div>
+        <p className="text-xs text-purple-700">
+          {t('walkthrough.ai_premerge_desc') || 'Το LLM ενσωματώνει τις τροπολογίες που αποδέχθηκε ο συγγραφέας — και όσες υπερβαίνουν το όριο δημοφιλίας της κοινότητας (amendmentInclusionThreshold) — σε ρέοντα κείμενο. Το κληρωτό σώμα ξεκινά από αυτό αντί για άδειο πεδίο.'}
+        </p>
+      </div>
+
       <div className="p-4 border rounded-lg bg-muted/30">
         <label className="text-sm font-medium mb-2 block">{t('walkthrough.author_proposal_accepted')}</label>
         <div className="p-3 bg-background rounded border text-sm space-y-2">
@@ -539,14 +557,21 @@ function StepRatificationVote() {
           <ExternalLink className="w-3 h-3" />
           {t('walkthrough.live_demo')}: <Link to="/proposals/2" className="text-blue-600 underline">{t('walkthrough.proposal_2_vote')}</Link>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button className="bg-green-600 hover:bg-green-700">
             <ThumbsUp className="mr-2 w-4 h-4" /> {t('walkthrough.for')}
           </Button>
           <Button variant="outline" className="text-red-600">
             <ThumbsDown className="mr-2 w-4 h-4" /> {t('walkthrough.against')}
           </Button>
+          <Button variant="outline">
+            {t('proposal.abstain') || 'Abstain'}
+          </Button>
         </div>
+      </div>
+
+      <div className="p-3 border rounded-lg bg-blue-50 border-blue-200 text-xs text-blue-900">
+        {t('walkthrough.vote_quorum_note') || 'Η ψηφοφορία οριστικοποιείται από τον συγγραφέα (ή έναν διαχειριστή της κοινότητας). Αν η συμμετοχή πέσει κάτω από το minParticipationPct της κοινότητας ή δεν υπάρχει αποφασιστική ψήφος, η πρόταση αρχειοθετείται αντί να εγκριθεί.'}
       </div>
     </div>
   );
