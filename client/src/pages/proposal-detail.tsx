@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
@@ -180,10 +180,38 @@ export default function ProposalDetailPage() {
                 {t('proposal.by')} {proposal.authorName || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
               </CardDescription>
             </div>
-            <Badge className={`${getStatusForProposal(proposal).color} self-start`} variant="outline" style={{ whiteSpace: 'nowrap' }}>
-              <span className="mr-1">{getStatusForProposal(proposal).icon}</span>
-              {getStatusLabel(proposal.status, t)}
-            </Badge>
+            <div className="flex items-center gap-2 self-start">
+              <Badge className={getStatusForProposal(proposal).color} variant="outline" style={{ whiteSpace: 'nowrap' }}>
+                <span className="mr-1">{getStatusForProposal(proposal).icon}</span>
+                {getStatusLabel(proposal.status, t)}
+              </Badge>
+              {userIsAuthor && proposal.status === 'draft' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:bg-red-50"
+                  onClick={async () => {
+                    if (!window.confirm(t('proposal.deleteConfirm') || 'Delete this draft proposal?')) return;
+                    try {
+                      const res = await fetch(`/api/proposals/${proposal.id}`, {
+                        method: 'DELETE',
+                        credentials: 'include',
+                      });
+                      if (!res.ok && res.status !== 204) {
+                        const data = await res.json().catch(() => ({}));
+                        throw new Error(data.message || `HTTP ${res.status}`);
+                      }
+                      setLocation('/home');
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : String(err));
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  {t('proposal.delete') || 'Delete'}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

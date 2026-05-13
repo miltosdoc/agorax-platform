@@ -29,6 +29,15 @@ interface CommunityForMerge {
   mergedInto: number | null;
 }
 
+interface CommunityMember {
+  userId: number;
+  username: string;
+  name: string | null;
+  profilePicture: string | null;
+  role: string;
+  joinedAt: string;
+}
+
 export default function CommunityDashboardPage() {
   const params = useParams();
   const communityId = params.id;
@@ -38,6 +47,8 @@ export default function CommunityDashboardPage() {
   const [summary, setSummary] = useState<CommunitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
+  const [members, setMembers] = useState<CommunityMember[] | null>(null);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [targetCommunityId, setTargetCommunityId] = useState<number | null>(null);
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -45,7 +56,7 @@ export default function CommunityDashboardPage() {
 
   useEffect(() => {
     if (!communityId) return;
-    
+
     Promise.all([
       api.get<CommunitySummary>(`/api/communities/${communityId}/summary`),
       api.get<CommunityForMerge[]>('/api/communities'),
@@ -54,6 +65,15 @@ export default function CommunityDashboardPage() {
       setAllCommunities(commResp.data);
     }).catch(() => setSummary(null))
       .finally(() => setLoading(false));
+  }, [communityId]);
+
+  useEffect(() => {
+    if (!communityId) return;
+    setMembersLoading(true);
+    api.get<CommunityMember[]>(`/api/communities/${communityId}/members`)
+      .then((r) => setMembers(r.data))
+      .catch(() => setMembers([]))
+      .finally(() => setMembersLoading(false));
   }, [communityId]);
 
   const handleMerge = async () => {
@@ -226,9 +246,45 @@ export default function CommunityDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>{t('community.tab_members')}</CardTitle>
+              <CardDescription>
+                {memberCount} {t('community.members')}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{t('community.members_coming_soon')}</p>
+              {membersLoading && (
+                <p className="text-muted-foreground">{t('common.loading')}</p>
+              )}
+              {!membersLoading && members && members.length === 0 && (
+                <p className="text-muted-foreground">{t('community.members_empty') || 'No members yet.'}</p>
+              )}
+              {!membersLoading && members && members.length > 0 && (
+                <ul className="divide-y">
+                  {members.map((m) => (
+                    <li key={m.userId} className="flex items-center gap-3 py-3">
+                      {m.profilePicture ? (
+                        <img
+                          src={m.profilePicture}
+                          alt={m.name || m.username}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                          {(m.name || m.username).slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{m.name || m.username}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          @{m.username} · {t('community.joined') || 'joined'} {new Date(m.joinedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant={m.role === 'admin' || m.role === 'founder' ? 'default' : 'secondary'}>
+                        {t(`community.role.${m.role}`) || m.role}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

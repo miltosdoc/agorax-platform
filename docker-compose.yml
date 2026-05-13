@@ -82,8 +82,8 @@ services:
   # ─── Python Economy Service ────────────────────────────────────────────────
   economy-service:
     build:
-      context: economy_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: economy_service/Dockerfile
     container_name: agorax_economy
     restart: unless-stopped
     depends_on:

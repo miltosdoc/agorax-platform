@@ -16,6 +16,7 @@ import {
   sortitionNotifications,
   communityMembers,
   proposals,
+  users,
   castProposalVoteSchema,
 } from '@shared/schema';
 import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput } from '@shared/community-settings';
@@ -88,8 +89,21 @@ export function registerCommunitiesRoutes(app: Express): void {
   });
   app.get("/api/communities/:id/members", async (req, res) => {
     try {
-      const members = await communityRepo.getCommunityMembers(parseInt(req.params.id));
-      res.json(members);
+      const communityId = parseInt(req.params.id);
+      const rows = await db
+        .select({
+          userId: communityMembers.userId,
+          role: communityMembers.role,
+          joinedAt: communityMembers.joinedAt,
+          username: users.username,
+          name: users.name,
+          profilePicture: users.profilePicture,
+        })
+        .from(communityMembers)
+        .innerJoin(users, eq(users.id, communityMembers.userId))
+        .where(eq(communityMembers.communityId, communityId))
+        .orderBy(desc(communityMembers.joinedAt));
+      res.json(rows);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch members" });
     }

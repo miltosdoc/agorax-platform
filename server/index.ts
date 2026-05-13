@@ -12,7 +12,9 @@ import { startJobQueue } from "./utils/job-handlers";
 validateRuntimeConfig();
 
 const app = express();
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+}));
 app.use(express.json({ limit: "100kb" }));
 
 // Apply rate limiting to all API routes

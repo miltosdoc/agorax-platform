@@ -56,6 +56,12 @@ export function registerProposalsRoutes(app: Express): void {
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
       }
+      if (typeof question !== "string" || typeof solution !== "string") {
+        return res.status(400).json({ message: "Question and solution must be strings" });
+      }
+      if (question.length > 2000 || solution.length > 4000) {
+        return res.status(400).json({ message: "Question max 2000 chars, solution max 4000 chars" });
+      }
       const proposal = await proposalRepo.createProposal({
         communityId,
         authorId: userId,
@@ -396,6 +402,24 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update attendance" });
     }
   });
+  app.delete("/api/proposals/:id", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        return res.status(403).json({ message: "Only the author can delete this proposal" });
+      }
+      if (proposal.status !== 'draft') {
+        return res.status(409).json({ message: "Only draft proposals can be deleted" });
+      }
+      await proposalRepo.deleteProposal(proposalId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete proposal" });
+    }
+  });
+
   app.post("/api/proposals/:id/revalidate", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);

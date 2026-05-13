@@ -57,6 +57,11 @@ export class ProposalRepository {
     return proposal;
   }
 
+  /** Delete a proposal. Caller must enforce status/author rules. */
+  async deleteProposal(id: number): Promise<void> {
+    await db.delete(proposals).where(eq(proposals.id, id));
+  }
+
   /** Transition proposal to a new state. */
   async transitionProposalState(id: number, newState: string): Promise<Proposal> {
     if (!isProposalState(newState)) {

@@ -131,6 +131,8 @@ const en: TranslationDictionary = {
 
   // Proposal Detail
   'proposal.notFound': 'Proposal not found',
+  'proposal.delete': 'Delete',
+  'proposal.deleteConfirm': 'Delete this draft proposal? This cannot be undone.',
   'proposal.by': 'by',
   'proposal.userWithId': 'User #{id}',
   'proposal.proposedSolution': 'Proposed Solution',
@@ -344,6 +346,11 @@ const en: TranslationDictionary = {
   'community.sortition_bodies': 'Sortition Bodies',
   'community.no_sortition_bodies': 'No active sortition bodies',
   'community.members_coming_soon': 'Member list coming soon',
+  'community.members_empty': 'No members yet.',
+  'community.joined': 'joined',
+  'community.role.founder': 'Founder',
+  'community.role.admin': 'Admin',
+  'community.role.member': 'Member',
   'community.tab_merge': 'Merge',
   'community.merge_title': 'Merge Communities',
   'community.merge_description': 'Merge this community into another. Members and proposals will be transferred.',

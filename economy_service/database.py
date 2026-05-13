@@ -62,7 +62,13 @@ def init_db() -> None:
     Safe for shared DB — only creates tables that don't exist.
     """
     engine = get_engine()
-    Base.metadata.create_all(bind=engine, checkfirst=True)
+    from sqlalchemy.exc import ProgrammingError
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+    except ProgrammingError as e:
+        # Tables/indexes already managed by Drizzle in the shared DB.
+        if "already exists" not in str(e):
+            raise
 
 
 def get_db() -> Generator[Session, None, None]:

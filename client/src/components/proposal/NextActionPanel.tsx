@@ -3,9 +3,10 @@
  * Uses the STATUS_MAP from proposal-status.ts to determine action text and buttons.
  */
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, AlertCircle, CheckCircle2, Clock, Zap } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, Clock, Zap, Loader2 } from 'lucide-react';
 import { getStatusForProposal, STATUS_MAP } from '@/lib/proposal-status';
 import { useTranslation } from '@/hooks/use-translation';
 import type { ProposalState } from '@shared/proposal-lifecycle';
@@ -31,6 +32,27 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
   const { t } = useTranslation();
   const entry = getStatusForProposal({ status });
   const Icon = ACTION_ICONS[status] || ArrowRight;
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function handleSubmitDraft() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/submit`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+      }
+      window.location.reload();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : String(err));
+      setSubmitting(false);
+    }
+  }
 
   // Map status to workspace i18n key
   const actionKey = `workspace.action.${status}`;
@@ -49,11 +71,19 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
             </div>
           </div>
           {status === 'draft' && userIsAuthor && (
-            <Button size="sm" asChild>
-              <a href={`/proposals/${proposalId}/submit`}>
-                {t('workspace.action.draftButton')}
-              </a>
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button size="sm" onClick={handleSubmitDraft} disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('workspace.action.draftButton')}
+                  </>
+                ) : (
+                  t('workspace.action.draftButton')
+                )}
+              </Button>
+              {submitError && <p className="text-xs text-red-600">{submitError}</p>}
+            </div>
           )}
           {status === 'author_review' && userIsAuthor && (
             <Button size="sm" asChild>

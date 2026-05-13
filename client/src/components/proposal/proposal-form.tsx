@@ -5,7 +5,7 @@
  * Collects: question (problem), solution, category, and optional description.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,20 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const targetCommunityId = communityId || 1;  // Default to main community
+  const [generalCommunityId, setGeneralCommunityId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (communityId) return;
+    fetch('/api/communities', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load communities'))))
+      .then((list: Array<{ id: number; isGeneral?: boolean }>) => {
+        const general = list.find((c) => c.isGeneral);
+        if (general) setGeneralCommunityId(general.id);
+      })
+      .catch(() => {});
+  }, [communityId]);
+
+  const targetCommunityId = communityId ?? generalCommunityId;
   const [formData, setFormData] = useState({
     question: '',
     solution: '',
@@ -44,6 +57,10 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!targetCommunityId) {
+      setError(t('proposal.create_error'));
+      return;
+    }
     setLoading(true);
     setError(null);
 

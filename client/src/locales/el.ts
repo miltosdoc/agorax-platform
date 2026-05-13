@@ -131,6 +131,8 @@ const el: TranslationDictionary = {
 
   // Proposal Detail
   'proposal.notFound': 'Η πρόταση δεν βρέθηκε',
+  'proposal.delete': 'Διαγραφή',
+  'proposal.deleteConfirm': 'Διαγραφή του πρόχειρου; Η ενέργεια δεν αναιρείται.',
   'proposal.by': 'από',
   'proposal.userWithId': 'Χρήστης #{id}',
   'proposal.proposedSolution': 'Προτεινόμενη Λύση',
@@ -344,6 +346,11 @@ const el: TranslationDictionary = {
   'community.sortition_bodies': 'Σώματα Κλήρωσης',
   'community.no_sortition_bodies': 'Δεν υπάρχουν ενεργά σώματα κλήρωσης',
   'community.members_coming_soon': 'Λίστα μελών σύντομα',
+  'community.members_empty': 'Δεν υπάρχουν ακόμα μέλη.',
+  'community.joined': 'εγγραφή',
+  'community.role.founder': 'Ιδρυτής',
+  'community.role.admin': 'Διαχειριστής',
+  'community.role.member': 'Μέλος',
   'community.tab_merge': 'Ενσωμάτωση',
   'community.merge_title': 'Ενσωμάτωση Κοινοτήτων',
   'community.merge_description': 'Ενσωματώστε αυτή την κοινότητα σε άλλη. Τα μέλη και οι προτάσεις θα μεταφερθούν.',
