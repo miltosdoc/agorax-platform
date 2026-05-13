@@ -20,25 +20,39 @@ interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
 }
 
+interface MemberCommunity {
+  id: number;
+  name: string;
+  isGeneral?: boolean;
+}
+
 export function ProposalForm({ communityId }: ProposalFormProps) {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generalCommunityId, setGeneralCommunityId] = useState<number | null>(null);
+  const [memberCommunities, setMemberCommunities] = useState<MemberCommunity[]>([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(true);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<number | null>(communityId ?? null);
 
   useEffect(() => {
-    if (communityId) return;
     fetch('/api/communities', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load communities'))))
-      .then((list: Array<{ id: number; isGeneral?: boolean }>) => {
-        const general = list.find((c) => c.isGeneral);
-        if (general) setGeneralCommunityId(general.id);
+      .then((list: MemberCommunity[]) => {
+        setMemberCommunities(list);
+        if (!communityId) {
+          const general = list.find((c) => c.isGeneral);
+          setSelectedCommunityId((prev) => prev ?? general?.id ?? list[0]?.id ?? null);
+        }
       })
-      .catch(() => {});
+      .catch(() => setMemberCommunities([]))
+      .finally(() => setCommunitiesLoading(false));
   }, [communityId]);
 
-  const targetCommunityId = communityId ?? generalCommunityId;
+  const targetCommunityId = communityId ?? selectedCommunityId;
+  const lockedCommunity = communityId
+    ? memberCommunities.find((c) => c.id === communityId)
+    : null;
   const [formData, setFormData] = useState({
     question: '',
     solution: '',
@@ -102,6 +116,43 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="community">
+              {t('proposal.community_label') || 'Κοινότητα'} <span className="text-red-500">*</span>
+            </Label>
+            {communitiesLoading ? (
+              <p className="text-sm text-muted-foreground">{t('common.loading') || 'Φόρτωση…'}</p>
+            ) : lockedCommunity ? (
+              <p className="text-sm font-medium">{lockedCommunity.name}</p>
+            ) : memberCommunities.length === 0 ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {t('proposal.no_communities') || 'Δεν είστε μέλος σε καμία κοινότητα. Εγγραφείτε πρώτα σε μία.'}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Select
+                value={selectedCommunityId != null ? String(selectedCommunityId) : ''}
+                onValueChange={(v) => setSelectedCommunityId(parseInt(v, 10))}
+              >
+                <SelectTrigger id="community">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {memberCommunities.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}{c.isGeneral ? ' ★' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <p className="text-sm text-muted-foreground">
+              {t('proposal.community_hint') || 'Μόνο κοινότητες όπου είστε μέλος.'}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="question">

@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useParams } from 'wouter';
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,8 +41,8 @@ interface CommunitySignal {
 }
 
 export default function AmendmentCommunitySignal() {
-  const [location] = useLocation();
-  const proposalId = parseInt(location.split('/').pop()?.replace('/signals', '') || '0');
+  const params = useParams<{ id: string }>();
+  const proposalId = parseInt(params.id || '0', 10);
   const { t } = useTranslation();
   
   const [amendments, setAmendments] = useState<RejectedAmendment[]>([]);
@@ -51,6 +51,22 @@ export default function AmendmentCommunitySignal() {
   const [voting, setVoting] = useState<Record<number, boolean>>({});
   const [userVotes, setUserVotes] = useState<Record<number, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+
+  async function advanceToNextPhase() {
+    const anyFlagged = signals.some((s) => s.flagged);
+    const next = anyFlagged ? 'sortition_synthesis' : 'voting';
+    setAdvancing(true);
+    setAdvanceError(null);
+    try {
+      await api.post(`/api/proposals/${proposalId}/transition`, { newState: next });
+      window.location.href = `/proposals/${proposalId}`;
+    } catch (e: any) {
+      setAdvanceError(e?.response?.data?.message || String(e?.message || e));
+      setAdvancing(false);
+    }
+  }
 
   useEffect(() => {
     loadData();
@@ -134,8 +150,14 @@ export default function AmendmentCommunitySignal() {
 
       {amendments.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            {t('amendment.communitySignal.noRejectedAmendments')}
+          <CardContent className="py-8 text-center space-y-4">
+            <p className="text-muted-foreground">{t('amendment.communitySignal.noRejectedAmendments')}</p>
+            <Button onClick={advanceToNextPhase} disabled={advancing}>
+              {advancing
+                ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
+                : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην ψηφοφορία')}
+            </Button>
+            {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
           </CardContent>
         </Card>
       ) : (
@@ -207,6 +229,21 @@ export default function AmendmentCommunitySignal() {
               </Card>
             );
           })}
+          <Card className="border-primary/20">
+            <CardContent className="py-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {signals.some((s) => s.flagged)
+                  ? (t('amendment.communitySignal.advanceHintFlagged') || 'Υπάρχουν επισημασμένες τροπολογίες — μετάβαση στο κληρωτό σώμα.')
+                  : (t('amendment.communitySignal.advanceHintNoFlagged') || 'Καμία τροπολογία δεν επισημάνθηκε — μετάβαση στην ψηφοφορία.')}
+              </p>
+              <Button onClick={advanceToNextPhase} disabled={advancing}>
+                {advancing
+                  ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
+                  : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην επόμενη φάση')}
+              </Button>
+              {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+            </CardContent>
+          </Card>
         </div>
       )}
       </div>

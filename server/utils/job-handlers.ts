@@ -63,7 +63,16 @@ async function handleCreateSortition(payload: JobPayload): Promise<void> {
 
 async function handleRecalculateScore(payload: JobPayload): Promise<void> {
   const { communityId } = payload.data;
-  // TODO: Implement score recalculation logic
+  if (typeof communityId !== 'number') return;
+  const { calculateDemocracyScore } = await import('./democracy-score');
+  const { storage } = await import('../storage');
+  const { communityRepo } = await import('../storage');
+  try {
+    const result = await calculateDemocracyScore(communityId, storage as any);
+    await communityRepo.updateCommunity(communityId, { democracyScore: String(result.score) });
+  } catch {
+    // Swallow — recompute is best-effort; next trigger will retry.
+  }
 }
 
 // ─── Handler: cleanup_expired ───────────────────────────────────────────────

@@ -65,7 +65,19 @@ export function rateLimit({
   };
 }
 
-// Pre-configured limiters for common use cases
-export const apiLimit = rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 100 });
-export const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, maxRequests: 10 });
-export const votingLimit = rateLimit({ windowMs: 60 * 1000, maxRequests: 5 });
+// Pre-configured limiters for common use cases.
+// Dev gets generous limits so HMR polling + iteration doesn't lock you out.
+const isDev = process.env.NODE_ENV !== 'production';
+
+export const apiLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: isDev ? 10000 : 100,
+});
+export const authLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: isDev ? 1000 : 10,
+});
+export const votingLimit = rateLimit({
+  windowMs: 60 * 1000,
+  maxRequests: isDev ? 1000 : 5,
+});

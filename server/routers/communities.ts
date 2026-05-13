@@ -16,6 +16,7 @@ import {
   sortitionNotifications,
   communityMembers,
   proposals,
+  proposalSupport,
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
@@ -26,8 +27,80 @@ export function registerCommunitiesRoutes(app: Express): void {
   app.get("/api/communities", async (req, res) => {
     try {
       const userId = req.user?.id;
-      const communities = await communityRepo.getCommunities(userId);
-      res.json(communities);
+      const list = await communityRepo.getCommunities(userId);
+      if (list.length === 0) return res.json(list);
+
+      const ids = list.map((c) => c.id);
+
+      // Member counts per community
+      const memberRows = await db
+        .select({
+          communityId: communityMembers.communityId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(communityMembers)
+        .where(inArray(communityMembers.communityId, ids))
+        .groupBy(communityMembers.communityId);
+      const memberCounts = new Map(memberRows.map((r) => [r.communityId, r.count]));
+
+      // Latest proposal per community
+      const latestRows = await db
+        .select({
+          id: proposals.id,
+          communityId: proposals.communityId,
+          question: proposals.question,
+          status: proposals.status,
+          createdAt: proposals.createdAt,
+        })
+        .from(proposals)
+        .where(inArray(proposals.communityId, ids))
+        .orderBy(desc(proposals.createdAt));
+      const latestByCommunity = new Map<number, typeof latestRows[number]>();
+      for (const row of latestRows) {
+        if (!latestByCommunity.has(row.communityId)) {
+          latestByCommunity.set(row.communityId, row);
+        }
+      }
+
+      // Most popular proposal per community — by distinct supporters
+      const supportRows = await db
+        .select({
+          proposalId: proposalSupport.proposalId,
+          supporters: sql<number>`cast(count(distinct ${proposalSupport.userId}) as int)`,
+        })
+        .from(proposalSupport)
+        .where(eq(proposalSupport.type, 'support'))
+        .groupBy(proposalSupport.proposalId);
+      const supportByProposal = new Map(supportRows.map((r) => [r.proposalId, r.supporters]));
+
+      const popularByCommunity = new Map<number, { id: number; question: string; supporters: number }>();
+      for (const row of latestRows) {
+        const supporters = supportByProposal.get(row.id) ?? 0;
+        const current = popularByCommunity.get(row.communityId);
+        if (!current || supporters > current.supporters) {
+          popularByCommunity.set(row.communityId, {
+            id: row.id,
+            question: row.question,
+            supporters,
+          });
+        }
+      }
+
+      const enriched = list.map((c) => ({
+        ...c,
+        memberCount: memberCounts.get(c.id) ?? 0,
+        latestProposal: latestByCommunity.get(c.id)
+          ? {
+              id: latestByCommunity.get(c.id)!.id,
+              question: latestByCommunity.get(c.id)!.question,
+              status: latestByCommunity.get(c.id)!.status,
+              createdAt: latestByCommunity.get(c.id)!.createdAt,
+            }
+          : null,
+        mostPopularProposal: popularByCommunity.get(c.id) ?? null,
+      }));
+
+      res.json(enriched);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch communities" });
     }
@@ -133,6 +206,39 @@ export function registerCommunitiesRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to leave community" });
     }
   });
+  // Promote or demote a member's role. Caller must be admin or founder
+  // of the community. Founder role is immutable.
+  app.patch("/api/communities/:id/members/:userId", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const targetUserId = parseInt(req.params.userId);
+      if (!Number.isFinite(communityId) || !Number.isFinite(targetUserId)) {
+        return res.status(400).json({ message: "Invalid community or user id" });
+      }
+      const { role } = req.body as { role?: string };
+      if (role !== 'admin' && role !== 'member') {
+        return res.status(400).json({ message: "Role must be 'admin' or 'member'" });
+      }
+      const callerRole = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (callerRole !== 'admin' && callerRole !== 'founder') {
+        return res.status(403).json({ message: "Only admins or the founder can change roles" });
+      }
+      const targetRole = await communityRepo.getCommunityMemberRole(communityId, targetUserId);
+      if (!targetRole) {
+        return res.status(404).json({ message: "Target user is not a member" });
+      }
+      if (targetRole === 'founder') {
+        return res.status(409).json({ message: "Founder role cannot be changed" });
+      }
+      if (targetUserId === req.user.id) {
+        return res.status(409).json({ message: "Cannot change your own role" });
+      }
+      const updated = await communityRepo.updateMemberRole(communityId, targetUserId, role);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update member role" });
+    }
+  });
   // ─── Demopolis: Proposal Routes ────────────────────────────────────────────
   app.post("/api/communities/:id/merge", requireAuth, async (req: any, res) => {
     try {
@@ -189,10 +295,25 @@ export function registerCommunitiesRoutes(app: Express): void {
       if (role !== 'admin' && role !== 'founder') {
         return res.status(403).json({ message: "Not authorized" });
       }
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
       const { size } = req.body;
-      const panelSize = size || 7;
+      const mode = (community.sortitionMode ?? 'absolute') as 'absolute' | 'percentage';
+      const responseHours = community.sortitionResponseHours ?? 72;
+      // Caller can override the community's configured size; otherwise use it.
+      const panelSize = typeof size === 'number' && size > 0
+        ? size
+        : (community.sortitionSize ?? 7);
       const { createSortitionBody } = await import('../utils/sortition');
-      const result = await createSortitionBody(communityId, panelSize, storage);
+      const result = await createSortitionBody(
+        communityId,
+        panelSize,
+        storage,
+        undefined,
+        undefined,
+        undefined,
+        { mode, responseHours },
+      );
       // Notify selected members
       try {
         const { notifySortitionMembers } = await import('../utils/notifications');
@@ -200,7 +321,7 @@ export function registerCommunitiesRoutes(app: Express): void {
           result.bodyId,
           communityId,
           null,
-          72
+          responseHours,
         );
       } catch (notifError) {
         // Don't fail the sortition creation if notifications fail
@@ -220,10 +341,16 @@ export function registerCommunitiesRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member" });
       }
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
       const { previewSortition } = await import('../utils/sortition');
       const { size } = req.query;
-      const panelSize = parseInt(size as string) || 7;
-      const result = await previewSortition(communityId, panelSize, storage);
+      const queryPanelSize = parseInt(size as string);
+      const panelSize = Number.isFinite(queryPanelSize) && queryPanelSize > 0
+        ? queryPanelSize
+        : (community.sortitionSize ?? 7);
+      const mode = (community.sortitionMode ?? 'absolute') as 'absolute' | 'percentage';
+      const result = await previewSortition(communityId, panelSize, storage, mode);
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to preview sortition" });
@@ -268,6 +395,13 @@ export function registerCommunitiesRoutes(app: Express): void {
       }
       const { calculateDemocracyScore, getDemocracyGrade } = await import('../utils/democracy-score');
       const result = await calculateDemocracyScore(communityId, storage as any);
+      // Persist the score so the badge on the community dashboard reflects
+      // the latest computation, not the seeded value.
+      try {
+        await communityRepo.updateCommunity(communityId, { democracyScore: String(result.score) });
+      } catch {
+        // Don't block the response if persistence fails.
+      }
       res.json({
         ...result,
         grade: getDemocracyGrade(result.score),

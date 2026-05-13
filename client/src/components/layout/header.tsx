@@ -84,7 +84,7 @@ export default function Header() {
           >
             <img
               src={logoImage}
-              alt="AgoraX Logo"
+              alt=""
               className="h-8 sm:h-10 w-auto flex-shrink-0"
             />
             <div className="min-w-0">

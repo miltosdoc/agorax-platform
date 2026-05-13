@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useParams } from 'wouter';
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,8 +29,8 @@ interface Amendment {
 }
 
 export default function AmendmentAuthorReview() {
-  const [location] = useLocation();
-  const proposalId = parseInt(location.split('/').pop() || '0');
+  const params = useParams<{ id: string }>();
+  const proposalId = parseInt(params.id || '0', 10);
   const { t } = useTranslation();
   
   const [amendments, setAmendments] = useState<Amendment[]>([]);
@@ -38,6 +38,20 @@ export default function AmendmentAuthorReview() {
   const [reviewing, setReviewing] = useState<Record<number, boolean>>({});
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [advancing, setAdvancing] = useState(false);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+
+  async function advanceToCommunitySignal() {
+    setAdvancing(true);
+    setAdvanceError(null);
+    try {
+      await api.post(`/api/proposals/${proposalId}/transition`, { newState: 'community_signal' });
+      window.location.href = `/proposals/${proposalId}`;
+    } catch (e: any) {
+      setAdvanceError(e?.response?.data?.message || String(e?.message || e));
+      setAdvancing(false);
+    }
+  }
 
   useEffect(() => {
     loadAmendments();
@@ -216,12 +230,18 @@ export default function AmendmentAuthorReview() {
           ))}
 
           {allReviewed && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center">
-              <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-2" />
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center space-y-3">
+              <CheckCircle className="w-6 h-6 text-green-600 mx-auto" />
               <p className="font-medium text-green-700">{t('amendment.authorReview.reviewComplete')}</p>
-              <p className="text-sm text-green-600 mt-1">
+              <p className="text-sm text-green-600">
                 {t('amendment.authorReview.rejectedGoToCommunity')}
               </p>
+              <Button onClick={advanceToCommunitySignal} disabled={advancing}>
+                {advancing
+                  ? (t('amendment.authorReview.advancing') || 'Μετάβαση…')
+                  : (t('amendment.authorReview.advanceButton') || 'Μετάβαση στην επόμενη φάση')}
+              </Button>
+              {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
             </div>
           )}
         </div>

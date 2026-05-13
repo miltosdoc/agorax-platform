@@ -94,7 +94,7 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
           )}
           {status === 'community_signal' && (
             <Button size="sm" asChild>
-              <a href={`/proposals/${proposalId}/amendments/signal`}>
+              <a href={`/proposals/${proposalId}/amendments/signals`}>
                 {t('workspace.action.communitySignalButton')}
               </a>
             </Button>

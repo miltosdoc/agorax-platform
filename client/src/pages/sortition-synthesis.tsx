@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
+import { useParams } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,8 +41,8 @@ interface SortitionInput {
 }
 
 export default function SortitionSynthesis() {
-  const [location] = useLocation();
-  const proposalId = parseInt(location.split('/').pop() || '0');
+  const params = useParams<{ id: string }>();
+  const proposalId = parseInt(params.id || '0', 10);
   const { t } = useTranslation();
   
   const [input, setInput] = useState<SortitionInput | null>(null);

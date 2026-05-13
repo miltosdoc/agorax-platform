@@ -163,37 +163,46 @@ export async function createSortitionBody(
   purpose: string = 'scoring',
   proposalId?: number,
   excludeUserIds?: Set<number>,
+  options: { mode?: 'absolute' | 'percentage'; responseHours?: number } = {},
 ): Promise<SortitionResult> {
-  // Clamp size to reasonable range (3-23 is standard for deliberative bodies)
-  const clampedSize = Math.max(3, Math.min(23, size));
-  
   // Get eligible members (already excludes active sortition members)
   const eligible = await getEligibleMembers(communityId, storage);
-  
+
   // Remove additionally excluded users
   const pool = excludeUserIds
     ? eligible.filter(m => !excludeUserIds.has(m.userId))
     : eligible;
-  
+
   if (pool.length === 0) {
     throw new Error('No eligible members for sortition');
   }
-  
+
+  // Interpret size per the community's sortitionMode.
+  // - absolute: `size` is the literal number of members to pick
+  // - percentage: `size` is a percent (1-100) of the eligible pool
+  let desired = size;
+  if (options.mode === 'percentage') {
+    const pct = Math.max(1, Math.min(100, size));
+    desired = Math.max(1, Math.ceil((pool.length * pct) / 100));
+  }
+  // Clamp to reasonable deliberative-body range
+  const clampedSize = Math.max(3, Math.min(23, desired));
+
   // If pool is smaller than requested size, use all available
   const actualSize = Math.min(clampedSize, pool.length);
-  
+
   // Cryptographically secure random selection
   const seed = generateSeed();
   const shuffled = cryptoShuffle(pool);
   const selected = shuffled.slice(0, actualSize);
-  
+
   // Create the sortition body in the database
   const body = await storage.createSortitionBody({
     communityId,
     proposalId: proposalId ?? null,
     purpose,
     size: actualSize,
-    responseHours: 72,
+    responseHours: options.responseHours ?? 72,
     status: 'active',
     selectedAt: new Date(),
   });
@@ -221,10 +230,16 @@ export async function previewSortition(
   communityId: number,
   size: number = 7,
   storage: any,
+  mode: 'absolute' | 'percentage' = 'absolute',
 ): Promise<{ selectedUserIds: number[]; totalEligible: number }> {
   const eligible = await getEligibleMembers(communityId, storage);
+  let desired = size;
+  if (mode === 'percentage') {
+    const pct = Math.max(1, Math.min(100, size));
+    desired = Math.max(1, Math.ceil((eligible.length * pct) / 100));
+  }
   const shuffled = cryptoShuffle(eligible);
-  const actualSize = Math.min(size, eligible.length);
+  const actualSize = Math.min(desired, eligible.length);
   const selected = shuffled.slice(0, actualSize);
   
   return {

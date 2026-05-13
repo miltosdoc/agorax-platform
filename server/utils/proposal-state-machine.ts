@@ -212,9 +212,13 @@ export async function triggerSideEffects(
       // Recalculate democracy score when voting opens
       await enqueueRecalculateScore(proposal.communityId);
       break;
-    
+
     default:
-      // No side effects for other transitions
+      // Any transition into a terminal state should refresh the score too,
+      // so the badge on the community dashboard reflects new outcomes.
+      if (toState === 'decided' || toState === 'archived') {
+        await enqueueRecalculateScore(proposal.communityId);
+      }
       break;
   }
 }

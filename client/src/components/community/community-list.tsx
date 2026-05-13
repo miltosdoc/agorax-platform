@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, TrendingUp } from 'lucide-react';
+import { Plus, Users, TrendingUp, Clock, Flame } from 'lucide-react';
 import { Link } from 'wouter';
 import { useTranslation } from '@/hooks/use-translation';
 
@@ -23,6 +23,8 @@ interface Community {
   governanceModel?: string;
   memberCount?: number;
   democracyScore?: number;
+  latestProposal?: { id: number; question: string; status: string; createdAt: string } | null;
+  mostPopularProposal?: { id: number; question: string; supporters: number } | null;
 }
 
 export function CommunityList() {
@@ -103,6 +105,37 @@ export function CommunityList() {
                     </div>
                   )}
                 </div>
+
+                {community.latestProposal && (
+                  <Link
+                    href={`/proposals/${community.latestProposal.id}`}
+                    className="mt-3 block rounded border border-muted bg-muted/30 p-2 hover:bg-muted/60"
+                  >
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {t('community.latest_proposal') || 'Πιο πρόσφατη'}
+                    </div>
+                    <p className="text-sm font-medium line-clamp-2 mt-0.5">
+                      {community.latestProposal.question}
+                    </p>
+                  </Link>
+                )}
+
+                {community.mostPopularProposal && community.mostPopularProposal.supporters > 0 && (
+                  <Link
+                    href={`/proposals/${community.mostPopularProposal.id}`}
+                    className="mt-2 block rounded border border-muted bg-muted/30 p-2 hover:bg-muted/60"
+                  >
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Flame className="h-3 w-3 text-orange-500" />
+                      {t('community.most_popular') || 'Πιο δημοφιλής'} · {community.mostPopularProposal.supporters} {t('proposal.support') || 'support'}
+                    </div>
+                    <p className="text-sm font-medium line-clamp-2 mt-0.5">
+                      {community.mostPopularProposal.question}
+                    </p>
+                  </Link>
+                )}
+
                 <Button asChild className="mt-4 w-full" variant="outline">
                   <Link href={`/communities/${community.id}`}>{t('community.view')}</Link>
                 </Button>

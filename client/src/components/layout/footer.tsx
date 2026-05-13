@@ -15,7 +15,7 @@ export default function Footer() {
           {/* Logo & Tagline */}
           <div>
             <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => navigate("/")}>
-              <img src={logoImage} alt="AgoraX" className="h-8 w-auto" />
+              <img src={logoImage} alt="" className="h-8 w-auto" />
               <span className="text-white text-xl font-bold">AgoraX</span>
             </div>
             <p className="text-sm text-slate-400">

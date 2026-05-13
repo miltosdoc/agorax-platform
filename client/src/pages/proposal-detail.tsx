@@ -44,6 +44,21 @@ interface Proposal {
 
 type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
 
+function defaultTabForStatus(status: string): string {
+  switch (status) {
+    case 'author_review':
+    case 'community_signal':
+      return 'amendments';
+    case 'sortition_synthesis':
+      return 'sortition';
+    case 'voting':
+    case 'decided':
+      return 'votes';
+    default:
+      return 'overview';
+  }
+}
+
 function categoryFromScore(score: number | null): ValidationCategory | null {
   if (score === null) return null;
   if (score < 20) return 'return';
@@ -291,8 +306,10 @@ export default function ProposalDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Tabs: Overview, Debate, Amendments, Sortition, Votes */}
-      <Tabs defaultValue="overview">
+      {/* Tabs: Overview, Debate, Amendments, Sortition, Votes.
+          Default tab follows the lifecycle phase so users land on the
+          relevant work surface for the proposal's current state. */}
+      <Tabs defaultValue={defaultTabForStatus(proposal.status)}>
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="overview" className="flex-col sm:flex-row gap-1 py-2">
             <Eye className="w-4 h-4 sm:mr-1" />
@@ -379,13 +396,6 @@ export default function ProposalDetailPage() {
           />
           {voteError && (
             <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
-          )}
-          {userIsAuthor && isVoting && (
-            <div className="mt-4 flex justify-center">
-              <Button onClick={handleFinalize} disabled={finalizing}>
-                {finalizing ? t('general.loading') : t('proposal.finalize')}
-              </Button>
-            </div>
           )}
         </TabsContent>
       </Tabs>

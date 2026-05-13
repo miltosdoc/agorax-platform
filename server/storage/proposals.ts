@@ -179,27 +179,61 @@ export class ProposalRepository {
   }
 
   /** Get proposal vote results. */
-  async getProposalVoteResults(proposalId: number): Promise<{ yes: number; no: number; total: number }> {
-    const yesVotes = await db
-      .select({ count: count() })
+  async getProposalVoteResults(proposalId: number): Promise<{
+    yes: number;
+    no: number;
+    abstain: number;
+    total: number;
+    participants: number;
+    participationPct: number;
+    passes: boolean;
+    meetsQuorum: boolean;
+    minParticipationPct: number;
+  }> {
+    const { communityMembers, communities } = await import('../../shared/schema');
+
+    const proposal = await this.getProposal(proposalId);
+    if (!proposal) {
+      return {
+        yes: 0, no: 0, abstain: 0, total: 0,
+        participants: 0, participationPct: 0,
+        passes: false, meetsQuorum: false, minParticipationPct: 0,
+      };
+    }
+
+    const tallies = await db
+      .select({ choice: proposalVotes.choice, count: count() })
       .from(proposalVotes)
-      .where(and(
-        eq(proposalVotes.proposalId, proposalId),
-        eq(proposalVotes.choice, 'yes')
-      ));
+      .where(eq(proposalVotes.proposalId, proposalId))
+      .groupBy(proposalVotes.choice);
 
-    const noVotes = await db
+    const yes = tallies.find(t => t.choice === 'yes')?.count ?? 0;
+    const no = tallies.find(t => t.choice === 'no')?.count ?? 0;
+    const abstain = tallies.find(t => t.choice === 'abstain')?.count ?? 0;
+    const total = yes + no + abstain;
+
+    const [community] = await db
+      .select({ minParticipationPct: communities.minParticipationPct })
+      .from(communities)
+      .where(eq(communities.id, proposal.communityId));
+    const minParticipationPct = Number(community?.minParticipationPct ?? 0);
+
+    const [memberRow] = await db
       .select({ count: count() })
-      .from(proposalVotes)
-      .where(and(
-        eq(proposalVotes.proposalId, proposalId),
-        eq(proposalVotes.choice, 'no')
-      ));
+      .from(communityMembers)
+      .where(eq(communityMembers.communityId, proposal.communityId));
+    const memberCount = memberRow?.count ?? 0;
 
-    const yes = yesVotes[0]?.count || 0;
-    const no = noVotes[0]?.count || 0;
+    const participants = total;
+    const participationPct = memberCount > 0 ? participants / memberCount : 0;
+    const meetsQuorum = participationPct >= minParticipationPct;
+    const passes = meetsQuorum && (yes + no) > 0 && yes > no;
 
-    return { yes, no, total: yes + no };
+    return {
+      yes, no, abstain, total,
+      participants, participationPct,
+      passes, meetsQuorum, minParticipationPct,
+    };
   }
 
 }

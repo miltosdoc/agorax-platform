@@ -91,24 +91,11 @@ export default function HomePage() {
   }, []);
 
   const myProposals = user ? proposals.filter((p) => p.authorId === user.id) : [];
+  const othersProposals = user ? proposals.filter((p) => p.authorId !== user.id) : proposals;
   const activeBodies = sortitionBodies.filter((b) => b.status !== 'completed' && b.status !== 'archived');
 
   return (
-    <AppShell
-      title={t('dashboard.title')}
-      actions={
-        <>
-          <Button onClick={() => navigate('/proposals/new')} data-testid="dashboard-new-proposal">
-            <Plus className="w-4 h-4 mr-2" />
-            {t('home.submitProposal')}
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/proposals')} data-testid="dashboard-all-proposals">
-            <FileText className="w-4 h-4 mr-2" />
-            {t('dashboard.viewAllProposals')}
-          </Button>
-        </>
-      }
-    >
+    <AppShell title={t('dashboard.title')}>
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
           {t('general.loading')}
@@ -119,11 +106,6 @@ export default function HomePage() {
           <section data-testid="dashboard-my-proposals">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-semibold">{t('dashboard.myProposals')}</h2>
-              {myProposals.length > 0 && (
-                <Link href="/proposals" className="text-sm text-primary hover:underline">
-                  {t('dashboard.viewAllProposals')} →
-                </Link>
-              )}
             </div>
             {myProposals.length === 0 ? (
               <Card>
@@ -200,7 +182,7 @@ export default function HomePage() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-            {proposals.length === 0 ? (
+            {othersProposals.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center text-sm text-muted-foreground">
                   {t('home.noProposals')}
@@ -208,7 +190,7 @@ export default function HomePage() {
               </Card>
             ) : (
               <div className="space-y-2">
-                {proposals.slice(0, 6).map((p) => (
+                {othersProposals.slice(0, 6).map((p) => (
                   <ProposalCard key={p.id} proposal={p} />
                 ))}
               </div>

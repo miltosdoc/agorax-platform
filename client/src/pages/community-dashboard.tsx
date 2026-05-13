@@ -13,8 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
 import {
   getCommunityDashboardMetrics,
@@ -43,12 +44,14 @@ export default function CommunityDashboardPage() {
   const communityId = params.id;
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
-  
+  const { user } = useAuth();
+
   const [summary, setSummary] = useState<CommunitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [roleUpdating, setRoleUpdating] = useState<Record<number, boolean>>({});
   const [targetCommunityId, setTargetCommunityId] = useState<number | null>(null);
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
@@ -137,12 +140,20 @@ export default function CommunityDashboardPage() {
                 {description || t('community.no_description')}
               </CardDescription>
             </div>
-            {canManageSettings && (
-              <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
-                <Settings className="w-4 h-4 mr-2" />
-                {t('community.settings_title')}
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {user && members?.some((m) => m.userId === user.id) && (
+                <Button size="sm" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('home.submitProposal')}
+                </Button>
+              )}
+              {canManageSettings && (
+                <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  {t('community.settings_title')}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -281,6 +292,31 @@ export default function CommunityDashboardPage() {
                       <Badge variant={m.role === 'admin' || m.role === 'founder' ? 'default' : 'secondary'}>
                         {t(`community.role.${m.role}`) || m.role}
                       </Badge>
+                      {canManageSettings && m.role !== 'founder' && user && m.userId !== user.id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={roleUpdating[m.userId]}
+                          onClick={async () => {
+                            const next = m.role === 'admin' ? 'member' : 'admin';
+                            setRoleUpdating((p) => ({ ...p, [m.userId]: true }));
+                            try {
+                              await api.patch(`/api/communities/${communityId}/members/${m.userId}`, { role: next });
+                              setMembers((prev) =>
+                                prev?.map((x) => (x.userId === m.userId ? { ...x, role: next } : x)) ?? prev,
+                              );
+                            } catch (e: any) {
+                              alert(e?.response?.data?.message || String(e?.message || e));
+                            } finally {
+                              setRoleUpdating((p) => ({ ...p, [m.userId]: false }));
+                            }
+                          }}
+                        >
+                          {m.role === 'admin'
+                            ? (t('community.demote') || 'Υποβιβασμός')
+                            : (t('community.promote') || 'Προαγωγή σε διαχειριστή')}
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>

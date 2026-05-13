@@ -50,11 +50,14 @@ function CommunitiesPage() {
 }
 
 function ProposalFormPage() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('community');
+  const communityId = raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : undefined;
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <ProposalForm />
+        <ProposalForm communityId={communityId} />
       </div>
       <Footer />
     </div>

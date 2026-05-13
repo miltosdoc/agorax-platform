@@ -72,6 +72,7 @@ export function registerProposalsRoutes(app: Express): void {
       });
       res.status(201).json(proposal);
     } catch (error) {
+      console.error("create-proposal failed:", error);
       res.status(500).json({ message: "Failed to create proposal" });
     }
   });
@@ -252,7 +253,11 @@ export function registerProposalsRoutes(app: Express): void {
         }
       }
       const results = await proposalRepo.getProposalVoteResults(proposalId);
-      const nextState = (results.yes + results.no) >= 3 ? 'decided' : 'archived';
+      // Use the community's minParticipationPct + decisive-vote check.
+      // Archive if quorum was not met, or if there are zero yes/no votes
+      // (only abstains can't decide a yes/no outcome).
+      const hasDecisive = (results.yes + results.no) > 0;
+      const nextState = results.meetsQuorum && hasDecisive ? 'decided' : 'archived';
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
       const { storage: storageInstance } = await import('../storage');
       const updated = await transitionProposal(proposal, nextState, storage);
@@ -293,6 +298,21 @@ export function registerProposalsRoutes(app: Express): void {
         const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
         if (role !== 'admin' && role !== 'founder') {
           return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+      // Enforce maxConcurrentVotes when entering the voting phase.
+      if (newState === 'voting') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        const cap = community?.maxConcurrentVotes ?? -1;
+        if (cap > 0) {
+          const active = await proposalRepo.getProposals(proposal.communityId, { status: 'voting' });
+          if (active.length >= cap) {
+            return res.status(409).json({
+              message: `Community has reached its concurrent-votes cap (${cap}). Wait for an existing vote to finalize.`,
+              maxConcurrentVotes: cap,
+              activeVotes: active.length,
+            });
+          }
         }
       }
       const { storage: storageInstance } = await import('../storage');
