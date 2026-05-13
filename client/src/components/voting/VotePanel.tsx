@@ -334,15 +334,23 @@ export default function VotePanel({
               </div>
             </div>
             <div>
-              <div>
-                {t('proposal.participation', {
-                  pct: participationPercent,
-                  quorum: quorumPercent,
-                })}
-              </div>
-              <div className={results.meetsQuorum ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
-                {results.meetsQuorum ? t('vote.quorumMet') : t('vote.quorumNotMet')}
-              </div>
+              {quorumPercent === 0 ? (
+                <>
+                  <div>{t('proposal.participation_no_quorum', { pct: participationPercent }) || `Συμμετοχή: ${participationPercent}%`}</div>
+                  <div className="text-muted-foreground">
+                    {t('vote.noQuorumRequired') || 'Δεν απαιτείται απαρτία'}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    {t('proposal.participation', { pct: participationPercent, quorum: quorumPercent })}
+                  </div>
+                  <div className={results.meetsQuorum ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
+                    {results.meetsQuorum ? t('vote.quorumMet') : t('vote.quorumNotMet')}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="text-xs text-center text-muted-foreground">

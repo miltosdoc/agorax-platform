@@ -422,6 +422,65 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update attendance" });
     }
   });
+  // Snapshot of the sortition body for a proposal: who's on the jury,
+  // how many have responded, deadline, status, the AI-pre-merged baseline.
+  app.get("/api/proposals/:id/sortition-body", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const bodies = await db
+        .select()
+        .from(sortitionBodies)
+        .where(eq(sortitionBodies.proposalId, proposalId))
+        .orderBy(desc(sortitionBodies.createdAt));
+      if (bodies.length === 0) {
+        return res.json({ body: null, members: [], userIsMember: false, deadline: null, baseline: null });
+      }
+      const body = bodies[0];
+      const memberRows = await db
+        .select({
+          memberId: sortitionMembers.id,
+          userId: sortitionMembers.userId,
+          responded: sortitionMembers.responded,
+          scoredAt: sortitionMembers.scoredAt,
+          username: users.username,
+          name: users.name,
+          profilePicture: users.profilePicture,
+        })
+        .from(sortitionMembers)
+        .innerJoin(users, eq(users.id, sortitionMembers.userId))
+        .where(eq(sortitionMembers.bodyId, body.id));
+      const userId = req.user?.id;
+      const userIsMember = userId ? memberRows.some(m => m.userId === userId) : false;
+      const deadline = body.selectedAt
+        ? new Date(new Date(body.selectedAt).getTime() + (body.responseHours ?? 72) * 60 * 60 * 1000).toISOString()
+        : null;
+      const responded = memberRows.filter(m => m.responded).length;
+      res.json({
+        body: {
+          id: body.id,
+          status: body.status,
+          purpose: body.purpose,
+          size: body.size,
+          responseHours: body.responseHours,
+          selectedAt: body.selectedAt,
+          completedAt: body.completedAt,
+        },
+        members: memberRows,
+        respondedCount: responded,
+        userIsMember,
+        deadline,
+        baseline: proposal.finalText ?? proposal.solution,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sortition body" });
+    }
+  });
+
   // Preview or recompute the AI-merged final text. Anyone can read; the
   // POST variant persists the result to finalText (author or admin only).
   app.get("/api/proposals/:id/merge-preview", async (req: any, res) => {
