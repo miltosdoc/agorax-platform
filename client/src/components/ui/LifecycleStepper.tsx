@@ -11,6 +11,19 @@ interface LifecycleStepperProps {
 
 const VISIBLE_STATES: ProposalState[] = ORDERED_STATES.filter((s) => s !== 'archived');
 
+// Per-phase accent color. Only applied to the CURRENT step so the rest of
+// the stepper stays neutral and the app keeps a serious tone.
+const PHASE_ACCENT: Record<string, { ring: string; bg: string; border: string; text: string }> = {
+  draft:              { ring: 'ring-blue-200',    bg: 'bg-blue-50',    border: 'border-blue-500',    text: 'text-blue-700' },
+  review:             { ring: 'ring-green-200',   bg: 'bg-green-50',   border: 'border-green-500',   text: 'text-green-700' },
+  author_review:      { ring: 'ring-indigo-200',  bg: 'bg-indigo-50',  border: 'border-indigo-500',  text: 'text-indigo-700' },
+  community_signal:   { ring: 'ring-amber-200',   bg: 'bg-amber-50',   border: 'border-amber-500',   text: 'text-amber-700' },
+  sortition_synthesis:{ ring: 'ring-purple-200',  bg: 'bg-purple-50',  border: 'border-purple-500',  text: 'text-purple-700' },
+  voting:             { ring: 'ring-emerald-200', bg: 'bg-emerald-50', border: 'border-emerald-500', text: 'text-emerald-700' },
+  decided:            { ring: 'ring-emerald-200', bg: 'bg-emerald-50', border: 'border-emerald-600', text: 'text-emerald-700' },
+};
+const NEUTRAL_ACCENT = { ring: 'ring-primary/20', bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
+
 export default function LifecycleStepper({ status, interactive = true }: LifecycleStepperProps) {
   const { locale } = useTranslation();
 
@@ -28,6 +41,7 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
           const isCurrent = !isArchived && currentIndex === idx;
           const isFuture = isArchived || currentIndex < idx;
 
+          const accent = isCurrent ? (PHASE_ACCENT[state] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
           return (
             <li key={state} className="flex items-center flex-1 min-w-0">
               <div className="flex flex-col items-center text-center min-w-0">
@@ -35,8 +49,8 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                   className={cn(
                     'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors',
                     isCompleted && 'bg-primary border-primary text-primary-foreground',
-                    isCurrent && interactive && 'bg-primary/10 border-primary text-primary ring-4 ring-primary/20',
-                    isCurrent && !interactive && 'bg-primary/10 border-primary text-primary',
+                    isCurrent && interactive && `${accent.bg} ${accent.border} ${accent.text} ring-4 ${accent.ring}`,
+                    isCurrent && !interactive && `${accent.bg} ${accent.border} ${accent.text}`,
                     isFuture && 'bg-background border-muted text-muted-foreground',
                   )}
                   data-testid={`stepper-circle-${state}`}
@@ -46,7 +60,7 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                 <span
                   className={cn(
                     'mt-1.5 text-xs leading-tight px-1 truncate max-w-[7rem]',
-                    isCurrent && 'font-semibold text-foreground',
+                    isCurrent && `font-semibold ${accent.text}`,
                     isCompleted && 'text-foreground',
                     isFuture && 'text-muted-foreground',
                   )}
@@ -77,6 +91,7 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
           const isFuture = isArchived || currentIndex < idx;
           const isLast = idx === VISIBLE_STATES.length - 1;
 
+          const accent = isCurrent ? (PHASE_ACCENT[state] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
           return (
             <li key={state} className="flex gap-3 items-start">
               <div className="flex flex-col items-center">
@@ -84,7 +99,7 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                   className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-colors flex-shrink-0',
                     isCompleted && 'bg-primary border-primary text-primary-foreground',
-                    isCurrent && 'bg-primary/10 border-primary text-primary',
+                    isCurrent && `${accent.bg} ${accent.border} ${accent.text}`,
                     isFuture && 'bg-background border-muted text-muted-foreground',
                   )}
                 >
@@ -103,7 +118,7 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                 <span
                   className={cn(
                     'text-sm',
-                    isCurrent && 'font-semibold text-foreground',
+                    isCurrent && `font-semibold ${accent.text}`,
                     isCompleted && 'text-foreground',
                     isFuture && 'text-muted-foreground',
                   )}

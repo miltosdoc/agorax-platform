@@ -209,6 +209,17 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
           {amendments.filter(a => a.status === 'pending').length}{' '}
           {t('workspace.amendments.statusPending').toLowerCase()}
         </CardDescription>
+        {(proposalStatus === 'author_review' || proposalStatus === 'community_signal') && (
+          <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+            proposalStatus === 'author_review'
+              ? 'border-indigo-200 bg-indigo-50/60 text-indigo-900'
+              : 'border-amber-200 bg-amber-50/60 text-amber-900'
+          }`}>
+            {proposalStatus === 'author_review'
+              ? (t('workspace.amendments.phaseHint.author_review') || 'Φάση: Κρίση συγγραφέα. Αποδέχεται ή απορρίπτει τις τροπολογίες· οι απορριφθείσες προχωρούν στο Σήμα Κοινότητας.')
+              : (t('workspace.amendments.phaseHint.community_signal') || 'Φάση: Σήμα Κοινότητας. Η κοινότητα ψηφίζει ⬆/⬇ στις απορριφθείσες τροπολογίες· όσες ξεπερνούν το όριο της κοινότητας προχωρούν στο κληρωτό σώμα.')}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {Array.from(groups.entries()).map(([groupId, group]) => (

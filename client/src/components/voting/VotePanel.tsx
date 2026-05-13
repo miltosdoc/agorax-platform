@@ -200,6 +200,11 @@ export default function VotePanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {isVoting && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-900">
+            {t('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
+          </div>
+        )}
         {!user && isVoting && (
           <div className="p-3 bg-muted rounded text-sm text-muted-foreground">
             {t('auth.loginToVote')}
