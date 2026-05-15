@@ -424,19 +424,23 @@ export const proposalSupport = pgTable("proposal_support", {
 }));
 
 // ─── Demopolis: Proposal Final Ratification Votes (Επικυρωτική Ψηφοφορία) ────
-// Distinct from proposal_support: this is the binding final vote cast during
-// the `voting` lifecycle phase. One row per (proposal, user). The choice is
-// 'yes' | 'no' | 'abstain'; abstain counts toward participation but not
-// toward yes/no totals.
+// Append-only ledger of ratification votes cast during the `voting` phase.
+// Each row links to its predecessor via prev_hash, forming a per-proposal
+// SHA-256 hash chain. A user changing their vote inserts a NEW row and the
+// previous row's superseded_by_id is set to the new row's id. Reads that
+// want "the user's current vote" must filter superseded_by_id IS NULL.
 export const proposalVotes = pgTable("proposal_votes", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id),
   choice: text("choice").notNull(), // 'yes' | 'no' | 'abstain'
   weight: numeric("weight").notNull().default("1"),
-  castAt: timestamp("cast_at").notNull().defaultNow(),
+  castAt: timestamp("cast_at").notNull(),
+  prevHash: text("prev_hash").notNull(),
+  rowHash: text("row_hash").notNull(),
+  supersededById: integer("superseded_by_id"),
 }, (table) => ({
-  proposalVoteUnique: uniqueIndex('proposal_vote_unique').on(table.proposalId, table.userId),
+  proposalChainIdx: uniqueIndex('proposal_votes_proposal_id_idx').on(table.proposalId, table.id),
 }));
 
 // ─── Admin Action Log ───────────────────────────────────────────────────────
@@ -854,7 +858,7 @@ export const insertDebateArgumentSchema = createInsertSchema(debateArguments).om
 export const insertDebateThreadSchema = createInsertSchema(debateThreads).omit({ id: true, createdAt: true, updatedAt: true, upvotes: true, downvotes: true });
 export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({ id: true, createdAt: true });
 export const insertProposalSupportSchema = createInsertSchema(proposalSupport).omit({ id: true, createdAt: true });
-export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true });
+export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true, prevHash: true, rowHash: true, supersededById: true });
 
 export const proposalVoteChoiceSchema = z.enum(['yes', 'no', 'abstain']);
 export const castProposalVoteSchema = z.object({

@@ -7,8 +7,9 @@
 
 import { db } from '../db';
 import { proposals, proposalSupport, proposalVotes, type Proposal, type InsertProposal, type ProposalSupport, type ProposalVote } from '../../shared/schema';
-import { eq, and, desc, ilike, sql, count } from 'drizzle-orm';
+import { eq, and, desc, ilike, isNull, sql, count } from 'drizzle-orm';
 import { isProposalState } from '../../shared/proposal-lifecycle';
+import { castProposalVoteWithChain, type VoteReceipt } from '../utils/vote-chain';
 
 export class ProposalRepository {
 
@@ -137,43 +138,23 @@ export class ProposalRepository {
     return result;
   }
 
-  /** Cast a proposal vote (support/oppose). */
-  async castProposalVote(proposalId: number, userId: number, choice: string): Promise<ProposalVote> {
-    // Check if user already voted
-    const [existing] = await db
-      .select()
-      .from(proposalVotes)
-      .where(and(
-        eq(proposalVotes.proposalId, proposalId),
-        eq(proposalVotes.userId, userId)
-      ));
-    
-    if (existing) {
-      // Update existing vote
-      const [updated] = await db
-        .update(proposalVotes)
-        .set({ choice })
-        .where(eq(proposalVotes.id, existing.id))
-        .returning();
-      return updated;
-    }
-
-    // Create new vote
-    const [vote] = await db
-      .insert(proposalVotes)
-      .values({ proposalId, userId, choice })
-      .returning();
-    return vote;
+  /**
+   * Cast a final ratification vote. Append-only: re-voting inserts a new row
+   * and supersedes the prior one via the hash-chain helper.
+   */
+  async castProposalVote(proposalId: number, userId: number, choice: string): Promise<ProposalVote & { receipt: VoteReceipt }> {
+    return await castProposalVoteWithChain({ proposalId, userId, choice });
   }
 
-  /** Get user's vote on a proposal. */
+  /** Get the user's current (non-superseded) vote on a proposal. */
   async getUserProposalVote(proposalId: number, userId: number): Promise<ProposalVote | undefined> {
     const [vote] = await db
       .select()
       .from(proposalVotes)
       .where(and(
         eq(proposalVotes.proposalId, proposalId),
-        eq(proposalVotes.userId, userId)
+        eq(proposalVotes.userId, userId),
+        isNull(proposalVotes.supersededById),
       ));
     return vote;
   }
@@ -204,7 +185,10 @@ export class ProposalRepository {
     const tallies = await db
       .select({ choice: proposalVotes.choice, count: count() })
       .from(proposalVotes)
-      .where(eq(proposalVotes.proposalId, proposalId))
+      .where(and(
+        eq(proposalVotes.proposalId, proposalId),
+        isNull(proposalVotes.supersededById),
+      ))
       .groupBy(proposalVotes.choice);
 
     const yes = tallies.find(t => t.choice === 'yes')?.count ?? 0;

@@ -179,7 +179,9 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
   // ─── Demopolis: Proposal Final Ratification Vote Routes ────────────────────
-  // Cast or update final ratification vote (one per user per proposal).
+  // Cast a final ratification vote. The table is append-only and forms a
+  // per-proposal SHA-256 hash chain; the response includes a receipt the
+  // voter can use later to prove their ballot is included in the chain.
   app.post("/api/proposals/:id/vote", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -209,6 +211,40 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(201).json(vote);
     } catch (error) {
       res.status(500).json({ message: "Failed to cast vote" });
+    }
+  });
+  // Public chain head — any third party can pin this hash periodically to
+  // turn the in-DB chain into an externally anchored append-only log.
+  app.get("/api/proposals/:id/vote-chain/head", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { getChainHead } = await import('../utils/vote-chain');
+      const head = await getChainHead(proposalId);
+      res.json(head);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch vote chain head" });
+    }
+  });
+  // Walk the chain and verify every row. Returns ok=false with the first
+  // broken row if tampering is detected.
+  app.get("/api/proposals/:id/vote-chain/verify", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { verifyChain } = await import('../utils/vote-chain');
+      const result = await verifyChain(proposalId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify vote chain" });
     }
   });
   // Get aggregated final-vote results for a proposal.

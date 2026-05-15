@@ -78,6 +78,13 @@
       "when": 1776947046201,
       "tag": "0009_sortition_attendance",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779148800000,
+      "tag": "0010_vote_hash_chain",
+      "breakpoints": true
     }
   ]
 }

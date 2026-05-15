@@ -20,6 +20,7 @@ import {
   adminActions,
 } from '../shared/schema';
 import { eq } from 'drizzle-orm';
+import { castProposalVoteWithChain } from './utils/vote-chain';
 
 async function seed() {
   console.log('🌱 Seeding demo data...\n');
@@ -399,13 +400,12 @@ async function seed() {
   // ─── Proposal Votes (final ratification) ──────────────────────────────────
   // Voters must be members of the proposal's community (cf. routes.ts cast
   // handler). proposal4 lives in community3 (members: user2, user3). proposal3
-  // lives in community2 (members: user1, user2).
-  await db.insert(proposalVotes).values([
-    { proposalId: proposal4.id, userId: user2.id, choice: 'yes', castAt: new Date(Date.now() - 1 * day) },
-    { proposalId: proposal4.id, userId: user3.id, choice: 'abstain', castAt: new Date(Date.now() - 1 * day) },
-    { proposalId: proposal3.id, userId: user1.id, choice: 'yes', castAt: new Date(Date.now() - 11 * day) },
-    { proposalId: proposal3.id, userId: user2.id, choice: 'yes', castAt: new Date(Date.now() - 11 * day) },
-  ]);
+  // lives in community2 (members: user1, user2). Votes go through the
+  // hash-chain helper so the seed data is a valid chain end-to-end.
+  await castProposalVoteWithChain({ proposalId: proposal4.id, userId: user2.id, choice: 'yes' });
+  await castProposalVoteWithChain({ proposalId: proposal4.id, userId: user3.id, choice: 'abstain' });
+  await castProposalVoteWithChain({ proposalId: proposal3.id, userId: user1.id, choice: 'yes' });
+  await castProposalVoteWithChain({ proposalId: proposal3.id, userId: user2.id, choice: 'yes' });
 
   console.log(`  ✅ 4 proposal votes recorded`);
 
