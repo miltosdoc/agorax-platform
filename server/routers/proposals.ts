@@ -179,9 +179,11 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
   // ─── Demopolis: Proposal Final Ratification Vote Routes ────────────────────
-  // Cast a final ratification vote. The table is append-only and forms a
-  // per-proposal SHA-256 hash chain; the response includes a receipt the
-  // voter can use later to prove their ballot is included in the chain.
+  // Cast a final ratification vote. Routed through the configured
+  // VotingBackend (see server/voting/) — today's hash-chain backend records
+  // an append-only SHA-256 chain; a future Helios backend would encrypt the
+  // ballot and decrypt only the aggregate tally. The receipt shape is
+  // backend-specific, but every backend returns one.
   app.post("/api/proposals/:id/vote", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -207,15 +209,22 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Only community members may cast a final vote" });
       }
-      const vote = await proposalRepo.castProposalVote(proposalId, req.user.id, parsed.data.choice);
-      res.status(201).json(vote);
+      const { getVotingBackend } = await import('../voting');
+      const backend = getVotingBackend();
+      const receipt = await backend.castSignedBallot({
+        proposalId,
+        userId: req.user.id,
+        choice: parsed.data.choice,
+        signature: req.body.signature,
+      });
+      res.status(201).json(receipt);
     } catch (error) {
       res.status(500).json({ message: "Failed to cast vote" });
     }
   });
-  // Public chain head — any third party can pin this hash periodically to
-  // turn the in-DB chain into an externally anchored append-only log.
-  app.get("/api/proposals/:id/vote-chain/head", async (req, res) => {
+  // Public election proof — backend-specific artifact a third party can
+  // pin periodically to anchor the election externally.
+  app.get("/api/proposals/:id/election/proof", async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -223,16 +232,16 @@ export function registerProposalsRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const { getChainHead } = await import('../utils/vote-chain');
-      const head = await getChainHead(proposalId);
-      res.json(head);
+      const { getVotingBackend } = await import('../voting');
+      const proof = await getVotingBackend().getProof({ proposalId });
+      res.json(proof);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch vote chain head" });
+      res.status(500).json({ message: "Failed to fetch election proof" });
     }
   });
-  // Walk the chain and verify every row. Returns ok=false with the first
-  // broken row if tampering is detected.
-  app.get("/api/proposals/:id/vote-chain/verify", async (req, res) => {
+  // Backend-internal consistency check. Returns ok=false with the first
+  // inconsistency if tampering is detected.
+  app.get("/api/proposals/:id/election/verify", async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -240,11 +249,11 @@ export function registerProposalsRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const { verifyChain } = await import('../utils/vote-chain');
-      const result = await verifyChain(proposalId);
+      const { getVotingBackend } = await import('../voting');
+      const result = await getVotingBackend().verify({ proposalId });
       res.json(result);
     } catch (error) {
-      res.status(500).json({ message: "Failed to verify vote chain" });
+      res.status(500).json({ message: "Failed to verify election" });
     }
   });
   // Get aggregated final-vote results for a proposal.

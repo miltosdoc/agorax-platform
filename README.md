@@ -79,6 +79,38 @@ function cryptographicallySecureShuffle<T>(array: T[]): T[] {
 - **Active panel exclusion** (users serving on a panel cannot be selected again)
 - **Cryptographic seed recording** for auditability and verification
 
+### Ratification Vote: Pluggable VotingBackend
+
+The binding ratification vote (the final yes/no/abstain decision in the `voting` phase) is routed through a `VotingBackend` interface in `server/voting/`. The deliberation layer — proposals, sortition, amendments, debate — is unchanged regardless of which backend is active.
+
+```typescript
+interface VotingBackend {
+  startElection(args): Promise<void>;
+  castSignedBallot(input): Promise<BallotReceipt>;  // optional signature
+  getTally(args): Promise<ElectionTally>;
+  closeAndTally(args): Promise<ElectionTally & { proof }>;
+  getProof(args): Promise<ElectionProof>;
+  verify(args): Promise<VerificationResult>;
+}
+```
+
+Configured via the `VOTING_BACKEND` env var. Today:
+
+| Backend | Status | Guarantees | Limits |
+|---|---|---|---|
+| `hash-chain` (default) | ✅ Shipping | Tamper-evident inclusion via per-proposal SHA-256 chain. Any post-hoc edit breaks `/api/proposals/:id/election/verify`. | Cleartext votes; no defense against host-side ballot stuffing or full-history rewrite. |
+| `helios` | 🚧 Reserved | ElGamal-encrypted ballots, threshold-trustee decryption (the [Helios protocol](https://heliosvoting.org/)). Host cannot decrypt individual votes; tally is publicly verifiable. | Coercion-resistance still requires identity layer (Gov.gr verification). |
+| `mobile-signed` | 🔮 Future | Voter-side signing in Secure Enclave / StrongBox. Server cannot forge ballots because it never holds the private key. | Requires the AgoraX mobile app. |
+
+`castSignedBallot` already accepts an optional `BallotSignature` so the mobile signing piece can land without changing the API surface. The hash-chain backend ignores it; future backends require it.
+
+**Why this design:** the trust model of "what can the host do?" depends entirely on the voting backend, while the deliberation experience does not. A research community can run with `hash-chain`; a high-stakes board election can run with `helios`; a national pilot pairs `mobile-signed` with Gov.gr-verified rolls. Same product, same routes, same UX.
+
+**Public endpoints (all backends):**
+- `POST /api/proposals/:id/vote` — cast a ballot, returns backend-defined receipt
+- `GET  /api/proposals/:id/election/proof` — pinable artifact for external observers
+- `GET  /api/proposals/:id/election/verify` — backend-internal consistency check
+
 ---
 
 ## 📊 Mathematical Algorithms

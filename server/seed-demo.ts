@@ -20,7 +20,7 @@ import {
   adminActions,
 } from '../shared/schema';
 import { eq } from 'drizzle-orm';
-import { castProposalVoteWithChain } from './utils/vote-chain';
+import { getVotingBackend } from './voting';
 
 async function seed() {
   console.log('🌱 Seeding demo data...\n');
@@ -401,13 +401,15 @@ async function seed() {
   // Voters must be members of the proposal's community (cf. routes.ts cast
   // handler). proposal4 lives in community3 (members: user2, user3). proposal3
   // lives in community2 (members: user1, user2). Votes go through the
-  // hash-chain helper so the seed data is a valid chain end-to-end.
-  await castProposalVoteWithChain({ proposalId: proposal4.id, userId: user2.id, choice: 'yes' });
-  await castProposalVoteWithChain({ proposalId: proposal4.id, userId: user3.id, choice: 'abstain' });
-  await castProposalVoteWithChain({ proposalId: proposal3.id, userId: user1.id, choice: 'yes' });
-  await castProposalVoteWithChain({ proposalId: proposal3.id, userId: user2.id, choice: 'yes' });
+  // configured VotingBackend so the seed exercises the same path as the
+  // app — and so demo data is a valid election regardless of backend.
+  const voting = getVotingBackend();
+  await voting.castSignedBallot({ proposalId: proposal4.id, userId: user2.id, choice: 'yes' });
+  await voting.castSignedBallot({ proposalId: proposal4.id, userId: user3.id, choice: 'abstain' });
+  await voting.castSignedBallot({ proposalId: proposal3.id, userId: user1.id, choice: 'yes' });
+  await voting.castSignedBallot({ proposalId: proposal3.id, userId: user2.id, choice: 'yes' });
 
-  console.log(`  ✅ 4 proposal votes recorded`);
+  console.log(`  ✅ 4 proposal votes recorded via ${voting.name} backend`);
 
   // ─── Sortition Bodies ─────────────────────────────────────────────────────
   const [sortition1] = await db
