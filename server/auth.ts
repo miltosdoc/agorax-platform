@@ -3,6 +3,8 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Express } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { DatabaseStorage } from "./storage";
@@ -117,11 +119,22 @@ export function setupAuth(app: Express) {
   }
 
   const isProduction = process.env.APP_ENV === "production";
+
+  // Persist sessions in Postgres so restarts don't log everyone out and
+  // multi-instance deployments share state. Table is auto-created on first
+  // run; we use the same pool the rest of the app already opens.
+  const PgStore = connectPgSimple(session);
+  const sessionStore = new PgStore({
+    pool,
+    tableName: "user_sessions",
+    createTableIfMissing: true,
+  });
+
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    store: sessionStore,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
