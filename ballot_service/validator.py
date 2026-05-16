@@ -7,6 +7,7 @@ Implements 4 security gates:
 3. Context (Session Security): Verify poll token in text
 4. Identity (One Person, One Vote): Hash AFM and check voter uniqueness
 """
+import asyncio
 import hashlib
 import re
 import io
@@ -230,11 +231,15 @@ class BallotValidator:
             
             for sig in sig_fields:
                 try:
-                    status = validate_pdf_signature(
+                    # pyhanko's validate_pdf_signature drives its own asyncio
+                    # internally — run it in a worker thread so it never
+                    # collides with the server's running event loop.
+                    status = await asyncio.to_thread(
+                        validate_pdf_signature,
                         sig,
                         key_usage_settings=KeyUsageConstraints(
                             key_usage={'digital_signature', 'non_repudiation'},
-                        )
+                        ),
                     )
                     
                     # Check if signature is valid
