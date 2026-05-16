@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex, index, numeric } from "drizzle-orm/pg-core";
 import { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -488,6 +488,62 @@ export const egElectionRecords = pgTable("eg_election_records", {
 }, (table) => ({
   egRecordElectionUnique: uniqueIndex('eg_election_records_election_id_unique').on(table.electionId),
 }));
+
+// ─── Democracy Points (ο μισθός εκκλησιαστικός — civic-participation credit) ─
+// An append-only ledger that records civic contribution. Points are NOT a
+// token and have no monetary value until the platform reaches a revenue phase
+// (see platform_settings key `economy.phase`); redemption is gated on that
+// phase AND on identity verification. See docs / the economy modules.
+
+// Append-only transaction ledger — every point movement is one row.
+export const pointTransactions = pgTable("point_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), // 'participation' | 'redemption' | 'civic_dividend' | 'referral' | 'adjustment'
+  points: integer("points").notNull(), // signed: positive = credit, negative = debit
+  actionKey: text("action_key").notNull(), // e.g. 'sortition_score', 'ratification_vote'
+  refType: text("ref_type").notNull().default(''), // e.g. 'proposal', 'amendment', 'sortition_member'
+  refId: integer("ref_id").notNull().default(0),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // One award per (user, action, target) — makes awardPoints idempotent.
+  pointTxnIdempotency: uniqueIndex('point_transactions_idempotency')
+    .on(table.userId, table.actionKey, table.refType, table.refId),
+  pointTxnUserIdx: index('point_transactions_user_idx').on(table.userId),
+}));
+
+// Cached per-user balance — a projection of the ledger for fast reads.
+export const pointBalances = pgTable("point_balances", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  balance: integer("balance").notNull().default(0),
+  lifetimeEarned: integer("lifetime_earned").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Redemption requests — opened only past the pre_revenue phase, by verified users.
+export const pointRedemptions = pgTable("point_redemptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  points: integer("points").notNull(),
+  eurAmount: numeric("eur_amount").notNull(),
+  targetCurrency: text("target_currency").notNull().default('EUR'),
+  status: text("status").notNull().default('requested'), // 'requested' | 'approved' | 'paid' | 'rejected'
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  decidedAt: timestamp("decided_at"),
+});
+
+// Transparent treasury ledger — backs redemption honestly; public totals.
+export const treasuryLedger = pgTable("treasury_ledger", {
+  id: serial("id").primaryKey(),
+  entryType: text("entry_type").notNull(), // 'inbound_payment' | 'citizen_payout' | 'operations_expense' | 'dividend'
+  eurAmount: numeric("eur_amount").notNull(),
+  refType: text("ref_type").notNull().default(''),
+  refId: integer("ref_id"),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 // ─── Admin Action Log ───────────────────────────────────────────────────────
 

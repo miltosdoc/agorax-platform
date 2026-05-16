@@ -147,6 +147,16 @@ export async function castRejectionVote(
   
   // Recalculate totals
   await recalculateAmendmentVotes(amendmentId);
+
+  // Democracy Points: one award per (voter, amendment) — idempotent, so
+  // changing a vote does not re-award.
+  const { awardPoints } = await import('../economy/points');
+  await awardPoints({
+    userId,
+    actionKey: 'signal_vote',
+    refType: 'amendment',
+    refId: amendmentId,
+  });
 }
 
 /**

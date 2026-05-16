@@ -8,6 +8,7 @@ import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth } from '../auth';
 import { db } from '../db';
+import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
 import {
   sortitionMembers,
@@ -262,6 +263,13 @@ export function registerProposalsRoutes(app: Express): void {
         userId: req.user.id,
         choice: parsed.data.choice,
         signature: req.body.signature,
+      });
+      // Democracy Points: award one ballot's worth, once per (proposal, voter).
+      await awardPoints({
+        userId: req.user.id,
+        actionKey: 'ratification_vote',
+        refType: 'proposal',
+        refId: proposalId,
       });
       res.status(201).json(receipt);
     } catch (error) {

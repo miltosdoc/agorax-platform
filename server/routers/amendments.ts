@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from 'express';
 import { amendmentRepo, communityRepo, proposalRepo } from '../storage';
 import { requireAuth } from '../auth';
+import { awardPoints } from '../economy/points';
 import {
   authorReviewAmendment,
   castRejectionVote,
@@ -102,6 +103,15 @@ export function registerAmendmentsRoutes(app: Express): void {
       const { findDuplicateAmendments } = await import('../utils/amendment-merger');
       const groups = await findDuplicateAmendments(proposalId);
       const duplicateGroup = groups.find(g => g.amendmentIds.includes(amendment.id));
+      // Democracy Points: award the contributor — skip flagged duplicate siblings.
+      if (!duplicateGroup || duplicateGroup.representativeId === amendment.id) {
+        await awardPoints({
+          userId: req.user.id,
+          actionKey: 'amendment',
+          refType: 'amendment',
+          refId: amendment.id,
+        });
+      }
       res.status(201).json({
         ...amendment,
         duplicate: duplicateGroup
@@ -230,6 +240,13 @@ export function registerAmendmentsRoutes(app: Express): void {
         type: 'sortition_revision',
         text,
         status: 'accepted',
+      });
+      // Democracy Points: a sortition revision is an amendment contribution.
+      await awardPoints({
+        userId: req.user.id,
+        actionKey: 'amendment',
+        refType: 'amendment',
+        refId: amendment.id,
       });
       res.status(201).json(amendment);
     } catch (error) {

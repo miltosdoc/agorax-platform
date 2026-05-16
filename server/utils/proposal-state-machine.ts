@@ -100,7 +100,22 @@ export async function transitionProposal(
     );
   }
 
-  return await storage.updateProposal(proposal.id, { status: newState });
+  const updated = await storage.updateProposal(proposal.id, { status: newState });
+
+  // Democracy Points: a proposal that passes quality validation — leaving
+  // `review` for deliberation or straight to the vote — earns its author.
+  // A return to `draft` or `archived` does not qualify.
+  if (currentState === 'review' && (newState === 'author_review' || newState === 'voting')) {
+    const { awardPoints } = await import('../economy/points');
+    await awardPoints({
+      userId: proposal.authorId,
+      actionKey: 'proposal_validated',
+      refType: 'proposal',
+      refId: proposal.id,
+    });
+  }
+
+  return updated;
 }
 
 /**

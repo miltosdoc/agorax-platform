@@ -9,6 +9,7 @@ import { db } from '../db';
 import {  communityRepo, proposalRepo, sortitionRepo, userRepo , storage } from '../storage';
 
 import { requireAuth } from '../auth';
+import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
 import {
   sortitionMembers,
@@ -246,6 +247,13 @@ export function registerSortitionRoutes(app: Express): void {
         feedback: typeof feedback === 'string' && feedback.trim() ? feedback.trim() : null,
         responded: true,
         scoredAt: new Date(),
+      });
+      // Democracy Points: sortition jury service — the heaviest civic award.
+      await awardPoints({
+        userId: sortMember.userId,
+        actionKey: 'sortition_score',
+        refType: 'sortition_member',
+        refId: sortMember.id,
       });
       res.json({ success: true, member: updated });
     } catch (error) {
