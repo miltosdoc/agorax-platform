@@ -287,3 +287,93 @@ Each phase is its own PR with its own tests. Do not collapse them.
 - **Does the hash-chain backend stay** as a selectable development backend, or
   get removed once the ElectionGuard backend ships? (Recommendation: keep it as
   the dev/test backend — fast, no trustees needed.)
+
+---
+
+## 12. Threat Model: State-Level Adversary
+
+**Assumption.** If AgoraX becomes a serious civic-engagement and deliberation
+tool, it *will* be attacked by a capable, motivated state-level adversary. The
+design assumption is "when", not "if". Design for **visible failure, never
+silent compromise.**
+
+### What a coerced trustee threatens — three distinct properties
+
+- **Integrity — survives coercion.** The public bulletin board + ZK proofs mean
+  a coerced trustee cannot silently *falsify* a result; a forged tally fails
+  verification. The worst attack on integrity is *blocking* decryption, not
+  faking it. A coerced election leaves evidence.
+- **Availability — the easiest target.** Disabling (not compromising) more than
+  `n − t` trustees stops decryption: equipment seizure, injunctions, arrests.
+- **Privacy — the most dangerous loss.** Coercing `≥ t` trustees reconstructs
+  the key and exposes *individual* ballots, enabling retaliation against voters.
+
+### The structural tension
+
+- Resisting the **privacy** attack wants a **high** threshold `t`.
+- Resisting the **availability** attack wants a **low** `t`.
+- These cannot both be maximized. Buy room by increasing `n` and distributing
+  jurisdictionally — but the tension is structural, not a bug to fix.
+
+### Core defense: jurisdictional distribution
+
+Threshold crypto resists a *state* adversary only if the state cannot reach `t`
+trustees:
+
+- Trustees across **≥3 countries / legal systems**.
+- At least some trustees **outside the likely-adversary state**.
+- Favor organizations with built-in coercion resistance — universities
+  (academic-freedom protections), press organizations (source protection),
+  international NGOs, EU institutions.
+- A purely-domestic trustee set is fragile against the domestic state by
+  construction.
+
+### Recommended starting structure (robustness vs complexity balance)
+
+- **Start: 3-of-5**, across **≥3 jurisdictions**, with **≥2 trustees outside the
+  adversary state.**
+  - Privacy: a coercing state must reach 3 trustees across borders.
+  - Availability: tolerates 2 lost or disabled trustees.
+  - Operable: 5 parties is coordinatable for two scheduled moments per election.
+- **Scale with stakes.** Routine community votes can use the base structure;
+  high-stakes binding referenda warrant 4-of-7 or 5-of-9.
+- **Do not over-engineer.** A 9-of-15 structure across 10 countries is more
+  coercion-resistant but operationally fragile — more parties must show up, more
+  to coordinate, more to lose. The balance point is "defensible against
+  multi-jurisdiction coercion, still runnable by a small team."
+
+### Honest limits — what cryptography does NOT solve
+
+- A state willing to use enough force, against trustees and operators within its
+  reach, cannot be cryptographically stopped.
+- Trustees are one surface. The same adversary can block the site at the ISP
+  level, seize host servers, arrest operators, or outlaw the platform.
+- Hardening trustees while servers and people sit in a coercible jurisdiction is
+  half a defense.
+
+### The realistic goal
+
+Not "uncoercible." The goal is that coercion is **expensive, requires reaching
+multiple jurisdictions, and cannot be done covertly.** Because the system is
+verifiable:
+
+- Forced refusal to decrypt → the election publicly stalls.
+- Server seizure → an internationally replicated bulletin board still proves
+  what ballots were cast.
+- Coercion becomes a **public act on the record**, not a quiet manipulation.
+
+You do not stop the state from acting. You make it impossible for the state to
+act *invisibly* — which, for a democracy platform, is most of the political
+value.
+
+### Mitigations beyond the SDK (separate workstreams)
+
+- Replicate the public audit data internationally; anchor head hashes to an
+  external timestamping service so the record survives server seizure.
+- Treat platform censorship-resistance (mirrors, reachability when blocked) as
+  its own workstream, scoped to the actual assessed risk.
+- Operator safety and server-hosting jurisdiction are governance decisions, not
+  code — decide them deliberately.
+- Document this threat model publicly. Transparency is itself a defense: covert
+  coercion is harder when the public knows what a stalled election or a missing
+  mirror would mean.
