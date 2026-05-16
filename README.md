@@ -1,348 +1,214 @@
-# AgoraX: Digital Deliberative Democracy Engine
+# AgoraX
 
-[![CI](https://github.com/miltosdoc/agoraxdemo/actions/workflows/ci.yml/badge.svg)](https://github.com/miltosdoc/agoraxdemo/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-81%20passing-brightgreen)](tests/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-strict%20mode-blue)](tsconfig.json)
+[![CI](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml/badge.svg)](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](tsconfig.json)
 [![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
-**A deterministic governance engine that replaces human moderation with mathematical certainty.**
+**A deliberative-democracy platform — structured deliberation, sortition, and
+verifiable voting for civic decision-making.**
 
-AgoraX implements the Demopolis framework as a production-grade deliberative democracy platform. It explicitly rejects polling application mechanics and standard comment sections. Instead, it enforces structured deliberation through a cryptographically secure, mathematically validated 8-state proposal lifecycle.
-
----
-
-## 🏛️ Architecture at a Glance
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        AGORAX ARCHITECTURE                          │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │   Frontend   │  │   Backend    │  │   Ballot     │              │
-│  │   (React)    │  │   (Express)  │  │   (FastAPI)  │              │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
-│         │                 │                  │                      │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────▼───────┐              │
-│  │  107 TSX     │  │  12 Domain   │  │  PDF Valid.  │              │
-│  │  Components  │  │  Routers     │  │  SHA-256 Dedup│              │
-│  └──────────────┘  └──────┬───────┘  └──────────────┘              │
-│                           │                                         │
-│  ┌────────────────────────▼──────────────────────────────────────┐  │
-│  │                    DOMAIN REPOSITORIES                        │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │  │
-│  │  │  Users   │ │Communities│ │Proposals │ │Amendments│        │  │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │  │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │  │
-│  │  │Sortition │ │  Voting  │ │  Debate  │ │Platform  │        │  │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │  │
-│  └────────────────────────┬─────────────────────────────────────┘  │
-│                           │                                         │
-│  ┌────────────────────────▼──────────────────────────────────────┐  │
-│  │                    PostgreSQL + Drizzle ORM                    │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-```
+AgoraX implements the *Demopolis* framework: instead of a comment section and a
+poll, a proposal moves through a defined eight-state lifecycle — AI quality
+validation, community amendments, a randomly selected citizen jury, and a
+binding ratification vote whose count anyone can re-verify. It is built for
+Greek civic communities, bilingual (Ελληνικά / English) throughout.
 
 ---
 
-## 🔐 Cryptographic Security
+## What AgoraX does
 
-### Sortition: Cryptographically Secure Random Selection
-
-AgoraX implements Athenian-style sortition (random citizen selection) with production-grade cryptographic guarantees:
-
-```typescript
-// CSPRNG-backed Fisher-Yates with rejection sampling
-function cryptographicallySecureShuffle<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const limit = 256 - (256 % (i + 1)); // Rejection sampling threshold
-    let bytes;
-    do {
-      bytes = new Uint8Array(1);
-      crypto.getRandomValues(bytes); // Web Crypto API
-    } while (bytes[0] >= limit); // Reject out-of-bounds values
-    
-    const j = bytes[0] % (i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-```
-
-**Why this matters:** Standard `Math.random()` is predictable and vulnerable to manipulation. `crypto.getRandomValues()` provides CSPRNG-grade randomness. The rejection sampling eliminates modulo bias, ensuring statistically uniform distribution regardless of array size.
-
-### Anti-Sybil Constraints
-
-- **7-day membership minimum** before eligibility (prevents bot flooding)
-- **Active panel exclusion** (users serving on a panel cannot be selected again)
-- **Cryptographic seed recording** for auditability and verification
-
-### Ratification Vote: Pluggable VotingBackend
-
-The binding ratification vote (the final yes/no/abstain decision in the `voting` phase) is routed through a `VotingBackend` interface in `server/voting/`. The deliberation layer — proposals, sortition, amendments, debate — is unchanged regardless of which backend is active.
-
-```typescript
-interface VotingBackend {
-  startElection(args): Promise<void>;
-  castSignedBallot(input): Promise<BallotReceipt>;  // optional signature
-  getTally(args): Promise<ElectionTally>;
-  closeAndTally(args): Promise<ElectionTally & { proof }>;
-  getProof(args): Promise<ElectionProof>;
-  verify(args): Promise<VerificationResult>;
-}
-```
-
-Configured via the `VOTING_BACKEND` env var. Today:
-
-| Backend | Status | Guarantees | Limits |
-|---|---|---|---|
-| `hash-chain` (default) | ✅ Shipping | Tamper-evident inclusion via per-proposal SHA-256 chain. Any post-hoc edit breaks `/api/proposals/:id/election/verify`. | Cleartext votes; no defense against host-side ballot stuffing or full-history rewrite. |
-| `electionguard` | 🧪 Dev backend | ElGamal-encrypted ballots, ballot-validity ZK proofs, homomorphic tally, threshold-trustee decryption, public verifier. | Encryption + guardian shares are still server-side — verifiable integrity today, not yet vote privacy. Not for binding elections. |
-| `mobile-signed` | 🔮 Future | Voter-side signing in Secure Enclave / StrongBox. Server cannot forge ballots because it never holds the private key. | Requires the AgoraX mobile app. |
-
-The `electionguard` backend is powered by **`@agorax/voting`** — an in-house TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/) protocol, built on audited primitives (`@noble/curves`, `@noble/hashes`), in `packages/voting-sdk`. Its cryptographic core (group, encryption, ZK proofs, ballots, tally, threshold key ceremony + decryption, public verifier) is complete and tested; the AgoraX backend wires it in behind this interface. Until ballots are encrypted client-side (a later SDK phase) and trustees hold their own shares, run it as a development/demo backend only. The complete build plan, responsibility split, privacy checklist, and state-adversary threat model live in [`docs/VERIFIABLE_VOTING_SDK_PLAN.md`](docs/VERIFIABLE_VOTING_SDK_PLAN.md).
-
-Selecting it: `VOTING_BACKEND=electionguard` (optionally `EG_GUARDIANS` / `EG_THRESHOLD`, default 1-of-1 — dev only). Run `migrations/0011_electionguard_voting.sql` first.
-
-`castSignedBallot` already accepts an optional `BallotSignature` so the mobile signing piece can land without changing the API surface. The hash-chain backend ignores it; future backends require it.
-
-**Why this design:** the trust model of "what can the host do?" depends entirely on the voting backend, while the deliberation experience does not. A research community can run with `hash-chain`; a high-stakes binding vote runs with `electionguard`; a national pilot pairs `mobile-signed` with Gov.gr-verified rolls. Same product, same routes, same UX.
-
-**Public endpoints (all backends):**
-- `POST /api/proposals/:id/vote` — cast a ballot, returns backend-defined receipt
-- `GET  /api/proposals/:id/election/proof` — pinable artifact for external observers
-- `GET  /api/proposals/:id/election/verify` — backend-internal consistency check
+- **Structured deliberation** — every proposal follows the same eight-state
+  lifecycle; transitions are validated, not ad hoc.
+- **AI quality gate** — proposals are scored by an LLM before they reach the
+  community, filtering noise without human moderators.
+- **Community amendments** — members propose improvements and counter-proposals;
+  the author reviews them, and the community can override an author's rejection.
+- **Sortition** — a randomly selected citizen jury (Athenian-style) reviews and
+  revises the proposal. Selection uses a CSPRNG with rejection sampling, so it
+  is statistically unbiased and auditable.
+- **Verifiable ratification voting** — the binding yes/no/abstain vote runs
+  through a pluggable `VotingBackend`; every ballot lands in a tamper-evident
+  record anyone can re-check.
+- **Gov.gr identity verification** — citizens verify with a digitally signed
+  Responsible Declaration, giving one account per real person.
+- **Democracy Points** — civic participation is recorded as contribution
+  credit (*ο μισθός εκκλησιαστικός*), honestly phase-gated and never a token.
 
 ---
 
-## 📊 Mathematical Algorithms
+## The proposal lifecycle
 
-### Amendment Similarity: TF-IDF + Cosine Similarity
-
-AgoraX uses 2D vector space mapping to mathematically evaluate text amendments:
+Eight states, defined canonically in [`shared/proposal-lifecycle.ts`](shared/proposal-lifecycle.ts):
 
 ```
-TF-IDF Formula: log((N + 1) / (df + 1)) + 1
-Cosine Similarity: cos(θ) = (A · B) / (||A|| × ||B||)
+draft ─▶ review ─▶ author_review ─▶ community_signal ─▶ sortition_synthesis ─▶ voting ─▶ decided
+                                                                                   └────▶ archived
 ```
 
-**What this achieves:**
-- Groups amendments by thematic proximity
-- Automatically deduplicates identical suggestions
-- Distinguishes between improvements vs. counterproposals
-- Preserves opposing viewpoints (not automatically deleted)
+- **draft** — the author drafts the proposal.
+- **review** — automated LLM quality validation.
+- **author_review** — the author accepts or rejects community amendments.
+- **community_signal** — the community votes on the author's rejections.
+- **sortition_synthesis** — a sortition jury scores the proposal and revises it.
+- **voting** — the binding ratification vote.
+- **decided / archived** — terminal: a decision was reached, or it was closed
+  without one.
 
-### Democracy Score: Composite Reputational Metric
-
-A 0-100 composite score that acts as a reputational enforcement mechanism:
-
-```
-Score = f(admin_intervention, sortition_usage, participation_rate, deliberation_depth)
-```
-
-- High administrative intervention → score decreases
-- Consistent sortition usage → score increases
-- High participation + deliberation depth → score increases
+Progression is forward-only and each transition is validated at the API layer.
+A high LLM score can fast-path `review → voting`; `archived` is reachable from
+any active state.
 
 ---
 
-## 🔄 8-State Proposal Lifecycle
+## Architecture
 
 ```
-Draft → Review → Synthesis → Author Review → Sortition → Voting → Archived
-                                    ↓
-                              (Conditional)
+┌──────────────┐   ┌───────────────────┐   ┌──────────────────────┐
+│  Web client  │   │  Application API  │   │  Ballot service      │
+│  React + TS  │◀─▶│  Express + TS     │◀─▶│  FastAPI (Python)    │
+└──────────────┘   └─────────┬─────────┘   │  Gov.gr PDF validation│
+                             │             └──────────────────────┘
+                   ┌─────────▼─────────┐
+                   │ Domain repositories│  users · communities · proposals
+                   │ + server/economy  │  amendments · sortition · voting
+                   │ + server/voting   │  debate · platform · economy
+                   └─────────┬─────────┘
+                             │
+                   ┌─────────▼─────────┐   ┌──────────────────────┐
+                   │ PostgreSQL        │   │ @agorax/voting        │
+                   │ + Drizzle ORM     │   │ ElectionGuard 2.1 SDK │
+                   └───────────────────┘   │ (packages/voting-sdk) │
+                                           └──────────────────────┘
 ```
 
-**Key properties:**
-- **Unidirectional progression** — proposals cannot skip phases
-- **Mathematically validated transitions** at the API level
-- **Author veto power** with community override mechanism
-- **LLM auto-approval** for absolute consensus cases (>90% agreement)
+The server is organised by domain — one router and one repository per domain,
+with an enforced module boundary (`scripts/check-modularity.cjs`). The
+deliberation layer is independent of the voting backend: swapping how votes are
+secured never touches proposals, sortition, amendments, or debate.
 
 ---
 
-## 🏗️ Technical Architecture
+## Verifiable voting
 
-### Domain-Driven Design
+The binding ratification vote is routed through a `VotingBackend` interface
+(`server/voting/`), selected by the `VOTING_BACKEND` environment variable:
 
-```
-server/
-├── routers/          # 12 domain-specific routers (avg 166 lines each)
-├── storage/          # 9 domain repositories + legacy facade
-├── utils/            # 19 utility modules
-└── index.ts          # Express application entry point
-```
+| Backend | Status | Guarantees |
+|---|---|---|
+| `hash-chain` *(default)* | Shipping | Tamper-evident inclusion — a per-proposal SHA-256 chain; any post-hoc edit is detected by `/api/proposals/:id/election/verify`. Votes are cleartext. |
+| `electionguard` | Development | ElGamal-encrypted ballots, zero-knowledge ballot-validity proofs, homomorphic tally, threshold-trustee decryption, public verifier. Verifiable integrity today; client-side encryption (full vote privacy) is a later phase — not for binding elections yet. |
+| `mobile-signed` | Planned | Voter-side signing in a device secure element — the server never holds the key. |
 
-### Quality Gates
+The `electionguard` backend is powered by **`@agorax/voting`**, an in-house
+TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/)
+protocol built on audited primitives (`@noble/curves`, `@noble/hashes`) — see
+[`packages/voting-sdk`](packages/voting-sdk) and the build plan in
+[`docs/VERIFIABLE_VOTING_SDK_PLAN.md`](docs/VERIFIABLE_VOTING_SDK_PLAN.md).
 
-| Metric | Value |
-|--------|-------|
-| TypeScript strict mode | ✅ Enabled |
-| Test coverage | 81 tests, 100% passing |
-| File size limit | <400 lines per file |
-| JSDoc coverage | All public APIs documented |
-| `any` type usage | Zero in production code |
-| `console.log` statements | Zero in production code |
-| Module boundary enforcement | Automated via `check-modularity.cjs` |
-
-### Performance
-
-- **Rate limiting**: 100 req/15min (API), 10 req/15min (auth), 5 req/min (voting)
-- **Structured logging**: JSON output in production, colored in development
-- **Health check endpoint**: `/health` with real-time memory metrics
-- **Request timing**: Slow request detection (>500ms threshold)
+The trust model — *what can the host do?* — is set entirely by the chosen
+backend, while the deliberation experience stays identical. Public endpoints
+(`/api/proposals/:id/vote`, `/election/proof`, `/election/verify`) are the same
+for every backend.
 
 ---
 
-## 🚀 Deployment
+## Identity verification
 
-### Docker
+Citizens verify their identity by uploading a **Gov.gr Responsible Declaration**
+(Υπεύθυνη Δήλωση). The Python ballot service validates the document's PAdES
+digital signature offline — it never contacts Gov.gr — and extracts a minimal
+verified-identity set (name, date of birth, place of birth, residence). The Tax
+ID (ΑΦΜ) is stored only as a salted hash, which guarantees **one account per
+real person**. ID-card number, parents' names, phone and street address are
+deliberately not stored.
 
-`docker-compose.yml` brings up the full stack — **PostgreSQL**, the
-**AgoraX app**, and the **ballot service**:
+## Democracy Points
 
-```bash
-docker compose up --build
-curl http://localhost:3000/api/health
-```
-
-(See [docs/RUNNING.md](docs/RUNNING.md) for the non-Docker runbook and the
-list of background services.)
-
-### CI/CD Pipeline
-
-```yaml
-# .github/workflows/ci.yml
-- Lint (ESLint)
-- TypeCheck (TypeScript strict)
-- Test (Vitest + PostgreSQL)
-- Modularity check
-- Build (Vite)
-```
-
-### Production Checklist
-
-- [x] TypeScript strict mode
-- [x] Rate limiting middleware
-- [x] Structured logging
-- [x] Health check endpoint
-- [x] Docker multi-stage build
-- [x] CI/CD pipeline
-- [x] E2E test infrastructure
-- [x] Database migration strategy
-- [x] Performance benchmarking script
-- [x] Playwright test suite (7 test files)
-- [x] Load testing script
-- [x] Security audit checklist
-- [ ] Playwright test execution
-- [ ] Load test results
-- [ ] Security audit completion
+Civic participation — a validated proposal, a sortition-jury term, a
+ratification vote — earns **Democracy Points**, an append-only record of
+contribution. Points are not a token or cryptocurrency and carry no monetary
+value until the platform reaches a revenue phase; redemption is gated on that
+phase and on identity verification. The earning schedule is fixed and public.
 
 ---
 
-## 📚 Documentation
-
-- [Running AgoraX](docs/RUNNING.md) — Install, services, and the local runbook
-- [API Reference](docs/API.md) — Complete endpoint documentation
-- [Architecture Guide](docs/ARCHITECTURE.md) — Domain-driven design principles
-- [Test Suite](docs/TESTS.md) — Test coverage and structure
-- [Migration Strategy](docs/MIGRATION_STRATEGY.md) — Database migration workflow
-- [Security Audit](docs/SECURITY_AUDIT.md) — Security checklist and compliance
-- [Performance Optimization](docs/PERFORMANCE_OPTIMIZATION.md) — Optimization guide
-- [Refactoring Plan](docs/REFACTORING_PLAN.md) — Migration roadmap
-
----
-
-## 🔬 Research & Validation
-
-AgoraX implements several novel approaches to digital democracy:
-
-1. **Cryptographically secure sortition** — First implementation using Web Crypto API with rejection sampling
-2. **TF-IDF amendment clustering** — Mathematical deduplication without semantic loss
-3. **Democracy score ratchet** — One-way transition toward decentralization
-4. **Author veto with community override** — Balances intent preservation with consensus
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please read our [Code of Conduct](CODE_OF_CONDUCT.md) and [Contributing Guide](CONTRIBUTING.md).
-
-### Local Development Setup
-
-See [docs/RUNNING.md](docs/RUNNING.md) for the full runbook. In short:
+## Getting started
 
 **Prerequisites:** Node.js 20+, Python 3.11+, PostgreSQL 14+.
-
-**1. Clone & install**
 
 ```bash
 git clone https://github.com/miltosdoc/agoraxdemocracy.git
 cd agoraxdemocracy
-npm install                # Node app + the @agorax/voting workspace package
-```
-
-**2. Database** — create a PostgreSQL database and sync the schema:
-
-```bash
+npm install                       # Node app + the @agorax/voting workspace
 createdb agorax
-npm run db:push            # creates every table from shared/schema.ts
+npm run db:push                   # create the schema
+cp .env.example .env              # then set DATABASE_URL and SESSION_SECRET
 ```
 
-**3. Environment** — copy `.env.example` to `.env` and set at least
-`DATABASE_URL` and `SESSION_SECRET`.
+AgoraX runs as **three processes**:
 
-**4. Run the services** — AgoraX is **three processes**:
-
-| Service | Command | Port | Needed for |
-|---|---|---|---|
-| PostgreSQL | your system service | 5432 | everything |
-| AgoraX app (Node) | `npm run dev` | 3001 | the platform — API + UI |
-| Ballot service (Python) | see below | 8000 | Gov.gr identity verification |
+| Service | Command | Port |
+|---|---|---|
+| PostgreSQL | your system service | 5432 |
+| AgoraX app (Node) | `npm run dev` | 3001 |
+| Ballot service (Python) | see below | 8000 |
 
 ```bash
-# The ballot service — a separate FastAPI app for Gov.gr PDF validation:
+# Ballot service — Gov.gr PDF validation (a separate FastAPI app):
 cd ballot_service
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 DATABASE_URL="postgresql://USER@localhost:5432/agorax" SALT_KEY="<stable secret>" \
   .venv/bin/uvicorn main:app --port 8000
 ```
 
-Without the ballot service the app still runs — only Gov.gr identity
-verification is unavailable. The former Python `economy-service` has been
-**retired**: Democracy Points are now native to the Node app, so there is no
-separate economy process.
+The app runs without the ballot service — only Gov.gr identity verification is
+then unavailable. `npm run db:seed` loads demo content. The full runbook,
+including Docker (`docker compose up`), is in [docs/RUNNING.md](docs/RUNNING.md).
 
-**5. Demo data (optional):** `npm run db:seed` — then log in as `demo_admin`,
-`demo_citizen1` or `demo_citizen2`.
+---
 
-**Other commands**
+## Project structure
 
-```bash
-npm test                           # tests
-npx tsc --noEmit                    # typecheck
-node scripts/check-modularity.cjs   # module-boundary check
-npm run check:i18n                  # translation-key parity
+```
+client/            React + TypeScript web client (bilingual el/en)
+server/            Express API — domain routers, repositories, economy, voting
+shared/            Drizzle schema + types shared by client and server
+packages/
+  voting-sdk/      @agorax/voting — ElectionGuard 2.1 protocol implementation
+ballot_service/    FastAPI service — Gov.gr declaration validation
+migrations/        Ordered SQL migrations (0000 … 0013)
+docs/              Architecture, API, runbook, and design documents
 ```
 
+## Quality
+
+- TypeScript strict mode across client, server, and the SDK.
+- Enforced module boundaries (`scripts/check-modularity.cjs`).
+- Unit and integration tests (Vitest) plus an end-to-end suite (Playwright).
+- Bilingual translation-key parity checked in CI (`npm run check:i18n`).
+- CI runs lint, typecheck, tests, the modularity check, and the build.
+
+## Documentation
+
+- [Running AgoraX](docs/RUNNING.md) — install, services, local runbook
+- [API Reference](docs/API.md) — endpoint documentation
+- [Architecture Guide](docs/ARCHITECTURE.md) — domain-driven design
+- [Verifiable Voting SDK Plan](docs/VERIFIABLE_VOTING_SDK_PLAN.md) — the
+  ElectionGuard build plan, threat model, and privacy checklist
+- [Migration Strategy](docs/MIGRATION_STRATEGY.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Tests](docs/TESTS.md)
+
+## Contributing
+
+Contributions are welcome — please read the [Contributing Guide](CONTRIBUTING.md)
+and [Code of Conduct](CODE_OF_CONDUCT.md). Before opening a pull request, run
+`npx tsc --noEmit`, `npm test`, `npm run check:i18n`, and
+`node scripts/check-modularity.cjs`.
+
+## License
+
+See [LICENSE](LICENSE). *(Note: the `LICENSE` file is MIT while `package.json`
+declares `CC-BY-NC-4.0` — these should be reconciled.)*
+
 ---
 
-## 📄 License
-
-MIT License — See [LICENSE](LICENSE) for details.
-
----
-
-## 🏛️ About
-
-AgoraX is built by physicians, engineers, and civic technologists who believe that digital democracy requires mathematical rigor, not just good intentions.
-
-**"Trust isn't generated by promises. It relies entirely on a backend engineered for mathematical immunity to statistical bias and identity fraud."**
-
----
-
-*Built with ❤️ in Sweden, inspired by Athens.*
+*Built in Sweden, inspired by Athens — digital democracy with engineering rigor.*
