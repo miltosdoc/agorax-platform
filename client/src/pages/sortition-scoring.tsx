@@ -5,7 +5,7 @@
  * Members see the proposal, similar proposals, and submit their score.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Clock, ThumbsUp, ThumbsDown } from 'lucide-react';
+import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
@@ -46,6 +47,19 @@ interface AttendanceState {
     status: 'invited' | 'accepted' | 'declined' | 'no-show' | 'completed';
   } | null;
   responseDeadline: string | null;
+}
+
+/** Page shell — full header/footer chrome and a centered desktop column. */
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <main className="flex-grow pt-16 pb-10">
+        <div className="container mx-auto px-4 max-w-3xl">{children}</div>
+      </main>
+      <Footer />
+    </div>
+  );
 }
 
 export default function SortitionScoringPage() {
@@ -167,11 +181,21 @@ export default function SortitionScoringPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[50vh]">{t('general.loading')}</div>;
+    return (
+      <Shell>
+        <div className="py-16 text-center text-muted-foreground">{t('general.loading')}</div>
+      </Shell>
+    );
   }
 
   if (!assignment) {
-    return <div className="flex items-center justify-center min-h-[50vh]">{t('sortition.scoring.assignmentNotFound')}</div>;
+    return (
+      <Shell>
+        <div className="py-16 text-center text-muted-foreground">
+          {t('sortition.scoring.assignmentNotFound')}
+        </div>
+      </Shell>
+    );
   }
 
   const timeRemaining = new Date(assignment.responseDeadline).getTime() - Date.now();
@@ -179,7 +203,7 @@ export default function SortitionScoringPage() {
 
   if (submitted) {
     return (
-      <div className="container mx-auto py-6 px-4 max-w-2xl">
+      <Shell>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -191,12 +215,12 @@ export default function SortitionScoringPage() {
             <p>{t('sortition.scoring.scoreRecorded')}</p>
           </CardContent>
         </Card>
-      </div>
+      </Shell>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-2xl">
+    <Shell>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -396,7 +420,6 @@ export default function SortitionScoringPage() {
           </div>
         </CardContent>
       </Card>
-      <Footer />
-    </div>
+    </Shell>
   );
 }

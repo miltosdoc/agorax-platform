@@ -101,7 +101,7 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
           )}
           {status === 'sortition_synthesis' && (
             <Button size="sm" variant="outline" asChild>
-              <a href={`/proposals/${proposalId}`}>
+              <a href={`/proposals/${proposalId}/sortition`}>
                 {t('workspace.action.sortitionSynthesisButton')}
               </a>
             </Button>
