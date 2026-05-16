@@ -1,0 +1,20 @@
+{
+  "name": "@agorax/voting",
+  "version": "0.0.0",
+  "description": "Verifiable, private voting SDK for AgoraX — the ElectionGuard 2.1 cryptographic protocol layer (ElGamal, ZK proofs, homomorphic tally, threshold decryption, public verifier).",
+  "private": true,
+  "type": "module",
+  "license": "CC-BY-NC-4.0",
+  "author": "Miltiadis Triantafyllou",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.1",
+    "@noble/hashes": "^1.8.0"
+  }
+}

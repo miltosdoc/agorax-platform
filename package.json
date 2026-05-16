@@ -6,6 +6,9 @@
   "author": "Miltiadis Triantafyllou",
   "type": "module",
   "license": "CC-BY-NC-4.0",
+  "workspaces": [
+    "packages/*"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/miltosdoc/agorax.git"

@@ -1,0 +1,14 @@
+{
+  "type": "group-parameters",
+  "description": "ElectionGuard 2.1 standard 4096-bit baseline group — structural conformance. Each case names a value derived from the embedded p/q/g/r constants and the expected result; the relations uniquely pin the four constants to each other, so any transcription error fails at least one case.",
+  "source": "ElectionGuard Design Specification v2.1.0; constants from microsoft/electionguard-rust standard_parameters.rs",
+  "cases": [
+    { "name": "parameter set identifier", "field": "name", "expect": "ElectionGuard-2.1.0-standard-4096" },
+    { "name": "p is a 4096-bit prime", "field": "pBits", "expect": 4096 },
+    { "name": "q is a 256-bit prime", "field": "qBits", "expect": 256 },
+    { "name": "q = 2^256 - 189", "field": "qIsTwoPow256Minus189", "expect": true },
+    { "name": "p = q*r + 1 (cofactor relation)", "field": "pEqualsQRplus1", "expect": true },
+    { "name": "g^q mod p = 1 (g lies in the order-q subgroup)", "field": "gPowQModP", "expect": "1" },
+    { "name": "g is a non-trivial residue, 1 < g < p", "field": "gIsNonTrivial", "expect": true }
+  ]
+}
