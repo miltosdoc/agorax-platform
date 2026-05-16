@@ -255,6 +255,10 @@ const el: TranslationDictionary = {
   'sortition.scoring.submitting': 'Υποβολή...',
   'sortition.scoring.submitScore': 'Υποβολή Βαθμολογίας',
   'sortition.scoring.submitFailed': 'Δεν ήταν δυνατή η υποβολή της βαθμολογίας σας. Δοκιμάστε ξανά.',
+  'sortition.scoring.alreadyScored': 'Έχετε ήδη υποβάλει βαθμολογία. Αν υποβάλετε ξανά, θα ενημερωθεί.',
+  'sortition.scoring.notYoursTitle': 'Δεν είναι η δική σας ανάθεση',
+  'sortition.scoring.notYoursDescription': 'Αυτός ο χώρος εργασίας κλήρωσης ανήκει σε άλλο μέλος της κριτικής επιτροπής. Ανοίξτε τη δική σας ανάθεση από τη λίστα κληρώσεών σας.',
+  'sortition.scoring.goToMyAssignments': 'Μετάβαση στις κληρώσεις μου',
 
   // Sortition Synthesis
   'sortition.synthesis.finalTextSubmitted': 'Τελικό Κείμενο Υποβλήθηκε',

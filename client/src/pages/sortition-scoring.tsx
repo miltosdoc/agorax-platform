@@ -30,6 +30,10 @@ interface SortitionAssignment {
     question: string;
     state: string;
   }>;
+  /** Whether this assignment belongs to the current viewer. */
+  isYours: boolean;
+  /** Whether the viewer has already submitted a score. */
+  responded: boolean;
 }
 
 interface AttendanceState {
@@ -63,7 +67,7 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 export default function SortitionScoringPage() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const assignmentId = location.split('/').pop();
   const { t } = useTranslation();
   
@@ -83,28 +87,11 @@ export default function SortitionScoringPage() {
 
   useEffect(() => {
     if (!assignmentId) return;
-
-    // DEMO MODE: Use mock data when backend is unavailable
-    api.get<SortitionAssignment>(`/api/sortition/assignments/${assignmentId}`)
-      .then(resp => {
-        setAssignment(resp.data);
-        setLoading(false);
-      })
-      .catch(() => {
-        // Fallback to demo data
-        setAssignment({
-          id: 1,
-          proposalId: 1,
-          proposalQuestion: 'Πώς μπορούμε να βελτιώσουμε τη δημόσια συγκοινωνία στην περιοχή μας;',
-          proposalSolution: 'Εισαγωγή ηλεκτρικών λεωφορείων και επέκταση του δικτύου ποδηλατοδρόμων με στόχο μείωση των εκπομπών CO2 κατά 30% έως το 2030.',
-          responseDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          similarProposals: [
-            { id: 2, question: 'Βελτίωση ποδηλατοδρόμων στο κέντρο', state: 'voting' },
-            { id: 3, question: 'Δωρεάν εισιτήρια για μαθητές', state: 'deliberation' },
-          ],
-        });
-        setLoading(false);
-      });
+    api
+      .get<SortitionAssignment>(`/api/sortition/assignments/${assignmentId}`)
+      .then((resp) => setAssignment(resp.data))
+      .catch(() => setAssignment(null))
+      .finally(() => setLoading(false));
   }, [assignmentId]);
 
   const refreshAttendance = useCallback(async (proposalId: number) => {
@@ -198,6 +185,24 @@ export default function SortitionScoringPage() {
         <div className="py-16 text-center text-muted-foreground">
           {t('sortition.scoring.assignmentNotFound')}
         </div>
+      </Shell>
+    );
+  }
+
+  if (!assignment.isYours) {
+    return (
+      <Shell>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('sortition.scoring.notYoursTitle')}</CardTitle>
+            <CardDescription>{t('sortition.scoring.notYoursDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate('/sortition')}>
+              {t('sortition.scoring.goToMyAssignments')}
+            </Button>
+          </CardContent>
+        </Card>
       </Shell>
     );
   }
@@ -352,6 +357,12 @@ export default function SortitionScoringPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {assignment.responded && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <span>{t('sortition.scoring.alreadyScored')}</span>
+              </div>
+            )}
             <div>
               <div className="flex justify-between mb-2">
                 <label className="text-sm font-medium">{t('sortition.scoring.qualityScore')}</label>

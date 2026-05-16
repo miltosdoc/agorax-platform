@@ -216,6 +216,7 @@ export function registerSortitionRoutes(app: Express): void {
           : new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
         similarProposals,
         responded: sortMember.responded,
+        isYours: sortMember.userId === req.user.id,
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch assignment" });

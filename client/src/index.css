@@ -85,9 +85,23 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 16px;
+  }
+
+  /* Desktop renders ~10% smaller. At 100% browser zoom the UI otherwise
+     reads as over-sized with a mouse; phones keep the full 16px base.
+     Everything is rem-based, so this scales text, spacing and controls
+     together — equivalent to viewing the desktop at ~90% zoom. */
+  @media (min-width: 768px) {
+    html {
+      font-size: 14.5px;
+    }
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    font-size: 16px;
+    font-size: 1rem;
     line-height: 1.6;
   }
 
@@ -130,7 +144,7 @@
   }
 
   input, textarea, select {
-    font-size: 16px;
+    font-size: 1rem;
   }
 
   /* 44px touch targets on touch devices only. On desktop (a fine pointer)

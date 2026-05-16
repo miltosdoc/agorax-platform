@@ -255,6 +255,10 @@ const en: TranslationDictionary = {
   'sortition.scoring.submitting': 'Submitting...',
   'sortition.scoring.submitScore': 'Submit Score',
   'sortition.scoring.submitFailed': 'Could not submit your score. Please try again.',
+  'sortition.scoring.alreadyScored': 'You have already submitted a score. Submitting again will update it.',
+  'sortition.scoring.notYoursTitle': 'This is not your assignment',
+  'sortition.scoring.notYoursDescription': 'This sortition workspace belongs to another jury member. Open your own assignment from your sortition list.',
+  'sortition.scoring.goToMyAssignments': 'Go to my sortition assignments',
 
   // Sortition Synthesis
   'sortition.synthesis.finalTextSubmitted': 'Final Text Submitted',
