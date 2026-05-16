@@ -29,3 +29,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Local dev virtualenv
+.venv/
