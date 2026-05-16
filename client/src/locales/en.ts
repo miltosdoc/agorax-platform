@@ -930,6 +930,8 @@ const en: TranslationDictionary = {
   'vote.changeYourVote': 'Update your vote:',
   'vote.changeVote': 'Change vote',
   'vote.youVoted': 'You voted:',
+  'vote.ballotCast': 'You have cast an encrypted ballot.',
+  'vote.tallySealed': 'Results stay sealed until the vote closes.',
   'vote.passed': 'Passed',
   'vote.notPassed': 'Did not pass',
   'vote.quorumMet': 'Quorum met',

@@ -29,6 +29,8 @@ import type {
   ElectionProof,
   ElectionTally,
   VerificationResult,
+  VoteChoice,
+  VoterView,
   VotingBackend,
 } from './types';
 
@@ -111,5 +113,29 @@ export class HashChainBackend implements VotingBackend {
       firstBreakAt: result.firstBreakAt,
       payload: { headHash: result.headHash, total: result.total },
     };
+  }
+
+  async getVoterView(args: { proposalId: number; userId?: number }): Promise<VoterView> {
+    // The hash chain stores cleartext votes: the tally is always visible and
+    // a voter's own current choice is known.
+    const tally = await this.getTally({ proposalId: args.proposalId });
+    let hasVoted = false;
+    let userChoice: VoteChoice | null = null;
+    if (args.userId != null) {
+      const rows = await db
+        .select({ choice: proposalVotes.choice })
+        .from(proposalVotes)
+        .where(and(
+          eq(proposalVotes.proposalId, args.proposalId),
+          eq(proposalVotes.userId, args.userId),
+          isNull(proposalVotes.supersededById),
+        ))
+        .limit(1);
+      if (rows[0]) {
+        hasVoted = true;
+        userChoice = rows[0].choice as VoteChoice;
+      }
+    }
+    return { hasVoted, userChoice, ballotCount: tally.total, tallySealed: false, tally };
   }
 }

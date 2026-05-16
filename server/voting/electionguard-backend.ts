@@ -27,7 +27,7 @@
  * default backend's module graph and the production server bundle.
  */
 
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, count, eq, isNull, ne } from 'drizzle-orm';
 import { db } from '../db';
 import { egElections, egBallots, egElectionRecords } from '@shared/schema';
 import type {
@@ -36,6 +36,7 @@ import type {
   ElectionProof,
   ElectionTally,
   VerificationResult,
+  VoterView,
   VotingBackend,
 } from './types';
 import type {
@@ -374,6 +375,59 @@ export class ElectionGuardBackend implements VotingBackend {
       backend: NAME,
       firstBreakAt: firstBad === -1 ? undefined : { ballotIndex: firstBad },
       payload: { status: 'open', ballotsChecked: ballots.length },
+    };
+  }
+
+  async getVoterView(args: { proposalId: number; userId?: number }): Promise<VoterView> {
+    const election = await this.loadElection(args.proposalId);
+    if (!election) {
+      return { hasVoted: false, userChoice: null, ballotCount: 0, tallySealed: true, tally: null };
+    }
+
+    // Whether this viewer has an effective ballot is public (eg_ballots.user_id);
+    // *how* they voted is encrypted and is never returned.
+    let hasVoted = false;
+    if (args.userId != null) {
+      const rows = await db
+        .select({ id: egBallots.id })
+        .from(egBallots)
+        .where(and(
+          eq(egBallots.electionId, election.id),
+          eq(egBallots.userId, args.userId),
+          isNull(egBallots.supersededById),
+        ))
+        .limit(1);
+      hasVoted = rows.length > 0;
+    }
+
+    // The running tally stays sealed until the election is closed.
+    if (election.status !== 'closed') {
+      const [row] = await db
+        .select({ c: count() })
+        .from(egBallots)
+        .where(and(eq(egBallots.electionId, election.id), isNull(egBallots.supersededById)));
+      return {
+        hasVoted,
+        userChoice: null,
+        ballotCount: row?.c ?? 0,
+        tallySealed: true,
+        tally: null,
+      };
+    }
+
+    // Closed: the decrypted result is published in the election record.
+    const stored = await db
+      .select()
+      .from(egElectionRecords)
+      .where(eq(egElectionRecords.electionId, election.id))
+      .limit(1);
+    const tally = (stored[0]?.tally as ElectionTally | undefined) ?? null;
+    return {
+      hasVoted,
+      userChoice: null,
+      ballotCount: tally?.total ?? 0,
+      tallySealed: false,
+      tally,
     };
   }
 }

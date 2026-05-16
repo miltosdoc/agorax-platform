@@ -73,6 +73,26 @@ export interface VerificationResult {
 }
 
 /**
+ * UI-facing view of a proposal's vote state for one viewer — what the vote
+ * panel needs to render. Backends that keep ballots private (ElectionGuard)
+ * seal the running tally until the election closes and never reveal how an
+ * individual voted; the hash chain, which stores cleartext votes, does both.
+ */
+export interface VoterView {
+  /** Whether this viewer has cast an effective (non-superseded) ballot. */
+  hasVoted: boolean;
+  /** The viewer's choice — null when they have not voted, or when the
+   *  backend keeps ballots private (ElectionGuard always returns null). */
+  userChoice: VoteChoice | null;
+  /** Number of effective ballots cast so far. Always public. */
+  ballotCount: number;
+  /** True while the running tally is withheld (ElectionGuard, pre-close). */
+  tallySealed: boolean;
+  /** The yes/no/abstain tally — null while sealed. */
+  tally: ElectionTally | null;
+}
+
+/**
  * Concrete backends implement this. Routes/seed/storage call here, never
  * directly into hash-chain helpers — so swapping backends does not touch
  * any deliberation code.
@@ -104,4 +124,8 @@ export interface VotingBackend {
   /** Backend-internal consistency check. Hash chain: walks the chain.
    *  Helios: re-runs ZK proofs against the published ballots. */
   verify(args: { proposalId: number }): Promise<VerificationResult>;
+
+  /** UI-facing vote state for one viewer — drives the vote panel. Private
+   *  backends seal the tally until close and never reveal a choice. */
+  getVoterView(args: { proposalId: number; userId?: number }): Promise<VoterView>;
 }

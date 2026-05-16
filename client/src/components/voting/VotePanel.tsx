@@ -29,6 +29,12 @@ export interface VoteResults {
   meetsQuorum: boolean;
   minParticipationPct: number;
   userVote: VoteChoice | null;
+  /** True while the running tally is withheld (private backends, pre-close). */
+  sealed?: boolean;
+  /** Whether the viewer has cast a ballot — known even when `userVote` is not. */
+  hasVoted?: boolean;
+  /** Effective ballots cast so far (shown while the tally is sealed). */
+  ballotCount?: number;
 }
 
 const EMPTY_RESULTS: VoteResults = {
@@ -42,6 +48,9 @@ const EMPTY_RESULTS: VoteResults = {
   meetsQuorum: false,
   minParticipationPct: 0,
   userVote: null,
+  sealed: false,
+  hasVoted: false,
+  ballotCount: 0,
 };
 
 interface VotePanelProps {
@@ -70,7 +79,8 @@ export default function VotePanel({
 
   const isVoting = proposalStatus === 'voting';
   const isClosed = proposalStatus === 'decided' || proposalStatus === 'archived';
-  const userVoted = results.userVote !== null;
+  // A private backend never reveals `userVote`, but still reports `hasVoted`.
+  const userVoted = results.hasVoted ?? results.userVote !== null;
   const userIsAuthor = !!user && proposalAuthorId !== undefined && user.id === proposalAuthorId;
 
   useEffect(() => {
@@ -269,12 +279,18 @@ export default function VotePanel({
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
               <span>
-                {t('vote.youVoted')}{' '}
-                <span className="font-medium">
-                  {results.userVote === 'yes' && t('proposal.support')}
-                  {results.userVote === 'no' && t('proposal.oppose')}
-                  {results.userVote === 'abstain' && t('proposal.abstain')}
-                </span>
+                {results.userVote ? (
+                  <>
+                    {t('vote.youVoted')}{' '}
+                    <span className="font-medium">
+                      {results.userVote === 'yes' && t('proposal.support')}
+                      {results.userVote === 'no' && t('proposal.oppose')}
+                      {results.userVote === 'abstain' && t('proposal.abstain')}
+                    </span>
+                  </>
+                ) : (
+                  t('vote.ballotCast')
+                )}
               </span>
             </div>
             {isVoting && (
@@ -292,7 +308,16 @@ export default function VotePanel({
           </div>
         )}
 
-        {/* Tally */}
+        {/* Tally — private backends seal it until the election closes */}
+        {results.sealed ? (
+          <div className="rounded-md border bg-muted/30 p-4 text-center space-y-1.5">
+            <Lock className="w-5 h-5 mx-auto text-muted-foreground" />
+            <div className="text-sm font-medium">{t('vote.tallySealed')}</div>
+            <div className="text-xs text-muted-foreground">
+              {t('proposal.totalVotes', { count: results.ballotCount ?? results.total })}
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-1">
@@ -362,6 +387,7 @@ export default function VotePanel({
             {t('proposal.totalVotes', { count: results.total })}
           </div>
         </div>
+        )}
 
         {isVoting && userIsAuthor && (
           <div className="flex justify-center pt-2 border-t">

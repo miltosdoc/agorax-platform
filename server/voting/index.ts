@@ -41,4 +41,4 @@ export function getVotingBackend(): VotingBackend {
   }
 }
 
-export type { VotingBackend, BallotReceipt, BallotSignature, CastBallotInput, ElectionProof, ElectionTally, VerificationResult, VoteChoice } from './types';
+export type { VotingBackend, BallotReceipt, BallotSignature, CastBallotInput, ElectionProof, ElectionTally, VerificationResult, VoteChoice, VoterView } from './types';

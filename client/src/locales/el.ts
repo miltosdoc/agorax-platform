@@ -932,6 +932,8 @@ const el: TranslationDictionary = {
   'vote.changeYourVote': 'Ενημερώστε την ψήφο σας:',
   'vote.changeVote': 'Αλλαγή ψήφου',
   'vote.youVoted': 'Ψηφίσατε:',
+  'vote.ballotCast': 'Έχετε υποβάλει κρυπτογραφημένο ψηφοδέλτιο.',
+  'vote.tallySealed': 'Τα αποτελέσματα παραμένουν σφραγισμένα μέχρι το κλείσιμο της ψηφοφορίας.',
   'vote.passed': 'Έπεσε',
   'vote.notPassed': 'Δεν έπεσε',
   'vote.quorumMet': 'Η απαρτία καλύφθηκε',

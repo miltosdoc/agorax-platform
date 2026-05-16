@@ -8,18 +8,63 @@ import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth } from '../auth';
 import { db } from '../db';
-import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
 import {
   sortitionMembers,
   sortitionBodies,
   sortitionNotifications,
   communityMembers,
+  communities,
   proposals,
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState } from '@shared/proposal-lifecycle';
+import type { VoterView } from '../voting';
 import { createServer, type Server } from 'http';
+
+/**
+ * Build the vote-results payload the client expects from a backend-provided
+ * VoterView plus the community's quorum config. Works for any VotingBackend:
+ * private backends seal the tally (yes/no/abstain are 0 and `sealed` is true)
+ * until the election closes.
+ */
+async function computeVoteResults(
+  proposal: { communityId: number },
+  view: VoterView,
+) {
+  const [community] = await db
+    .select({ minParticipationPct: communities.minParticipationPct })
+    .from(communities)
+    .where(eq(communities.id, proposal.communityId));
+  const minParticipationPct = Number(community?.minParticipationPct ?? 0);
+
+  const [memberRow] = await db
+    .select({ c: count() })
+    .from(communityMembers)
+    .where(eq(communityMembers.communityId, proposal.communityId));
+  const memberCount = memberRow?.c ?? 0;
+
+  const participants = view.ballotCount;
+  const participationPct = memberCount > 0 ? participants / memberCount : 0;
+  const meetsQuorum = participationPct >= minParticipationPct;
+
+  const tally = view.tally;
+  const yes = tally?.yes ?? 0;
+  const no = tally?.no ?? 0;
+  const abstain = tally?.abstain ?? 0;
+  const total = tally?.total ?? view.ballotCount;
+  const passes = !!tally && meetsQuorum && yes + no > 0 && yes > no;
+
+  return {
+    yes, no, abstain, total,
+    sealed: view.tallySealed || !tally,
+    hasVoted: view.hasVoted,
+    ballotCount: view.ballotCount,
+    participants, participationPct, meetsQuorum, passes, minParticipationPct,
+    userVote: view.userChoice,
+  };
+}
 
 export function registerProposalsRoutes(app: Express): void {
   app.get("/api/proposals", async (req, res) => {
@@ -266,13 +311,14 @@ export function registerProposalsRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const results = await proposalRepo.getProposalVoteResults(proposalId);
-      const userId = (req.user as any)?.id;
-      const userVote = userId ? await proposalRepo.getUserProposalVote(proposalId, userId) : undefined;
-      res.json({
-        ...results,
-        userVote: userVote?.choice ?? null,
+      // Source the tally from the active voting backend, not the hash-chain
+      // table directly — so a private backend can seal it until close.
+      const { getVotingBackend } = await import('../voting');
+      const view = await getVotingBackend().getVoterView({
+        proposalId,
+        userId: (req.user as any)?.id,
       });
+      res.json(await computeVoteResults(proposal, view));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch vote results" });
     }
@@ -298,14 +344,21 @@ export function registerProposalsRoutes(app: Express): void {
           return res.status(403).json({ message: "Not authorized to finalize this proposal" });
         }
       }
-      const results = await proposalRepo.getProposalVoteResults(proposalId);
+      // Close the election with the active backend first: this triggers
+      // trustee decryption + seals the published record for ElectionGuard,
+      // and is a head read for the hash chain. The final tally then comes
+      // from the backend, so finalize works the same for any backend.
+      const { getVotingBackend } = await import('../voting');
+      const backend = getVotingBackend();
+      await backend.closeAndTally({ proposalId });
+      const view = await backend.getVoterView({ proposalId });
+      const results = await computeVoteResults(proposal, view);
       // Use the community's minParticipationPct + decisive-vote check.
       // Archive if quorum was not met, or if there are zero yes/no votes
       // (only abstains can't decide a yes/no outcome).
       const hasDecisive = (results.yes + results.no) > 0;
       const nextState = results.meetsQuorum && hasDecisive ? 'decided' : 'archived';
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
-      const { storage: storageInstance } = await import('../storage');
       const updated = await transitionProposal(proposal, nextState, storage);
       await triggerSideEffects(proposal.status, nextState, updated);
       res.json({ proposal: updated, results });
