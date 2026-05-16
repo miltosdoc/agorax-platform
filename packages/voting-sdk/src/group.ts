@@ -104,6 +104,11 @@ export function addModQ(a: bigint, b: bigint): ElementModQ {
   return Fq.add(Fq.create(a), Fq.create(b)) as ElementModQ;
 }
 
+/** Modular subtraction in Z_q: (a − b) mod q. */
+export function subModQ(a: bigint, b: bigint): ElementModQ {
+  return Fq.sub(Fq.create(a), Fq.create(b)) as ElementModQ;
+}
+
 /** Modular multiplication in Z_q: (a · b) mod q. */
 export function multModQ(a: bigint, b: bigint): ElementModQ {
   return Fq.mul(Fq.create(a), Fq.create(b)) as ElementModQ;

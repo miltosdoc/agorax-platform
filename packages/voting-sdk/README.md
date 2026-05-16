@@ -20,12 +20,12 @@ It deliberately does **not** own eligibility (one-person-one-vote),
 coercion-resistance, client-code delivery trust, or metadata-leak prevention —
 those are platform and governance concerns. See section 3 of the plan.
 
-## Status — Phase 0 (scaffold)
+## Status — Phase 1 (encryption + proofs)
 
 | Phase | Scope | State |
 |-------|-------|-------|
-| 0 | Workspace package, EG 2.1 group params, conformance harness | ✅ this PR |
-| 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | — |
+| 0 | Workspace package, EG 2.1 group params, conformance harness | ✅ |
+| 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ this PR |
 | 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | — |
 | 3 | Pedersen VSS key ceremony, threshold decryption | — |
 | 4 | Independent public verifier | — |
@@ -35,8 +35,20 @@ those are platform and governance concerns. See section 3 of the plan.
 
 Phase 0 exposes the ElectionGuard 2.1 standard 4096-bit group and a
 conformance test-vector harness. The group's `p`, `q`, `g`, `r` constants are
-checked at test time against the algebraic relations that uniquely pin them
+checked against the algebraic relations that uniquely pin them
 (`p = q·r + 1`, `g^q mod p = 1`), so any transcription error fails CI.
+
+Phase 1 adds the cryptographic core: the EG hash `H` (HMAC-SHA-256, checked
+against the reference known-answer vector), exponential ElGamal encryption
+with its additive-homomorphic tally, and the zero-knowledge proofs — a
+Chaum-Pedersen discrete-log-equality proof and the disjunctive zero-or-one
+ballot-validity proof, both made non-interactive via Fiat-Shamir.
+
+**Conformance caveat:** Phase 1 proves *mathematical* soundness — honest
+proofs verify, tampered proofs and out-of-range ballots are rejected. The
+Fiat-Shamir encoding is sound but not yet byte-identical to EG 2.1's exact
+`H_E`/domain-byte scheme; aligning it against the official EG 2.1 encryption
+test vectors is tracked for a follow-up before any conformance claim.
 
 ## Layout
 
@@ -44,6 +56,13 @@ checked at test time against the algebraic relations that uniquely pin them
 src/
   constants.ts   — EG 2.1 standard 4096-bit p/q/g/r (hex, spec-formatted)
   group.ts       — group params, ElementModP/ElementModQ types, modular helpers
+  hash.ts        — EG hash H = HMAC-SHA-256, fixed-width byte encodings
+  random.ts      — crypto.getRandomValues-backed scalars in Z_q
+  elgamal.ts     — exponential ElGamal: keygen, encrypt, homomorphic add, decrypt
+  proofs/
+    fiat-shamir.ts    — non-interactive challenge derivation (domain-separated)
+    chaum-pedersen.ts — discrete-log-equality proof
+    disjunctive.ts    — zero-or-one ballot-validity proof
   index.ts       — public API surface
 test/
   conformance.ts — JSON vector-file harness (loadVectorsByType)

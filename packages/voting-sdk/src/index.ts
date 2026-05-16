@@ -1,17 +1,22 @@
 /**
  * `@agorax/voting` — verifiable, private voting SDK.
  *
- * Public API surface. Phase 0 exposes only the ElectionGuard 2.1 group;
- * later phases add ElGamal encryption, ZK proofs, homomorphic tally,
- * threshold key ceremony / decryption, and the public verifier.
+ * Public API surface.
+ *  - Phase 0: the ElectionGuard 2.1 group.
+ *  - Phase 1: the EG hash function, ElGamal encryption, and the
+ *    Chaum-Pedersen / disjunctive zero-knowledge proofs.
  *
- * See `docs/VERIFIABLE_VOTING_SDK_PLAN.md` in the AgoraX repo for the build
- * plan and the integrity/privacy responsibility split.
+ * Still to come: ballots + homomorphic tally (Phase 2), threshold key
+ * ceremony + decryption (Phase 3), the public verifier (Phase 4), and the
+ * AgoraX integration (Phase 5+).
+ *
+ * See `docs/VERIFIABLE_VOTING_SDK_PLAN.md` in the AgoraX repo.
  *
  * NOT FOR BINDING ELECTIONS until an independent cryptographer review has
  * been completed (see the privacy checklist in the plan).
  */
 
+// --- Phase 0: group --------------------------------------------------------
 export {
   P,
   Q,
@@ -27,6 +32,7 @@ export {
   gPowP,
   modQ,
   addModQ,
+  subModQ,
   multModQ,
   isElementModP,
   isElementModQ,
@@ -42,3 +48,47 @@ export type {
 } from './group.ts';
 
 export { EG_2_1_PARAMETER_SET } from './constants.ts';
+
+// --- Phase 1: hash + randomness -------------------------------------------
+export {
+  H,
+  MOD_P_BYTES,
+  MOD_Q_BYTES,
+  bigintToBytes,
+  bytesToBigint,
+  modPToBytes,
+  modQToBytes,
+  concatBytes,
+  sha256Utf8,
+} from './hash.ts';
+
+export { randomModQ, randomModQNonzero } from './random.ts';
+
+// --- Phase 1: ElGamal encryption ------------------------------------------
+export {
+  generateKeyPair,
+  publicKeyOf,
+  encrypt,
+  encryptWithFreshNonce,
+  addCiphertexts,
+  decrypt,
+  decryptToGroupElement,
+} from './elgamal.ts';
+
+export type {
+  ElGamalKeyPair,
+  Ciphertext,
+  EncryptionResult,
+} from './elgamal.ts';
+
+// --- Phase 1: zero-knowledge proofs ---------------------------------------
+export { domainKey, fiatShamirChallenge } from './proofs/fiat-shamir.ts';
+
+export { proveEqualDlog, verifyEqualDlog } from './proofs/chaum-pedersen.ts';
+export type {
+  ChaumPedersenProof,
+  EqualDlogStatement,
+} from './proofs/chaum-pedersen.ts';
+
+export { proveZeroOrOne, verifyZeroOrOne } from './proofs/disjunctive.ts';
+export type { DisjunctiveProof } from './proofs/disjunctive.ts';
