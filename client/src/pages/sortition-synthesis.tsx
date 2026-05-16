@@ -28,13 +28,15 @@ export default function SortitionSynthesisPage() {
         return;
       }
       try {
-        const resp = await api.get<{ members: Array<{ id: number; userId: number }> }>(
+        const resp = await api.get<{ members: Array<{ memberId: number; userId: number }> }>(
           `/api/proposals/${proposalId}/sortition-body`,
         );
         const mine = user
           ? resp.data.members.find((m) => m.userId === user.id)
           : undefined;
-        if (!cancelled) navigate(mine ? `/sortition/${mine.id}` : '/sortition');
+        if (!cancelled) {
+          navigate(mine ? `/sortition/${mine.memberId}` : '/sortition');
+        }
       } catch {
         if (!cancelled) navigate('/sortition');
       }
