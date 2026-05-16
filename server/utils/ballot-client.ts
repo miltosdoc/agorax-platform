@@ -156,7 +156,11 @@ export async function verifyIdentity(
     if (!response.ok) {
       return {
         success: false,
-        message: (data as any).detail || `Identity verification failed: ${response.status}`,
+        // The validator returns {message,...}; HTTPException returns {detail}.
+        message:
+          (data as any).message ||
+          (data as any).detail ||
+          `Identity verification failed: ${response.status}`,
         rejection_reason: (data as any).rejection_reason,
       };
     }

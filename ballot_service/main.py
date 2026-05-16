@@ -14,11 +14,17 @@ import sys
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends
+import nest_asyncio
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+# pyhanko's signature validation calls asyncio.run() internally. Under
+# uvicorn that happens inside an already-running event loop; nest_asyncio
+# makes the nested run() legal instead of raising RuntimeError.
+nest_asyncio.apply()
 
 from config import settings
 from database import get_db, init_db, engine
@@ -102,20 +108,16 @@ app.add_middleware(
 
 # ─── Helper ─────────────────────────────────────────────────────────────────
 
-def result_to_response(result: ValidationResult) -> tuple[VoteResponse, int]:
-    """Convert ValidationResult to API response."""
-    status_code = 200 if result.success else 400
-    return (
-        VoteResponse(
-            success=result.success,
-            message=result.message,
-            voter_hash=result.voter_hash,
-            vote_choice=result.vote_choice,
-            file_hash=result.file_hash,
-            signer_name=result.signer_name,
-            rejection_reason=result.rejection_reason.value if result.rejection_reason else None,
-        ),
-        status_code,
+def result_to_response(result: ValidationResult) -> VoteResponse:
+    """Convert a ValidationResult into the API response body."""
+    return VoteResponse(
+        success=result.success,
+        message=result.message,
+        voter_hash=result.voter_hash,
+        vote_choice=result.vote_choice,
+        file_hash=result.file_hash,
+        signer_name=result.signer_name,
+        rejection_reason=result.rejection_reason.value if result.rejection_reason else None,
     )
 
 
@@ -139,6 +141,7 @@ async def health():
 
 @app.post("/api/ballot/validate", response_model=VoteResponse)
 async def validate_ballot(
+    response: Response,
     file: UploadFile = File(..., description="Gov.gr Solemn Declaration PDF"),
     poll_id: str = Form(..., description="Poll identifier"),
     poll_token: str = Form(..., description="Session token for this poll"),
@@ -174,14 +177,17 @@ async def validate_ballot(
         logger.error(f"Validation error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal validation error: {str(e)}")
     
-    response, status_code = result_to_response(result)
+    body = result_to_response(result)
+    if not result.success:
+        response.status_code = 400
     logger.info(f"Validation result: success={result.success}, reason={result.rejection_reason}")
-    
-    return response, status_code
+
+    return body
 
 
 @app.post("/api/ballot/validate-identity", response_model=IdentityResponse)
 async def validate_identity(
+    response: Response,
     file: UploadFile = File(..., description="Gov.gr Solemn Declaration PDF"),
     db: Session = Depends(get_db),
 ):
@@ -215,18 +221,16 @@ async def validate_identity(
         logger.error(f"Identity validation error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal validation error: {str(e)}")
     
-    status_code = 200 if result.success else 400
-    return (
-        IdentityResponse(
-            success=result.success,
-            message=result.message,
-            voter_hash=result.voter_hash,
-            signer_name=result.signer_name,
-            rejection_reason=result.rejection_reason.value if result.rejection_reason else None,
-            demographics=result.demographics,
-            doc_code_hash=result.doc_code_hash,
-        ),
-        status_code,
+    if not result.success:
+        response.status_code = 400
+    return IdentityResponse(
+        success=result.success,
+        message=result.message,
+        voter_hash=result.voter_hash,
+        signer_name=result.signer_name,
+        rejection_reason=result.rejection_reason.value if result.rejection_reason else None,
+        demographics=result.demographics,
+        doc_code_hash=result.doc_code_hash,
     )
 
 
