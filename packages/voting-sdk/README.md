@@ -20,7 +20,7 @@ It deliberately does **not** own eligibility (one-person-one-vote),
 coercion-resistance, client-code delivery trust, or metadata-leak prevention —
 those are platform and governance concerns. See section 3 of the plan.
 
-## Status — Phase 4 (public verifier)
+## Status — Phase 5 (AgoraX integration)
 
 | Phase | Scope | State |
 |-------|-------|-------|
@@ -28,8 +28,8 @@ those are platform and governance concerns. See section 3 of the plan.
 | 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ |
 | 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | ✅ |
 | 3 | Pedersen VSS key ceremony, threshold decryption | ✅ |
-| 4 | Independent public verifier | ✅ this PR |
-| 5 | AgoraX `ElectionGuardBackend` (`VotingBackend`) | — |
+| 4 | Independent public verifier | ✅ |
+| 5 | AgoraX `ElectionGuardBackend` (`VotingBackend`) | ✅ this PR |
 | 6 | Browser-side encryption (privacy becomes real here) | — |
 | 7 | Mobile signing surface | — |
 
@@ -65,6 +65,19 @@ homomorphic aggregate of the ballots, and that the threshold decryption is
 correct. A miscount, stuffed ballot, forged tally or cheating guardian fails
 at least one named check.
 
+Phase 5 wires the SDK into AgoraX as the `electionguard` `VotingBackend`
+(`server/voting/electionguard-backend.ts`), with Postgres tables for
+elections, encrypted ballots and records (migration `0011`). It runs the key
+ceremony when voting opens, encrypts and proof-checks each cast ballot,
+tallies homomorphically, and decrypts + verifies at close. A `codec.ts`
+(`toJsonSafe`/`fromJsonSafe`) handles bigint-safe JSON persistence.
+
+**Still server-side, by design for now:** the backend encrypts ballots and
+holds guardian shares on the server — verifiable *integrity* today, not yet
+*privacy*. Client-side encryption (Phase 6) and voter-side signing (Phase 7)
+are what make it private; an independent cryptographer review gates any
+binding use.
+
 **Conformance caveat:** Phase 1 proves *mathematical* soundness — honest
 proofs verify, tampered proofs and out-of-range ballots are rejected. The
 Fiat-Shamir encoding is sound but not yet byte-identical to EG 2.1's exact
@@ -90,6 +103,7 @@ src/
   keyceremony.ts — Pedersen VSS key ceremony, t-of-n guardian shares
   decryption.ts  — single-guardian + threshold decryption, with proofs
   verifier.ts    — ElectionRecord + verifyElectionRecord (public verifier)
+  codec.ts       — bigint-safe JSON codec (toJsonSafe / fromJsonSafe)
   index.ts       — public API surface
 test/
   conformance.ts — JSON vector-file harness (loadVectorsByType)

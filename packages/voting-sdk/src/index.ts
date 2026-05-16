@@ -178,3 +178,6 @@ export type {
   VerificationCheck,
   VerificationReport,
 } from './verifier.ts';
+
+// --- JSON codec (bigint-safe persistence / transport) ---------------------
+export { toJsonSafe, fromJsonSafe } from './codec.ts';

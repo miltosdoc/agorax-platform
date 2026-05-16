@@ -99,10 +99,12 @@ Configured via the `VOTING_BACKEND` env var. Today:
 | Backend | Status | Guarantees | Limits |
 |---|---|---|---|
 | `hash-chain` (default) | ✅ Shipping | Tamper-evident inclusion via per-proposal SHA-256 chain. Any post-hoc edit breaks `/api/proposals/:id/election/verify`. | Cleartext votes; no defense against host-side ballot stuffing or full-history rewrite. |
-| `electionguard` | 📋 Planned | ElGamal-encrypted ballots, ballot-validity ZK proofs, homomorphic tally, threshold-trustee decryption, public verifier. Host cannot decrypt individual votes. | Coercion-resistance still requires identity layer (Gov.gr verification). |
+| `electionguard` | 🧪 Dev backend | ElGamal-encrypted ballots, ballot-validity ZK proofs, homomorphic tally, threshold-trustee decryption, public verifier. | Encryption + guardian shares are still server-side — verifiable integrity today, not yet vote privacy. Not for binding elections. |
 | `mobile-signed` | 🔮 Future | Voter-side signing in Secure Enclave / StrongBox. Server cannot forge ballots because it never holds the private key. | Requires the AgoraX mobile app. |
 
-The `electionguard` backend will be powered by **`@agorax/voting`** — an in-house TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/) protocol, built on audited primitives (`@noble/curves`, `@noble/hashes`). The complete build plan, responsibility split, privacy checklist, and state-adversary threat model live in [`docs/VERIFIABLE_VOTING_SDK_PLAN.md`](docs/VERIFIABLE_VOTING_SDK_PLAN.md).
+The `electionguard` backend is powered by **`@agorax/voting`** — an in-house TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/) protocol, built on audited primitives (`@noble/curves`, `@noble/hashes`), in `packages/voting-sdk`. Its cryptographic core (group, encryption, ZK proofs, ballots, tally, threshold key ceremony + decryption, public verifier) is complete and tested; the AgoraX backend wires it in behind this interface. Until ballots are encrypted client-side (a later SDK phase) and trustees hold their own shares, run it as a development/demo backend only. The complete build plan, responsibility split, privacy checklist, and state-adversary threat model live in [`docs/VERIFIABLE_VOTING_SDK_PLAN.md`](docs/VERIFIABLE_VOTING_SDK_PLAN.md).
+
+Selecting it: `VOTING_BACKEND=electionguard` (optionally `EG_GUARDIANS` / `EG_THRESHOLD`, default 1-of-1 — dev only). Run `migrations/0011_electionguard_voting.sql` first.
 
 `castSignedBallot` already accepts an optional `BallotSignature` so the mobile signing piece can land without changing the API surface. The hash-chain backend ignores it; future backends require it.
 

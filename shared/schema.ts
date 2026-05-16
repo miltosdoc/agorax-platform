@@ -443,6 +443,52 @@ export const proposalVotes = pgTable("proposal_votes", {
   proposalChainIdx: uniqueIndex('proposal_votes_proposal_id_idx').on(table.proposalId, table.id),
 }));
 
+// ─── ElectionGuard verifiable voting (@agorax/voting backend) ───────────────
+// Used only when VOTING_BACKEND=electionguard. One election per proposal,
+// created lazily when the voting phase opens or the first ballot is cast.
+//
+// dev_guardian_secrets holds the trustee secret key shares SERVER-SIDE. That
+// is a development-only compromise: with the shares on the server the host
+// can decrypt, so this backend does NOT yet deliver vote privacy. Real
+// privacy needs client-side encryption (SDK Phase 6) and trustees that hold
+// their own shares off-server. The column name is deliberately loud.
+export const egElections = pgTable("eg_elections", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  threshold: integer("threshold").notNull(),
+  guardianCount: integer("guardian_count").notNull(),
+  jointPublicKey: text("joint_public_key").notNull(),
+  guardianCommitments: jsonb("guardian_commitments").notNull(),
+  devGuardianSecrets: jsonb("dev_guardian_secrets").notNull(),
+  status: text("status").notNull().default("open"), // 'open' | 'closed'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+}, (table) => ({
+  egElectionProposalUnique: uniqueIndex('eg_elections_proposal_id_unique').on(table.proposalId),
+}));
+
+// One encrypted ballot per cast. Re-voting inserts a new row and sets the
+// previous row's superseded_by_id; the tally uses only non-superseded rows.
+export const egBallots = pgTable("eg_ballots", {
+  id: serial("id").primaryKey(),
+  electionId: integer("election_id").notNull().references(() => egElections.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  ciphertextBallot: jsonb("ciphertext_ballot").notNull(),
+  castAt: timestamp("cast_at").notNull().defaultNow(),
+  supersededById: integer("superseded_by_id"),
+});
+
+// The published election record + decrypted tally, written once at close.
+export const egElectionRecords = pgTable("eg_election_records", {
+  id: serial("id").primaryKey(),
+  electionId: integer("election_id").notNull().references(() => egElections.id, { onDelete: "cascade" }),
+  record: jsonb("record").notNull(),
+  tally: jsonb("tally").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  egRecordElectionUnique: uniqueIndex('eg_election_records_election_id_unique').on(table.electionId),
+}));
+
 // ─── Admin Action Log ───────────────────────────────────────────────────────
 
 export const adminActions = pgTable("admin_actions", {
