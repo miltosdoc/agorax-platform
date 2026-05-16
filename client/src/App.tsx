@@ -29,6 +29,7 @@ import SortitionCeremonyPage from "@/pages/sortition-ceremony";
 import AmendmentAuthorReview from "@/pages/amendment-author-review";
 import AmendmentCommunitySignal from "@/pages/amendment-community-signal";
 import DeliberationWalkthrough from "@/pages/deliberation-walkthrough";
+import DemocracyPointsPage from "@/pages/democracy-points";
 import { CommunityForm } from "@/components/community/community-form";
 import { CommunityList } from "@/components/community/community-list";
 import { ProposalForm } from "@/components/proposal/proposal-form";
@@ -129,6 +130,7 @@ function AppRouter() {
         <ProtectedRoute path="/proposals/:id/sortition" component={SortitionSynthesisPage} />
         <ProtectedRoute path="/proposals/:id/amendments/review" component={AmendmentAuthorReview} />
         <ProtectedRoute path="/proposals/:id/amendments/signals" component={AmendmentCommunitySignal} />
+        <ProtectedRoute path="/points" component={DemocracyPointsPage} />
         <ProtectedRoute path="/settings" component={PlatformSettingsPage} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <Route path="/walkthrough" component={DeliberationWalkthrough} />

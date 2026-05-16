@@ -16,7 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -194,6 +194,15 @@ export default function Header() {
               <Users className="h-4 w-4" />
               <span>{t('nav.sortition')}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => navigate("/points")}
+              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
+              data-testid="button-points"
+            >
+              <Coins className="h-4 w-4" />
+              <span>{t('nav.points')}</span>
+            </button>
 
             {/* Notification Bell */}
             <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
@@ -358,6 +367,14 @@ export default function Header() {
                 >
                   <Users className="mr-2 h-4 w-4" />
                   {t('nav.sortition')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/points")}
+                  className="cursor-pointer transition-smooth"
+                  data-testid="menu-points"
+                >
+                  <Coins className="mr-2 h-4 w-4" />
+                  {t('nav.points')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/proposals/new")}
