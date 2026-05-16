@@ -77,8 +77,12 @@ export function registerUsersRoutes(app: Express): void {
       const { verifyIdentity } = await import('../utils/ballot-client');
       const result = await verifyIdentity(file.buffer);
       if (result.success) {
-        // Check if this voter hash is already used by another account
         const voterHash = result.voter_hash || "";
+        const docCodeHash = result.doc_code_hash || "";
+        const demo = result.demographics || {};
+
+        // One person = one account: the AFM hash must not already belong to
+        // a different account.
         if (voterHash) {
           const existingUser = await userRepo.getUserByVoterHash(voterHash);
           if (existingUser && existingUser.id !== req.user.id) {
@@ -89,11 +93,38 @@ export function registerUsersRoutes(app: Express): void {
             });
           }
         }
-        // Update user record with verification info
+
+        // Anti-replay: the same declaration document cannot verify two accounts.
+        if (docCodeHash) {
+          const { db } = await import('../db');
+          const { users } = await import('@shared/schema');
+          const { and, eq, ne } = await import('drizzle-orm');
+          const [reused] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.govgrDocCodeHash, docCodeHash), ne(users.id, req.user.id)))
+            .limit(1);
+          if (reused) {
+            return res.status(400).json({
+              success: false,
+              message: "Αυτή η δήλωση έχει ήδη χρησιμοποιηθεί για επαλήθευση",
+              rejection_reason: "duplicate_file"
+            });
+          }
+        }
+
+        // Store verification + the minimal verified demographics.
         await userRepo.updateUser(req.user.id, {
           govgrVerified: true,
           govgrVerifiedAt: new Date(),
           govgrVoterHash: voterHash || "hash-missing",
+          govgrDocCodeHash: docCodeHash || null,
+          govgrFirstName: demo.first_name ?? null,
+          govgrLastName: demo.last_name ?? null,
+          govgrDob: demo.date_of_birth ?? null,
+          govgrPlaceOfBirth: demo.place_of_birth ?? null,
+          govgrMunicipality: demo.municipality ?? null,
+          govgrPostcode: demo.postcode ?? null,
         });
         return res.status(200).json({
           success: true,

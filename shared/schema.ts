@@ -37,7 +37,16 @@ export const users = pgTable("users", {
   // Gov.gr Identity Verification
   govgrVerified: boolean("govgr_verified").default(false),
   govgrVerifiedAt: timestamp("govgr_verified_at"),
-  govgrVoterHash: text("govgr_voter_hash"), // SHA256(AFM + SALT)
+  govgrVoterHash: text("govgr_voter_hash"), // SHA256(AFM + SALT) — one-person key
+  govgrDocCodeHash: text("govgr_doc_code_hash"), // SHA256(doc code + SALT) — anti-replay
+  // Verified demographics extracted from the Responsible Declaration. By
+  // data-minimisation, identifiers (ID-card number, parents) are NOT stored.
+  govgrFirstName: text("govgr_first_name"),
+  govgrLastName: text("govgr_last_name"),
+  govgrDob: text("govgr_dob"),                 // DD/MM/YYYY as printed
+  govgrPlaceOfBirth: text("govgr_place_of_birth"),
+  govgrMunicipality: text("govgr_municipality"),
+  govgrPostcode: text("govgr_postcode"),
 });
 
 export const polls = pgTable("polls", {
@@ -1167,6 +1176,12 @@ export type SafeUser = Pick<
   | 'accountStatus'
   | 'govgrVerified'
   | 'govgrVerifiedAt'
+  | 'govgrFirstName'
+  | 'govgrLastName'
+  | 'govgrDob'
+  | 'govgrPlaceOfBirth'
+  | 'govgrMunicipality'
+  | 'govgrPostcode'
 >;
 
 

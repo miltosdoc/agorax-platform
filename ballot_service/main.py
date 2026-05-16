@@ -52,6 +52,8 @@ class IdentityResponse(BaseModel):
     voter_hash: Optional[str] = None
     signer_name: Optional[str] = None
     rejection_reason: Optional[str] = None
+    demographics: Optional[dict] = None
+    doc_code_hash: Optional[str] = None
 
 
 class PollStats(BaseModel):
@@ -221,6 +223,8 @@ async def validate_identity(
             voter_hash=result.voter_hash,
             signer_name=result.signer_name,
             rejection_reason=result.rejection_reason.value if result.rejection_reason else None,
+            demographics=result.demographics,
+            doc_code_hash=result.doc_code_hash,
         ),
         status_code,
     )

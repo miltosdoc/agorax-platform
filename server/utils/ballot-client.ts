@@ -27,6 +27,17 @@ export interface IdentityValidationResult {
   voter_hash?: string;
   signer_name?: string;
   rejection_reason?: string;
+  /** Best-effort verified demographics from the declaration. */
+  demographics?: {
+    first_name?: string;
+    last_name?: string;
+    date_of_birth?: string;
+    place_of_birth?: string;
+    municipality?: string;
+    postcode?: string;
+  };
+  /** Salted hash of the Gov.gr per-document code — an anti-replay key. */
+  doc_code_hash?: string;
 }
 
 export interface PollStats {

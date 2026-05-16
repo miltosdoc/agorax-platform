@@ -897,6 +897,11 @@ const en: TranslationDictionary = {
   'profile.updateLocation': 'Update your location for location-restricted participation.',
   'profile.userInformation': 'User information',
   'profile.verified': 'Verified',
+  'profile.verifiedIdentity': 'Verified identity (Gov.gr)',
+  'profile.verifiedName': 'Name',
+  'profile.verifiedDob': 'Date of birth',
+  'profile.verifiedPob': 'Place of birth',
+  'profile.verifiedResidence': 'Residence',
   'walkthrough.responded': 'Responded',
 
   // Proposal index page

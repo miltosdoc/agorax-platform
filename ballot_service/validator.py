@@ -51,6 +51,9 @@ class ValidationResult:
     vote_choice: Optional[str] = None
     file_hash: Optional[str] = None
     signer_name: Optional[str] = None
+    # Identity-verification extras (best-effort; non-fatal if absent).
+    demographics: Optional[dict] = None
+    doc_code_hash: Optional[str] = None
 
 
 class BallotValidator:
@@ -185,12 +188,20 @@ class BallotValidator:
             )
             
         voter_hash = self._hash_voter_id(afm)
-        
+
+        # Best-effort profile demographics + the per-document code. None of
+        # these affect success — identity rests on the signature + AFM.
+        demographics = self._extract_demographics(text)
+        doc_code = self._extract_doc_code(text)
+        doc_code_hash = self._hash_doc_code(doc_code) if doc_code else None
+
         return ValidationResult(
             success=True,
             message="Identity verified successfully",
             voter_hash=voter_hash,
-            signer_name=gate1_result.signer_name
+            signer_name=gate1_result.signer_name,
+            demographics=demographics,
+            doc_code_hash=doc_code_hash,
         )
     
     async def _gate1_verify_signature(self, pdf_bytes: bytes) -> ValidationResult:
@@ -439,6 +450,52 @@ class BallotValidator:
         if match:
             return match.group(1)
         return None
+
+    def _extract_demographics(self, text: str) -> dict:
+        """
+        Best-effort extraction of profile demographics from a Responsible
+        Declaration. Non-fatal — any field that does not parse is omitted;
+        identity verification does not depend on these.
+
+        Stored: first/last name, date of birth, place of birth, residence
+        municipality, postcode. NOT extracted: ID-card number, parents'
+        names, phone, full street — deliberately, by data-minimisation.
+        """
+        flat = re.sub(r"\s+", " ", text)
+        out: dict = {}
+
+        def grab(pattern: str) -> Optional[str]:
+            m = re.search(pattern, flat, re.IGNORECASE)
+            return m.group(1).strip() if m else None
+
+        first = grab(r"Όνομα:\s*([^\s:]+)")
+        if first:
+            out["first_name"] = first
+        last = grab(r"Επώνυμο:\s*([^\s:]+)")
+        if last:
+            out["last_name"] = last
+        dob = grab(r"γέννησης:\s*(\d{1,2}/\d{1,2}/\d{4})")
+        if dob:
+            out["date_of_birth"] = dob
+        pob = grab(r"Τόπος Γέννησης:\s*(.+?)\s*(?:Αριθμός|Αρ\.\s*Δελτ|Τηλ|ΑΦΜ)")
+        if pob:
+            out["place_of_birth"] = pob
+        muni = grab(r"Κατοικίας:\s*(.+?)\s*(?:Οδός|Αριθ|ΤΚ|Τ\.Κ|ΑΦΜ)")
+        if muni:
+            out["municipality"] = muni
+        postcode = grab(r"Τ\.?Κ\.?\s*:?\s*(\d{5})")
+        if postcode:
+            out["postcode"] = postcode
+        return out
+
+    def _extract_doc_code(self, text: str) -> Optional[str]:
+        """Extract the Gov.gr per-document code (Κωδικός)."""
+        match = re.search(r"Κωδικός:\s*([A-Za-z0-9_\-]{6,})", text)
+        return match.group(1).strip() if match else None
+
+    def _hash_doc_code(self, code: str) -> str:
+        """Salted hash of the document code — a stable anti-replay key."""
+        return hashlib.sha256(f"{code}{self.salt_key}".encode("utf-8")).hexdigest()
     
     def _extract_vote_choice(self, text: str) -> Optional[str]:
         """Extract vote choice from text using multiple regex patterns."""

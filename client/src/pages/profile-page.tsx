@@ -31,6 +31,12 @@ export default function ProfilePage() {
     accountStatus: "active",
     govgrVerified: false,
     govgrVerifiedAt: null,
+    govgrFirstName: null,
+    govgrLastName: null,
+    govgrDob: null,
+    govgrPlaceOfBirth: null,
+    govgrMunicipality: null,
+    govgrPostcode: null,
   };
 
   if (isLoading) {
@@ -134,6 +140,46 @@ export default function ProfilePage() {
                     </p>
                   </div>
                 </div>
+                {effectiveUser.govgrVerified &&
+                  (effectiveUser.govgrFirstName ||
+                    effectiveUser.govgrDob ||
+                    effectiveUser.govgrMunicipality) && (
+                    <div className="rounded-lg border p-4 space-y-1.5 text-sm">
+                      <p className="font-medium text-muted-foreground">
+                        {t('profile.verifiedIdentity')}
+                      </p>
+                      {(effectiveUser.govgrFirstName || effectiveUser.govgrLastName) && (
+                        <p>
+                          <span className="text-muted-foreground">{t('profile.verifiedName')}:</span>{' '}
+                          {[effectiveUser.govgrFirstName, effectiveUser.govgrLastName]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </p>
+                      )}
+                      {effectiveUser.govgrDob && (
+                        <p>
+                          <span className="text-muted-foreground">{t('profile.verifiedDob')}:</span>{' '}
+                          {effectiveUser.govgrDob}
+                        </p>
+                      )}
+                      {effectiveUser.govgrPlaceOfBirth && (
+                        <p>
+                          <span className="text-muted-foreground">{t('profile.verifiedPob')}:</span>{' '}
+                          {effectiveUser.govgrPlaceOfBirth}
+                        </p>
+                      )}
+                      {(effectiveUser.govgrMunicipality || effectiveUser.govgrPostcode) && (
+                        <p>
+                          <span className="text-muted-foreground">
+                            {t('profile.verifiedResidence')}:
+                          </span>{' '}
+                          {[effectiveUser.govgrMunicipality, effectiveUser.govgrPostcode]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 <p className="text-sm text-muted-foreground">{t('profile.identityActionUnavailable')}</p>
                 {!effectiveUser.govgrVerified && (
                   <Button

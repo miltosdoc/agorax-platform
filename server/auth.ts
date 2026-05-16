@@ -46,6 +46,12 @@ function sanitizeUser(user: User): SafeUser {
     accountStatus: user.accountStatus,
     govgrVerified: user.govgrVerified,
     govgrVerifiedAt: user.govgrVerifiedAt,
+    govgrFirstName: user.govgrFirstName,
+    govgrLastName: user.govgrLastName,
+    govgrDob: user.govgrDob,
+    govgrPlaceOfBirth: user.govgrPlaceOfBirth,
+    govgrMunicipality: user.govgrMunicipality,
+    govgrPostcode: user.govgrPostcode,
   };
 }
 

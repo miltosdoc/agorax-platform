@@ -897,6 +897,11 @@ const el: TranslationDictionary = {
   'profile.updateLocation': 'Ενημερώστε την τοποθεσία σας για συμμετοχή με γεωγραφικούς περιορισμούς.',
   'profile.userInformation': 'Στοιχεία χρήστη',
   'profile.verified': 'Επαληθευμένος',
+  'profile.verifiedIdentity': 'Επαληθευμένη ταυτότητα (Gov.gr)',
+  'profile.verifiedName': 'Ονοματεπώνυμο',
+  'profile.verifiedDob': 'Ημερομηνία γέννησης',
+  'profile.verifiedPob': 'Τόπος γέννησης',
+  'profile.verifiedResidence': 'Τόπος κατοικίας',
   'walkthrough.responded': 'Απάντησε',
 
   // Proposal index page
