@@ -129,14 +129,22 @@
     line-height: 1.65;
   }
 
-  button, a, [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
+  input, textarea, select {
+    font-size: 16px;
   }
 
-  input, textarea, select {
-    min-height: 44px;
-    font-size: 16px;
+  /* 44px touch targets on touch devices only. On desktop (a fine pointer)
+     controls keep their natural sizing — the global 44px minimum made the
+     whole UI read as zoomed-in with a mouse. */
+  @media (pointer: coarse) {
+    button, a, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    input, textarea, select {
+      min-height: 44px;
+    }
   }
 }
 

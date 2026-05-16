@@ -13,10 +13,10 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Clock, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { CheckCircle, Clock, ThumbsUp, ThumbsDown, XCircle } from 'lucide-react';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
 
 interface SortitionAssignment {
@@ -78,6 +78,8 @@ export default function SortitionScoringPage() {
   const [revisions, setRevisions] = useState<Array<{ id: number; text: string; authorName: string }>>([]);
   const [revisionText, setRevisionText] = useState('');
   const [revisionSubmitting, setRevisionSubmitting] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -135,6 +137,7 @@ export default function SortitionScoringPage() {
   const handleAttendance = async (status: 'accepted' | 'declined') => {
     if (!assignment?.proposalId || attendanceSubmitting) return;
     setAttendanceSubmitting(true);
+    setAttendanceError(null);
     try {
       await api.post(`/api/proposals/${assignment.proposalId}/attendance`, {
         status,
@@ -142,7 +145,7 @@ export default function SortitionScoringPage() {
       });
       await refreshAttendance(assignment.proposalId);
     } catch (e) {
-      console.error('Failed to update attendance:', e);
+      setAttendanceError(e instanceof ApiError ? e.message : t('sortition.attendance.failed'));
     } finally {
       setAttendanceSubmitting(false);
     }
@@ -152,6 +155,7 @@ export default function SortitionScoringPage() {
     if (!assignmentId) return;
     
     setSubmitting(true);
+    setScoreError(null);
     try {
       await api.post(`/api/sortition/assignments/${assignmentId}/score`, {
         score,
@@ -159,7 +163,7 @@ export default function SortitionScoringPage() {
       });
       setSubmitted(true);
     } catch (error) {
-      console.error('Failed to submit score:', error);
+      setScoreError(error instanceof ApiError ? error.message : t('sortition.scoring.submitFailed'));
     }
     setSubmitting(false);
   };
@@ -315,6 +319,12 @@ export default function SortitionScoringPage() {
               </Button>
             </div>
           )}
+          {attendanceError && (
+            <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+              <XCircle className="w-4 h-4 shrink-0" />
+              <span>{attendanceError}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -379,6 +389,12 @@ export default function SortitionScoringPage() {
               </ul>
             </div>
 
+            {scoreError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>{scoreError}</span>
+              </div>
+            )}
             <Button onClick={handleSubmit} disabled={submitting}>
               {submitting ? t('sortition.scoring.submitting') : t('sortition.scoring.submitScore')}
             </Button>

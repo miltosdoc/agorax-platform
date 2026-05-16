@@ -254,6 +254,7 @@ const en: TranslationDictionary = {
   'sortition.scoring.guidelineHigh': '>90: Proposal is well-structured and ready for deliberation',
   'sortition.scoring.submitting': 'Submitting...',
   'sortition.scoring.submitScore': 'Submit Score',
+  'sortition.scoring.submitFailed': 'Could not submit your score. Please try again.',
 
   // Sortition Synthesis
   'sortition.synthesis.finalTextSubmitted': 'Final Text Submitted',
@@ -1050,6 +1051,7 @@ const en: TranslationDictionary = {
   'sortition.attendance.description': 'Confirm whether you can take part in this sortition body before the deadline.',
   'sortition.attendance.confirm': 'Confirm attendance',
   'sortition.attendance.decline': 'Decline',
+  'sortition.attendance.failed': 'Could not update your attendance. Please try again.',
   'sortition.attendance.changeResponse': 'Change response',
   'sortition.attendance.confirmedRate': 'Confirmed members',
   'sortition.attendance.status.invited': 'Invited',

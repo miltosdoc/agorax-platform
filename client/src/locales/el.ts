@@ -254,6 +254,7 @@ const el: TranslationDictionary = {
   'sortition.scoring.guidelineHigh': '>90: Η πρόταση είναι καλοδομημένη και έτοιμη για διαβούλευση',
   'sortition.scoring.submitting': 'Υποβολή...',
   'sortition.scoring.submitScore': 'Υποβολή Βαθμολογίας',
+  'sortition.scoring.submitFailed': 'Δεν ήταν δυνατή η υποβολή της βαθμολογίας σας. Δοκιμάστε ξανά.',
 
   // Sortition Synthesis
   'sortition.synthesis.finalTextSubmitted': 'Τελικό Κείμενο Υποβλήθηκε',
@@ -1050,6 +1051,7 @@ const el: TranslationDictionary = {
   'sortition.attendance.description': 'Επιβεβαίωσε αν μπορείς να συμμετέχεις στο κληρωτό σώμα πριν τη λήξη της προθεσμίας.',
   'sortition.attendance.confirm': 'Επιβεβαίωση',
   'sortition.attendance.decline': 'Απόρριψη',
+  'sortition.attendance.failed': 'Δεν ήταν δυνατή η ενημέρωση της συμμετοχής σας. Δοκιμάστε ξανά.',
   'sortition.attendance.changeResponse': 'Αλλαγή απάντησης',
   'sortition.attendance.confirmedRate': 'Επιβεβαιωμένα μέλη',
   'sortition.attendance.status.invited': 'Προσκλήθηκε',
