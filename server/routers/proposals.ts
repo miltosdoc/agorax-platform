@@ -15,6 +15,7 @@ import {
   sortitionNotifications,
   communityMembers,
   proposals,
+  users,
   castProposalVoteSchema,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState } from '@shared/proposal-lifecycle';

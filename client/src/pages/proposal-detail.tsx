@@ -73,7 +73,7 @@ function scoreColor(score: number): string {
 }
 
 export default function ProposalDetailPage() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const proposalId = location.split('/').pop();
   const { t } = useTranslation();
   const { user } = useAuth();
