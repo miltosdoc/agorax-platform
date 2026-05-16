@@ -170,3 +170,11 @@ export type {
   ThresholdContestResult,
   ThresholdDecryptionResult,
 } from './decryption.ts';
+
+// --- Phase 4: the public verifier -----------------------------------------
+export { verifyElectionRecord } from './verifier.ts';
+export type {
+  ElectionRecord,
+  VerificationCheck,
+  VerificationReport,
+} from './verifier.ts';

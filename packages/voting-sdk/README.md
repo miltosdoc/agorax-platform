@@ -20,15 +20,15 @@ It deliberately does **not** own eligibility (one-person-one-vote),
 coercion-resistance, client-code delivery trust, or metadata-leak prevention —
 those are platform and governance concerns. See section 3 of the plan.
 
-## Status — Phase 3 (threshold trustees)
+## Status — Phase 4 (public verifier)
 
 | Phase | Scope | State |
 |-------|-------|-------|
 | 0 | Workspace package, EG 2.1 group params, conformance harness | ✅ |
 | 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ |
 | 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | ✅ |
-| 3 | Pedersen VSS key ceremony, threshold decryption | ✅ this PR |
-| 4 | Independent public verifier | — |
+| 3 | Pedersen VSS key ceremony, threshold decryption | ✅ |
+| 4 | Independent public verifier | ✅ this PR |
 | 5 | AgoraX `ElectionGuardBackend` (`VotingBackend`) | — |
 | 6 | Browser-side encryption (privacy becomes real here) | — |
 | 7 | Mobile signing surface | — |
@@ -57,6 +57,14 @@ proof; any `t` partials Lagrange-combine into the result. The test confirms
 three different 3-guardian subsets (and the full 5) all decrypt identically,
 and that a sub-threshold set cannot.
 
+Phase 4 is the standalone verifier. `verifyElectionRecord` takes the complete
+public bundle of an election — manifest, joint key, guardian commitments,
+every encrypted ballot, the tally, the partial decryptions, the result — and
+re-derives and re-checks all of it: ballot validity, that the tally is the
+homomorphic aggregate of the ballots, and that the threshold decryption is
+correct. A miscount, stuffed ballot, forged tally or cheating guardian fails
+at least one named check.
+
 **Conformance caveat:** Phase 1 proves *mathematical* soundness — honest
 proofs verify, tampered proofs and out-of-range ballots are rejected. The
 Fiat-Shamir encoding is sound but not yet byte-identical to EG 2.1's exact
@@ -81,6 +89,7 @@ src/
   tally.ts       — homomorphic aggregation of encrypted ballots
   keyceremony.ts — Pedersen VSS key ceremony, t-of-n guardian shares
   decryption.ts  — single-guardian + threshold decryption, with proofs
+  verifier.ts    — ElectionRecord + verifyElectionRecord (public verifier)
   index.ts       — public API surface
 test/
   conformance.ts — JSON vector-file harness (loadVectorsByType)
