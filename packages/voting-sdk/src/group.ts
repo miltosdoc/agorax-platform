@@ -114,6 +114,11 @@ export function multModQ(a: bigint, b: bigint): ElementModQ {
   return Fq.mul(Fq.create(a), Fq.create(b)) as ElementModQ;
 }
 
+/** Modular inverse in Z_q: a⁻¹ mod q. */
+export function invModQ(a: bigint): ElementModQ {
+  return Fq.inv(Fq.create(a)) as ElementModQ;
+}
+
 // --- Membership checks -----------------------------------------------------
 
 /** True if `x` is a valid residue mod p (0 < x < p). */

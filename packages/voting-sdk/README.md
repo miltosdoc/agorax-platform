@@ -20,14 +20,14 @@ It deliberately does **not** own eligibility (one-person-one-vote),
 coercion-resistance, client-code delivery trust, or metadata-leak prevention —
 those are platform and governance concerns. See section 3 of the plan.
 
-## Status — Phase 2 (ballots, tally, decryption)
+## Status — Phase 3 (threshold trustees)
 
 | Phase | Scope | State |
 |-------|-------|-------|
 | 0 | Workspace package, EG 2.1 group params, conformance harness | ✅ |
 | 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ |
-| 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | ✅ this PR |
-| 3 | Pedersen VSS key ceremony, threshold decryption | — |
+| 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | ✅ |
+| 3 | Pedersen VSS key ceremony, threshold decryption | ✅ this PR |
 | 4 | Independent public verifier | — |
 | 5 | AgoraX `ElectionGuardBackend` (`VotingBackend`) | — |
 | 6 | Browser-side encryption (privacy becomes real here) | — |
@@ -49,6 +49,13 @@ encryption (each selection a proven 0/1, each contest proven to sum to its
 selection limit), the homomorphic tally over many ballots, and single-guardian
 decryption that recovers the counts with a verifiable proof. The end-to-end
 test casts ten ballots and confirms the decrypted result and its proof.
+
+Phase 3 removes the single point of trust: a Pedersen verifiable-secret-sharing
+key ceremony produces a `t`-of-`n` guardian set with a joint public key whose
+secret is never assembled. Each guardian partially decrypts the tally with a
+proof; any `t` partials Lagrange-combine into the result. The test confirms
+three different 3-guardian subsets (and the full 5) all decrypt identically,
+and that a sub-threshold set cannot.
 
 **Conformance caveat:** Phase 1 proves *mathematical* soundness — honest
 proofs verify, tampered proofs and out-of-range ballots are rejected. The
@@ -72,7 +79,8 @@ src/
   manifest.ts    — election manifest (contests, selections, limits)
   ballot.ts      — plaintext/ciphertext ballots, encrypt + verify
   tally.ts       — homomorphic aggregation of encrypted ballots
-  decryption.ts  — single-guardian decryption with verifiable proof
+  keyceremony.ts — Pedersen VSS key ceremony, t-of-n guardian shares
+  decryption.ts  — single-guardian + threshold decryption, with proofs
   index.ts       — public API surface
 test/
   conformance.ts — JSON vector-file harness (loadVectorsByType)

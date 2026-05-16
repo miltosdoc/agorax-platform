@@ -34,6 +34,7 @@ export {
   addModQ,
   subModQ,
   multModQ,
+  invModQ,
   isElementModP,
   isElementModQ,
   isInSubgroup,
@@ -134,4 +135,38 @@ export type {
   DecryptedSelection,
   DecryptedContest,
   DecryptedTally,
+} from './decryption.ts';
+
+// --- Phase 3: threshold key ceremony + decryption -------------------------
+export {
+  evaluatePolynomial,
+  generateGuardian,
+  commitmentFor,
+  dealShare,
+  verifyShare,
+  deriveShareCommitment,
+  lagrangeCoefficient,
+  runKeyCeremony,
+} from './keyceremony.ts';
+export type {
+  Guardian,
+  GuardianCommitment,
+  GuardianShare,
+  KeyCeremonyResult,
+} from './keyceremony.ts';
+
+export {
+  partiallyDecryptTally,
+  verifyPartialDecryption,
+  combineDecryptionShares,
+  verifyThresholdDecryption,
+} from './decryption.ts';
+export type {
+  PartialDecryptionSelection,
+  PartialDecryptionContest,
+  GuardianPartialDecryption,
+  GuardianPublicShare,
+  ThresholdSelectionResult,
+  ThresholdContestResult,
+  ThresholdDecryptionResult,
 } from './decryption.ts';
