@@ -201,14 +201,16 @@ server/
 
 ### Docker
 
-```bash
-# Build and run
-docker build -t agorax .
-docker run -p 3000:3000 -p 5173:5173 agorax
+`docker-compose.yml` brings up the full stack — **PostgreSQL**, the
+**AgoraX app**, and the **ballot service**:
 
-# Health check
-curl http://localhost:3000/health
+```bash
+docker compose up --build
+curl http://localhost:3000/api/health
 ```
+
+(See [docs/RUNNING.md](docs/RUNNING.md) for the non-Docker runbook and the
+list of background services.)
 
 ### CI/CD Pipeline
 
@@ -243,6 +245,7 @@ curl http://localhost:3000/health
 
 ## 📚 Documentation
 
+- [Running AgoraX](docs/RUNNING.md) — Install, services, and the local runbook
 - [API Reference](docs/API.md) — Complete endpoint documentation
 - [Architecture Guide](docs/ARCHITECTURE.md) — Domain-driven design principles
 - [Test Suite](docs/TESTS.md) — Test coverage and structure
@@ -268,22 +271,62 @@ AgoraX implements several novel approaches to digital democracy:
 
 We welcome contributions! Please read our [Code of Conduct](CODE_OF_CONDUCT.md) and [Contributing Guide](CONTRIBUTING.md).
 
-### Development Setup
+### Local Development Setup
+
+See [docs/RUNNING.md](docs/RUNNING.md) for the full runbook. In short:
+
+**Prerequisites:** Node.js 20+, Python 3.11+, PostgreSQL 14+.
+
+**1. Clone & install**
 
 ```bash
-# Clone and install
-git clone https://github.com/miltosdoc/agoraxdemo.git
-cd agoraxdemo
-npm install
+git clone https://github.com/miltosdoc/agoraxdemocracy.git
+cd agoraxdemocracy
+npm install                # Node app + the @agorax/voting workspace package
+```
 
-# Start development environment
-npm run dev
+**2. Database** — create a PostgreSQL database and sync the schema:
 
-# Run tests
-npm test
+```bash
+createdb agorax
+npm run db:push            # creates every table from shared/schema.ts
+```
 
-# Check modularity
-node scripts/check-modularity.cjs
+**3. Environment** — copy `.env.example` to `.env` and set at least
+`DATABASE_URL` and `SESSION_SECRET`.
+
+**4. Run the services** — AgoraX is **three processes**:
+
+| Service | Command | Port | Needed for |
+|---|---|---|---|
+| PostgreSQL | your system service | 5432 | everything |
+| AgoraX app (Node) | `npm run dev` | 3001 | the platform — API + UI |
+| Ballot service (Python) | see below | 8000 | Gov.gr identity verification |
+
+```bash
+# The ballot service — a separate FastAPI app for Gov.gr PDF validation:
+cd ballot_service
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+DATABASE_URL="postgresql://USER@localhost:5432/agorax" SALT_KEY="<stable secret>" \
+  .venv/bin/uvicorn main:app --port 8000
+```
+
+Without the ballot service the app still runs — only Gov.gr identity
+verification is unavailable. The former Python `economy-service` has been
+**retired**: Democracy Points are now native to the Node app, so there is no
+separate economy process.
+
+**5. Demo data (optional):** `npm run db:seed` — then log in as `demo_admin`,
+`demo_citizen1` or `demo_citizen2`.
+
+**Other commands**
+
+```bash
+npm test                           # tests
+npx tsc --noEmit                    # typecheck
+node scripts/check-modularity.cjs   # module-boundary check
+npm run check:i18n                  # translation-key parity
 ```
 
 ---
