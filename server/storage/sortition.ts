@@ -157,16 +157,45 @@ private async bodyIdsForProposal(proposalId: number): Promise<number[]> {
 
 
   /**
-   * Get attendance summary for a proposal.
+   * Get the attendance summary for a proposal — counts drawn from the
+   * sortition_attendance records (not the scoring `responded` flag).
+   * `confirmedPct` is a fraction in [0,1]; callers multiply by 100 to display.
    */
   async getAttendanceSummary(proposalId: number) {
-    const members = await this.getSortitionMembers(proposalId);
-    const confirmed = members.filter(m => m.responded === true);
+    // getSortitionMembers is keyed by bodyId; gather across the proposal's
+    // sortition bodies.
+    const bodyIds = await this.bodyIdsForProposal(proposalId);
+    const members = bodyIds.length > 0
+      ? await db
+          .select()
+          .from(sortitionMembers)
+          .where(inArray(sortitionMembers.bodyId, bodyIds))
+      : [];
+    const total = members.length;
+    const records = bodyIds.length > 0
+      ? await db
+          .select()
+          .from(sortitionAttendance)
+          .where(inArray(sortitionAttendance.bodyId, bodyIds))
+      : [];
+    const countOf = (status: string) =>
+      records.filter(r => r.status === status).length;
+    const accepted = countOf('accepted');
+    const declined = countOf('declined');
+    const completed = countOf('completed');
+    const noShow = countOf('no-show');
+    // Members without an attendance row yet are still merely 'invited'.
+    const invited = countOf('invited') + Math.max(0, total - records.length);
+    const confirmed = accepted + completed;
     return {
-      confirmedPct: members.length > 0 ? (confirmed.length / members.length) * 100 : 0,
-      attended: confirmed.length,
-      total: members.length,
-      rate: members.length > 0 ? confirmed.length / members.length : 0,
+      invited,
+      accepted,
+      declined,
+      noShow,
+      completed,
+      total,
+      confirmedPct: total > 0 ? confirmed / total : 0,
+      rate: total > 0 ? confirmed / total : 0,
     };
   }
 }
