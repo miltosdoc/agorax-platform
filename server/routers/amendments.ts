@@ -15,6 +15,23 @@ import {
   saveFinalText,
 } from '../utils/amendment-processor';
 
+/** True if `userId` belongs to a sortition body assigned to `proposalId`. */
+async function isSortitionMember(proposalId: number, userId: number): Promise<boolean> {
+  const { db } = await import('../db');
+  const { sortitionBodies, sortitionMembers } = await import('@shared/schema');
+  const { and, eq } = await import('drizzle-orm');
+  const rows = await db
+    .select({ id: sortitionMembers.id })
+    .from(sortitionMembers)
+    .innerJoin(sortitionBodies, eq(sortitionBodies.id, sortitionMembers.bodyId))
+    .where(and(
+      eq(sortitionBodies.proposalId, proposalId),
+      eq(sortitionMembers.userId, userId),
+    ))
+    .limit(1);
+  return rows.length > 0;
+}
+
 export function registerAmendmentsRoutes(app: Express): void {
   app.get("/api/proposals/:id/amendments", async (req: any, res) => {
     try {
@@ -193,7 +210,65 @@ export function registerAmendmentsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch sortition input" });
     }
   });
-  // ─── Sortition: Save final composed text ────────────────────────────────────
+  // ─── Sortition: jury revisions ──────────────────────────────────────────────
+  // A sortition body member's edit is recorded as an amendment layered on the
+  // author's original — type 'sortition_revision' — so the voter sees the
+  // original proposal plus every attributed revision, never an opaque blob.
+  app.post("/api/proposals/:id/sortition-amendments", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+      if (!text) return res.status(400).json({ message: "Revision text is required" });
+      if (!(await isSortitionMember(proposalId, req.user.id))) {
+        return res.status(403).json({ message: "Only sortition body members may revise this proposal" });
+      }
+      const amendment = await amendmentRepo.createAmendment({
+        proposalId,
+        authorId: req.user.id,
+        type: 'sortition_revision',
+        text,
+        status: 'accepted',
+      });
+      res.status(201).json(amendment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to submit sortition revision" });
+    }
+  });
+
+  app.get("/api/proposals/:id/sortition-amendments", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const all = await amendmentRepo.getAmendments(proposalId);
+      const revisions = all.filter((a: any) => a.type === 'sortition_revision');
+      if (revisions.length === 0) return res.json([]);
+      const { db } = await import('../db');
+      const { users } = await import('@shared/schema');
+      const { inArray } = await import('drizzle-orm');
+      const authorIds = Array.from(new Set(revisions.map((a: any) => a.authorId)));
+      const authors = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(inArray(users.id, authorIds));
+      const nameById = new Map(authors.map((u) => [u.id, u.name]));
+      res.json(
+        revisions
+          .sort((a: any, b: any) => a.id - b.id)
+          .map((a: any) => ({
+            id: a.id,
+            text: a.text,
+            authorId: a.authorId,
+            authorName: nameById.get(a.authorId) ?? 'Unknown',
+            createdAt: a.createdAt,
+          })),
+      );
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sortition revisions" });
+    }
+  });
+
+  // ─── Sortition: Save final composed text (legacy — kept for compatibility) ──
   app.post("/api/proposals/:id/final-text", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -206,6 +281,10 @@ export function registerAmendmentsRoutes(app: Express): void {
       // Check if proposal is in sortition_synthesis state
       if (proposal.status !== 'sortition_synthesis') {
         return res.status(400).json({ message: "Proposal must be in sortition_synthesis state" });
+      }
+      // Only a member of this proposal's sortition body may compose the text.
+      if (!(await isSortitionMember(proposalId, req.user.id))) {
+        return res.status(403).json({ message: "Only sortition body members may compose the final text" });
       }
       await saveFinalText(proposalId, finalText);
       res.json({ success: true });

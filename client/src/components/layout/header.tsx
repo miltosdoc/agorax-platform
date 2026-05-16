@@ -185,6 +185,15 @@ export default function Header() {
               <Users className="h-4 w-4" />
               <span>{t('nav.communities')}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => navigate("/sortition")}
+              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
+              data-testid="button-sortition"
+            >
+              <Users className="h-4 w-4" />
+              <span>{t('nav.sortition')}</span>
+            </button>
 
             {/* Notification Bell */}
             <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
@@ -341,6 +350,14 @@ export default function Header() {
                 >
                   <Users className="mr-2 h-4 w-4" />
                   {t('nav.communities')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/sortition")}
+                  className="cursor-pointer transition-smooth"
+                  data-testid="menu-sortition"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  {t('nav.sortition')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/proposals/new")}

@@ -61,6 +61,9 @@ export default function SortitionScoringPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [revisions, setRevisions] = useState<Array<{ id: number; text: string; authorName: string }>>([]);
+  const [revisionText, setRevisionText] = useState('');
+  const [revisionSubmitting, setRevisionSubmitting] = useState(false);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -97,11 +100,23 @@ export default function SortitionScoringPage() {
     }
   }, []);
 
+  const refreshRevisions = useCallback(async (proposalId: number) => {
+    try {
+      const resp = await api.get<Array<{ id: number; text: string; authorName: string }>>(
+        `/api/proposals/${proposalId}/sortition-amendments`,
+      );
+      setRevisions(resp.data);
+    } catch {
+      setRevisions([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (assignment?.proposalId) {
       void refreshAttendance(assignment.proposalId);
+      void refreshRevisions(assignment.proposalId);
     }
-  }, [assignment?.proposalId, refreshAttendance]);
+  }, [assignment?.proposalId, refreshAttendance, refreshRevisions]);
 
   const handleAttendance = async (status: 'accepted' | 'declined') => {
     if (!assignment?.proposalId || attendanceSubmitting) return;
@@ -133,6 +148,22 @@ export default function SortitionScoringPage() {
       console.error('Failed to submit score:', error);
     }
     setSubmitting(false);
+  };
+
+  const handleAddRevision = async () => {
+    if (!assignment?.proposalId || !revisionText.trim() || revisionSubmitting) return;
+    setRevisionSubmitting(true);
+    try {
+      await api.post(`/api/proposals/${assignment.proposalId}/sortition-amendments`, {
+        text: revisionText.trim(),
+      });
+      setRevisionText('');
+      await refreshRevisions(assignment.proposalId);
+    } catch (error) {
+      console.error('Failed to submit revision:', error);
+    } finally {
+      setRevisionSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -326,6 +357,41 @@ export default function SortitionScoringPage() {
 
             <Button onClick={handleSubmit} disabled={submitting}>
               {submitting ? t('sortition.scoring.submitting') : t('sortition.scoring.submitScore')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Propose revisions — each becomes an amendment on the original */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>{t('sortition.revisions.title')}</CardTitle>
+          <CardDescription>{t('sortition.revisions.description')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {revisions.length > 0 && (
+              <div className="space-y-2">
+                {revisions.map((r) => (
+                  <div key={r.id} className="p-3 border rounded text-sm">
+                    <div className="text-xs text-muted-foreground mb-1">{r.authorName}</div>
+                    <p className="whitespace-pre-wrap">{r.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Textarea
+              value={revisionText}
+              onChange={(e) => setRevisionText(e.target.value)}
+              placeholder={t('sortition.revisions.placeholder')}
+              rows={3}
+            />
+            <Button
+              onClick={handleAddRevision}
+              disabled={revisionSubmitting || !revisionText.trim()}
+              variant="outline"
+            >
+              {revisionSubmitting ? t('sortition.revisions.adding') : t('sortition.revisions.add')}
             </Button>
           </div>
         </CardContent>

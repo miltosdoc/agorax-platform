@@ -84,6 +84,9 @@ export default function ProposalDetailPage() {
   const [voteError, setVoteError] = useState<string | null>(null);
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState<string | null>(null);
+  const [sortitionRevisions, setSortitionRevisions] = useState<
+    Array<{ id: number; text: string; authorName: string }>
+  >([]);
 
   useEffect(() => {
     if (!proposalId) return;
@@ -105,6 +108,16 @@ export default function ProposalDetailPage() {
         });
       })
       .finally(() => setLoading(false));
+  }, [proposalId]);
+
+  useEffect(() => {
+    if (!proposalId) return;
+    api
+      .get<Array<{ id: number; text: string; authorName: string }>>(
+        `/api/proposals/${proposalId}/sortition-amendments`,
+      )
+      .then((resp) => setSortitionRevisions(resp.data))
+      .catch(() => setSortitionRevisions([]));
   }, [proposalId]);
 
   const handleFinalize = async () => {
@@ -233,6 +246,23 @@ export default function ProposalDetailPage() {
           <div className="prose max-w-none">
             <h4 className="text-sm font-medium text-muted-foreground">{t('proposal.proposedSolution')}</h4>
             <p className="whitespace-pre-wrap">{proposal.solution}</p>
+
+            {sortitionRevisions.length > 0 && (
+              <div className="mt-4 p-4 border rounded space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium">{t('proposal.sortitionRevisions')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('proposal.sortitionRevisionsHint')}</p>
+                </div>
+                {sortitionRevisions.map((r, i) => (
+                  <div key={r.id} className="text-sm border-l-2 border-purple-300 pl-3">
+                    <div className="text-xs text-muted-foreground">
+                      {t('proposal.sortitionRevisionLabel', { n: i + 1 })} · {r.authorName}
+                    </div>
+                    <p className="whitespace-pre-wrap">{r.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
               <div className="mt-4 p-4 bg-muted rounded space-y-2">
