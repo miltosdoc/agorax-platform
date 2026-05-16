@@ -83,3 +83,12 @@ export function H(key: Uint8Array, data: Uint8Array): Uint8Array {
 export function sha256Utf8(s: string): Uint8Array {
   return sha256(new TextEncoder().encode(s));
 }
+
+/**
+ * Derive a challenge-binding context value from a list of string ids — used
+ * to tie a proof to a specific election / contest / selection so a proof
+ * transcript cannot be lifted from one place and replayed in another.
+ */
+export function contextFromIds(...parts: string[]): bigint[] {
+  return [bytesToBigint(sha256Utf8(parts.join(' ')))];
+}

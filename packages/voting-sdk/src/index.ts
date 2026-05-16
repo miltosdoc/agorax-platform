@@ -92,3 +92,46 @@ export type {
 
 export { proveZeroOrOne, verifyZeroOrOne } from './proofs/disjunctive.ts';
 export type { DisjunctiveProof } from './proofs/disjunctive.ts';
+
+// --- Phase 2: manifest, ballots, tally, decryption ------------------------
+export {
+  agoraxRatificationManifest,
+  assertValidManifest,
+} from './manifest.ts';
+export type {
+  SelectionDescription,
+  ContestDescription,
+  ElectionManifest,
+} from './manifest.ts';
+
+export {
+  ratificationBallot,
+  encryptBallot,
+  verifyBallot,
+} from './ballot.ts';
+export type {
+  PlaintextSelection,
+  PlaintextContest,
+  PlaintextBallot,
+  EncryptedSelection,
+  EncryptedContest,
+  CiphertextBallot,
+} from './ballot.ts';
+
+export {
+  emptyTally,
+  accumulateBallot,
+  tallyBallots,
+} from './tally.ts';
+export type {
+  SelectionTally,
+  ContestTally,
+  EncryptedTally,
+} from './tally.ts';
+
+export { decryptTally, verifyDecryptedTally } from './decryption.ts';
+export type {
+  DecryptedSelection,
+  DecryptedContest,
+  DecryptedTally,
+} from './decryption.ts';

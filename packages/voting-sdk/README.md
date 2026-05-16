@@ -20,13 +20,13 @@ It deliberately does **not** own eligibility (one-person-one-vote),
 coercion-resistance, client-code delivery trust, or metadata-leak prevention —
 those are platform and governance concerns. See section 3 of the plan.
 
-## Status — Phase 1 (encryption + proofs)
+## Status — Phase 2 (ballots, tally, decryption)
 
 | Phase | Scope | State |
 |-------|-------|-------|
 | 0 | Workspace package, EG 2.1 group params, conformance harness | ✅ |
-| 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ this PR |
-| 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | — |
+| 1 | ElGamal + Chaum-Pedersen + disjunctive proofs + Fiat-Shamir | ✅ |
+| 2 | Ballot encode/decode, homomorphic tally, single-guardian decrypt | ✅ this PR |
 | 3 | Pedersen VSS key ceremony, threshold decryption | — |
 | 4 | Independent public verifier | — |
 | 5 | AgoraX `ElectionGuardBackend` (`VotingBackend`) | — |
@@ -43,6 +43,12 @@ against the reference known-answer vector), exponential ElGamal encryption
 with its additive-homomorphic tally, and the zero-knowledge proofs — a
 Chaum-Pedersen discrete-log-equality proof and the disjunctive zero-or-one
 ballot-validity proof, both made non-interactive via Fiat-Shamir.
+
+Phase 2 builds the election flow on top: an election manifest, ballot
+encryption (each selection a proven 0/1, each contest proven to sum to its
+selection limit), the homomorphic tally over many ballots, and single-guardian
+decryption that recovers the counts with a verifiable proof. The end-to-end
+test casts ten ballots and confirms the decrypted result and its proof.
 
 **Conformance caveat:** Phase 1 proves *mathematical* soundness — honest
 proofs verify, tampered proofs and out-of-range ballots are rejected. The
@@ -63,6 +69,10 @@ src/
     fiat-shamir.ts    — non-interactive challenge derivation (domain-separated)
     chaum-pedersen.ts — discrete-log-equality proof
     disjunctive.ts    — zero-or-one ballot-validity proof
+  manifest.ts    — election manifest (contests, selections, limits)
+  ballot.ts      — plaintext/ciphertext ballots, encrypt + verify
+  tally.ts       — homomorphic aggregation of encrypted ballots
+  decryption.ts  — single-guardian decryption with verifiable proof
   index.ts       — public API surface
 test/
   conformance.ts — JSON vector-file harness (loadVectorsByType)
