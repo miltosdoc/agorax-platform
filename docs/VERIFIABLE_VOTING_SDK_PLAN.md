@@ -377,3 +377,64 @@ value.
 - Document this threat model publicly. Transparency is itself a defense: covert
   coercion is harder when the public knows what a stalled election or a missing
   mirror would mean.
+
+---
+
+## 13. Attack-Aware Operation
+
+The goal: AgoraX should *react* to an attack rather than passively die. Two
+ideas that sound appealing here do **not** work and must not be built — they
+are documented so a future session does not re-derive them.
+
+### What does NOT work (do not build these)
+
+- **"Standby VMs that activate as trustees."** A trustee's key share is created
+  during the key ceremony at election start; the decryption key is split among
+  exactly the trustees present then. A server not in the ceremony has no share,
+  and one cannot be retroactively injected into an already-keyed election.
+  (Proactive secret-sharing can *re-randomize* existing shares but needs a
+  threshold of the *existing* trustees to cooperate — the very parties being
+  coerced.) Trustees are fixed, once, up front.
+- **Host-controlled "hidden" trustees.** Even if such a VM held a share, a
+  server the host can activate is one the host controls — so its key is one the
+  host holds. It provides zero protection against the host being coerced. A
+  trustee's value is independence + jurisdiction, never secrecy. Hidden ≠
+  independent.
+- **"Output everything" on attack, where everything = votes.** A mechanism that
+  dumps plaintext ballots under attack hands the adversary a harvest: they
+  trigger the response and collect every vote. This destroys the privacy
+  property it is meant to protect. Never decrypt ballots as an attack response.
+
+### What DOES work (build these)
+
+- **Warrant canary / dead-man's switch.** Operators periodically re-sign a "we
+  have not been compelled" statement. If they stop — seizure, arrest, gag order
+  — a pre-signed "AgoraX has been attacked" disclosure publishes automatically.
+  It reveals *that* an attack happened, never the votes.
+- **Internationally replicated bulletin board.** Standby mirrors of the *public
+  encrypted record* (ciphertext + proofs only), in other jurisdictions,
+  continuously synced. If the primary servers are seized, the verifiable record
+  survives and the election can still be checked. Safe because mirrors hold no
+  plaintext.
+- **Standby infrastructure for availability.** Cold/hot-standby servers in other
+  jurisdictions that take over *serving the platform* if the primary dies.
+  Legitimate disaster recovery — but it protects *availability*, not *privacy*;
+  it does nothing about coerced trustees.
+- **Tripwire monitoring.** Detect trustees going dark, servers unreachable, or
+  censorship probes failing; alert humans and arm the canary.
+
+### Caveat on automatic attack-triggered mechanisms
+
+An automatic attack-response is itself an attack surface. False positives (a
+trustee's server crashed vs. was seized) trigger it spuriously. An adversary who
+learns the trigger can avoid it — or deliberately trip it to make AgoraX "cry
+wolf" until the alarm is ignored. **Detection may be automatic; the response to
+a high-consequence event should require a human in the loop.**
+
+### Summary
+
+Trustees cannot be made reactive — they are fixed at ceremony time and defended
+by independence + jurisdiction. What *can* be made attack-aware is the **public
+record** (replicate it so seizure cannot erase it) and the **disclosure
+mechanism** (a canary so coercion becomes public). Same goal — the system reacts
+to attack — on mechanisms that do not backfire.
