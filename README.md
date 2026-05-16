@@ -99,12 +99,14 @@ Configured via the `VOTING_BACKEND` env var. Today:
 | Backend | Status | Guarantees | Limits |
 |---|---|---|---|
 | `hash-chain` (default) | ✅ Shipping | Tamper-evident inclusion via per-proposal SHA-256 chain. Any post-hoc edit breaks `/api/proposals/:id/election/verify`. | Cleartext votes; no defense against host-side ballot stuffing or full-history rewrite. |
-| `helios` | 🚧 Reserved | ElGamal-encrypted ballots, threshold-trustee decryption (the [Helios protocol](https://heliosvoting.org/)). Host cannot decrypt individual votes; tally is publicly verifiable. | Coercion-resistance still requires identity layer (Gov.gr verification). |
+| `electionguard` | 📋 Planned | ElGamal-encrypted ballots, ballot-validity ZK proofs, homomorphic tally, threshold-trustee decryption, public verifier. Host cannot decrypt individual votes. | Coercion-resistance still requires identity layer (Gov.gr verification). |
 | `mobile-signed` | 🔮 Future | Voter-side signing in Secure Enclave / StrongBox. Server cannot forge ballots because it never holds the private key. | Requires the AgoraX mobile app. |
+
+The `electionguard` backend will be powered by **`@agorax/voting`** — an in-house TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/) protocol, built on audited primitives (`@noble/curves`, `@noble/hashes`). The complete build plan, responsibility split, privacy checklist, and state-adversary threat model live in [`docs/VERIFIABLE_VOTING_SDK_PLAN.md`](docs/VERIFIABLE_VOTING_SDK_PLAN.md).
 
 `castSignedBallot` already accepts an optional `BallotSignature` so the mobile signing piece can land without changing the API surface. The hash-chain backend ignores it; future backends require it.
 
-**Why this design:** the trust model of "what can the host do?" depends entirely on the voting backend, while the deliberation experience does not. A research community can run with `hash-chain`; a high-stakes board election can run with `helios`; a national pilot pairs `mobile-signed` with Gov.gr-verified rolls. Same product, same routes, same UX.
+**Why this design:** the trust model of "what can the host do?" depends entirely on the voting backend, while the deliberation experience does not. A research community can run with `hash-chain`; a high-stakes binding vote runs with `electionguard`; a national pilot pairs `mobile-signed` with Gov.gr-verified rolls. Same product, same routes, same UX.
 
 **Public endpoints (all backends):**
 - `POST /api/proposals/:id/vote` — cast a ballot, returns backend-defined receipt
