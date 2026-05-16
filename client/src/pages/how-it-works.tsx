@@ -176,12 +176,12 @@ export default function HowItWorksPage() {
                         <div className="mt-6 flex gap-4">
                           <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
                             <Users className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-                            <div className="text-lg font-bold">5</div>
+                            <div className="text-lg font-bold">12</div>
                             <div className="text-xs text-muted-foreground">{t('walkthrough.hiw_step5_citizens')}</div>
                           </div>
                           <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
                             <Globe className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-                            <div className="text-lg font-bold">48h</div>
+                            <div className="text-lg font-bold">72h</div>
                             <div className="text-xs text-muted-foreground">{t('walkthrough.hiw_step5_deadline')}</div>
                           </div>
                           <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
