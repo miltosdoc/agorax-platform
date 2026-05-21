@@ -126,13 +126,14 @@ no source_ref is a bug, not a stylistic choice. Shape:
 
 ### Render stages (abstract both behind interfaces — these vendors will change)
 
-- `TTSProvider` → first impl: ElevenLabs v3 (`/v1/text-to-dialogue`, multi-speaker, one object
-  per host with text + voice_id). We already hold the account; it leads blind-preference quality;
-  Greek quality is verified-good. Keep Gemini 3.1 Flash TTS (`gemini-3.1-flash-tts-preview`,
-  multi-speaker) as a documented cost-down fallback behind the SAME interface — revisit it if
-  ElevenLabs cost-at-scale bites AND its Greek output passes a quality check. (Gemini's SynthID
-  watermarking is a governance plus worth re-evaluating later, not a reason to lead with
-  unverified Greek now.)
+- `TTSProvider` → first impl: **OpenAI TTS (v1/v2)**. AgoraX is a democracy platform — its core
+  content is political/civic discourse. ElevenLabs, Gemini, and many commercial providers BLOCK
+  political content by default. OpenAI TTS allows civic/political speech (prohibits hate speech/
+  violence, not deliberation). Greek quality is good. Multi-speaker via separate calls + ffmpeg
+  mix. Keep Google Cloud TTS as a documented alternative if Greek quality is the priority.
+  Keep ElevenLabs as a documented option ONLY for non-sensitive, non-political content (e.g.,
+  platform tutorials, onboarding). Do NOT use ElevenLabs for proposal deliberation content — it
+  will be blocked.
 
 - `VideoRenderer` → templated, NOT generative. Phase 0 must EVALUATE three paths and recommend
   the SIMPLEST that yields TikTok-acceptable output for data cards (title, tally bars, verify-URL):
