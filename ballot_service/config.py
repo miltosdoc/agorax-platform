@@ -3,22 +3,26 @@ Configuration management for the Ballot Validation Service.
 Load settings from environment variables with sensible defaults.
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from typing import List
 import os
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
-    
-    # Security
-    SALT_KEY: str = "CHANGE_ME_IN_PRODUCTION_abc123xyz"
-    
+
+    # Security — SALT_KEY is the server-side secret used to hash AFMs and
+    # Gov.gr document codes. No default: missing env var must fail startup
+    # so a misconfigured deployment can never share a known/default salt
+    # across environments (GDPR pseudonymisation: brief §4.2).
+    SALT_KEY: str = Field(..., min_length=16)
+
     # Database — defaults to PostgreSQL (shared with main API)
     DATABASE_URL: str = "postgresql://agorax:changeme@db:5432/agorax"
     

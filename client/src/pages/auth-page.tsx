@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { loginUserSchema, registerUserSchema } from "@shared/schema";
+import { CURRENT_CONSENT_VERSION } from "@shared/consent";
 import { FcGoogle } from "react-icons/fc";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../assets/logo.png";
@@ -255,7 +256,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
 }
 
 function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onSwitchToLogin: () => void }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { registerMutation } = useAuth();
   const [acceptTerms, setAcceptTerms] = useState(false);
 
@@ -273,9 +274,11 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
     if (!acceptTerms) return;
     const deviceFingerprint = await getFingerprint();
     const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/home';
+    const consentLocale: 'el' | 'en' = locale === 'en' ? 'en' : 'el';
     registerMutation.mutate({
       ...values,
       deviceFingerprint,
+      consent: { version: CURRENT_CONSENT_VERSION, locale: consentLocale },
       returnTo: urlReturnTo
     }, {
       onSuccess: onSubmit,

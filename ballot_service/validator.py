@@ -473,18 +473,16 @@ class BallotValidator:
             m = re.search(pattern, flat, re.IGNORECASE)
             return m.group(1).strip() if m else None
 
+        # GDPR Art. 5(1)(c) minimisation: DOB and place-of-birth are
+        # extracted from the PDF text in transit but deliberately NOT stored.
+        # See migration 0014_minimise_personal_data.sql and
+        # docs/compliance/02_DATA_MINIMIZATION_AUDIT.md.
         first = grab(r"Όνομα:\s*([^\s:]+)")
         if first:
             out["first_name"] = first
         last = grab(r"Επώνυμο:\s*([^\s:]+)")
         if last:
             out["last_name"] = last
-        dob = grab(r"γέννησης:\s*(\d{1,2}/\d{1,2}/\d{4})")
-        if dob:
-            out["date_of_birth"] = dob
-        pob = grab(r"Τόπος Γέννησης:\s*(.+?)\s*(?:Αριθμός|Αρ\.\s*Δελτ|Τηλ|ΑΦΜ)")
-        if pob:
-            out["place_of_birth"] = pob
         muni = grab(r"Κατοικίας:\s*(.+?)\s*(?:Οδός|Αριθ|ΤΚ|Τ\.Κ|ΑΦΜ)")
         if muni:
             out["municipality"] = muni

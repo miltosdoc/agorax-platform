@@ -31,8 +31,6 @@ export interface IdentityValidationResult {
   demographics?: {
     first_name?: string;
     last_name?: string;
-    date_of_birth?: string;
-    place_of_birth?: string;
     municipality?: string;
     postcode?: string;
   };

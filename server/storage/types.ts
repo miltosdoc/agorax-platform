@@ -32,13 +32,6 @@ export interface IStorage {
   getUserByProviderId(providerId: string, provider: string): Promise<User | undefined>;
   getUserByVoterHash(voterHash: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserLocation(userId: number, locationData: {
-    latitude?: string;
-    longitude?: string;
-    locationConfirmed?: boolean;
-    locationVerified?: boolean;
-  }): Promise<User>;
-  verifyUserLocation(userId: number, verified: boolean): Promise<User>;
   updateUser(userId: number, updates: Partial<User>): Promise<User>;
   deleteUser(userId: number, deletePolls: boolean): Promise<boolean>;
   checkDuplicateAccounts(deviceFingerprint: string, ip: string): Promise<number>;

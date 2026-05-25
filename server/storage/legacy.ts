@@ -69,14 +69,6 @@ export class DatabaseStorage {
     return this.users.createUser(user);
   }
 
-  async updateUserLocation(userId: number, locationData: any) {
-    return this.users.updateUserLocation(userId, locationData);
-  }
-
-  async verifyUserLocation(userId: number, verified: boolean) {
-    return this.users.verifyUserLocation(userId, verified);
-  }
-
   async updateUser(userId: number, updates: any) {
     return this.users.updateUser(userId, updates);
   }
@@ -103,6 +95,18 @@ export class DatabaseStorage {
 
   async getAllUsersWithAccountInfo(filters?: any) {
     return this.users.getAllUsersWithAccountInfo(filters);
+  }
+
+  async recordConsent(args: { userId: number; consentVersion: string; consentTextHash: string; locale: string }) {
+    return this.users.recordConsent(args);
+  }
+
+  async getActiveConsent(userId: number) {
+    return this.users.getActiveConsent(userId);
+  }
+
+  async withdrawConsent(userId: number) {
+    return this.users.withdrawConsent(userId);
   }
 
   async updateAccountStatus(userId: number, status: string) {

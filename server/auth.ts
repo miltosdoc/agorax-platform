@@ -15,6 +15,11 @@ import { users, User, SafeUser } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
 import { addMember as addCommunityMember, getGeneralCommunity } from "./utils/community-manager";
+import {
+  CURRENT_CONSENT_VERSION,
+  consentTextHash,
+  validateConsent,
+} from "../shared/consent";
 
 // Extend session interface to include returnTo property
 declare module "express-session" {
@@ -38,18 +43,12 @@ function sanitizeUser(user: User): SafeUser {
     name: user.name,
     email: user.email,
     profilePicture: user.profilePicture,
-    latitude: user.latitude,
-    longitude: user.longitude,
-    locationConfirmed: user.locationConfirmed,
-    locationVerified: user.locationVerified,
     isAdmin: user.isAdmin,
     accountStatus: user.accountStatus,
     govgrVerified: user.govgrVerified,
     govgrVerifiedAt: user.govgrVerifiedAt,
     govgrFirstName: user.govgrFirstName,
     govgrLastName: user.govgrLastName,
-    govgrDob: user.govgrDob,
-    govgrPlaceOfBirth: user.govgrPlaceOfBirth,
     govgrMunicipality: user.govgrMunicipality,
     govgrPostcode: user.govgrPostcode,
   };
@@ -103,8 +102,6 @@ export const requireAuth = (req: any, res: any, next: any) => {
         profilePicture: null,
         isAdmin: true,
         govgrVerified: true,
-        locationConfirmed: false,
-        locationVerified: false,
       };
     }
     return next();
@@ -274,6 +271,18 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", authLimiter, async (req, res, next) => {
     try {
+      // GDPR Art. 9(2)(a) — registration requires explicit consent to the
+      // current canonical privacy text. Reject before any DB work so a
+      // missing/stale consent block never leaves us with a registered
+      // member who hasn't agreed.
+      const consent = validateConsent(req.body.consent);
+      if (!consent) {
+        return res.status(400).json({
+          message: "Consent required",
+          required: { version: CURRENT_CONSENT_VERSION, locales: ['el', 'en'] },
+        });
+      }
+
       // Store any returnTo info
       const returnTo = req.body.returnTo || '/home';
 
@@ -296,8 +305,8 @@ export function setupAuth(app: Express) {
         return res.status(400).send("Invalid registration data");
       }
 
-      // Remove returnTo and deviceFingerprint from the data saved to the database
-      const { returnTo: _, deviceFingerprint: __, ...userData } = req.body;
+      // Remove non-user fields from the data saved to the database
+      const { returnTo: _, deviceFingerprint: __, consent: ___, ...userData } = req.body;
 
       const user = await storage.createUser({
         ...userData,
@@ -307,6 +316,22 @@ export function setupAuth(app: Express) {
         lastLoginIp: clientIp || null,
         accountStatus: 'active',
       });
+
+      // Record the consent acceptance against the freshly created user.
+      // Failure here must roll back: a registered user with no consent row
+      // is the exact state this whole gate exists to prevent.
+      try {
+        await storage.recordConsent({
+          userId: user.id,
+          consentVersion: consent.version,
+          consentTextHash: consentTextHash(consent.locale),
+          locale: consent.locale,
+        });
+      } catch (consentErr) {
+        // Best-effort rollback of the user row.
+        try { await storage.deleteUser(user.id, false); } catch {}
+        throw consentErr;
+      }
 
       // Log account activity
       await storage.createAccountActivity({

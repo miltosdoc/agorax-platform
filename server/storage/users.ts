@@ -7,8 +7,17 @@
  */
 
 import { db } from '../db';
-import { users, accountActivity, type User, type InsertUser, type InsertAccountActivity, type SelectAccountActivity } from '../../shared/schema';
-import { eq, and, ilike, desc, sql } from 'drizzle-orm';
+import {
+  users,
+  accountActivity,
+  userConsents,
+  type User,
+  type InsertUser,
+  type InsertAccountActivity,
+  type SelectAccountActivity,
+  type UserConsent,
+} from '../../shared/schema';
+import { eq, and, ilike, desc, sql, isNull } from 'drizzle-orm';
 
 export class UserRepository {
 
@@ -66,32 +75,38 @@ export class UserRepository {
     return user;
   }
 
-  /** Update user location data. */
-  async updateUserLocation(userId: number, locationData: {
-    latitude?: string;
-    longitude?: string;
-    locationConfirmed?: boolean;
-    locationVerified?: boolean;
-  }): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set(locationData)
-      .where(eq(users.id, userId))
-      .returning();
-    if (!user) throw new Error("User not found");
-    return user;
+  /** Record an explicit consent acceptance (GDPR Art. 7 + Art. 9(2)(a)). */
+  async recordConsent(args: {
+    userId: number;
+    consentVersion: string;
+    consentTextHash: string;
+    locale: string;
+  }): Promise<UserConsent> {
+    const [row] = await db.insert(userConsents).values(args).returning();
+    return row;
   }
 
-  /** Verify user location. */
-  async verifyUserLocation(userId: number, verified: boolean): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ locationVerified: verified })
-      .where(eq(users.id, userId))
-      .returning();
-    if (!user) throw new Error("User not found");
-    return user;
+  /** Return the member's current non-withdrawn consent, if any. */
+  async getActiveConsent(userId: number): Promise<UserConsent | undefined> {
+    const [row] = await db
+      .select()
+      .from(userConsents)
+      .where(and(eq(userConsents.userId, userId), isNull(userConsents.withdrawnAt)))
+      .orderBy(desc(userConsents.acceptedAt))
+      .limit(1);
+    return row;
   }
+
+  /** Withdraw all active consents for a member (Art. 7(3)). */
+  async withdrawConsent(userId: number): Promise<number> {
+    const result = await db
+      .update(userConsents)
+      .set({ withdrawnAt: new Date() })
+      .where(and(eq(userConsents.userId, userId), isNull(userConsents.withdrawnAt)))
+      .returning({ id: userConsents.id });
+    return result.length;
+  }
+
 
   /** Update user fields. */
   async updateUser(userId: number, updates: Partial<User>): Promise<User> {

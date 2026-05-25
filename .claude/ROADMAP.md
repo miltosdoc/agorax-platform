@@ -84,7 +84,29 @@
 - **Status:** Not yet addressed
 - **What's needed:** React Query or SWR for data fetching with caching. Infinite scroll for proposal index. Debounced search. Skeleton loaders.
 
-### 7. Polish & Launch Prep
+### 7. Vote Privacy — Client-Side Encryption
+- **Status:** Not started — required before binding votes can run
+- **Problem:** Both backends (hash-chain, electionguard) let the server host see plaintext votes. Hash-chain stores `userId + choice` in cleartext. ElectionGuard encrypts server-side — host sees plaintext briefly.
+- **What's needed:**
+  - **Client-side encryption** — ballot encrypted in the browser before it reaches the server. Server only ever handles ciphertext.
+  - **Independent trustees** — guardian secret key shares distributed to off-server trustees, not stored in `eg_elections.dev_guardian_secrets`.
+  - **SDK Phase 6** — per `docs/VERIFIABLE_VOTING_SDK_PLAN.md`, client-side encryption is the final phase.
+- **Why:** Without this, the host can reconstruct "member X cast vote Y on proposal Z" — processing of political opinions linked to identifiable persons (Art. 9 special-category data). Binding votes on cleartext = GDPR liability.
+- **Blocker:** GDPR §1 finding. Either implement this (Option A) or formally accept pseudonymity with residual risk (Option B) and don't run binding votes until fixed.
+
+### 8. GDPR Formalization (Phase 8 — Compliance)
+- **Status:** Planned — brief at `docs/compliance/GDPR_FORMALIZATION_BRIEF.md`
+- **What's needed:**
+  - **DPIA** (Data Protection Impact Assessment) — verify every control against codebase, cite file+symbol
+  - **ROPA** (Record of Processing, Art. 30) — enumerate all processing activities
+  - **Privacy Notice + Consent** (Art. 13 + Art. 9(2)(a)) — bilingual el/en
+  - **Internal Policies** — access control, retention/deletion, breach response
+- **Critical decision:** §1 vote-linkage — default `VOTING_BACKEND=hash-chain` stores cleartext votes linked to verified identity. Must resolve to Option A (architectural fix — unlinkable ballots) or Option B (pseudonymity honestly labelled with residual risk acceptance). Binding votes cannot run on cleartext without honest documentation.
+- **Other tensions:** Right to erasure vs append-only hash-chain, AFM salted hash re-identifiability, LLM quality gate external data flow, LICENSE inconsistency (MIT vs CC-BY-NC-4.0)
+- **Deliverables:** `docs/compliance/` directory with DPIA.md, ROPA.md, PRIVACY_NOTICE.md, CONSENT.md, INTERNAL_POLICIES.md, README.md
+- **Why:** Processing political opinions = Article 9 special-category data. DPIA is legally required. Without it, the AMKE has no defensible position with HDPA.
+
+### 9. Polish & Launch Prep
 - **Status:** Future
 - **What's needed:** Error boundaries, empty states, loading states everywhere. Accessibility audit (keyboard nav, ARIA labels, contrast). i18n completeness (all strings in both el/en). Docker Compose production config. Deployment documentation.
 

@@ -8,54 +8,46 @@ import type { Express, Request, Response } from 'express';
 import multer from 'multer';
 import { userRepo } from '../storage';
 import { requireAuth } from '../auth';
-import { verifyLocationSchema, locationSchema } from '../utils/location-validator';
 import { ballotUpload } from '../utils/ballot-client';
 import { requireAdmin } from '../auth';
+import {
+  CONSENT_TEXT,
+  CURRENT_CONSENT_VERSION,
+  consentTextHash,
+} from '../../shared/consent';
 
 export function registerUsersRoutes(app: Express): void {
-  app.patch("/api/user/verify-location", requireAuth, async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Δεν είστε συνδεδεμένοι" });
-      }
-      const parsedData = verifyLocationSchema(req.body);
-      if (!parsedData.success) {
-        return res.status(400).json({
-          message: "Λανθασμένα δεδομένα επαλήθευσης",
-          errors: JSON.stringify(parsedData.error || "Validation failed")
-        });
-      }
-      // Update the user's location verification status
-      const updated = await userRepo.verifyUserLocation(userId, parsedData.data.verified);
-      // If verification is false, reset the location confirmation as well
-      if (!parsedData.data.verified) {
-        await userRepo.updateUserLocation(userId, {
-          locationConfirmed: false,
-          locationVerified: false
-        });
-      }
-      res.json(updated);
-    } catch (error) {
-      res.status(500).json({ message: "Σφάλμα κατά την επαλήθευση τοποθεσίας" });
-    }
+  // GDPR Art. 13 — surface the canonical privacy text + version so the
+  // client can re-prompt members whose stored consent version is stale.
+  app.get('/api/consent/current', (_req, res) => {
+    res.json({
+      version: CURRENT_CONSENT_VERSION,
+      text: CONSENT_TEXT,
+      hash: { el: consentTextHash('el'), en: consentTextHash('en') },
+    });
   });
-  app.patch("/api/user/location", requireAuth, async (req, res) => {
-    try {
-      const userId = req.user!.id;
-      const parsedData = verifyLocationSchema(req.body);
-      if (!parsedData.success) {
-        return res.status(400).json({
-          message: "Λανθασμένα δεδομένα τοποθεσίας",
-          errors: JSON.stringify(parsedData.error || "Validation failed")
-        });
-      }
-      const updatedUser = await userRepo.updateUserLocation(userId, parsedData.data);
-      res.json(updatedUser);
-    } catch (error) {
-      res.status(500).json({ message: "Σφάλμα κατά την ενημέρωση της τοποθεσίας" });
-    }
+
+  // GDPR Art. 15 — let the member see their own active consent record.
+  app.get('/api/user/consent', requireAuth, async (req: any, res) => {
+    const row = await userRepo.getActiveConsent(req.user.id);
+    if (!row) return res.json({ active: null, current: CURRENT_CONSENT_VERSION });
+    res.json({
+      active: {
+        version: row.consentVersion,
+        locale: row.locale,
+        acceptedAt: row.acceptedAt,
+      },
+      current: CURRENT_CONSENT_VERSION,
+      stale: row.consentVersion !== CURRENT_CONSENT_VERSION,
+    });
   });
+
+  // GDPR Art. 7(3) — right to withdraw consent at any time.
+  app.post('/api/user/consent/withdraw', requireAuth, async (req: any, res) => {
+    const withdrawn = await userRepo.withdrawConsent(req.user.id);
+    res.json({ withdrawn });
+  });
+
   // Admin-only access control middleware
   const requireAdmin = (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
@@ -121,8 +113,6 @@ export function registerUsersRoutes(app: Express): void {
           govgrDocCodeHash: docCodeHash || null,
           govgrFirstName: demo.first_name ?? null,
           govgrLastName: demo.last_name ?? null,
-          govgrDob: demo.date_of_birth ?? null,
-          govgrPlaceOfBirth: demo.place_of_birth ?? null,
           govgrMunicipality: demo.municipality ?? null,
           govgrPostcode: demo.postcode ?? null,
         });

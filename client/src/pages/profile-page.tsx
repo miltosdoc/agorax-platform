@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
-import { ArrowLeft, BadgeCheck, Fingerprint, MapPin, Shield, Trash2, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Fingerprint, Shield, Trash2, User } from "lucide-react";
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 
@@ -23,18 +23,12 @@ export default function ProfilePage() {
     name: "Demo User",
     email: "demo@agorax.gr",
     profilePicture: null,
-    latitude: null,
-    longitude: null,
-    locationConfirmed: false,
-    locationVerified: false,
     isAdmin: false,
     accountStatus: "active",
     govgrVerified: false,
     govgrVerifiedAt: null,
     govgrFirstName: null,
     govgrLastName: null,
-    govgrDob: null,
-    govgrPlaceOfBirth: null,
     govgrMunicipality: null,
     govgrPostcode: null,
   };
@@ -126,24 +120,14 @@ export default function ProfilePage() {
                 <CardDescription>{t('profile.identityVerificationDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border p-4">
-                    <p className="text-sm font-medium text-muted-foreground">{t('profile.govgrStatus')}</p>
-                    <p className="mt-1 font-semibold">
-                      {effectiveUser.govgrVerified ? t('profile.verified') : t('profile.notVerified')}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-4">
-                    <p className="text-sm font-medium text-muted-foreground">{t('profile.locationStatus')}</p>
-                    <p className="mt-1 font-semibold">
-                      {effectiveUser.locationConfirmed ? t('profile.confirmed') : t('profile.notConfirmed')}
-                    </p>
-                  </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-medium text-muted-foreground">{t('profile.govgrStatus')}</p>
+                  <p className="mt-1 font-semibold">
+                    {effectiveUser.govgrVerified ? t('profile.verified') : t('profile.notVerified')}
+                  </p>
                 </div>
                 {effectiveUser.govgrVerified &&
-                  (effectiveUser.govgrFirstName ||
-                    effectiveUser.govgrDob ||
-                    effectiveUser.govgrMunicipality) && (
+                  (effectiveUser.govgrFirstName || effectiveUser.govgrMunicipality) && (
                     <div className="rounded-lg border p-4 space-y-1.5 text-sm">
                       <p className="font-medium text-muted-foreground">
                         {t('profile.verifiedIdentity')}
@@ -154,18 +138,6 @@ export default function ProfilePage() {
                           {[effectiveUser.govgrFirstName, effectiveUser.govgrLastName]
                             .filter(Boolean)
                             .join(' ')}
-                        </p>
-                      )}
-                      {effectiveUser.govgrDob && (
-                        <p>
-                          <span className="text-muted-foreground">{t('profile.verifiedDob')}:</span>{' '}
-                          {effectiveUser.govgrDob}
-                        </p>
-                      )}
-                      {effectiveUser.govgrPlaceOfBirth && (
-                        <p>
-                          <span className="text-muted-foreground">{t('profile.verifiedPob')}:</span>{' '}
-                          {effectiveUser.govgrPlaceOfBirth}
                         </p>
                       )}
                       {(effectiveUser.govgrMunicipality || effectiveUser.govgrPostcode) && (
@@ -191,28 +163,6 @@ export default function ProfilePage() {
                     {t('profile.verifyIdentity')}
                   </Button>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  {t('profile.participationSettings')}
-                </CardTitle>
-                <CardDescription>{t('profile.participationSettingsDescription')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{t('profile.locationManagedLater')}</p>
-                <Button
-                  variant="outline"
-                  onClick={() => setLocation("/home")}
-                  data-testid="button-update-location"
-                  className="gap-2"
-                >
-                  <MapPin className="h-4 w-4" />
-                  {t('profile.updateLocationButton')}
-                </Button>
               </CardContent>
             </Card>
 

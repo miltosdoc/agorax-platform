@@ -14,16 +14,6 @@ export const users = pgTable("users", {
   provider: text("provider"), // 'google', 'facebook', 'twitter'
   profilePicture: text("profile_picture"), // URL to profile picture
 
-  // Geographic coordinates (only keeping GPS-based location)
-  latitude: text("latitude"),
-  longitude: text("longitude"),
-
-  // Flag for confirmed location
-  locationConfirmed: boolean("location_confirmed").default(false),
-
-  // Flag for verified location (when manually entered)
-  locationVerified: boolean("location_verified").default(false),
-
   // Admin role
   isAdmin: boolean("is_admin").notNull().default(false),
 
@@ -43,10 +33,22 @@ export const users = pgTable("users", {
   // data-minimisation, identifiers (ID-card number, parents) are NOT stored.
   govgrFirstName: text("govgr_first_name"),
   govgrLastName: text("govgr_last_name"),
-  govgrDob: text("govgr_dob"),                 // DD/MM/YYYY as printed
-  govgrPlaceOfBirth: text("govgr_place_of_birth"),
   govgrMunicipality: text("govgr_municipality"),
   govgrPostcode: text("govgr_postcode"),
+});
+
+// Append-only consent audit log (GDPR Art. 7 + Art. 9(2)(a)).
+// One row per acceptance; withdrawal sets `withdrawnAt` in place — the
+// acceptance row itself is never deleted, since the historical fact
+// "they did agree at time T" remains true even after withdrawal.
+export const userConsents = pgTable("user_consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  consentVersion: text("consent_version").notNull(),
+  consentTextHash: text("consent_text_hash").notNull(),
+  locale: text("locale").notNull(),
+  acceptedAt: timestamp("accepted_at").notNull().defaultNow(),
+  withdrawnAt: timestamp("withdrawn_at"),
 });
 
 export const polls = pgTable("polls", {
@@ -1088,6 +1090,12 @@ export const registerUserSchema = insertUserSchema.extend({
   name: z.string().min(2, { message: "Το όνομα πρέπει να έχει τουλάχιστον 2 χαρακτήρες" }),
   returnTo: z.string().optional(), // Add returnTo field for redirection after authentication
   deviceFingerprint: z.string().optional(),
+  // GDPR Art. 9(2)(a) — explicit consent for processing political opinions.
+  // Server validates the version matches the current canonical text.
+  consent: z.object({
+    version: z.string(),
+    locale: z.enum(['el', 'en']),
+  }).optional(),
 });
 
 export const loginUserSchema = z.object({
@@ -1115,6 +1123,8 @@ export type RegisterUser = z.infer<typeof registerUserSchema>;
 export type LoginUser = z.infer<typeof loginUserSchema>;
 
 export type User = typeof users.$inferSelect;
+export type UserConsent = typeof userConsents.$inferSelect;
+export type InsertUserConsent = typeof userConsents.$inferInsert;
 export type PollNotification = typeof pollNotifications.$inferSelect;
 export type SelectAccountActivity = typeof accountActivity.$inferSelect;
 export type Poll = typeof polls.$inferSelect;
@@ -1168,18 +1178,12 @@ export type SafeUser = Pick<
   | 'name'
   | 'email'
   | 'profilePicture'
-  | 'latitude'
-  | 'longitude'
-  | 'locationConfirmed'
-  | 'locationVerified'
   | 'isAdmin'
   | 'accountStatus'
   | 'govgrVerified'
   | 'govgrVerifiedAt'
   | 'govgrFirstName'
   | 'govgrLastName'
-  | 'govgrDob'
-  | 'govgrPlaceOfBirth'
   | 'govgrMunicipality'
   | 'govgrPostcode'
 >;
