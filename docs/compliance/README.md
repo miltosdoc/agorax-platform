@@ -33,7 +33,14 @@
 3. **LLM quality gate data flow** — **Confirmed external** (`server/utils/llm-validation.ts` → OpenRouter → NVIDIA Nemotron; `server/utils/ai-merger.ts` same transport). Controller decision pending: swap to local model, remove until local, or document as processor with DPA. See [02_DATA_MINIMIZATION_AUDIT.md §4.2](02_DATA_MINIMIZATION_AUDIT.md).
 4. ~~**AFM salt verification**~~ — **Pass + remediation applied**: `SALT_KEY` is server-side, env-loaded. Removed unsafe default in `ballot_service/config.py` so deployments fail-loud if env is missing. Residual risk (small AFM keyspace) documented for DPIA. See [03_OPERATIONAL_AUDITS.md §1](03_OPERATIONAL_AUDITS.md).
 5. **LICENSE inconsistency** — **Decision required**: LICENSE file says MIT, `package.json` says CC-BY-NC-4.0. See [03_OPERATIONAL_AUDITS.md §4](03_OPERATIONAL_AUDITS.md) for options.
-6. **Consent logging** — **Gap confirmed, remediation pending**: no consent storage exists. Two options documented (column-on-users vs `user_consents` table — recommended). See [03_OPERATIONAL_AUDITS.md §3](03_OPERATIONAL_AUDITS.md).
+6. ~~**Consent logging**~~ — **Closed.** `user_consents` append-only table (migration 0015) + `users.requires_consent` gate (migration 0016) + bilingual canonical text (`shared/consent.ts`) + register gate + `POST /api/user/consent/accept` for OAuth/re-consent + `POST /api/user/consent/withdraw` (Art. 7(3)) + `requireConsent` middleware applied to vote/proposal/amendment/debate routes.
+
+### Additional GDPR rights infrastructure (this PR set)
+
+- **Art. 15 (right of access)** — `GET /api/user/data-export` returns the member's profile + consent history + activity + erasure requests as a downloadable JSON.
+- **Art. 17 (right to be forgotten)** — `POST /api/user/erasure-request` records a pending request; manual admin processing per the brief's ≤1000-member scope. Hash-chain-vs-erasure resolution still pending (Internal Policies decision).
+- **OAuth consent gap** — `users.requires_consent` defaults TRUE for OAuth-created members; the gate blocks Art. 9 routes until they accept via `/api/user/consent/accept`. Frontend interstitial UI is the remaining piece.
+- **Existing-member backfill** — migration 0016 sets `requires_consent=true` for every pre-existing user; they will be gated until they re-accept.
 7. **Right to erasure vs hash-chain** — Decide approach: crypto-shredding, pseudonymise-in-place, or documented lawful refusal.
 
 ---

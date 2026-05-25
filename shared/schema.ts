@@ -35,6 +35,13 @@ export const users = pgTable("users", {
   govgrLastName: text("govgr_last_name"),
   govgrMunicipality: text("govgr_municipality"),
   govgrPostcode: text("govgr_postcode"),
+
+  // GDPR consent gate. Default TRUE — any new row (OAuth, manual insert)
+  // is locked out of Art. 9 routes until the member accepts the canonical
+  // privacy text. /api/register sets this FALSE explicitly after recording
+  // consent. /api/user/consent/accept clears it for OAuth users at first
+  // login. See migration 0016 + the requireConsent middleware.
+  requiresConsent: boolean("requires_consent").notNull().default(true),
 });
 
 // Append-only consent audit log (GDPR Art. 7 + Art. 9(2)(a)).
@@ -49,6 +56,19 @@ export const userConsents = pgTable("user_consents", {
   locale: text("locale").notNull(),
   acceptedAt: timestamp("accepted_at").notNull().defaultNow(),
   withdrawnAt: timestamp("withdrawn_at"),
+});
+
+// GDPR Art. 17 — pending right-to-be-forgotten requests. Manual admin
+// processing per the brief (≤1000-member scale). Resolving the
+// hash-chain-vs-erasure tension is documented in INTERNAL_POLICIES.md.
+export const erasureRequests = pgTable("erasure_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reason: text("reason"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  processedBy: integer("processed_by").references(() => users.id, { onDelete: "set null" }),
+  notes: text("notes"),
 });
 
 export const polls = pgTable("polls", {
@@ -1125,6 +1145,8 @@ export type LoginUser = z.infer<typeof loginUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserConsent = typeof userConsents.$inferSelect;
 export type InsertUserConsent = typeof userConsents.$inferInsert;
+export type ErasureRequest = typeof erasureRequests.$inferSelect;
+export type InsertErasureRequest = typeof erasureRequests.$inferInsert;
 export type PollNotification = typeof pollNotifications.$inferSelect;
 export type SelectAccountActivity = typeof accountActivity.$inferSelect;
 export type Poll = typeof polls.$inferSelect;
@@ -1180,6 +1202,7 @@ export type SafeUser = Pick<
   | 'profilePicture'
   | 'isAdmin'
   | 'accountStatus'
+  | 'requiresConsent'
   | 'govgrVerified'
   | 'govgrVerifiedAt'
   | 'govgrFirstName'

@@ -6,7 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
-import { requireAuth } from '../auth';
+import { requireAuth, requireConsent } from '../auth';
 import { db } from '../db';
 import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
@@ -90,7 +90,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
   });
-  app.post("/api/communities/:communityId/proposals", requireAuth, async (req: any, res) => {
+  app.post("/api/communities/:communityId/proposals", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.communityId);
       const userId = req.user!.id;
@@ -203,7 +203,7 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
   // ─── Demopolis: Amendment Routes ───────────────────────────────────────────
-  app.post("/api/proposals/:id/support", requireAuth, async (req: any, res) => {
+  app.post("/api/proposals/:id/support", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const { type } = req.body; // 'support' or 'oppose'
@@ -231,7 +231,7 @@ export function registerProposalsRoutes(app: Express): void {
   // an append-only SHA-256 chain; a future Helios backend would encrypt the
   // ballot and decrypt only the aggregate tally. The receipt shape is
   // backend-specific, but every backend returns one.
-  app.post("/api/proposals/:id/vote", requireAuth, async (req: any, res) => {
+  app.post("/api/proposals/:id/vote", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {

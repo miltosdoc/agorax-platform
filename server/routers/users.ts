@@ -14,6 +14,7 @@ import {
   CONSENT_TEXT,
   CURRENT_CONSENT_VERSION,
   consentTextHash,
+  validateConsent,
 } from '../../shared/consent';
 
 export function registerUsersRoutes(app: Express): void {
@@ -42,10 +43,68 @@ export function registerUsersRoutes(app: Express): void {
     });
   });
 
-  // GDPR Art. 7(3) — right to withdraw consent at any time.
+  // GDPR Art. 7(3) — right to withdraw consent at any time. Re-arms the
+  // requires_consent gate so the member must re-accept before any further
+  // Art. 9 action.
   app.post('/api/user/consent/withdraw', requireAuth, async (req: any, res) => {
     const withdrawn = await userRepo.withdrawConsent(req.user.id);
+    await userRepo.setRequiresConsent(req.user.id, true);
     res.json({ withdrawn });
+  });
+
+  // GDPR Art. 9(2)(a) acceptance path — used by OAuth users at first login
+  // and any member re-prompted after a version bump or withdrawal.
+  app.post('/api/user/consent/accept', requireAuth, async (req: any, res) => {
+    const consent = validateConsent(req.body);
+    if (!consent) {
+      return res.status(400).json({
+        message: 'Consent required',
+        required: { version: CURRENT_CONSENT_VERSION, locales: ['el', 'en'] },
+      });
+    }
+    await userRepo.recordConsent({
+      userId: req.user.id,
+      consentVersion: consent.version,
+      consentTextHash: consentTextHash(consent.locale),
+      locale: consent.locale,
+    });
+    await userRepo.clearRequiresConsent(req.user.id);
+    res.json({ accepted: true, version: consent.version });
+  });
+
+  // GDPR Art. 15 — right of access. Returns everything we hold about the
+  // member as a single JSON payload they can download.
+  app.get('/api/user/data-export', requireAuth, async (req: any, res) => {
+    const data = await userRepo.exportUserData(req.user.id);
+    if (!data.profile) return res.status(404).json({ message: 'Profile not found' });
+    res.setHeader('Content-Disposition', `attachment; filename="agorax-data-${req.user.id}.json"`);
+    res.json({
+      exportedAt: new Date().toISOString(),
+      profile: data.profile,
+      consents: data.consents,
+      activity: data.activity,
+      erasureRequests: data.erasureRequests,
+    });
+  });
+
+  // GDPR Art. 17 — right to be forgotten. Records a request; an admin
+  // processes manually per the closed ≤1000-member scale documented in
+  // the brief. Hash-chain-vs-erasure resolution lives in INTERNAL_POLICIES.
+  app.post('/api/user/erasure-request', requireAuth, async (req: any, res) => {
+    const existing = await userRepo.getPendingErasureRequest(req.user.id);
+    if (existing) {
+      return res.status(409).json({
+        message: 'You already have a pending erasure request.',
+        requestedAt: existing.requestedAt,
+      });
+    }
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 2000) : undefined;
+    const row = await userRepo.createErasureRequest({ userId: req.user.id, reason });
+    res.status(201).json({
+      message: 'Erasure request recorded. An administrator will process it manually.',
+      requestId: row.id,
+      requestedAt: row.requestedAt,
+    });
   });
 
   // Admin-only access control middleware

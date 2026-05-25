@@ -45,6 +45,7 @@ function sanitizeUser(user: User): SafeUser {
     profilePicture: user.profilePicture,
     isAdmin: user.isAdmin,
     accountStatus: user.accountStatus,
+    requiresConsent: user.requiresConsent,
     govgrVerified: user.govgrVerified,
     govgrVerifiedAt: user.govgrVerifiedAt,
     govgrFirstName: user.govgrFirstName,
@@ -88,6 +89,25 @@ export const requireAdmin = (req: any, res: any, next: any) => {
     return next();
   }
   res.status(403).json({ message: 'Admin access required' });
+};
+
+/**
+ * GDPR Art. 9 gate. Use AFTER requireAuth on any route that processes
+ * special-category data (votes, proposal text, debate contributions).
+ * Members who have not accepted the current canonical consent are blocked
+ * with a 403 carrying the required version so the client can interstitial.
+ *
+ * Cleared by /api/user/consent/accept once the member accepts.
+ */
+export const requireConsent = (req: any, res: any, next: any) => {
+  if (req.user?.requiresConsent === true) {
+    return res.status(403).json({
+      code: 'consent_required',
+      currentVersion: CURRENT_CONSENT_VERSION,
+      message: 'Explicit consent to the current privacy text is required before this action.',
+    });
+  }
+  next();
 };
 
 export const requireAuth = (req: any, res: any, next: any) => {
@@ -315,6 +335,9 @@ export function setupAuth(app: Express) {
         registrationIp: clientIp || null,
         lastLoginIp: clientIp || null,
         accountStatus: 'active',
+        // Member came through the consent gate at registration — clear the
+        // default-true flag set by the column default.
+        requiresConsent: false,
       });
 
       // Record the consent acceptance against the freshly created user.

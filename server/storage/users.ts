@@ -11,11 +11,13 @@ import {
   users,
   accountActivity,
   userConsents,
+  erasureRequests,
   type User,
   type InsertUser,
   type InsertAccountActivity,
   type SelectAccountActivity,
   type UserConsent,
+  type ErasureRequest,
 } from '../../shared/schema';
 import { eq, and, ilike, desc, sql, isNull } from 'drizzle-orm';
 
@@ -105,6 +107,49 @@ export class UserRepository {
       .where(and(eq(userConsents.userId, userId), isNull(userConsents.withdrawnAt)))
       .returning({ id: userConsents.id });
     return result.length;
+  }
+
+  /** Clear the consent-required flag — called after recordConsent succeeds. */
+  async clearRequiresConsent(userId: number): Promise<void> {
+    await db.update(users).set({ requiresConsent: false }).where(eq(users.id, userId));
+  }
+
+  /** Re-arm the consent gate for a member (used on consent withdrawal). */
+  async setRequiresConsent(userId: number, value: boolean): Promise<void> {
+    await db.update(users).set({ requiresConsent: value }).where(eq(users.id, userId));
+  }
+
+  /** GDPR Art. 17 — record a pending right-to-be-forgotten request. */
+  async createErasureRequest(args: { userId: number; reason?: string }): Promise<ErasureRequest> {
+    const [row] = await db.insert(erasureRequests).values(args).returning();
+    return row;
+  }
+
+  /** Return the member's still-open (unprocessed) erasure request, if any. */
+  async getPendingErasureRequest(userId: number): Promise<ErasureRequest | undefined> {
+    const [row] = await db
+      .select()
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.userId, userId), isNull(erasureRequests.processedAt)))
+      .orderBy(desc(erasureRequests.requestedAt))
+      .limit(1);
+    return row;
+  }
+
+  /** GDPR Art. 15 — full export of everything we hold about a member. */
+  async exportUserData(userId: number): Promise<{
+    profile: User | undefined;
+    consents: UserConsent[];
+    activity: SelectAccountActivity[];
+    erasureRequests: ErasureRequest[];
+  }> {
+    const [profile, consents, activity, erasures] = await Promise.all([
+      this.getUser(userId),
+      db.select().from(userConsents).where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.acceptedAt)),
+      this.getUserAccountActivity(userId),
+      db.select().from(erasureRequests).where(eq(erasureRequests.userId, userId)).orderBy(desc(erasureRequests.requestedAt)),
+    ]);
+    return { profile, consents, activity, erasureRequests: erasures };
   }
 
 

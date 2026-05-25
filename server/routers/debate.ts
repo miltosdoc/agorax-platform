@@ -6,7 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 import { communityRepo, debateRepo, proposalRepo } from '../storage';
-import { requireAuth } from '../auth';
+import { requireAuth, requireConsent } from '../auth';
 import * as debateService from '../utils/debate';
 
 export function registerDebateRoutes(app: Express): void {
@@ -18,7 +18,7 @@ export function registerDebateRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch arguments" });
     }
   });
-  app.post("/api/proposals/:id/arguments", requireAuth, async (req: any, res) => {
+  app.post("/api/proposals/:id/arguments", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const proposal = await proposalRepo.getProposal(proposalId);
@@ -81,7 +81,7 @@ export function registerDebateRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch debate stats" });
     }
   });
-  app.post("/api/proposals/:id/debate", requireAuth, async (req: any, res) => {
+  app.post("/api/proposals/:id/debate", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (Number.isNaN(proposalId)) {

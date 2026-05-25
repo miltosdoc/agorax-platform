@@ -6,7 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 import { amendmentRepo, communityRepo, proposalRepo } from '../storage';
-import { requireAuth } from '../auth';
+import { requireAuth, requireConsent } from '../auth';
 import { awardPoints } from '../economy/points';
 import {
   authorReviewAmendment,
@@ -71,7 +71,7 @@ export function registerAmendmentsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch amendments" });
     }
   });
-  app.post("/api/proposals/:id/amendments", requireAuth, async (req: any, res) => {
+  app.post("/api/proposals/:id/amendments", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const proposal = await proposalRepo.getProposal(proposalId);
@@ -171,8 +171,8 @@ export function registerAmendmentsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to cast vote" });
     }
   };
-  app.post("/api/amendments/:id/vote", requireAuth, handleAmendmentVote);
-  app.post("/api/amendments/:id/rejection-vote", requireAuth, handleAmendmentVote);
+  app.post("/api/amendments/:id/vote", requireAuth, requireConsent, handleAmendmentVote);
+  app.post("/api/amendments/:id/rejection-vote", requireAuth, requireConsent, handleAmendmentVote);
   // ─── Amendment Duplicates: Flag overlapping amendments for author review ────
   app.get("/api/proposals/:id/amendments/duplicates", async (req, res) => {
     try {

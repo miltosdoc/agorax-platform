@@ -109,6 +109,26 @@ export class DatabaseStorage {
     return this.users.withdrawConsent(userId);
   }
 
+  async clearRequiresConsent(userId: number) {
+    return this.users.clearRequiresConsent(userId);
+  }
+
+  async setRequiresConsent(userId: number, value: boolean) {
+    return this.users.setRequiresConsent(userId, value);
+  }
+
+  async createErasureRequest(args: { userId: number; reason?: string }) {
+    return this.users.createErasureRequest(args);
+  }
+
+  async getPendingErasureRequest(userId: number) {
+    return this.users.getPendingErasureRequest(userId);
+  }
+
+  async exportUserData(userId: number) {
+    return this.users.exportUserData(userId);
+  }
+
   async updateAccountStatus(userId: number, status: string) {
     return this.users.updateAccountStatus(userId, status);
   }
