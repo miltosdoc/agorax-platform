@@ -15,12 +15,11 @@
 | [GDPR_FORMALIZATION_BRIEF.md](GDPR_FORMALIZATION_BRIEF.md) | ✅ Complete | Audit brief — defines scope, operating principles, acceptance criteria |
 | [01_VOTE_LINKAGE_AUDIT.md](01_VOTE_LINKAGE_AUDIT.md) | ✅ Complete | §1 finding — resolved to Option B (pseudonymity) with hard gate against binding votes |
 | [02_DATA_MINIMIZATION_AUDIT.md](02_DATA_MINIMIZATION_AUDIT.md) | ✅ Complete | Art. 5(1)(c) drop list — 6 columns + dead location vertical removed; 3 open architectural decisions for controller |
-| [03_OPERATIONAL_AUDITS.md](03_OPERATIONAL_AUDITS.md) | ✅ Complete | AFM salt (fixed), Gov.gr PDF retention (pass), consent logging (gap), LICENSE (decision needed) |
-| [DPIA.md](DPIA.md) | ⏳ Pending | Data Protection Impact Assessment — all audit inputs ready |
-| [ROPA.md](ROPA.md) | ⏳ Pending | Record of Processing Activities (Art. 30) |
-| [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | ⏳ Pending | Privacy Notice (Art. 13) — bilingual el/en |
-| [CONSENT.md](CONSENT.md) | ⏳ Pending | Consent artifact (Art. 9(2)(a)) — bilingual el/en |
-| [INTERNAL_POLICIES.md](INTERNAL_POLICIES.md) | ⏳ Pending | Access control, retention/deletion, breach response |
+| [03_OPERATIONAL_AUDITS.md](03_OPERATIONAL_AUDITS.md) | ✅ Complete | AFM salt (fixed), Gov.gr PDF retention (pass), consent logging (closed), LICENSE (resolved) |
+| [DPIA.md](DPIA.md) | ✅ Draft for sign-off | Data Protection Impact Assessment (Art. 35) — keystone; controller signature pending |
+| [ROPA.md](ROPA.md) | ✅ Draft | Record of Processing Activities (Art. 30) |
+| [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | ✅ Draft | Privacy Notice (Art. 13) — bilingual el/en; consent text canonical source is `shared/consent.ts` |
+| [INTERNAL_POLICIES.md](INTERNAL_POLICIES.md) | ✅ Draft for sign-off | Access control, retention/deletion (incl. erasure-vs-hash-chain resolution), breach runbook |
 
 ---
 
