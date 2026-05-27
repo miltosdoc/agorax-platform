@@ -36,6 +36,7 @@
 |---|---|---|---|
 | VPS host (TBD per deployment) | Infrastructure processor | **Yes** | Pending — controller must sign DPA with chosen host |
 | Email provider (TBD) | Sub-processor for notifications | Yes | Not yet integrated |
+| Sentry (optional) | Error monitoring — only active when SENTRY_DSN is set; beforeSend hook redacts bodies / cookies / Auth headers on Art. 9 routes | **Yes** | Pending — DPA required before SENTRY_DSN is set in production |
 | Google (OAuth) | Identity provider for OAuth signups | Outside controller's processor relationship — the member's relationship with Google is independent. Notice required in Privacy Notice. | Notice to be added |
 | ~~OpenRouter / NVIDIA~~ | Was: LLM quality gate | — | **Removed** — see DPIA §6.5 |
 

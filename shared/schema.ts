@@ -102,31 +102,7 @@ export const polls = pgTable("polls", {
   allowComments: boolean("allow_comments").notNull().default(true),
   requireVerification: boolean("require_verification").notNull().default(false),
   pollType: text("poll_type").notNull().default("singleChoice"),
-  locationScope: text("location_scope").notNull().default("global"), // "global" or "geofenced"
   communityMode: boolean("community_mode").notNull().default(false), // Indicates if creator name is hidden with "community"
-
-  // Geofencing coordinates
-  centerLat: text("center_lat"), // Decimal latitude for geofencing
-  centerLng: text("center_lng"), // Decimal longitude for geofencing
-  radiusKm: integer("radius_km"), // Radius in kilometers for geofencing
-
-  // Location filter data (extracted during reverse geocoding)
-  city: text("city"), // City/municipality name for legacy compatibility
-  region: text("region"), // Region/state name for legacy compatibility  
-  country: text("country"), // Country name for legacy compatibility
-
-  // Standardized location IDs
-  locationCity: text("location_city"), // City/municipality name for filtering
-  locationRegion: text("location_region"), // Region/state name for filtering
-  locationCountry: text("location_country"), // Country name for filtering
-
-  // Standardized location IDs
-  locationCityId: text("location_city_id"), // City/municipality ID for hierarchical location
-  locationRegionId: text("location_region_id"), // Region/state ID for hierarchical location
-  locationCountryId: text("location_country_id"), // Country ID for hierarchical location
-
-  // Standardized geographic region (for more robust filtering)
-  geoRegion: text("geo_region"), // Normalized geographic region name derived from coordinates
 
   // Community visibility
   communityId: integer("community_id").references(() => communities.id, { onDelete: "set null" }), // If set, poll is only visible to community members
@@ -551,7 +527,9 @@ export const egElectionRecords = pgTable("eg_election_records", {
 // Append-only transaction ledger — every point movement is one row.
 export const pointTransactions = pgTable("point_transactions", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Nullable for Art. 17 crypto-shred (see migration 0019). The ledger row
+  // survives for treasury reconciliation; only the user binding is gone.
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(), // 'participation' | 'redemption' | 'civic_dividend' | 'referral' | 'adjustment'
   points: integer("points").notNull(), // signed: positive = credit, negative = debit
   actionKey: text("action_key").notNull(), // e.g. 'sortition_score', 'ratification_vote'
@@ -577,7 +555,9 @@ export const pointBalances = pgTable("point_balances", {
 // Redemption requests — opened only past the pre_revenue phase, by verified users.
 export const pointRedemptions = pgTable("point_redemptions", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Nullable for Art. 17 crypto-shred (see migration 0019). Redemption
+  // history survives for treasury accounting; user binding is severed.
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   points: integer("points").notNull(),
   eurAmount: numeric("eur_amount").notNull(),
   targetCurrency: text("target_currency").notNull().default('EUR'),
@@ -1027,63 +1007,6 @@ export const createPollSchema = z.object({
     // Make these optional so they can be removed after processing
     startTime: z.string().optional(),
     endTime: z.string().optional(),
-    // Only global or geofenced location scopes are now supported
-    locationScope: z.enum(["global", "geofenced"]).default("global"),
-    // Geofencing fields
-    centerLat: z.string().optional(),
-    centerLng: z.string().optional(),
-    radiusKm: z.number().optional()
-  }).superRefine((data, ctx) => {
-    // Validate geofencing fields when locationScope is "geofenced"
-    if (data.locationScope === "geofenced") {
-      if (!data.centerLat) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Latitude is required for geofenced polls",
-          path: ["centerLat"]
-        });
-      } else if (isNaN(parseFloat(data.centerLat))) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Latitude must be a valid number",
-          path: ["centerLat"]
-        });
-      }
-
-      if (!data.centerLng) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Longitude is required for geofenced polls",
-          path: ["centerLng"]
-        });
-      } else if (isNaN(parseFloat(data.centerLng))) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Longitude must be a valid number",
-          path: ["centerLng"]
-        });
-      }
-
-      if (data.radiusKm === undefined || data.radiusKm === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Radius is required for geofenced polls",
-          path: ["radiusKm"]
-        });
-      } else if (data.radiusKm <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Radius must be greater than 0",
-          path: ["radiusKm"]
-        });
-      } else if (data.radiusKm > 1000) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Radius cannot exceed 1000 km",
-          path: ["radiusKm"]
-        });
-      }
-    }
   }),
   options: z.array(z.object({
     text: z.string().min(1),
@@ -1100,9 +1023,6 @@ export const createSurveyPollSchema = z.object({
     startTime: z.string().optional(),
     endTime: z.string().optional(),
     pollType: z.literal("surveyPoll"),
-    // Only global or geofenced location scopes are now supported - matching createPollSchema
-    locationScope: z.enum(["global", "geofenced"]).default("global"),
-    // Geofencing fields from createPollSchema are reused
   }),
   questions: z.array(z.object({
     id: z.number().optional(), // Frontend temp ID for mapping

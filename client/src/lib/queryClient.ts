@@ -43,14 +43,49 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Read a cookie value from document.cookie (browser only).
+ * Returns undefined when missing or running outside the browser.
+ */
+function readCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  for (const part of document.cookie.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return undefined;
+}
+
+const CSRF_COOKIE = 'agorax_csrf';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+let csrfBootstrapped: Promise<void> | null = null;
+
+/** Lazily fetch the CSRF cookie on first state-changing call. */
+async function ensureCsrfCookie(): Promise<void> {
+  if (readCookie(CSRF_COOKIE)) return;
+  if (!csrfBootstrapped) {
+    csrfBootstrapped = fetch('/api/csrf', { credentials: 'include' })
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  await csrfBootstrapped;
+  csrfBootstrapped = null;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  if (!SAFE_METHODS.has(method.toUpperCase())) {
+    await ensureCsrfCookie();
+  }
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  const csrf = readCookie(CSRF_COOKIE);
+  if (csrf) headers["X-CSRF-Token"] = csrf;
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });

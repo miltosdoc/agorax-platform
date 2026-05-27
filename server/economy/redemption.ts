@@ -148,14 +148,21 @@ export async function decideRedemption(
     }
 
     if (decision === 'reject') {
+      // If the redemption's user was erased (Art. 17), the points-to-be-
+      // refunded have no destination: balance row was deleted and the
+      // ledger has no user binding. Reject without refund — the points
+      // become unrecoverable from the user's perspective by their own
+      // erasure request.
+      const refundUserId = r.userId;
       await db.transaction(async (tx) => {
         await tx
           .update(pointRedemptions)
           .set({ status: 'rejected', decidedAt: new Date() })
           .where(eq(pointRedemptions.id, id));
+        if (refundUserId == null) return;
         // Refund the held points.
         await tx.insert(pointTransactions).values({
-          userId: r.userId,
+          userId: refundUserId,
           kind: 'adjustment',
           points: r.points,
           actionKey: 'redemption_refund',
@@ -169,7 +176,7 @@ export async function decideRedemption(
             balance: sql`${pointBalances.balance} + ${r.points}`,
             updatedAt: new Date(),
           })
-          .where(eq(pointBalances.userId, r.userId));
+          .where(eq(pointBalances.userId, refundUserId));
       });
       return { ok: true };
     }

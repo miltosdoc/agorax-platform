@@ -70,11 +70,13 @@
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.3",
     "@replit/vite-plugin-shadcn-theme-json": "^0.0.4",
+    "@sentry/node": "^10.54.0",
     "@tanstack/react-query": "^5.60.5",
     "@tiptap/extension-placeholder": "^2.12.0",
     "@tiptap/pm": "^2.12.0",
     "@tiptap/react": "^2.12.0",
     "@tiptap/starter-kit": "^2.12.0",
+    "@types/cors": "^2.8.19",
     "@types/leaflet": "^1.9.17",
     "@types/multer": "^2.0.0",
     "@types/passport-google-oauth20": "^2.0.16",
@@ -85,6 +87,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "connect-pg-simple": "^10.0.0",
+    "cors": "^2.8.6",
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.39.1",
@@ -127,6 +130,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@replit/vite-plugin-cartographer": "^0.0.11",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
@@ -148,8 +152,7 @@
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.14",
-    "vitest": "^2.1.9",
-    "@playwright/test": "^1.40.0"
+    "vitest": "^2.1.9"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"

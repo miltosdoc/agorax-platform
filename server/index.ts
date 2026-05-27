@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { apiLimit, authLimit } from './utils/rate-limiter';
 import { logger } from './utils/logger';
+import { csrfBootstrap, csrfMiddleware } from './utils/csrf';
+import { initSentry } from './utils/sentry';
 
 import helmet from "helmet";
 import { registerRoutes } from "./routes";
@@ -10,17 +13,49 @@ import { validateRuntimeConfig } from "./config";
 import { startJobQueue } from "./utils/job-handlers";
 
 validateRuntimeConfig();
+initSentry();
 
 const app = express();
 app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
 }));
+
+// CORS allowlist. In production, only origins explicitly enumerated in
+// CORS_ALLOWED_ORIGINS (comma-separated) may make cross-origin requests
+// with credentials. In dev, same-origin Vite proxy means CORS is
+// effectively unused — we still mount it so the policy is uniform.
+const corsAllowlist = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+app.use(cors({
+  credentials: true,
+  origin(origin, callback) {
+    // Same-origin / curl-with-no-Origin: allow.
+    if (!origin) return callback(null, true);
+    // Explicit allowlist: production must enumerate origins.
+    if (corsAllowlist.includes(origin)) return callback(null, true);
+    // Dev convenience: localhost variants when not in production.
+    if (process.env.APP_ENV !== 'production') {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+    }
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+}));
+
 app.use(express.json({ limit: "100kb" }));
 
 // Apply rate limiting to all API routes
 app.use('/api/', apiLimit);
 
 app.use(express.urlencoded({ extended: false, limit: "100kb" }));
+
+// CSRF bootstrap (clients call this once at startup to get the cookie)
+// and double-submit enforcement on state-changing /api/* requests.
+app.get('/api/csrf', csrfBootstrap);
+app.use(csrfMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();

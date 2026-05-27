@@ -15,6 +15,9 @@ import {
   proposalVotes,
   egBallots,
   proposals,
+  pointTransactions,
+  pointBalances,
+  pointRedemptions,
   type User,
   type InsertUser,
   type InsertAccountActivity,
@@ -221,7 +224,13 @@ export class UserRepository {
   }): Promise<{
     processed: boolean;
     targetUserId: number;
-    cryptoShredded: { proposalVotes: number; egBallots: number };
+    cryptoShredded: {
+      proposalVotes: number;
+      egBallots: number;
+      pointTransactions: number;
+      pointRedemptions: number;
+      pointBalanceDeleted: boolean;
+    };
     deferredVoteRowIds: number[];
     userAnonymised: boolean;
   }> {
@@ -292,7 +301,26 @@ export class UserRepository {
         egShredded = updated.length;
       }
 
-      // 4. Anonymise the user row in place. Keep voter_hash / doc_code_hash
+      // 4. Democracy Points crypto-shred (Art. 17 + INTERNAL_POLICIES §2.4).
+      //    Ledger and redemption rows survive for treasury reconciliation;
+      //    only the user binding is severed. The cached balance row is a
+      //    projection and is deleted outright.
+      const txnUpdated = await tx
+        .update(pointTransactions)
+        .set({ userId: null })
+        .where(eq(pointTransactions.userId, targetUserId))
+        .returning({ id: pointTransactions.id });
+      const redUpdated = await tx
+        .update(pointRedemptions)
+        .set({ userId: null })
+        .where(eq(pointRedemptions.userId, targetUserId))
+        .returning({ id: pointRedemptions.id });
+      const balDeleted = await tx
+        .delete(pointBalances)
+        .where(eq(pointBalances.userId, targetUserId))
+        .returning({ userId: pointBalances.userId });
+
+      // 5. Anonymise the user row in place. Keep voter_hash / doc_code_hash
       //    as anti-replay controls; nullify all PII; mark status erased.
       const sentinel = `erased-${targetUserId}`;
       await tx.update(users).set({
@@ -315,13 +343,13 @@ export class UserRepository {
         govgrPostcode: null,
       }).where(eq(users.id, targetUserId));
 
-      // 5. Withdraw any still-active consent rows (Art. 7(3)).
+      // 6. Withdraw any still-active consent rows (Art. 7(3)).
       await tx
         .update(userConsents)
         .set({ withdrawnAt: now })
         .where(and(eq(userConsents.userId, targetUserId), isNull(userConsents.withdrawnAt)));
 
-      // 6. Mark the request processed.
+      // 7. Mark the request processed.
       await tx
         .update(erasureRequests)
         .set({ processedAt: now, processedBy: args.processedBy, notes: args.notes })
@@ -330,7 +358,13 @@ export class UserRepository {
       return {
         processed: true,
         targetUserId,
-        cryptoShredded: { proposalVotes: pvShredded, egBallots: egShredded },
+        cryptoShredded: {
+          proposalVotes: pvShredded,
+          egBallots: egShredded,
+          pointTransactions: txnUpdated.length,
+          pointRedemptions: redUpdated.length,
+          pointBalanceDeleted: balDeleted.length > 0,
+        },
         deferredVoteRowIds: deferredVoteIds,
         userAnonymised: true,
       };

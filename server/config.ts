@@ -26,8 +26,31 @@ function requireStrongSecret(name: string, minLength = 32) {
 }
 
 export function validateRuntimeConfig() {
-  if (!process.env.DATABASE_URL) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
+  }
+
+  // In production, the DB connection must use TLS. Postgres reads sslmode
+  // from the URL query string or PGSSLMODE; accept any of the modes that
+  // actually enforce encryption. Local docker-network targets (e.g.
+  // `postgres://...@db:5432/...`) are allowed without sslmode only when
+  // PGSSLMODE_DISABLE_INSECURE=1 is explicitly set — making the insecure
+  // case an explicit opt-in rather than a silent default.
+  if (isProductionLike()) {
+    const enforcingModes = new Set(['require', 'verify-ca', 'verify-full']);
+    const queryMatch = databaseUrl.match(/[?&]sslmode=([^&]+)/i);
+    const urlMode = queryMatch?.[1]?.toLowerCase();
+    const envMode = process.env.PGSSLMODE?.toLowerCase();
+    const effectiveMode = urlMode ?? envMode;
+    const isExplicitInsecure = process.env.ALLOW_INSECURE_DB === '1';
+    if (!isExplicitInsecure && (!effectiveMode || !enforcingModes.has(effectiveMode))) {
+      throw new Error(
+        "DATABASE_URL must enforce TLS in production " +
+        "(sslmode=require | verify-ca | verify-full, in the URL or PGSSLMODE). " +
+        "Set ALLOW_INSECURE_DB=1 to override (e.g. local-network Postgres).",
+      );
+    }
   }
 
   requireStrongSecret("SESSION_SECRET");
