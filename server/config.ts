@@ -39,4 +39,19 @@ export function validateRuntimeConfig() {
   if (isProductionLike() && process.env.DEMO_MODE === "true") {
     throw new Error("DEMO_MODE=true is not allowed when APP_ENV=production");
   }
+
+  // External LLM gate was removed for Art. 9 reasons in
+  // docs/compliance/02_DATA_MINIMIZATION_AUDIT.md §4.2. If an LLM key is
+  // set in production it likely means someone is about to re-enable a
+  // removed external-disclosure path — fail loud so the controller decides.
+  if (
+    isProductionLike() &&
+    (process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY)
+  ) {
+    throw new Error(
+      "LLM_API_KEY / OPENROUTER_API_KEY is set in production but the external " +
+      "LLM gate has been removed per GDPR audit. Unset the env var, or re-run " +
+      "the §4.2 audit decision before re-enabling.",
+    );
+  }
 }
