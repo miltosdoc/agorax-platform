@@ -111,7 +111,11 @@ export class HashChainBackend implements VotingBackend {
       ok: result.ok,
       backend: NAME,
       firstBreakAt: result.firstBreakAt,
-      payload: { headHash: result.headHash, total: result.total },
+      payload: {
+        headHash: result.headHash,
+        total: result.total,
+        erasedCount: result.erasedCount,
+      },
     };
   }
 

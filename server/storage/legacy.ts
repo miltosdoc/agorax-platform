@@ -129,6 +129,18 @@ export class DatabaseStorage {
     return this.users.exportUserData(userId);
   }
 
+  async listPendingErasureRequests() {
+    return this.users.listPendingErasureRequests();
+  }
+
+  async getErasureRequest(id: number) {
+    return this.users.getErasureRequest(id);
+  }
+
+  async processErasureRequest(args: { requestId: number; processedBy: number; notes?: string }) {
+    return this.users.processErasureRequest(args);
+  }
+
   async updateAccountStatus(userId: number, status: string) {
     return this.users.updateAccountStatus(userId, status);
   }

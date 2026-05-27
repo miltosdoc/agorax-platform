@@ -13,9 +13,9 @@ import { requireAdmin } from '../auth';
 import {
   CONSENT_TEXT,
   CURRENT_CONSENT_VERSION,
-  consentTextHash,
   validateConsent,
 } from '../../shared/consent';
+import { consentTextHash } from '../utils/consent-hash';
 
 export function registerUsersRoutes(app: Express): void {
   // GDPR Art. 13 — surface the canonical privacy text + version so the
@@ -117,6 +117,36 @@ export function registerUsersRoutes(app: Express): void {
     }
     next();
   };
+
+  // Admin queue: pending Art. 17 erasure requests.
+  app.get('/api/admin/erasure-requests', requireAdmin, async (_req, res) => {
+    const rows = await userRepo.listPendingErasureRequests();
+    res.json(rows);
+  });
+
+  // Admin action: process one erasure request. Per INTERNAL_POLICIES §2.4,
+  // votes on active proposals are deferred (lawful refusal under
+  // Art. 17(3)(d)); votes on closed proposals are crypto-shredded.
+  app.post('/api/admin/erasure-requests/:id/process', requireAdmin, async (req: any, res) => {
+    const requestId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(requestId)) {
+      return res.status(400).json({ message: 'Invalid request id' });
+    }
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.slice(0, 2000) : undefined;
+    try {
+      const result = await userRepo.processErasureRequest({
+        requestId,
+        processedBy: req.user.id,
+        notes,
+      });
+      res.json(result);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to process erasure request';
+      if (/not found/i.test(msg)) return res.status(404).json({ message: msg });
+      if (/already processed/i.test(msg)) return res.status(409).json({ message: msg });
+      res.status(500).json({ message: msg });
+    }
+  });
   // Analytics Dashboard Endpoints (Public - Platform Statistics)
   app.post("/api/user/verify-govgr", requireAuth, multer({ storage: multer.memoryStorage() }).single('file'), async (req: any, res) => {
     try {

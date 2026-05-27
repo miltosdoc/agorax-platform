@@ -12,6 +12,9 @@ import {
   accountActivity,
   userConsents,
   erasureRequests,
+  proposalVotes,
+  egBallots,
+  proposals,
   type User,
   type InsertUser,
   type InsertAccountActivity,
@@ -19,7 +22,7 @@ import {
   type UserConsent,
   type ErasureRequest,
 } from '../../shared/schema';
-import { eq, and, ilike, desc, sql, isNull } from 'drizzle-orm';
+import { eq, and, ilike, desc, sql, isNull, inArray } from 'drizzle-orm';
 
 export class UserRepository {
 
@@ -134,6 +137,157 @@ export class UserRepository {
       .orderBy(desc(erasureRequests.requestedAt))
       .limit(1);
     return row;
+  }
+
+  /** List pending (unprocessed) erasure requests, oldest first. */
+  async listPendingErasureRequests(): Promise<ErasureRequest[]> {
+    return db
+      .select()
+      .from(erasureRequests)
+      .where(isNull(erasureRequests.processedAt))
+      .orderBy(erasureRequests.requestedAt);
+  }
+
+  /** Load a single erasure request by id. */
+  async getErasureRequest(id: number): Promise<ErasureRequest | undefined> {
+    const [row] = await db.select().from(erasureRequests).where(eq(erasureRequests.id, id)).limit(1);
+    return row;
+  }
+
+  /**
+   * GDPR Art. 17 — actually process an erasure request. Per
+   * docs/compliance/INTERNAL_POLICIES.md §2.4:
+   *   * Votes on active (not-yet-closed) proposals are DEFERRED — audit
+   *     integrity during a live deliberation is a legitimate interest under
+   *     Art. 17(3)(d). They will be erased when the proposal closes (the
+   *     close-handler must call this same path).
+   *   * Votes on closed proposals are crypto-shredded: user_id → NULL,
+   *     erased_at → now(). The chain row_hash stays opaque — verifyChain
+   *     only checks prev_hash linkage for erased rows.
+   *   * The users row is anonymised in place. voter_hash and doc_code_hash
+   *     are retained as anti-replay controls (preventing the same identity
+   *     re-registering under a new account).
+   */
+  async processErasureRequest(args: {
+    requestId: number;
+    processedBy: number;
+    notes?: string;
+  }): Promise<{
+    processed: boolean;
+    targetUserId: number;
+    cryptoShredded: { proposalVotes: number; egBallots: number };
+    deferredVoteRowIds: number[];
+    userAnonymised: boolean;
+  }> {
+    const request = await this.getErasureRequest(args.requestId);
+    if (!request) throw new Error(`Erasure request ${args.requestId} not found`);
+    if (request.processedAt) throw new Error(`Erasure request ${args.requestId} already processed`);
+
+    const targetUserId = request.userId;
+
+    return await db.transaction(async (tx) => {
+      // 1. Find which proposal_votes rows belong to closed proposals (eligible
+      //    for immediate crypto-shred) vs active (deferred).
+      const voteRows = await tx
+        .select({
+          id: proposalVotes.id,
+          proposalId: proposalVotes.proposalId,
+          status: proposals.status,
+        })
+        .from(proposalVotes)
+        .leftJoin(proposals, eq(proposals.id, proposalVotes.proposalId))
+        .where(and(eq(proposalVotes.userId, targetUserId), isNull(proposalVotes.erasedAt)));
+
+      const eligibleVoteIds: number[] = [];
+      const deferredVoteIds: number[] = [];
+      for (const row of voteRows) {
+        // Treat 'closed', 'archived', 'finalized' (and similar terminal states)
+        // as eligible. Any active/voting state defers per the policy.
+        const status = row.status ?? '';
+        if (status === 'closed' || status === 'archived' || status === 'finalized') {
+          eligibleVoteIds.push(row.id);
+        } else {
+          deferredVoteIds.push(row.id);
+        }
+      }
+
+      const now = new Date();
+
+      // 2. Crypto-shred the eligible proposal_votes rows.
+      let pvShredded = 0;
+      if (eligibleVoteIds.length > 0) {
+        const updated = await tx
+          .update(proposalVotes)
+          .set({ userId: null, erasedAt: now })
+          .where(inArray(proposalVotes.id, eligibleVoteIds))
+          .returning({ id: proposalVotes.id });
+        pvShredded = updated.length;
+      }
+
+      // 3. Crypto-shred eg_ballots tied to closed elections. The egElections
+      //    status field is what gates eligibility there.
+      const egRows = await tx.execute(sql`
+        SELECT b.id
+        FROM eg_ballots b
+        JOIN eg_elections e ON e.id = b.election_id
+        WHERE b.user_id = ${targetUserId}
+          AND b.erased_at IS NULL
+          AND e.status = 'closed'
+      `);
+      const egIds = (egRows.rows as Array<{ id: number }>).map(r => r.id);
+      let egShredded = 0;
+      if (egIds.length > 0) {
+        const updated = await tx
+          .update(egBallots)
+          .set({ userId: null, erasedAt: now })
+          .where(inArray(egBallots.id, egIds))
+          .returning({ id: egBallots.id });
+        egShredded = updated.length;
+      }
+
+      // 4. Anonymise the user row in place. Keep voter_hash / doc_code_hash
+      //    as anti-replay controls; nullify all PII; mark status erased.
+      const sentinel = `erased-${targetUserId}`;
+      await tx.update(users).set({
+        username: sentinel,
+        email: `${sentinel}@example.invalid`,
+        name: 'Erased Member',
+        password: null,
+        providerId: null,
+        provider: null,
+        profilePicture: null,
+        deviceFingerprint: null,
+        registrationIp: null,
+        lastLoginIp: null,
+        accountFlags: null,
+        accountStatus: 'erased',
+        requiresConsent: true,
+        govgrFirstName: null,
+        govgrLastName: null,
+        govgrMunicipality: null,
+        govgrPostcode: null,
+      }).where(eq(users.id, targetUserId));
+
+      // 5. Withdraw any still-active consent rows (Art. 7(3)).
+      await tx
+        .update(userConsents)
+        .set({ withdrawnAt: now })
+        .where(and(eq(userConsents.userId, targetUserId), isNull(userConsents.withdrawnAt)));
+
+      // 6. Mark the request processed.
+      await tx
+        .update(erasureRequests)
+        .set({ processedAt: now, processedBy: args.processedBy, notes: args.notes })
+        .where(eq(erasureRequests.id, args.requestId));
+
+      return {
+        processed: true,
+        targetUserId,
+        cryptoShredded: { proposalVotes: pvShredded, egBallots: egShredded },
+        deferredVoteRowIds: deferredVoteIds,
+        userAnonymised: true,
+      };
+    });
   }
 
   /** GDPR Art. 15 — full export of everything we hold about a member. */

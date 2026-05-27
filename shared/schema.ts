@@ -463,13 +463,18 @@ export const proposalSupport = pgTable("proposal_support", {
 export const proposalVotes = pgTable("proposal_votes", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id),
+  // Nullable for Art. 17 crypto-shred: erased rows have user_id = NULL +
+  // erased_at set. The chain row_hash stays opaque; verifier only checks
+  // prev_hash linkage for erased rows. See migration 0017 and
+  // docs/compliance/INTERNAL_POLICIES.md §2.4.
+  userId: integer("user_id").references(() => users.id),
   choice: text("choice").notNull(), // 'yes' | 'no' | 'abstain'
   weight: numeric("weight").notNull().default("1"),
   castAt: timestamp("cast_at").notNull(),
   prevHash: text("prev_hash").notNull(),
   rowHash: text("row_hash").notNull(),
   supersededById: integer("superseded_by_id"),
+  erasedAt: timestamp("erased_at"),
 }, (table) => ({
   proposalChainIdx: uniqueIndex('proposal_votes_proposal_id_idx').on(table.proposalId, table.id),
 }));
@@ -503,7 +508,9 @@ export const egElections = pgTable("eg_elections", {
 export const egBallots = pgTable("eg_ballots", {
   id: serial("id").primaryKey(),
   electionId: integer("election_id").notNull().references(() => egElections.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id),
+  // Nullable for Art. 17 crypto-shred (see migration 0017 + proposalVotes).
+  userId: integer("user_id").references(() => users.id),
+  erasedAt: timestamp("erased_at"),
   ciphertextBallot: jsonb("ciphertext_ballot").notNull(),
   castAt: timestamp("cast_at").notNull().defaultNow(),
   supersededById: integer("superseded_by_id"),

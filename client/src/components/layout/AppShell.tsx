@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import BottomNav from "@/components/layout/bottom-nav";
 import { useAuth } from "@/hooks/use-auth";
+import { ConsentInterstitial } from "@/components/user/consent-interstitial";
 
 export interface BreadcrumbItem {
   label: string;
@@ -69,6 +70,7 @@ export default function AppShell({ title, breadcrumb, actions, children }: AppSh
 
       <Footer />
       {user && <BottomNav user={user} />}
+      <ConsentInterstitial />
     </div>
   );
 }

@@ -17,9 +17,9 @@ import rateLimit from "express-rate-limit";
 import { addMember as addCommunityMember, getGeneralCommunity } from "./utils/community-manager";
 import {
   CURRENT_CONSENT_VERSION,
-  consentTextHash,
   validateConsent,
 } from "../shared/consent";
+import { consentTextHash } from "./utils/consent-hash";
 
 // Extend session interface to include returnTo property
 declare module "express-session" {

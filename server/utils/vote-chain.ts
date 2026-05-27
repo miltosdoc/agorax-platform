@@ -183,6 +183,7 @@ export interface ChainVerification {
   proposalId: number;
   headHash: string;
   total: number;
+  erasedCount: number;
   firstBreakAt?: { voteId: number; reason: string };
 }
 
@@ -191,6 +192,12 @@ export interface ChainVerification {
  * verifies and prev_hash links match. On break, firstBreakAt names the row
  * whose computed hash doesn't match its stored hash, or whose prev_hash
  * doesn't match the previous row's row_hash.
+ *
+ * Crypto-shredded rows (Art. 17 — see INTERNAL_POLICIES.md §2.4) are
+ * recognised by erased_at IS NOT NULL. For those rows we verify only the
+ * prev_hash linkage and accept the stored row_hash as opaque (we no longer
+ * have the original user_id needed to recompute it). The chain therefore
+ * remains intact across erased rows; only the row's *content* is opaque.
  */
 export async function verifyChain(proposalId: number): Promise<ChainVerification> {
   const rows = await db
@@ -200,6 +207,7 @@ export async function verifyChain(proposalId: number): Promise<ChainVerification
     .orderBy(proposalVotes.id);
 
   let expectedPrev = GENESIS_PREV_HASH;
+  let erasedCount = 0;
   for (const row of rows) {
     if (row.prevHash !== expectedPrev) {
       return {
@@ -207,7 +215,25 @@ export async function verifyChain(proposalId: number): Promise<ChainVerification
         proposalId,
         headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
         total: rows.length,
+        erasedCount,
         firstBreakAt: { voteId: row.id, reason: 'prev_hash mismatch' },
+      };
+    }
+    if (row.erasedAt !== null) {
+      // Crypto-shredded row — row_hash stays opaque, chain linkage intact.
+      erasedCount++;
+      expectedPrev = row.rowHash;
+      continue;
+    }
+    if (row.userId === null) {
+      // Non-erased row must have a user_id.
+      return {
+        ok: false,
+        proposalId,
+        headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
+        total: rows.length,
+        erasedCount,
+        firstBreakAt: { voteId: row.id, reason: 'null user_id without erased_at' },
       };
     }
     const recomputed = computeRowHash({
@@ -224,6 +250,7 @@ export async function verifyChain(proposalId: number): Promise<ChainVerification
         proposalId,
         headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
         total: rows.length,
+        erasedCount,
         firstBreakAt: { voteId: row.id, reason: 'row_hash mismatch' },
       };
     }
@@ -235,5 +262,6 @@ export async function verifyChain(proposalId: number): Promise<ChainVerification
     proposalId,
     headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
     total: rows.length,
+    erasedCount,
   };
 }

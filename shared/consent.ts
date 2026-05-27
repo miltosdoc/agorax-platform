@@ -13,7 +13,6 @@
  *   3. Members with prior versions will be re-prompted on next login
  *      (UI gate — see PR that lands the interstitial).
  */
-import { createHash } from 'node:crypto';
 
 export const CURRENT_CONSENT_VERSION = '2026-05-25';
 
@@ -49,11 +48,6 @@ Votes are not anonymous. The vote↔identity linkage is reconstructable by datab
 
 I have the right to withdraw consent at any time (Art. 7(3) GDPR), to request access to or erasure of my data (Art. 15–17), and to lodge a complaint with the Hellenic Data Protection Authority.`,
 };
-
-/** SHA-256 of the canonical text for a locale (hex). */
-export function consentTextHash(locale: ConsentLocale): string {
-  return createHash('sha256').update(CONSENT_TEXT[locale], 'utf8').digest('hex');
-}
 
 /** What a client sends back to acknowledge consent. */
 export interface ConsentAcceptance {
