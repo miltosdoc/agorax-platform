@@ -29,6 +29,14 @@ const EXEMPT_PATHS = new Set<string>([
   '/auth/google/callback',
 ]);
 
+// Pattern exemptions — used for path families where every member is exempt.
+// /api/proposals/*/anonymous-vote: deliberately unauthenticated (the whole
+// privacy property depends on no session cookie being carried), so there is
+// no session for CSRF to protect.
+const EXEMPT_PATH_PATTERNS: RegExp[] = [
+  /^\/api\/proposals\/\d+\/anonymous-vote$/,
+];
+
 function newToken(): string {
   return randomBytes(32).toString('hex');
 }
@@ -63,6 +71,7 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
 
   if (SAFE_METHODS.has(req.method)) return next();
   if (EXEMPT_PATHS.has(req.path)) return next();
+  if (EXEMPT_PATH_PATTERNS.some(rx => rx.test(req.path))) return next();
   // Only enforce on API routes — static assets and SPA shell don't need it.
   if (!req.path.startsWith('/api/')) return next();
 

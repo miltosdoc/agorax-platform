@@ -107,19 +107,32 @@ function GreekContent() {
 
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">
-          3. Σημαντική ειδοποίηση: οι ψήφοι ΔΕΝ είναι ανώνυμοι
+          3. Ανωνυμία ψήφου — δύο modes
         </h2>
         <p className="mb-3">
-          Στην τρέχουσα έκδοση της πλατφόρμας, η αντιστοίχιση{" "}
-          <strong className="text-foreground">ψήφος ↔ ταυτότητα</strong> είναι ανακτήσιμη από έναν διαχειριστή
-          της βάσης δεδομένων. Η πλατφόρμα υποστηρίζει{" "}
-          <strong className="text-foreground">συμβουλευτικές ψηφοφορίες μόνο</strong> — δεσμευτικές
-          ψηφοφορίες δεν θα τρέχουν μέχρι την ολοκλήρωση κρυπτογραφικής ανωνυμοποίησης (client-side
-          encryption, ανεξάρτητοι trustees, αναδιάρθρωση σχήματος ψηφοδελτίου).
+          Κάθε πρόταση δηλώνει ένα από δύο modes ψηφοφορίας:
         </p>
+        <ul className="list-disc pl-6 space-y-2 mb-3">
+          <li>
+            <strong className="text-foreground">Ανώνυμη ψηφοφορία (προεπιλογή για νέες προτάσεις):</strong>{" "}
+            Η ψήφος σας καταγράφεται με ένα τυχαίο token που δημιουργείτε στον φυλλομετρητή σας, τυφλά
+            υπογράφεται από τον server (ο server βλέπει μόνο το τυφλωμένο token, ποτέ το πρωτότυπο) και
+            αποθηκεύεται χωρίς αναφορά στην ταυτότητά σας.{" "}
+            <strong className="text-foreground">Ακόμη και διαχειριστής της βάσης δεδομένων δεν μπορεί να
+            ανακτήσει την επιλογή σας.</strong> Καμία επανάληψη ψήφου — μία ψήφος ανά μέλος ανά πρόταση.
+          </li>
+          <li>
+            <strong className="text-foreground">Ψευδώνυμη ψηφοφορία (επιλέξιμη ανά πρόταση):</strong>{" "}
+            Η ψήφος σας αποθηκεύεται μαζί με την ταυτότητά σας. Χρησιμοποιείται για διαφανείς δεσμευτικές
+            ψηφοφορίες όπου η αποδοτικότητα είναι σκόπιμη. Σε αυτό το mode ο διαχειριστής μπορεί να
+            ανακτήσει «μέλος Χ → επιλογή Υ».
+          </li>
+        </ul>
         <p>
-          Αυτό αποτελεί <strong className="text-foreground">γνωστό αποδεκτό υπολειπόμενο κίνδυνο</strong>{" "}
-          που αναγνωρίζετε με την ρητή συγκατάθεσή σας κατά την εγγραφή.
+          Το mode εμφανίζεται ρητά στη σελίδα της πρότασης πριν ψηφίσετε. Για την ανώνυμη ψηφοφορία
+          κρατάμε τοπικά στον φυλλομετρητή σας ένα receipt (token + υπογραφή) ώστε να μπορείτε να
+          επαληθεύσετε αργότερα ότι η ψήφος σας μετρήθηκε — αλλά κανείς άλλος δεν μπορεί να συνδέσει το
+          receipt αυτό με εσάς.
         </p>
       </section>
 
@@ -314,19 +327,30 @@ function EnglishContent() {
 
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">
-          3. Important notice: votes are NOT anonymous
+          3. Vote anonymity — two modes
         </h2>
         <p className="mb-3">
-          In the current version of the platform, the{" "}
-          <strong className="text-foreground">vote ↔ identity</strong> binding is reconstructable by a
-          database administrator. The platform supports{" "}
-          <strong className="text-foreground">consultative votes only</strong> — binding votes will not
-          run until cryptographic anonymisation is complete (client-side encryption, independent
-          off-server trustees, and a ballot-schema refactor).
+          Every proposal declares one of two voting modes:
         </p>
+        <ul className="list-disc pl-6 space-y-2 mb-3">
+          <li>
+            <strong className="text-foreground">Anonymous (default for new proposals):</strong> Your vote
+            is recorded with a random token you generate in your browser, blindly signed by the server
+            (the server sees only the blinded token, never the original) and stored without any reference
+            to your identity.{" "}
+            <strong className="text-foreground">Even a database administrator cannot recover your
+            choice.</strong> No re-voting — one vote per member per proposal.
+          </li>
+          <li>
+            <strong className="text-foreground">Pseudonymous (opt-in per proposal):</strong> Your vote is
+            stored alongside your identity. Used for transparent ratification votes where attribution is
+            deliberate. In this mode an administrator can reconstruct "member X → choice Y."
+          </li>
+        </ul>
         <p>
-          This is a <strong className="text-foreground">known accepted residual risk</strong> that you
-          acknowledge by giving your explicit consent at registration.
+          The mode is shown explicitly on the proposal page before you vote. For anonymous votes we keep
+          a local receipt (token + signature) in your browser so you can verify later that your vote was
+          counted — but nobody else can tie that receipt back to you.
         </p>
       </section>
 

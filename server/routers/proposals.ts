@@ -252,6 +252,14 @@ export function registerProposalsRoutes(app: Express): void {
           current_status: proposal.status,
         });
       }
+      // Anonymous-mode proposals MUST use the /blind-sign + /anonymous-vote
+      // pair so the user_id never gets bound to the vote row.
+      if (proposal.votingMode === 'anonymous') {
+        return res.status(409).json({
+          message: "This proposal uses anonymous voting — use /blind-sign + /anonymous-vote",
+          voting_mode: 'anonymous',
+        });
+      }
       const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
       if (!isMember) {
         return res.status(403).json({ message: "Only community members may cast a final vote" });
@@ -274,6 +282,168 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(201).json(receipt);
     } catch (error) {
       res.status(500).json({ message: "Failed to cast vote" });
+    }
+  });
+
+  // ─── Anonymous voting (blind-signed tokens, malicious-operator unlinkable) ──
+  // See docs/compliance/04_ANONYMOUS_VOTING_DESIGN.md. Two-step flow:
+  //   1. Authenticated voter requests a blind signature on a token they
+  //      generated client-side. We record THAT they got a signature.
+  //   2. Anyone (no auth) presents (token, signature, choice) to cast.
+  //      We verify the signature, store (token, choice), no user_id.
+
+  // Step 1: blind-sign a voter-provided blinded value.
+  app.post("/api/proposals/:id/blind-sign", requireAuth, requireConsent, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const blinded: unknown = req.body?.blindedToken;
+      if (typeof blinded !== 'string' || blinded.length === 0) {
+        return res.status(400).json({ message: "blindedToken (base64) required" });
+      }
+
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({ message: "Proposal is not in the voting phase" });
+      }
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+      const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
+      if (!isMember) {
+        return res.status(403).json({ message: "Only community members may vote" });
+      }
+
+      // Validate the blinded value LOOKS like base64 of a positive bigint
+      // before we touch the DB — saves a wasted issuance burn on garbage.
+      let blindedBytes: Uint8Array;
+      try {
+        const { base64ToBytes } = await import('@shared/blind-sig');
+        blindedBytes = base64ToBytes(blinded);
+      } catch {
+        return res.status(400).json({ message: "blindedToken must be valid base64" });
+      }
+      if (blindedBytes.length < 16 || blindedBytes.every(b => b === 0)) {
+        return res.status(400).json({ message: "blindedToken is malformed" });
+      }
+
+      // Ensure key exists FIRST (outside the tx). Then in a single tx:
+      // claim issuance + sign. If signing throws, the tx rolls back and
+      // the user keeps their one-shot.
+      const { blindSigIssuance } = await import('@shared/schema');
+      const { ensureKey, loadPrivateKey } = await import('../utils/blind-sig-vault');
+      const { signBlinded } = await import('@shared/blind-sig');
+      const pub = await ensureKey(proposalId);
+
+      let signature: string;
+      try {
+        signature = await db.transaction(async (tx) => {
+          await tx.insert(blindSigIssuance).values({ proposalId, userId: req.user.id });
+          const priv = await loadPrivateKey(proposalId);
+          return signBlinded(blinded, priv);
+        });
+      } catch (err: any) {
+        const msg = String(err?.message ?? err);
+        if (/duplicate key|unique/i.test(msg)) {
+          return res.status(409).json({ message: "You have already requested a signature for this proposal" });
+        }
+        if (/out of range/i.test(msg)) {
+          return res.status(400).json({ message: "blindedToken is out of valid RSA range for this key" });
+        }
+        throw err;
+      }
+      res.json({ signature, publicKey: pub });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to issue blind signature" });
+    }
+  });
+
+  // Step 2: cast an anonymous vote. NO AUTH — would correlate with the
+  // blind-sign request and defeat the property. Rate-limited per-IP by the
+  // global /api/ limiter; the unique (proposal_id, vote_token) index is
+  // the double-spend guard.
+  app.post("/api/proposals/:id/anonymous-vote", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const { token, signature, choice } = req.body ?? {};
+      if (typeof token !== 'string' || typeof signature !== 'string') {
+        return res.status(400).json({ message: "token + signature (base64) required" });
+      }
+      if (choice !== 'yes' && choice !== 'no' && choice !== 'abstain') {
+        return res.status(400).json({ message: "choice must be yes / no / abstain" });
+      }
+
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({ message: "Proposal is not in the voting phase" });
+      }
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+
+      const { ensureKey } = await import('../utils/blind-sig-vault');
+      const { verify, base64ToBytes } = await import('@shared/blind-sig');
+      const pub = await ensureKey(proposalId);
+      const tokenBytes = base64ToBytes(token);
+      const ok = await verify(tokenBytes, signature, pub);
+      if (!ok) return res.status(400).json({ message: "Invalid signature on token" });
+
+      const { castAnonymousVoteWithChain } = await import('../utils/vote-chain');
+      try {
+        const result = await castAnonymousVoteWithChain({
+          proposalId,
+          voteToken: token,
+          choice,
+        });
+        res.status(201).json({
+          voteId: result.id,
+          rowHash: result.receipt.rowHash,
+          prevHash: result.receipt.prevHash,
+          castAt: result.receipt.castAt,
+          backend: 'hash-chain',
+          mode: 'anonymous',
+        });
+      } catch (err: any) {
+        const msg = String(err?.message ?? err);
+        // Postgres unique-violation on (proposal_id, vote_token) → double-spend.
+        if (/duplicate key|unique/i.test(msg)) {
+          return res.status(409).json({ message: "This token has already been used" });
+        }
+        throw err;
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cast anonymous vote" });
+    }
+  });
+
+  // Step 3 (optional): verify your own vote landed. Deniable receipt —
+  // anyone holding a token can do this lookup, so a third party cannot
+  // use the result to prove how you voted.
+  app.get("/api/proposals/:id/verify-receipt", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const token = typeof req.query?.token === 'string' ? req.query.token : '';
+      if (!Number.isFinite(proposalId) || !token) {
+        return res.status(400).json({ message: "proposal id + token required" });
+      }
+      const { proposalVotes: pvTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [row] = await db
+        .select({ choice: pvTable.choice, castAt: pvTable.castAt, rowHash: pvTable.rowHash })
+        .from(pvTable)
+        .where(and(eq(pvTable.proposalId, proposalId), eq(pvTable.voteToken, token)))
+        .limit(1);
+      if (!row) return res.json({ found: false });
+      res.json({ found: true, choice: row.choice, castAt: row.castAt, rowHash: row.rowHash });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify receipt" });
     }
   });
   // Public election proof — backend-specific artifact a third party can

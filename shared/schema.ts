@@ -273,6 +273,12 @@ export const proposals = pgTable("proposals", {
   sortitionAvgScore: numeric("sortition_avg_score"), // weighted avg from sortition body
   sortitionRank: integer("sortition_rank"),       // rank among proposals in same cycle
 
+  // Voting privacy mode (migration 0021). Default 'anonymous' so every new
+  // proposal gets malicious-operator unlinkability. 'pseudonymous' is opt-in
+  // for transparent ratification votes where the creator explicitly wants
+  // public attribution.
+  votingMode: text("voting_mode").notNull().default("anonymous"), // 'anonymous' | 'pseudonymous'
+
   // Metadata
   category: text("category"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -454,12 +460,16 @@ export const proposalSupport = pgTable("proposal_support", {
 export const proposalVotes = pgTable("proposal_votes", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
-  // Nullable for Art. 17 crypto-shred: erased rows have user_id = NULL +
-  // erased_at set. The chain row_hash stays opaque; verifier only checks
-  // prev_hash linkage for erased rows. See migration 0017 and
-  // docs/compliance/INTERNAL_POLICIES.md §2.4.
+  // Nullable for two distinct reasons:
+  //   (a) Art. 17 crypto-shred (erased_at set): see migration 0017 and
+  //       docs/compliance/INTERNAL_POLICIES.md §2.4.
+  //   (b) voting_mode='anonymous': vote_token is set instead of user_id.
+  //       The (user → choice) link is absent from the schema by design.
+  //       See migration 0021 and docs/compliance/04_ANONYMOUS_VOTING_DESIGN.md.
   userId: integer("user_id").references(() => users.id),
-  choice: text("choice").notNull(), // 'yes' | 'no' | 'abstain'
+  voteToken: text("vote_token"),                        // anonymous-mode only
+  votingMode: text("voting_mode").notNull().default("pseudonymous"), // 'pseudonymous' | 'anonymous'
+  choice: text("choice").notNull(),                     // 'yes' | 'no' | 'abstain'
   weight: numeric("weight").notNull().default("1"),
   castAt: timestamp("cast_at").notNull(),
   prevHash: text("prev_hash").notNull(),
@@ -468,6 +478,34 @@ export const proposalVotes = pgTable("proposal_votes", {
   erasedAt: timestamp("erased_at"),
 }, (table) => ({
   proposalChainIdx: uniqueIndex('proposal_votes_proposal_id_idx').on(table.proposalId, table.id),
+}));
+
+// Anonymous-voting key store. One RSA keypair per proposal that runs in
+// voting_mode='anonymous'. The private exponent d is AES-256-GCM encrypted
+// at rest using a key derived (HKDF-SHA256) from the server-only
+// SIGNING_MASTER_KEY env var, with the proposal id as the HKDF info field.
+export const blindSigKeys = pgTable("blind_sig_keys", {
+  proposalId: integer("proposal_id")
+    .primaryKey()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  publicN: text("public_n").notNull(),
+  publicE: text("public_e").notNull(),
+  secretDCiphertext: text("secret_d_ciphertext").notNull(),
+  secretDIv: text("secret_d_iv").notNull(),
+  secretDTag: text("secret_d_tag").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Issuance ledger — proves one-blind-sig-per-(member, proposal) without
+// recording the token itself. Operator sees "user X participated in
+// proposal Y." Operator does NOT learn the unblinded token or the choice.
+export const blindSigIssuance = pgTable("blind_sig_issuance", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  issuedAt: timestamp("issued_at").notNull().defaultNow(),
+}, (table) => ({
+  unique: uniqueIndex('blind_sig_issuance_unique').on(table.proposalId, table.userId),
 }));
 
 // ─── ElectionGuard verifiable voting (@agorax/voting backend) ───────────────
@@ -1087,6 +1125,10 @@ export type LoginUser = z.infer<typeof loginUserSchema>;
 export type User = typeof users.$inferSelect;
 export type UserConsent = typeof userConsents.$inferSelect;
 export type InsertUserConsent = typeof userConsents.$inferInsert;
+export type BlindSigKey = typeof blindSigKeys.$inferSelect;
+export type InsertBlindSigKey = typeof blindSigKeys.$inferInsert;
+export type BlindSigIssuance = typeof blindSigIssuance.$inferSelect;
+export type InsertBlindSigIssuance = typeof blindSigIssuance.$inferInsert;
 export type ErasureRequest = typeof erasureRequests.$inferSelect;
 export type InsertErasureRequest = typeof erasureRequests.$inferInsert;
 export type PollNotification = typeof pollNotifications.$inferSelect;

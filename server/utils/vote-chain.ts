@@ -47,18 +47,31 @@ function canonicalizeCastAt(castAt: Date): string {
   );
 }
 
+/**
+ * Compute a chain row hash. Two modes (per migration 0021):
+ *   - pseudonymous: input set is (prev, proposal_id, user_id, choice, weight, cast_at)
+ *   - anonymous:    input set is (prev, proposal_id, vote_token, choice, weight, cast_at)
+ *
+ * The mode token itself is included as a domain separator so a row in one
+ * mode cannot be replayed as the other.
+ */
 export function computeRowHash(input: {
   prevHash: string;
   proposalId: number;
-  userId: number;
+  identity: { mode: 'pseudonymous'; userId: number } | { mode: 'anonymous'; voteToken: string };
   choice: string;
   weight: string;
   castAt: Date;
 }): string {
+  const identityField =
+    input.identity.mode === 'pseudonymous'
+      ? String(input.identity.userId)
+      : input.identity.voteToken;
   const canonical = [
     input.prevHash,
     String(input.proposalId),
-    String(input.userId),
+    input.identity.mode,
+    identityField,
     input.choice,
     input.weight,
     canonicalizeCastAt(input.castAt),
@@ -99,7 +112,7 @@ export async function castProposalVoteWithChain(args: {
     const rowHash = computeRowHash({
       prevHash,
       proposalId,
-      userId,
+      identity: { mode: 'pseudonymous', userId },
       choice,
       weight,
       castAt,
@@ -137,6 +150,77 @@ export async function castProposalVoteWithChain(args: {
         voteId: inserted.id,
         proposalId,
         userId,
+        choice,
+        weight,
+        castAt: canonicalizeCastAt(castAt),
+        prevHash,
+        rowHash,
+      },
+    };
+  });
+}
+
+/**
+ * Cast an anonymous vote — token + signature only, no user_id. Caller is
+ * responsible for verifying the RSA-blind signature on the token BEFORE
+ * calling this. Caller is also responsible for the unauthenticated
+ * request shape (we deliberately do not capture req.user here).
+ *
+ * Double-spend is prevented at the DB layer by the
+ * proposal_votes_token_unique index (unique on (proposal_id, vote_token)
+ * WHERE vote_token IS NOT NULL).
+ */
+export async function castAnonymousVoteWithChain(args: {
+  proposalId: number;
+  voteToken: string;
+  choice: string;
+  weight?: string;
+}): Promise<ProposalVote & { receipt: Omit<VoteReceipt, 'userId'> & { voteToken: string } }> {
+  const { proposalId, voteToken, choice } = args;
+  const weight = args.weight ?? '1';
+
+  return await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM proposals WHERE id = ${proposalId} FOR UPDATE`);
+
+    const [prev] = await tx
+      .select({ rowHash: proposalVotes.rowHash })
+      .from(proposalVotes)
+      .where(eq(proposalVotes.proposalId, proposalId))
+      .orderBy(desc(proposalVotes.id))
+      .limit(1);
+
+    const prevHash = prev?.rowHash ?? GENESIS_PREV_HASH;
+    const castAt = new Date();
+    const rowHash = computeRowHash({
+      prevHash,
+      proposalId,
+      identity: { mode: 'anonymous', voteToken },
+      choice,
+      weight,
+      castAt,
+    });
+
+    const [inserted] = await tx
+      .insert(proposalVotes)
+      .values({
+        proposalId,
+        userId: null,
+        voteToken,
+        votingMode: 'anonymous',
+        choice,
+        weight,
+        castAt,
+        prevHash,
+        rowHash,
+      })
+      .returning();
+
+    return {
+      ...inserted,
+      receipt: {
+        voteId: inserted.id,
+        proposalId,
+        voteToken,
         choice,
         weight,
         castAt: canonicalizeCastAt(castAt),
@@ -225,21 +309,36 @@ export async function verifyChain(proposalId: number): Promise<ChainVerification
       expectedPrev = row.rowHash;
       continue;
     }
-    if (row.userId === null) {
-      // Non-erased row must have a user_id.
-      return {
-        ok: false,
-        proposalId,
-        headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
-        total: rows.length,
-        erasedCount,
-        firstBreakAt: { voteId: row.id, reason: 'null user_id without erased_at' },
-      };
+    let identity: { mode: 'pseudonymous'; userId: number } | { mode: 'anonymous'; voteToken: string } | null = null;
+    if (row.votingMode === 'anonymous') {
+      if (row.voteToken === null) {
+        return {
+          ok: false,
+          proposalId,
+          headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
+          total: rows.length,
+          erasedCount,
+          firstBreakAt: { voteId: row.id, reason: 'anonymous row missing vote_token' },
+        };
+      }
+      identity = { mode: 'anonymous', voteToken: row.voteToken };
+    } else {
+      if (row.userId === null) {
+        return {
+          ok: false,
+          proposalId,
+          headHash: rows[rows.length - 1]?.rowHash ?? GENESIS_PREV_HASH,
+          total: rows.length,
+          erasedCount,
+          firstBreakAt: { voteId: row.id, reason: 'pseudonymous row missing user_id (not erased)' },
+        };
+      }
+      identity = { mode: 'pseudonymous', userId: row.userId };
     }
     const recomputed = computeRowHash({
       prevHash: row.prevHash,
       proposalId: row.proposalId,
-      userId: row.userId,
+      identity,
       choice: row.choice,
       weight: row.weight,
       castAt: row.castAt,

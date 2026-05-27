@@ -55,6 +55,11 @@ export function validateRuntimeConfig() {
 
   requireStrongSecret("SESSION_SECRET");
 
+  // Anonymous voting: per-proposal RSA keys are AES-GCM encrypted at rest
+  // using a key derived (HKDF) from SIGNING_MASTER_KEY. Without it, every
+  // anonymous vote endpoint fails — fail at boot instead.
+  requireStrongSecret("SIGNING_MASTER_KEY");
+
   if (process.env.JWT_SECRET) {
     requireStrongSecret("JWT_SECRET");
   }
