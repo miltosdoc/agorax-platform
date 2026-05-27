@@ -49,6 +49,7 @@ describe('community settings contract', () => {
       sortitionMode: 'absolute',
       sortitionResponseHours: 96,
       amendmentThreshold: '0.65',
+      amendmentInclusionThreshold: '1',
       maxAmendmentsPerProposal: 8,
       requireGovgrVerification: true,
     });
@@ -65,6 +66,7 @@ describe('community settings contract', () => {
       sortitionMode: 'absolute',
       sortitionResponseHours: 72,
       amendmentThreshold: '0.5',
+      amendmentInclusionThreshold: '1',
       maxAmendmentsPerProposal: -1,
       requireGovgrVerification: false,
     });

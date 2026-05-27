@@ -22,7 +22,9 @@ describe('profile/settings page contract', () => {
     expect(profileSource).toContain('data-testid="page-profile-settings"');
     expect(profileSource).toContain("t('profile.accountSettings')");
     expect(profileSource).toContain("t('profile.identityVerification')");
-    expect(profileSource).toContain("t('profile.participationSettings')");
+    // Note: the "participationSettings" card was removed in the GDPR data-
+    // minimisation pass — it only held a no-op "Update Location" button
+    // after the user-location vertical was dropped (migration 0014).
   });
 
   it('does not use legacy poll language or old admin-account framing', () => {
