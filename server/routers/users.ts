@@ -6,6 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { userRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { ballotUpload } from '../utils/ballot-client';
@@ -16,6 +17,34 @@ import {
   validateConsent,
 } from '../../shared/consent';
 import { consentTextHash } from '../utils/consent-hash';
+import { logAdminAction } from '../utils/admin-audit';
+
+// Abuse defense on GDPR rights endpoints. Tight ceiling for the
+// state-changing ones (consent accept/withdraw, erasure-request) and a
+// slightly looser one for data-export (members may need to retry). These
+// limits are per-IP; complement (not replace) the per-user nature of the
+// underlying operations.
+const consentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.DEMO_MODE === 'true',
+});
+const dataExportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.DEMO_MODE === 'true',
+});
+const erasureLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.DEMO_MODE === 'true',
+});
 
 export function registerUsersRoutes(app: Express): void {
   // GDPR Art. 13 — surface the canonical privacy text + version so the
@@ -46,7 +75,7 @@ export function registerUsersRoutes(app: Express): void {
   // GDPR Art. 7(3) — right to withdraw consent at any time. Re-arms the
   // requires_consent gate so the member must re-accept before any further
   // Art. 9 action.
-  app.post('/api/user/consent/withdraw', requireAuth, async (req: any, res) => {
+  app.post('/api/user/consent/withdraw', consentLimiter, requireAuth, async (req: any, res) => {
     const withdrawn = await userRepo.withdrawConsent(req.user.id);
     await userRepo.setRequiresConsent(req.user.id, true);
     res.json({ withdrawn });
@@ -54,7 +83,7 @@ export function registerUsersRoutes(app: Express): void {
 
   // GDPR Art. 9(2)(a) acceptance path — used by OAuth users at first login
   // and any member re-prompted after a version bump or withdrawal.
-  app.post('/api/user/consent/accept', requireAuth, async (req: any, res) => {
+  app.post('/api/user/consent/accept', consentLimiter, requireAuth, async (req: any, res) => {
     const consent = validateConsent(req.body);
     if (!consent) {
       return res.status(400).json({
@@ -74,7 +103,7 @@ export function registerUsersRoutes(app: Express): void {
 
   // GDPR Art. 15 — right of access. Returns everything we hold about the
   // member as a single JSON payload they can download.
-  app.get('/api/user/data-export', requireAuth, async (req: any, res) => {
+  app.get('/api/user/data-export', dataExportLimiter, requireAuth, async (req: any, res) => {
     const data = await userRepo.exportUserData(req.user.id);
     if (!data.profile) return res.status(404).json({ message: 'Profile not found' });
     res.setHeader('Content-Disposition', `attachment; filename="agorax-data-${req.user.id}.json"`);
@@ -90,7 +119,7 @@ export function registerUsersRoutes(app: Express): void {
   // GDPR Art. 17 — right to be forgotten. Records a request; an admin
   // processes manually per the closed ≤1000-member scale documented in
   // the brief. Hash-chain-vs-erasure resolution lives in INTERNAL_POLICIES.
-  app.post('/api/user/erasure-request', requireAuth, async (req: any, res) => {
+  app.post('/api/user/erasure-request', erasureLimiter, requireAuth, async (req: any, res) => {
     const existing = await userRepo.getPendingErasureRequest(req.user.id);
     if (existing) {
       return res.status(409).json({
@@ -119,8 +148,13 @@ export function registerUsersRoutes(app: Express): void {
   };
 
   // Admin queue: pending Art. 17 erasure requests.
-  app.get('/api/admin/erasure-requests', requireAdmin, async (_req, res) => {
+  app.get('/api/admin/erasure-requests', requireAdmin, async (req: any, res) => {
     const rows = await userRepo.listPendingErasureRequests();
+    await logAdminAction({
+      adminId: req.user.id,
+      action: 'erasure_requests.list',
+      details: { count: rows.length },
+    });
     res.json(rows);
   });
 
@@ -138,6 +172,16 @@ export function registerUsersRoutes(app: Express): void {
         requestId,
         processedBy: req.user.id,
         notes,
+      });
+      await logAdminAction({
+        adminId: req.user.id,
+        action: 'erasure_requests.process',
+        targetUserId: result.targetUserId,
+        targetResource: `erasure_request:${requestId}`,
+        details: {
+          cryptoShredded: result.cryptoShredded,
+          deferredVoteCount: result.deferredVoteRowIds.length,
+        },
       });
       res.json(result);
     } catch (err: any) {

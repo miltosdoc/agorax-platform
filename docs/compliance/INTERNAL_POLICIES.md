@@ -26,7 +26,7 @@
 
 - **No shared admin accounts.** Each technical admin has their own DB user and SSH key. List of holders is kept in the repo at `.claude/ADMINS.md` (private branch) — re-issued on any join/leave.
 - **MFA mandatory** for any admin who can read the `proposal_votes` table or run schema migrations.
-- **Audit log:** every join across `proposal_votes` and `users` performed manually (not via the application) must be logged in `docs/compliance/audit-log.md` with date, admin, purpose, and member-IDs touched. This is *the* control that turns "the host can read votes" into "we know when they did and why."
+- **Audit log:** **automated for in-application admin actions.** Every admin-initiated action that hits a privileged endpoint (`/api/admin/erasure-requests`, future admin endpoints) is logged to the `admin_audit_log` table (migration 0018). Direct-DB joins via `psql` are out of scope for this table and must instead be logged in `docs/compliance/audit-log.md` with date, admin, purpose, and member-IDs touched. This is *the* control that turns "the host can read votes" into "we know when they did and why."
 - **Postgres role separation:** the application service role does NOT have `SELECT` on `account_activity` or `erasure_requests` beyond what the app needs. Admins use a separate role.
 
 ### 1.3 Logging

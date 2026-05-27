@@ -58,6 +58,21 @@ export const userConsents = pgTable("user_consents", {
   withdrawnAt: timestamp("withdrawn_at"),
 });
 
+// Admin action audit log (INTERNAL_POLICIES §1.2). The control that lets
+// us answer "who touched what, when, why" for every admin-initiated
+// action that hits a privileged endpoint. DB-direct joins by a human
+// with psql are out of scope — those rely on the hosting layer.
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  targetUserId: integer("target_user_id").references(() => users.id, { onDelete: "set null" }),
+  targetResource: text("target_resource"),
+  details: jsonb("details"),
+  requestId: text("request_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // GDPR Art. 17 — pending right-to-be-forgotten requests. Manual admin
 // processing per the brief (≤1000-member scale). Resolving the
 // hash-chain-vs-erasure tension is documented in INTERNAL_POLICIES.md.
