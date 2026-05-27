@@ -84,14 +84,14 @@ When a member closes their account (Art. 17 or self-service in profile):
 
 **The tension:** `proposal_votes` row hash is `sha256(prev_hash | proposal_id | user_id | choice | weight | cast_at)` (migration `0010_vote_hash_chain.sql:48-54`). Changing `user_id` post-hoc breaks tamper-evidence.
 
-**The resolution — three-part:**
+**The resolution — three-part (implemented):**
 
-1. **Active deliberation period (proposal status `voting` or earlier):** documented lawful refusal under Art. 17(3)(d) — audit integrity during an active vote is a legitimate interest. Member is informed that erasure of votes in active proposals is deferred until the proposal closes; all other personal data is erased immediately.
-2. **Post-close crypto-shredding:** once a proposal reaches `closed`, replace the member's `user_id` in `proposal_votes` with a stable sentinel (`-1` for "erased"). Add a column `erased_at` to the chain rows so the verifier (in `server/utils/vote-chain.ts`) can skip those rows when re-checking the chain.
+1. **Active deliberation period (proposal status not yet `decided` / `archived`):** documented lawful refusal under Art. 17(3)(d) — audit integrity during an active vote is a legitimate interest. Member is informed that erasure of votes in active proposals is deferred until the proposal reaches a terminal state; all other personal data is erased immediately. Implemented in `server/storage/users.ts:processErasureRequest`, which returns the deferred row ids.
+2. **Post-close crypto-shredding:** once a proposal transitions to `decided` or `archived`, the close-handler in `server/utils/proposal-state-machine.ts:triggerSideEffects` calls `processDeferredErasuresForProposal(proposalId)` which sets `proposal_votes.user_id = NULL, erased_at = NOW()` for any row whose user has a processed erasure_request. The chain `row_hash` stays opaque; verifier in `server/utils/vote-chain.ts` recognises `erasedAt !== null` and accepts the stored hash, walking the prev_hash linkage only. Same treatment for `eg_ballots` joined to `eg_elections.status='closed'`.
 
-   - **Schema change required** (not yet shipped): `ALTER TABLE proposal_votes ADD COLUMN erased_at timestamp`. Verifier reads it; non-NULL → re-derive the row hash by substituting `user_id = -1` in the inputs, or skip the chain link entirely for that row.
+   - **Schema shipped:** migration `0017_vote_erasure.sql` — `user_id` is now nullable, `erased_at` column added. `NULL` is the stable erased sentinel (no FK violation).
    - **Side effect:** tally-by-choice survives (the `choice` column remains); the (member → choice) link is gone for that row.
-3. **Democracy Points ledger:** same — replace `user_id` with `-1`. The ledger total per member is lost, the ledger itself remains as anonymous transaction history.
+3. **Democracy Points ledger:** same approach — null the FK on erasure. Pending: the points ledger schema currently constrains `user_id NOT NULL`; this needs a follow-up migration once the ledger is decided to be in MVP scope (audit `02 §4.3` decision).
 
 **For the `electionguard` backend (`eg_ballots`):** same crypto-shred — null/sentinel `user_id`, ciphertext remains. The encrypted ballot still tallies into the result; the member is no longer linked to it.
 

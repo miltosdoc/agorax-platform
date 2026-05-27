@@ -139,6 +139,52 @@ export class UserRepository {
     return row;
   }
 
+  /**
+   * Close-handler hook: when a proposal reaches a terminal state, crypto-shred
+   * any votes on it that belong to members whose erasure request was already
+   * processed but had this vote deferred (Art. 17(3)(d) — pre-close lawful
+   * refusal). Idempotent: re-running it does nothing because erased rows are
+   * filtered out. Call from triggerSideEffects on transitions into
+   * 'decided' / 'archived'.
+   */
+  async processDeferredErasuresForProposal(proposalId: number): Promise<{
+    proposalVotesShredded: number;
+    egBallotsShredded: number;
+  }> {
+    const now = new Date();
+
+    const pvResult = await db.execute(sql`
+      UPDATE proposal_votes
+      SET user_id = NULL, erased_at = ${now}
+      WHERE proposal_id = ${proposalId}
+        AND erased_at IS NULL
+        AND user_id IN (
+          SELECT DISTINCT user_id FROM erasure_requests
+          WHERE processed_at IS NOT NULL
+        )
+      RETURNING id
+    `);
+
+    const egResult = await db.execute(sql`
+      UPDATE eg_ballots
+      SET user_id = NULL, erased_at = ${now}
+      WHERE election_id IN (
+          SELECT id FROM eg_elections WHERE proposal_id = ${proposalId}
+        )
+        AND erased_at IS NULL
+        AND user_id IN (
+          SELECT DISTINCT user_id FROM erasure_requests
+          WHERE processed_at IS NOT NULL
+        )
+      RETURNING id
+    `);
+
+    return {
+      proposalVotesShredded: (pvResult.rows as unknown[]).length,
+      egBallotsShredded: (egResult.rows as unknown[]).length,
+    };
+  }
+
   /** List pending (unprocessed) erasure requests, oldest first. */
   async listPendingErasureRequests(): Promise<ErasureRequest[]> {
     return db
@@ -201,10 +247,11 @@ export class UserRepository {
       const eligibleVoteIds: number[] = [];
       const deferredVoteIds: number[] = [];
       for (const row of voteRows) {
-        // Treat 'closed', 'archived', 'finalized' (and similar terminal states)
-        // as eligible. Any active/voting state defers per the policy.
+        // Canonical terminal states (shared/proposal-lifecycle.ts) — votes on
+        // proposals in these states are eligible for immediate crypto-shred.
+        // Any non-terminal status defers per Art. 17(3)(d) (audit integrity).
         const status = row.status ?? '';
-        if (status === 'closed' || status === 'archived' || status === 'finalized') {
+        if (status === 'decided' || status === 'archived') {
           eligibleVoteIds.push(row.id);
         } else {
           deferredVoteIds.push(row.id);

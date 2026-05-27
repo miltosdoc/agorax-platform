@@ -245,6 +245,18 @@ export async function triggerSideEffects(
       // so the badge on the community dashboard reflects new outcomes.
       if (toState === 'decided' || toState === 'archived') {
         await enqueueRecalculateScore(proposal.communityId);
+
+        // GDPR Art. 17 deferred-erasure hook: now that this proposal is
+        // terminal, crypto-shred any votes on it that belong to members
+        // whose erasure request was previously processed-but-deferred
+        // (per INTERNAL_POLICIES.md §2.4). Idempotent + best-effort —
+        // a failure here must not block the close.
+        try {
+          const { storage } = await import('../auth');
+          await storage.processDeferredErasuresForProposal(proposal.id);
+        } catch {
+          // Logged elsewhere; do not throw from a side-effect hook.
+        }
       }
       break;
   }

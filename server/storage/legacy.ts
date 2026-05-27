@@ -141,6 +141,10 @@ export class DatabaseStorage {
     return this.users.processErasureRequest(args);
   }
 
+  async processDeferredErasuresForProposal(proposalId: number) {
+    return this.users.processDeferredErasuresForProposal(proposalId);
+  }
+
   async updateAccountStatus(userId: number, status: string) {
     return this.users.updateAccountStatus(userId, status);
   }
