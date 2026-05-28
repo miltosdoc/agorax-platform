@@ -158,50 +158,18 @@ export default function Header() {
             <div className="flex-1 max-w-md min-w-0">
               <SearchBar />
             </div>
+            {/* Primary CTA stays visible as a button. The four secondary
+                nav items (Proposals / Communities / Sortition / Points)
+                live in the user dropdown — they used to also be top-level
+                buttons but that left the header cramped. */}
             <button
               type="button"
               onClick={() => navigate("/proposals/new")}
-              className="hidden lg:flex items-center gap-2 min-h-[44px] bg-primary hover:bg-primary/90 text-white transition-smooth shadow-sm hover:shadow-md rounded-md px-3 py-2 cursor-pointer"
+              className="hidden md:flex items-center gap-2 min-h-[44px] bg-primary hover:bg-primary/90 text-white transition-smooth shadow-sm hover:shadow-md rounded-md px-3 py-2 cursor-pointer"
               data-testid="button-new-proposal"
             >
               <PlusCircle className="h-4 w-4" />
               <span>{t('nav.newProposal')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/proposals")}
-              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-proposals"
-            >
-              <FileText className="h-4 w-4" />
-              <span>{t('nav.proposals')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/communities")}
-              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-communities"
-            >
-              <Users className="h-4 w-4" />
-              <span>{t('nav.communities')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/sortition")}
-              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-sortition"
-            >
-              <Users className="h-4 w-4" />
-              <span>{t('nav.sortition')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/points")}
-              className="hidden lg:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-points"
-            >
-              <Coins className="h-4 w-4" />
-              <span>{t('nav.points')}</span>
             </button>
 
             {/* Notification Bell */}
