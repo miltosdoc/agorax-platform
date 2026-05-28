@@ -60,8 +60,10 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex relative">
-      {/* Top-right language toggle — visible on both halves */}
-      <div className="absolute top-4 right-4 z-20">
+      {/* Top-right language toggle — visible on both halves.
+          Wrapped in a translucent-white pill so it stays readable over
+          the dark primary-colored hero column. */}
+      <div className="absolute top-4 right-4 z-20 rounded-lg bg-white/90 text-gray-800 shadow-sm backdrop-blur-sm">
         <LanguageSwitcher />
       </div>
 
