@@ -21,6 +21,7 @@ import { loginUserSchema, registerUserSchema } from "@shared/schema";
 import { CURRENT_CONSENT_VERSION } from "@shared/consent";
 import { FcGoogle } from "react-icons/fc";
 import { useTranslation } from "@/hooks/use-translation";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import logoImage from "../assets/logo.png";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
@@ -58,7 +59,12 @@ export default function AuthPage() {
   }, [user, navigate, returnTo]);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Top-right language toggle — visible on both halves */}
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSwitcher />
+      </div>
+
       {/* Left side - Auth forms */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
