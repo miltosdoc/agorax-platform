@@ -292,6 +292,29 @@ export function registerProposalsRoutes(app: Express): void {
   //   2. Anyone (no auth) presents (token, signature, choice) to cast.
   //      We verify the signature, store (token, choice), no user_id.
 
+  // Step 0: fetch the proposal's blind-signing public key. Idempotent —
+  // generates the key on first call, returns it on every subsequent one.
+  // Voter calls this before blind() so the math is well-defined; calling
+  // it does NOT burn the one-blind-sig-per-voter quota.
+  app.get("/api/proposals/:id/blind-key", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+      const { ensureKey } = await import('../utils/blind-sig-vault');
+      const pub = await ensureKey(proposalId);
+      res.json(pub);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch blind key" });
+    }
+  });
+
   // Step 1: blind-sign a voter-provided blinded value.
   app.post("/api/proposals/:id/blind-sign", requireAuth, requireConsent, async (req: any, res) => {
     try {

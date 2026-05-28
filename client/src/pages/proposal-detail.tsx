@@ -40,6 +40,8 @@ interface Proposal {
   llmValidationRound?: number | null;
   finalText?: string | null;
   category?: string;
+  /** 'anonymous' (default for new proposals) | 'pseudonymous' (transparent ratification) */
+  votingMode?: string;
 }
 
 type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
@@ -439,6 +441,7 @@ export default function ProposalDetailPage() {
             proposalId={proposal.id}
             proposalStatus={proposal.status}
             proposalAuthorId={proposal.authorId}
+            votingMode={proposal.votingMode}
             onProposalAdvanced={handleProposalAdvanced}
           />
           {voteError && (

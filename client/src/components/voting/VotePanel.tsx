@@ -11,10 +11,28 @@ import {
   XCircle,
   Vote,
   Lock,
+  ShieldCheck,
+  Eye,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
+import {
+  castAnonymousVote,
+  getReceipt,
+  type AnonymousReceipt,
+  type AnonymousChoice,
+} from '@/lib/anonymous-vote';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export type VoteChoice = 'yes' | 'no' | 'abstain';
 
@@ -57,6 +75,7 @@ interface VotePanelProps {
   proposalId: number;
   proposalStatus: string;
   proposalAuthorId?: number;
+  votingMode?: string;
   onVoteResultsChange?: (results: VoteResults) => void;
   onProposalAdvanced?: (newStatus: string) => void;
 }
@@ -65,6 +84,7 @@ export default function VotePanel({
   proposalId,
   proposalStatus,
   proposalAuthorId,
+  votingMode = 'pseudonymous',
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
@@ -76,11 +96,19 @@ export default function VotePanel({
   const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
+  // Anonymous mode: a local receipt + a confirm modal before the one-shot vote.
+  const [localReceipt, setLocalReceipt] = useState<AnonymousReceipt | undefined>(() => getReceipt(proposalId));
+  const [pendingAnon, setPendingAnon] = useState<AnonymousChoice | null>(null);
 
+  const isAnonymous = votingMode === 'anonymous';
   const isVoting = proposalStatus === 'voting';
   const isClosed = proposalStatus === 'decided' || proposalStatus === 'archived';
   // A private backend never reveals `userVote`, but still reports `hasVoted`.
-  const userVoted = results.hasVoted ?? results.userVote !== null;
+  // In anonymous mode the server NEVER reports hasVoted (it can't know);
+  // use the localStorage receipt instead.
+  const userVoted = isAnonymous
+    ? !!localReceipt
+    : (results.hasVoted ?? results.userVote !== null);
   const userIsAuthor = !!user && proposalAuthorId !== undefined && user.id === proposalAuthorId;
 
   useEffect(() => {
@@ -117,6 +145,12 @@ export default function VotePanel({
 
   const handleCastVote = async (choice: VoteChoice) => {
     if (voting) return;
+    // Anonymous proposals: open the confirm modal. The actual cast runs
+    // in confirmAnonymousVote() so the voter sees the one-shot warning.
+    if (isAnonymous) {
+      setPendingAnon(choice);
+      return;
+    }
     setVoting(true);
     setError(null);
     try {
@@ -125,6 +159,24 @@ export default function VotePanel({
       await refresh();
     } catch (e) {
       const message = e instanceof ApiError ? e.message : t('proposal.voteFailed');
+      setError(message);
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const confirmAnonymousVote = async () => {
+    if (!pendingAnon || voting) return;
+    const choice = pendingAnon;
+    setPendingAnon(null);
+    setVoting(true);
+    setError(null);
+    try {
+      const receipt = await castAnonymousVote(proposalId, choice);
+      setLocalReceipt(receipt);
+      await refresh();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : t('proposal.voteFailed');
       setError(message);
     } finally {
       setVoting(false);
@@ -171,7 +223,9 @@ export default function VotePanel({
   const participationPercent = Math.round(results.participationPct * 100);
   const quorumPercent = Math.round(results.minParticipationPct * 100);
 
-  const showVoteButtons = isVoting && (!userVoted || changing);
+  // Anonymous mode is one-shot — no "change vote" path. For pseudonymous,
+  // members can re-cast and that flips superseded_by_id server-side.
+  const showVoteButtons = isVoting && (!userVoted || (changing && !isAnonymous));
 
   return (
     <Card data-testid="vote-panel">
@@ -210,6 +264,26 @@ export default function VotePanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Mode badge — always visible so the voter sees the privacy property */}
+        <div className="flex items-center gap-2 text-xs">
+          {isAnonymous ? (
+            <Badge variant="default" className="gap-1 bg-emerald-700 hover:bg-emerald-700">
+              <ShieldCheck className="w-3 h-3" />
+              {t('vote.anonymousMode') || 'Ανώνυμη / Anonymous'}
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="gap-1">
+              <Eye className="w-3 h-3" />
+              {t('vote.pseudonymousMode') || 'Ψευδώνυμη / Pseudonymous'}
+            </Badge>
+          )}
+          <span className="text-muted-foreground">
+            {isAnonymous
+              ? (t('vote.anonymousModeHint') || 'Η ψήφος σας δεν συνδέεται με την ταυτότητά σας — ούτε από τον διαχειριστή. Μία ψήφος, χωρίς δυνατότητα αλλαγής.')
+              : (t('vote.pseudonymousModeHint') || 'Η ψήφος σας αποθηκεύεται μαζί με την ταυτότητά σας. Μπορείτε να την αλλάξετε όσο η ψηφοφορία είναι ανοιχτή.')}
+          </span>
+        </div>
+
         {isVoting && (
           <div className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-900">
             {t('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
@@ -279,7 +353,19 @@ export default function VotePanel({
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle2 className="w-4 h-4 text-green-600" />
               <span>
-                {results.userVote ? (
+                {isAnonymous && localReceipt ? (
+                  <>
+                    {t('vote.youVoted')}{' '}
+                    <span className="font-medium">
+                      {localReceipt.choice === 'yes' && t('proposal.support')}
+                      {localReceipt.choice === 'no' && t('proposal.oppose')}
+                      {localReceipt.choice === 'abstain' && t('proposal.abstain')}
+                    </span>{' '}
+                    <span className="text-muted-foreground">
+                      ({t('vote.receiptStoredLocally') || 'απόδειξη αποθηκευμένη μόνο τοπικά'})
+                    </span>
+                  </>
+                ) : results.userVote ? (
                   <>
                     {t('vote.youVoted')}{' '}
                     <span className="font-medium">
@@ -293,7 +379,8 @@ export default function VotePanel({
                 )}
               </span>
             </div>
-            {isVoting && (
+            {/* Anonymous = one-shot: no re-cast button. */}
+            {isVoting && !isAnonymous && (
               <Button variant="outline" size="sm" onClick={() => setChanging(true)} data-testid="vote-change">
                 {t('vote.changeVote')}
               </Button>
@@ -397,6 +484,37 @@ export default function VotePanel({
           </div>
         )}
       </CardContent>
+
+      {/* Anonymous mode confirmation — one-shot, no undo. */}
+      <AlertDialog open={pendingAnon !== null} onOpenChange={open => !open && setPendingAnon(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('vote.anonConfirmTitle') || 'Επιβεβαίωση ανώνυμης ψήφου / Confirm anonymous vote'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                {t('vote.anonConfirmBody') ||
+                  'Η ψήφος σας θα κατατεθεί ανώνυμα. Δεν θα μπορείτε να την αλλάξετε ή να την ανακτήσετε εκτός αυτού του φυλλομετρητή.'}
+              </span>
+              <span className="block">
+                {t('vote.anonConfirmChoice') || 'Επιλογή:'}{' '}
+                <span className="font-semibold">
+                  {pendingAnon === 'yes' && t('proposal.support')}
+                  {pendingAnon === 'no' && t('proposal.oppose')}
+                  {pendingAnon === 'abstain' && t('proposal.abstain')}
+                </span>
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={voting}>{t('general.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAnonymousVote} disabled={voting}>
+              {voting ? t('general.loading') : (t('vote.anonConfirmAction') || 'Καταθέτω την ψήφο')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
