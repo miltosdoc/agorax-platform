@@ -158,10 +158,8 @@ export default function Header() {
             <div className="flex-1 max-w-md min-w-0">
               <SearchBar />
             </div>
-            {/* Primary CTA stays visible as a button. The four secondary
-                nav items (Proposals / Communities / Sortition / Points)
-                live in the user dropdown — they used to also be top-level
-                buttons but that left the header cramped. */}
+            {/* Primary CTA + Communities (the main navigation hub).
+                Proposals / Sortition / Points stay in the user dropdown. */}
             <button
               type="button"
               onClick={() => navigate("/proposals/new")}
@@ -170,6 +168,15 @@ export default function Header() {
             >
               <PlusCircle className="h-4 w-4" />
               <span>{t('nav.newProposal')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/communities")}
+              className="hidden md:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
+              data-testid="button-communities"
+            >
+              <Users className="h-4 w-4" />
+              <span>{t('nav.communities')}</span>
             </button>
 
             {/* Notification Bell */}
