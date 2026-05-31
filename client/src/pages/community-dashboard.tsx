@@ -56,6 +56,10 @@ export default function CommunityDashboardPage() {
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [mergeSuccess, setMergeSuccess] = useState(false);
+  const [joinState, setJoinState] = useState<'idle' | 'submitting' | 'pending'>('idle');
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<Array<{ id: number; userId: number; message: string | null; createdAt: string; user: { id: number; username: string; name: string | null; profilePicture: string | null } | null }>>([]);
+  const [requestDeciding, setRequestDeciding] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (!communityId) return;
@@ -78,6 +82,51 @@ export default function CommunityDashboardPage() {
       .catch(() => setMembers([]))
       .finally(() => setMembersLoading(false));
   }, [communityId]);
+
+  const isMember = !!(user && members?.some((m) => m.userId === user.id));
+  const canManageSettingsLive = !!summary?.canManageSettings;
+
+  useEffect(() => {
+    if (!communityId || !canManageSettingsLive) return;
+    api.get<typeof pendingRequests>(`/api/communities/${communityId}/join-requests`)
+      .then((r) => setPendingRequests(r.data))
+      .catch(() => setPendingRequests([]));
+  }, [communityId, canManageSettingsLive, members]);
+
+  const applyToJoin = async () => {
+    if (!communityId) return;
+    setJoinState('submitting');
+    setJoinError(null);
+    try {
+      const res = await api.post<{ status?: string } | unknown>(`/api/communities/${communityId}/members`, {});
+      const status = (res.status === 202) ? 'pending' : 'idle';
+      setJoinState(status as 'pending' | 'idle');
+      if (status !== 'pending') {
+        const refreshed = await api.get<CommunityMember[]>(`/api/communities/${communityId}/members`);
+        setMembers(refreshed.data);
+      }
+    } catch (error: any) {
+      setJoinError(error.response?.data?.message || t('community.join_failed') || 'Failed to apply');
+      setJoinState('idle');
+    }
+  };
+
+  const decideJoinRequest = async (requestId: number, decision: 'approve' | 'reject') => {
+    if (!communityId) return;
+    setRequestDeciding((s) => ({ ...s, [requestId]: true }));
+    try {
+      await api.post(`/api/communities/${communityId}/join-requests/${requestId}/${decision}`, {});
+      setPendingRequests((rows) => rows.filter((r) => r.id !== requestId));
+      if (decision === 'approve') {
+        const refreshed = await api.get<CommunityMember[]>(`/api/communities/${communityId}/members`);
+        setMembers(refreshed.data);
+      }
+    } catch {
+      // surface inline failure on the row if needed; keep silent for now
+    } finally {
+      setRequestDeciding((s) => ({ ...s, [requestId]: false }));
+    }
+  };
 
   const handleMerge = async () => {
     if (!targetCommunityId || !communityId) return;
@@ -141,11 +190,27 @@ export default function CommunityDashboardPage() {
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {user && members?.some((m) => m.userId === user.id) && (
+              {user && isMember && (
                 <Button size="sm" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
                   <Plus className="w-4 h-4 mr-2" />
                   {t('home.submitProposal')}
                 </Button>
+              )}
+              {user && !isMember && community.joinPolicy !== 'invite_only' && joinState !== 'pending' && (
+                <Button size="sm" disabled={joinState === 'submitting'} onClick={applyToJoin}>
+                  {community.joinPolicy === 'approval'
+                    ? (t('community.apply_to_join') || 'Apply to join')
+                    : (t('community.join') || 'Join')}
+                </Button>
+              )}
+              {user && !isMember && community.joinPolicy === 'invite_only' && (
+                <Badge variant="outline">{t('community.invite_only') || 'Invite only'}</Badge>
+              )}
+              {user && !isMember && joinState === 'pending' && (
+                <Badge variant="outline">{t('community.request_pending') || 'Request pending'}</Badge>
+              )}
+              {joinError && (
+                <span className="text-sm text-destructive" data-testid="join-error">{joinError}</span>
               )}
               {canManageSettings && (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
@@ -254,6 +319,54 @@ export default function CommunityDashboardPage() {
         </TabsContent>
         
         <TabsContent value="members">
+          {canManageSettings && pendingRequests.length > 0 && (
+            <Card className="mb-4 border-amber-300/40">
+              <CardHeader>
+                <CardTitle>{t('community.pending_requests_title') || 'Pending join requests'}</CardTitle>
+                <CardDescription>
+                  {pendingRequests.length} {t('community.pending_requests_count') || 'pending'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y">
+                  {pendingRequests.map((r) => (
+                    <li key={r.id} className="flex items-center gap-3 py-3">
+                      {r.user?.profilePicture ? (
+                        <img src={r.user.profilePicture} alt={r.user.name || r.user.username} className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                          {(r.user?.name || r.user?.username || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{r.user?.name || r.user?.username || `user #${r.userId}`}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {r.user?.username ? `@${r.user.username} · ` : ''}{new Date(r.createdAt).toLocaleDateString()}
+                        </p>
+                        {r.message && <p className="text-sm mt-1 text-muted-foreground line-clamp-2">{r.message}</p>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        disabled={!!requestDeciding[r.id]}
+                        onClick={() => decideJoinRequest(r.id, 'approve')}
+                      >
+                        {t('community.approve') || 'Approve'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!requestDeciding[r.id]}
+                        onClick={() => decideJoinRequest(r.id, 'reject')}
+                      >
+                        {t('community.reject') || 'Reject'}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>{t('community.tab_members')}</CardTitle>

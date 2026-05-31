@@ -233,6 +233,11 @@ export const communities = pgTable("communities", {
 
   // Democracy score (computed, shows how democratic the community governance is)
   democracyScore: numeric("democracy_score"),
+
+  // Apply-to-join policy: 'open' adds members directly, 'approval' creates a
+  // pending community_join_requests row, 'invite_only' rejects unsolicited
+  // applications outright.
+  joinPolicy: text("join_policy").notNull().default("open"),
 });
 
 export const communityMembers = pgTable("community_members", {
@@ -244,6 +249,17 @@ export const communityMembers = pgTable("community_members", {
 }, (table) => ({
   communityMemberUnique: uniqueIndex('community_member_unique').on(table.communityId, table.userId),
 }));
+
+export const communityJoinRequests = pgTable("community_join_requests", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  message: text("message"),
+  status: text("status").notNull().default("pending"), // 'pending' | 'approved' | 'rejected'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  decidedAt: timestamp("decided_at"),
+  decidedByUserId: integer("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+});
 
 // ─── Demopolis: Proposals (Προβουλεύματα) ────────────────────────────────────
 
@@ -1022,6 +1038,7 @@ export const insertPollUserResponseSchema = createInsertSchema(pollUserResponses
 export const insertCommunitySchema = createInsertSchema(communities).omit({ id: true, createdAt: true });
 export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, lastChangedAt: true });
 export const insertCommunityMemberSchema = createInsertSchema(communityMembers).omit({ id: true, joinedAt: true });
+export const insertCommunityJoinRequestSchema = createInsertSchema(communityJoinRequests).omit({ id: true, createdAt: true, decidedAt: true, decidedByUserId: true, status: true });
 export const insertProposalSchema = createInsertSchema(proposals).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertProposalAmendmentSchema = createInsertSchema(proposalAmendments).omit({ id: true, createdAt: true });
 export const insertValidationResultSchema = createInsertSchema(validationResults).omit({ id: true, validatedAt: true });
@@ -1146,6 +1163,7 @@ export type BallotVote = typeof ballotVotes.$inferSelect;
 export type Community = typeof communities.$inferSelect;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type CommunityMember = typeof communityMembers.$inferSelect;
+export type CommunityJoinRequest = typeof communityJoinRequests.$inferSelect;
 export type Proposal = typeof proposals.$inferSelect;
 export type ProposalAmendment = typeof proposalAmendments.$inferSelect;
 export type ValidationResult = typeof validationResults.$inferSelect;
@@ -1164,6 +1182,7 @@ export type AdminAction = typeof adminActions.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type InsertCommunityMember = z.infer<typeof insertCommunityMemberSchema>;
+export type InsertCommunityJoinRequest = z.infer<typeof insertCommunityJoinRequestSchema>;
 export type InsertProposal = z.infer<typeof insertProposalSchema>;
 export type InsertProposalAmendment = z.infer<typeof insertProposalAmendmentSchema>;
 export type InsertValidationResult = z.infer<typeof insertValidationResultSchema>;

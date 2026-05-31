@@ -21,7 +21,7 @@ import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
-import type { CommunityGovernanceModel, CommunitySortitionMode, CommunityType } from '@shared/community-settings';
+import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunityType } from '@shared/community-settings';
 
 interface CommunitySettingsForm {
   name: string;
@@ -37,6 +37,7 @@ interface CommunitySettingsForm {
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
+  joinPolicy: CommunityJoinPolicy;
 }
 
 function toForm(community: Community): CommunitySettingsForm {
@@ -54,6 +55,7 @@ function toForm(community: Community): CommunitySettingsForm {
     amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '1'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
     requireGovgrVerification: community.requireGovgrVerification ?? false,
+    joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
   };
 }
 
@@ -199,6 +201,19 @@ export default function CommunitySettingsPage() {
                       </div>
                       <Switch id="requireGovgrVerification" checked={form.requireGovgrVerification} onCheckedChange={(checked) => update('requireGovgrVerification', checked)} />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="joinPolicy">{t('community.join_policy_label') || 'Join policy'}</Label>
+                    <Select value={form.joinPolicy} onValueChange={(value) => update('joinPolicy', value as CommunityJoinPolicy)}>
+                      <SelectTrigger id="joinPolicy"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open">{t('community.join_policy_open') || 'Open — anyone can join'}</SelectItem>
+                        <SelectItem value="approval">{t('community.join_policy_approval') || 'Approval — admins approve each request'}</SelectItem>
+                        <SelectItem value="invite_only">{t('community.join_policy_invite_only') || 'Invite-only — no public applications'}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">{t('community.join_policy_help') || 'How prospective members get into the community.'}</p>
                   </div>
                 </section>
 

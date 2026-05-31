@@ -7,6 +7,9 @@ export type CommunityGovernanceModel = typeof COMMUNITY_GOVERNANCE_MODELS[number
 export const COMMUNITY_SORTITION_MODES = ['absolute', 'percentage'] as const;
 export type CommunitySortitionMode = typeof COMMUNITY_SORTITION_MODES[number];
 
+export const COMMUNITY_JOIN_POLICIES = ['open', 'approval', 'invite_only'] as const;
+export type CommunityJoinPolicy = typeof COMMUNITY_JOIN_POLICIES[number];
+
 export interface CommunitySettingsInput {
   name?: unknown;
   description?: unknown;
@@ -21,6 +24,7 @@ export interface CommunitySettingsInput {
   amendmentInclusionThreshold?: unknown;
   maxAmendmentsPerProposal?: unknown;
   requireGovgrVerification?: unknown;
+  joinPolicy?: unknown;
 }
 
 // Sanitized community settings — narrow literal types instead of the wide
@@ -40,6 +44,7 @@ export interface CommunityCreateSettings {
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
+  joinPolicy: CommunityJoinPolicy;
 }
 
 export type CommunityUpdateSettings = Partial<CommunityCreateSettings>;
@@ -56,6 +61,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   amendmentInclusionThreshold: '1',
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
+  joinPolicy: 'open',
 } as const;
 
 function optionalString(value: unknown): string | undefined {
@@ -154,6 +160,7 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold ?? '1', 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
+    joinPolicy: enumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, DEFAULT_COMMUNITY_SETTINGS.joinPolicy, 'Invalid join policy'),
   };
 }
 
@@ -196,6 +203,9 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const requireGovgrVerification = optionalBoolean(input.requireGovgrVerification);
   if (requireGovgrVerification !== undefined) updates.requireGovgrVerification = requireGovgrVerification;
+
+  const joinPolicy = optionalEnumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, 'Invalid join policy');
+  if (joinPolicy !== undefined) updates.joinPolicy = joinPolicy;
 
   return updates;
 }

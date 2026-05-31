@@ -6,7 +6,7 @@
  */
 
 import { db } from '../db';
-import { communities, communityMembers, type Community, type InsertCommunity, type CommunityMember } from '../../shared/schema';
+import { communities, communityMembers, communityJoinRequests, type Community, type InsertCommunity, type CommunityMember, type CommunityJoinRequest } from '../../shared/schema';
 import { eq, and, inArray, desc } from 'drizzle-orm';
 
 export class CommunityRepository {
@@ -154,6 +154,55 @@ export class CommunityRepository {
         eq(communityMembers.userId, userId)
       ));
     return member?.role ?? undefined;
+  }
+
+  // ─── Join requests ─────────────────────────────────────────────────────────
+
+  async getPendingJoinRequest(communityId: number, userId: number): Promise<CommunityJoinRequest | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityJoinRequests)
+      .where(and(
+        eq(communityJoinRequests.communityId, communityId),
+        eq(communityJoinRequests.userId, userId),
+        eq(communityJoinRequests.status, 'pending'),
+      ));
+    return row;
+  }
+
+  async createJoinRequest(communityId: number, userId: number, message?: string): Promise<CommunityJoinRequest> {
+    const [row] = await db
+      .insert(communityJoinRequests)
+      .values({ communityId, userId, message: message ?? null })
+      .returning();
+    return row;
+  }
+
+  async listPendingJoinRequests(communityId: number): Promise<CommunityJoinRequest[]> {
+    return await db
+      .select()
+      .from(communityJoinRequests)
+      .where(and(
+        eq(communityJoinRequests.communityId, communityId),
+        eq(communityJoinRequests.status, 'pending'),
+      ))
+      .orderBy(desc(communityJoinRequests.createdAt));
+  }
+
+  async decideJoinRequest(
+    requestId: number,
+    decision: 'approved' | 'rejected',
+    decidedByUserId: number,
+  ): Promise<CommunityJoinRequest | undefined> {
+    const [row] = await db
+      .update(communityJoinRequests)
+      .set({ status: decision, decidedAt: new Date(), decidedByUserId })
+      .where(and(
+        eq(communityJoinRequests.id, requestId),
+        eq(communityJoinRequests.status, 'pending'),
+      ))
+      .returning();
+    return row;
   }
 
   /**

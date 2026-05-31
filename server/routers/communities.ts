@@ -185,15 +185,85 @@ export function registerCommunitiesRoutes(app: Express): void {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.user!.id;
-      // Check if already a member
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+
       const isMember = await communityRepo.isCommunityMember(communityId, userId);
       if (isMember) {
         return res.status(409).json({ message: "Already a member" });
       }
+
+      const policy = community.joinPolicy ?? 'open';
+
+      if (policy === 'invite_only') {
+        return res.status(403).json({ message: "This community is invite-only" });
+      }
+
+      if (policy === 'approval') {
+        const existing = await communityRepo.getPendingJoinRequest(communityId, userId);
+        if (existing) {
+          return res.status(202).json({ status: 'pending', request: existing });
+        }
+        const message = typeof req.body?.message === 'string' ? req.body.message.slice(0, 500) : undefined;
+        const request = await communityRepo.createJoinRequest(communityId, userId, message);
+        return res.status(202).json({ status: 'pending', request });
+      }
+
       const member = await communityRepo.addCommunityMember(communityId, userId);
       res.status(201).json(member);
     } catch (error) {
       res.status(500).json({ message: "Failed to join community" });
+    }
+  });
+
+  app.get("/api/communities/:id/join-requests", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const role = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (role !== 'admin' && role !== 'founder') {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const requests = await communityRepo.listPendingJoinRequests(communityId);
+      if (requests.length === 0) return res.json([]);
+
+      const userIds = Array.from(new Set(requests.map(r => r.userId)));
+      const userRows = await db
+        .select({ id: users.id, username: users.username, name: users.name, profilePicture: users.profilePicture })
+        .from(users)
+        .where(inArray(users.id, userIds));
+      const userById = new Map(userRows.map(u => [u.id, u]));
+
+      res.json(requests.map(r => ({ ...r, user: userById.get(r.userId) ?? null })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch join requests" });
+    }
+  });
+
+  app.post("/api/communities/:id/join-requests/:requestId/:decision", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const requestId = parseInt(req.params.requestId);
+      const decision = req.params.decision === 'approve' ? 'approved' : req.params.decision === 'reject' ? 'rejected' : null;
+      if (!decision) return res.status(400).json({ message: "Decision must be 'approve' or 'reject'" });
+
+      const role = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (role !== 'admin' && role !== 'founder') {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const decided = await communityRepo.decideJoinRequest(requestId, decision, req.user.id);
+      if (!decided) return res.status(404).json({ message: "Pending request not found" });
+      if (decided.communityId !== communityId) return res.status(400).json({ message: "Request does not belong to this community" });
+
+      if (decision === 'approved') {
+        const alreadyMember = await communityRepo.isCommunityMember(communityId, decided.userId);
+        if (!alreadyMember) {
+          await communityRepo.addCommunityMember(communityId, decided.userId);
+        }
+      }
+      res.json(decided);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update join request" });
     }
   });
   app.delete("/api/communities/:id/members", requireAuth, async (req: any, res) => {
