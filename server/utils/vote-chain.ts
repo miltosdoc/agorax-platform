@@ -33,16 +33,30 @@ export interface VoteReceipt {
 
 /**
  * Canonical serialization. Order and separators matter — any change here is
- * a chain-breaking change. cast_at is serialized in UTC with millisecond
- * precision; the DB migration uses the same format so backfilled rows and
- * future rows verify with the same function.
+ * a chain-breaking change.
+ *
+ * For pseudonymous votes: millisecond precision (identity is already known).
+ * For anonymous votes: coarsened to minute precision to prevent temporal
+ * correlation between token issuance and vote casting.
+ * See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G12
  */
-function canonicalizeCastAt(castAt: Date): string {
+function canonicalizeCastAt(castAt: Date, mode: 'pseudonymous' | 'anonymous'): string {
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
   const d = new Date(castAt.getTime());
-  return (
+  const datePart =
     `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
-    `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}` +
+    `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+
+  if (mode === 'anonymous') {
+    // Coarsen to minute precision — seconds and milliseconds are zeroed.
+    // This prevents temporal correlation between the authenticated /blind-sign
+    // request and the unauthenticated /anonymous-vote request.
+    return `${datePart}:00.000Z`;
+  }
+
+  // Pseudonymous: full millisecond precision (identity is already known).
+  return (
+    `${datePart}:${pad(d.getUTCSeconds())}` +
     `.${pad(d.getUTCMilliseconds(), 3)}Z`
   );
 }
@@ -63,18 +77,19 @@ export function computeRowHash(input: {
   weight: string;
   castAt: Date;
 }): string {
+  const mode = input.identity.mode;
   const identityField =
-    input.identity.mode === 'pseudonymous'
+    mode === 'pseudonymous'
       ? String(input.identity.userId)
       : input.identity.voteToken;
   const canonical = [
     input.prevHash,
     String(input.proposalId),
-    input.identity.mode,
+    mode,
     identityField,
     input.choice,
     input.weight,
-    canonicalizeCastAt(input.castAt),
+    canonicalizeCastAt(input.castAt, mode),
   ].join('|');
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
@@ -152,7 +167,7 @@ export async function castProposalVoteWithChain(args: {
         userId,
         choice,
         weight,
-        castAt: canonicalizeCastAt(castAt),
+        castAt: canonicalizeCastAt(castAt, 'pseudonymous'),
         prevHash,
         rowHash,
       },
@@ -223,7 +238,7 @@ export async function castAnonymousVoteWithChain(args: {
         voteToken,
         choice,
         weight,
-        castAt: canonicalizeCastAt(castAt),
+        castAt: canonicalizeCastAt(castAt, 'anonymous'),
         prevHash,
         rowHash,
       },

@@ -198,12 +198,14 @@ export interface PublicKey {
 }
 
 export interface BlindedRequest {
-  /** Random token the voter just generated, 32 bytes. */
+  /** Random token the voter just generated, 40 bytes: 32 random + 8 bytes expiry timestamp. */
   token: Uint8Array;
   /** Per-request blinding factor, kept secret on the client. */
   blindingFactor: bigint;
   /** What the voter sends to the server (base64 of H(token) · r^e mod n). */
   blinded: string;
+  /** Minimum cast time (epoch ms) embedded in the last 8 bytes of the token. */
+  minCastTime: number;
 }
 
 // ─── Public API: client (browser) side ───────────────────────────────────────
@@ -212,13 +214,27 @@ export interface BlindedRequest {
  * Generate a fresh random token + blind it against the proposal's public
  * key. The voter keeps `token` and `blindingFactor` locally and sends
  * `blinded` to the server.
+ *
+ * @param minCastTime - Epoch milliseconds before which the token is not
+ * valid for casting. Enforces time decoupling between token issuance and
+ * vote casting, preventing timing correlation. See AUDIT §G2.
  */
-export async function blind(publicKey: PublicKey): Promise<BlindedRequest> {
+export async function blind(
+  publicKey: PublicKey,
+  minCastTime: number = Date.now(),
+): Promise<BlindedRequest> {
   const n = base64ToBigInt(publicKey.n);
   const e = base64ToBigInt(publicKey.e);
   const nByteLength = base64ToBytes(publicKey.n).length;
 
-  const token = randomBytesCross(32);
+  // Token = 32 random bytes + 8 bytes of minCastTime (big-endian epoch ms)
+  const randomPart = randomBytesCross(32);
+  const expiryBytes = new Uint8Array(8);
+  new DataView(expiryBytes.buffer).setBigUint64(0, BigInt(minCastTime), false);
+  const token = new Uint8Array(40);
+  token.set(randomPart, 0);
+  token.set(expiryBytes, 32);
+
   const m = await fullDomainHash(token, n, nByteLength);
   const r = randomCoprime(n, nByteLength);
   const rPowE = modPow(r, e, n);
@@ -227,6 +243,7 @@ export async function blind(publicKey: PublicKey): Promise<BlindedRequest> {
     token,
     blindingFactor: r,
     blinded: bigIntToBase64(blindedInt, nByteLength),
+    minCastTime,
   };
 }
 

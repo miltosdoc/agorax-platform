@@ -75,7 +75,15 @@ export async function castAnonymousVote(
   const publicKey = keyResp.data;
 
   // 2. Generate token + blinding factor + blinded value.
-  const req = await blind(publicKey);
+  // GDPR: Enforce a 30-minute delay between token issuance and vote casting.
+  // This breaks timing correlation between the authenticated /blind-sign
+  // request (server knows user_id) and the unauthenticated /anonymous-vote
+  // request (server only sees the token). Without this delay, an operator
+  // could correlate the two requests by timestamp and defeat unlinkability.
+  // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G2
+  const MIN_CAST_DELAY_MS = 30 * 60 * 1000; // 30 minutes
+  const minCastTime = Date.now() + MIN_CAST_DELAY_MS;
+  const req = await blind(publicKey, minCastTime);
 
   // 3. Get the server's blind signature.
   const bsResp = await api.post<{ signature: string; publicKey: PublicKey }>(
@@ -89,18 +97,32 @@ export async function castAnonymousVote(
   // 5. Cast the vote (NO auth on this route — server-side CSRF + auth
   // are deliberately absent so the request cannot be correlated with
   // the voter's session).
+  //
+  // GDPR: credentials: 'omit' prevents the browser from sending session
+  // cookies with the anonymous-vote request. Without this, the server
+  // could correlate the vote to the voter's session via cookie-based
+  // session ID, defeating the blind-signature unlinkability guarantee.
+  // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G5
   const tokenB64 = bytesToBase64(req.token);
   const voteResp = await fetch(`/api/proposals/${proposalId}/anonymous-vote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: tokenB64, signature: sig, choice }),
+    credentials: 'omit', // GDPR: no session cookies on anonymous vote path
   });
   if (!voteResp.ok) {
     let message = `vote failed (${voteResp.status})`;
+    let minCastTime: number | undefined;
     try {
       const j = await voteResp.json();
       if (typeof j?.message === 'string') message = j.message;
+      if (typeof j?.minCastTime === 'number') minCastTime = j.minCastTime;
     } catch { /* keep default */ }
+    // If the token isn't yet valid, tell the user how long to wait.
+    if (minCastTime && Date.now() < minCastTime) {
+      const waitSec = Math.ceil((minCastTime - Date.now()) / 1000);
+      throw new Error(`${message} (wait ${waitSec}s)`);
+    }
     throw new Error(message);
   }
   const result = (await voteResp.json()) as { rowHash: string; castAt: string };

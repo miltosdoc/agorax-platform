@@ -418,6 +418,21 @@ export function registerProposalsRoutes(app: Express): void {
       const ok = await verify(tokenBytes, signature, pub);
       if (!ok) return res.status(400).json({ message: "Invalid signature on token" });
 
+      // GDPR: Enforce time decoupling — reject votes cast before the
+      // minimum cast time embedded in the token. The token is 40 bytes:
+      // 32 random + 8 bytes of big-endian epoch milliseconds.
+      // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G2
+      if (tokenBytes.length < 40) {
+        return res.status(400).json({ message: "Token too short — missing expiry" });
+      }
+      const minCastTime = Number(new DataView(tokenBytes.buffer, tokenBytes.byteOffset + 32, 8).getBigUint64(0, false));
+      if (Date.now() < minCastTime) {
+        return res.status(409).json({
+          message: "Token not yet valid — please wait before casting your vote",
+          minCastTime,
+        });
+      }
+
       const { castAnonymousVoteWithChain } = await import('../utils/vote-chain');
       try {
         const result = await castAnonymousVoteWithChain({

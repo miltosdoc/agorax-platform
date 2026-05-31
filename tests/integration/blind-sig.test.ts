@@ -34,8 +34,10 @@ describe('blind-sig — happy path', () => {
     const pub = publicOf(key);
 
     const req = await blind(pub);
-    expect(req.token.length).toBe(32);
+    expect(req.token.length).toBe(40); // 32 random + 8 bytes expiry
     expect(req.blinded.length).toBeGreaterThan(0);
+    // minCastTime defaults to Date.now() at call time — allow small clock drift
+    expect(req.minCastTime).toBeGreaterThan(0);
 
     const blindedSig = signBlinded(req.blinded, key);
     const sig = unblind(blindedSig, req.blindingFactor, pub);

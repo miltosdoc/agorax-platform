@@ -57,12 +57,32 @@ app.use(express.urlencoded({ extended: false, limit: "100kb" }));
 app.get('/api/csrf', csrfBootstrap);
 app.use(csrfMiddleware);
 
+// GDPR: Exclude vote endpoints from application logging.
+// Blind-sign and anonymous-vote paths must not be logged — logging them
+// creates a timing correlation vector between authenticated token issuance
+// and unauthenticated vote casting, defeating blind-signature unlinkability.
+// See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G7
+const VOTE_ENDPOINTS = new Set([
+  "/blind-sign",
+  "/anonymous-vote",
+  "/verify-receipt",
+  "/blind-key",
+]);
+
+function isVoteEndpoint(path: string): boolean {
+  for (const suffix of VOTE_ENDPOINTS) {
+    if (path.endsWith(suffix)) return true;
+  }
+  return false;
+}
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
 
   res.on("finish", () => {
     if (!path.startsWith("/api")) return;
+    if (isVoteEndpoint(path)) return; // GDPR: no logging on vote path
     const duration = Date.now() - start;
     log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
   });
