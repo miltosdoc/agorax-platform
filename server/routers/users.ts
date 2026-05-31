@@ -206,17 +206,30 @@ export function registerUsersRoutes(app: Express): void {
         const docCodeHash = result.doc_code_hash || "";
         const demo = result.demographics || {};
 
+        // The ballot service's contract is: success=true implies voter_hash
+        // is populated. If it is not, treat the response as a server-side
+        // contract violation and refuse — never store a sentinel like
+        // "hash-missing" with govgrVerified=true, which would conflate
+        // "AFM not extracted" with "verified, no AFM" and silently let one
+        // account through, while making every subsequent missing-AFM look
+        // like a duplicate.
+        if (!voterHash) {
+          return res.status(502).json({
+            success: false,
+            message: "Η ταυτότητα δεν επαληθεύτηκε: λείπει ο ΑΦΜ από το αποτέλεσμα",
+            rejection_reason: "afm_not_found",
+          });
+        }
+
         // One person = one account: the AFM hash must not already belong to
         // a different account.
-        if (voterHash) {
-          const existingUser = await userRepo.getUserByVoterHash(voterHash);
-          if (existingUser && existingUser.id !== req.user.id) {
-            return res.status(400).json({
-              success: false,
-              message: "Αυτή η ταυτότητα είναι ήδη συνδεδεμένη με άλλο λογαριασμό",
-              rejection_reason: "already_verified"
-            });
-          }
+        const existingUser = await userRepo.getUserByVoterHash(voterHash);
+        if (existingUser && existingUser.id !== req.user.id) {
+          return res.status(400).json({
+            success: false,
+            message: "Αυτή η ταυτότητα είναι ήδη συνδεδεμένη με άλλο λογαριασμό",
+            rejection_reason: "already_verified"
+          });
         }
 
         // Anti-replay: the same declaration document cannot verify two accounts.
@@ -242,7 +255,7 @@ export function registerUsersRoutes(app: Express): void {
         await userRepo.updateUser(req.user.id, {
           govgrVerified: true,
           govgrVerifiedAt: new Date(),
-          govgrVoterHash: voterHash || "hash-missing",
+          govgrVoterHash: voterHash,
           govgrDocCodeHash: docCodeHash || null,
           govgrFirstName: demo.first_name ?? null,
           govgrLastName: demo.last_name ?? null,

@@ -32,32 +32,88 @@ def validator(mock_db):
 
 
 class TestAFMExtraction:
-    """Tests for AFM extraction from text."""
-    
+    """Tests for AFM extraction from text.
+
+    A real Gov.gr Solemn Declaration always has an auto-populated identity
+    header followed by a fixed pretext ('Με ατομική μου ευθύνη …') and then
+    the citizen's free-form body. The extractor reads only the header — see
+    BallotValidator._extract_afm for why."""
+
+    HEADER_PRETEXT = "Με ατομική μου ευθύνη και γνωρίζοντας τις κυρώσεις:"
+
     def test_extract_afm_standard_format(self, validator):
-        text = "Name: John Doe\nAFM: 123456789\nAddress: Athens"
+        text = f"Name: John Doe\nAFM: 123456789\nAddress: Athens\n{self.HEADER_PRETEXT}\nbody"
         afm = validator._extract_afm(text)
         assert afm == "123456789"
-    
+
     def test_extract_afm_greek_format(self, validator):
-        text = "Ονομα: Γιάννης\nΑΦΜ: 987654321\nΔιεύθυνση: Αθήνα"
+        text = f"Ονομα: Γιάννης\nΑΦΜ: 987654321\nΔιεύθυνση: Αθήνα\n{self.HEADER_PRETEXT}\nκείμενο"
         afm = validator._extract_afm(text)
         assert afm == "987654321"
-    
+
     def test_extract_afm_with_dots(self, validator):
-        text = "Α.Φ.Μ.: 111222333"
+        text = f"Α.Φ.Μ.: 111222333\n{self.HEADER_PRETEXT}\nbody"
         afm = validator._extract_afm(text)
         assert afm == "111222333"
-    
+
     def test_extract_afm_not_found(self, validator):
-        text = "No tax ID in this document"
+        text = f"No tax ID in this document\n{self.HEADER_PRETEXT}\nbody"
         afm = validator._extract_afm(text)
         assert afm is None
-    
+
     def test_extract_afm_invalid_length(self, validator):
-        text = "AFM: 12345"  # Only 5 digits
+        text = f"AFM: 12345\n{self.HEADER_PRETEXT}\nbody"  # Only 5 digits
         afm = validator._extract_afm(text)
         assert afm is None
+
+    def test_extract_afm_ignores_body_injection(self, validator):
+        """Body-injection: citizen writes someone else's AFM into the
+        declaration body. The header AFM must win."""
+        text = (
+            "Ονομα: Γιάννης\n"
+            "ΑΦΜ: 100000001\n"
+            f"{self.HEADER_PRETEXT}\n"
+            "Δηλώνω ότι ο πραγματικός ΑΦΜ είναι ΑΦΜ: 999999999\n"
+        )
+        afm = validator._extract_afm(text)
+        assert afm == "100000001"
+
+    def test_extract_afm_refuses_body_only(self, validator):
+        """If the body has an AFM but the auto-populated header does not,
+        the extractor refuses — the body is untrusted text."""
+        text = (
+            "Ονομα: Γιάννης\n"
+            "Διεύθυνση: Αθήνα\n"
+            f"{self.HEADER_PRETEXT}\n"
+            "ΑΦΜ: 999999999\n"
+        )
+        afm = validator._extract_afm(text)
+        assert afm is None
+
+    def test_extract_afm_refuses_conflicting_header(self, validator):
+        """Two different AFMs in the header section → refuse rather than
+        guess which one is the auto-populated value."""
+        text = (
+            "ΑΦΜ: 100000001\n"
+            "ΑΦΜ: 200000002\n"
+            f"{self.HEADER_PRETEXT}\n"
+            "body"
+        )
+        afm = validator._extract_afm(text)
+        assert afm is None
+
+    def test_extract_afm_refuses_when_no_body_marker(self, validator):
+        """No declaration-body marker means the document does not look
+        like a Solemn Declaration — refuse rather than fall back to
+        whole-text search (the original exploitable path)."""
+        text = "Ονομα: Γιάννης\nΑΦΜ: 123456789\nrandom text without the standard marker"
+        afm = validator._extract_afm(text)
+        assert afm is None
+
+    def test_extract_afm_accepts_dilono_oti_marker(self, validator):
+        text = "ΑΦΜ: 555444333\nΔΗΛΩΝΩ ΟΤΙ\nbody text"
+        afm = validator._extract_afm(text)
+        assert afm == "555444333"
 
 
 class TestVoteChoiceExtraction:
@@ -165,35 +221,37 @@ class TestGate3Token:
 
 class TestGate4Identity:
     """Tests for Gate 4: Voter identity verification."""
-    
+
+    HEADER_PRETEXT = "Με ατομική μου ευθύνη και γνωρίζοντας τις κυρώσεις:"
+
     def test_new_voter_passes(self, mock_db):
         mock_db.query.return_value.filter.return_value.first.return_value = None
         validator = BallotValidator(mock_db)
-        
-        text = "AFM: 123456789"
+
+        text = f"AFM: 123456789\n{self.HEADER_PRETEXT}\nbody"
         result = validator._gate4_verify_identity(text, "poll_2024")
-        
+
         assert result.success is True
         assert result.voter_hash is not None
-    
+
     def test_afm_not_found_fails(self, mock_db):
         validator = BallotValidator(mock_db)
-        
-        text = "No tax ID here"
+
+        text = f"No tax ID here\n{self.HEADER_PRETEXT}\nbody"
         result = validator._gate4_verify_identity(text, "poll_2024")
-        
+
         assert result.success is False
         assert result.rejection_reason == RejectionReason.AFM_NOT_FOUND
-    
+
     def test_already_voted_fails(self, mock_db):
         # Simulate existing vote from same voter
         mock_db.query.return_value.filter.return_value.first.return_value = Mock()
         validator = BallotValidator(mock_db)
         validator.allow_vote_update = False
-        
-        text = "AFM: 123456789"
+
+        text = f"AFM: 123456789\n{self.HEADER_PRETEXT}\nbody"
         result = validator._gate4_verify_identity(text, "poll_2024")
-        
+
         assert result.success is False
         assert result.rejection_reason == RejectionReason.ALREADY_VOTED
 

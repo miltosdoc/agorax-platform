@@ -68,6 +68,19 @@ class BallotValidator:
     
     # Regex patterns for text extraction
     AFM_PATTERN = re.compile(r"(?:AFM|ΑΦΜ|Α\.Φ\.Μ\.|Tax ID)[:\s]*(\d{9})", re.IGNORECASE)
+    # Markers that delimit the start of the declarant's free-form text in a
+    # Gov.gr Solemn Declaration. Everything after one of these markers is
+    # user-controlled and CANNOT be trusted to bind to the signer's identity,
+    # because the citizen can type any AFM they want inside the declaration
+    # body and the PAdES signature is from Gov.gr (the institutional signer),
+    # not from a certificate that carries the citizen's AFM. Only header text
+    # — the Gov.gr-populated identity block above one of these markers — is
+    # used to extract the AFM that anchors `voter_hash`.
+    DECLARATION_BODY_MARKERS = [
+        re.compile(r"Με ατομική μου ευθύνη", re.IGNORECASE),
+        re.compile(r"ΔΗΛΩΝΩ\s+ΟΤΙ", re.IGNORECASE),
+        re.compile(r"Δηλώνω\s+ότι", re.IGNORECASE),
+    ]
     VOTE_CHOICE_PATTERN = re.compile(r"vote for \[(.*?)\]", re.IGNORECASE)
     # Alternative Greek patterns - more flexible
     VOTE_CHOICE_PATTERN_GR = re.compile(r"ψηφίζω \[(.*?)\]", re.IGNORECASE)
@@ -450,11 +463,54 @@ class BallotValidator:
         return "\n".join(text_parts)
     
     def _extract_afm(self, text: str) -> Optional[str]:
-        """Extract AFM (Tax ID) from text using regex."""
-        match = self.AFM_PATTERN.search(text)
-        if match:
-            return match.group(1)
-        return None
+        """
+        Extract the declarant's AFM from a Gov.gr Solemn Declaration.
+
+        The PAdES signature on a Solemn Declaration is from Gov.gr, not from
+        a certificate bound to the declarant — so the citizen's identity has
+        to come from the document's auto-populated header fields. The body
+        of the declaration is free text written by the citizen, and any AFM
+        appearing there is untrusted: a citizen could type someone else's
+        AFM into their own declaration and (depending on PDF text-extraction
+        order) have it match before the header AFM, allowing them to claim
+        another person's `voter_hash` slot.
+
+        This implementation:
+          1. Slices the text at the first declaration body marker
+             ("Με ατομική μου ευθύνη", "ΔΗΛΩΝΩ ΟΤΙ", "Δηλώνω ότι") — those
+             phrases are template-fixed in every Solemn Declaration.
+          2. Searches for AFM matches only in the header (text before the
+             marker).
+          3. Requires every header match to agree. Conflicting AFMs in the
+             header section indicate either template damage or tampering;
+             refuse rather than guess.
+          4. Returns None if no AFM is found in the header, if the body
+             marker is missing entirely, or if header AFMs disagree.
+
+        Callers must treat None as a verification failure (AFM_NOT_FOUND),
+        never as "verified without an AFM".
+        """
+        # Locate the earliest body marker and discard everything from there
+        # onwards. If no marker is present, the document does not look like
+        # a Gov.gr Solemn Declaration — refuse rather than fall back to
+        # whole-text search, which is the original exploitable path.
+        body_start = None
+        for marker in self.DECLARATION_BODY_MARKERS:
+            m = marker.search(text)
+            if m and (body_start is None or m.start() < body_start):
+                body_start = m.start()
+        if body_start is None:
+            return None
+
+        header = text[:body_start]
+        matches = self.AFM_PATTERN.findall(header)
+        if not matches:
+            return None
+
+        distinct = set(matches)
+        if len(distinct) != 1:
+            return None
+        return matches[0]
 
     def _extract_demographics(self, text: str) -> dict:
         """
