@@ -7,7 +7,7 @@
 import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
-import { db } from '../db';
+import { db, voteDb } from '../db';
 import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
 import {
@@ -436,10 +436,14 @@ export function registerProposalsRoutes(app: Express): void {
 
       const { castAnonymousVoteWithChain } = await import('../utils/vote-chain');
       try {
+        // B3: Use the vote-path DB connection (agorax_vote role) that
+        // physically cannot read identity tables. Separation enforced by
+        // PostgreSQL grants, not code convention.
         const result = await castAnonymousVoteWithChain({
           proposalId,
           voteToken: token,
           choice,
+          database: voteDb,
         });
         res.status(201).json({
           voteId: result.id,

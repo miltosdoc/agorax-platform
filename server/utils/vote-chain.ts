@@ -14,6 +14,7 @@
  */
 
 import { createHash } from 'crypto';
+import type { DrizzleNodePostgresDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { proposalVotes, type ProposalVote } from '@shared/schema';
@@ -190,11 +191,18 @@ export async function castAnonymousVoteWithChain(args: {
   voteToken: string;
   choice: string;
   weight?: string;
+  /**
+   * Optional database instance. When provided, the vote is cast using
+   * this connection — used for B3 DB-grant enforcement (agorax_vote role).
+   * Defaults to the main db if not provided.
+   */
+  database?: DrizzleNodePostgresDatabase;
 }): Promise<ProposalVote & { receipt: Omit<VoteReceipt, 'userId'> & { voteToken: string } }> {
   const { proposalId, voteToken, choice } = args;
   const weight = args.weight ?? '1';
+  const targetDb = args.database ?? db;
 
-  return await db.transaction(async (tx) => {
+  return await targetDb.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM proposals WHERE id = ${proposalId} FOR UPDATE`);
 
     const [prev] = await tx

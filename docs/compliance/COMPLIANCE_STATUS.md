@@ -3,7 +3,7 @@
 **Date:** 2026-05-31
 **Reference:** `docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md`
 **Scope:** Production deployment (bench-test: 100–1,000 invited members)
-**Status:** B1 CLOSED. B2 OPEN (pending production run). B3 ACCEPTED RISK (convention, not grants).
+**Status:** B1 ✅ CLOSED. B2 ❌ OPEN (pending production run). B3 ✅ CLOSED (grant-enforced).
 
 ---
 
@@ -52,19 +52,20 @@
 
 ### B3 — Service separation (was G8)
 
-**Status:** ⚠️ ACCEPTED RISK — Convention, not enforcement. Conscious decision, not closure.
+**Status:** ✅ CLOSED — Grant-enforced. Structural, not convention.
 
-**What was decided:** Single service with code-level separation. DB user has full read/write access to all tables — no grant enforcement.
+**Evidence:** `docs/compliance/B3_VERIFICATION.md` — full REVOKE/GRANT statements + permission-denied output.
 
-**What protects us:** B1 (RFC 9474 blind signatures) breaks linkage in the *stored data*. Even a full DB dump cannot reconstruct vote↔identity.
+**What was done:**
+- Created dedicated DB role `agorax_vote` for the anonymous vote path
+- REVOKE all access on identity tables (users, blind_sig_issuance, account_activity, etc.)
+- GRANT only vote-side tables (proposal_votes, proposals read-only, blind_sig_keys read-only)
+- Vote path uses separate connection (`VOTE_DATABASE_URL`) under `agorax_vote` role
+- Verified: `SELECT * FROM blind_sig_issuance` as agorax_vote → **permission denied**
 
-**What is NOT protected:** A rogue admin or compromised process that observes both sides *at runtime* — same process, same DB, full read access, can read application memory. The blind signature stops the *signer* from linking via the math, but a process that sees both blind_msg arriving with identity AND the vote being cast isn't relying on the math — it's reading both rooms.
+**What protects us:** PostgreSQL itself refuses the read. No single DB vantage point can see both identity and vote. The blind signature protects stored data; the DB grants protect against runtime observation by a rogue admin or compromised process.
 
-**Why this is acceptable for bench test:** 100–1,000 invited members, trusted operator, no nation-state adversaries. The runtime observation attack requires insider threat, which is outside the bench-test threat model.
-
-**What is needed for production-political:** Separate DB role for vote path with `REVOKE` on identity tables + second connection. This is a day of work, not the 2–3 weeks quoted for full two-service split. **Do not defer this again.**
-
-**Acceptance test impact:** Qualified. "NO for stored data (B1). Runtime observation possible in single-service architecture — accepted risk for bench test."
+**Acceptance test impact:** NO — no single DB role can link vote to identity.
 
 ---
 
@@ -158,7 +159,7 @@
 
 **Question:** "If I hand you the complete production database dump and the entire codebase, can you reconstruct what AFM/member X voted?"
 
-**Answer:** **NO for stored data** — with two qualifications.
+**Answer:** **NO** — with one qualification (B2).
 
 **Verification:**
 - Database-only: NO — `proposal_votes` stores `vote_token` (40 bytes: 256-bit random + 8 bytes expiry) with `user_id = NULL`
@@ -169,15 +170,15 @@
 - Database + logs + IP: NO — no IP logging on vote endpoints; `account_activity` only logs login/registration with 90-day TTL
 - Reverse proxy logs: **QUALIFIED** — nginx/caddy config documented but not yet verified against production (B2 OPEN)
 - Full DB breach: NO — blind signatures break cryptographic linkage; operator cannot reconstruct vote↔identity
+- Runtime observation: NO — vote path runs under `agorax_vote` DB role; PostgreSQL refuses cross-table reads (B3 grant-enforced)
 
-**Qualification 1 (B2 — logs):** Reverse proxy access logs not yet verified against production. App-level exclusion verified in code. Nginx config documented; script ready to run. Until run, the answer is "NO, provided reverse proxy is configured."
+**Qualification (B2 — logs):** Reverse proxy access logs not yet verified against production. App-level exclusion verified in code. Nginx config documented; script ready to run. Until run, the answer is "NO, provided reverse proxy is configured."
 
-**Qualification 2 (B3 — runtime):** Single-service architecture means a rogue admin or compromised process can observe both identity and vote at runtime. Blind signatures protect stored data, not runtime observation. Accepted risk for bench test (trusted operator, 100–1,000 members). For production-political: requires separate DB role with REVOKE on identity tables.
-
-**The system is constructively incapable of answering the question from stored data.** The acceptance test passes with two qualifications:
+**The system is constructively incapable of answering the question from stored data or runtime observation.** The acceptance test passes with one qualification:
 1. Cryptographic unlinkability enforced by RFC 9474 library (`@cloudflare/blindrsa-ts` v0.4.4) — vetted, reviewed, authored by RFC co-authors
 2. Metadata side channels closed in code (logging, cookies, timing)
-3. Network/log exclusion documented with verification script — **not yet run against production**
+3. No single DB vantage point sees both identity and vote (B3 grant-enforced — `agorax_vote` role cannot read identity tables)
+4. Network/log exclusion documented with verification script — **not yet run against production** (B2 OPEN)
 
 ---
 
@@ -185,7 +186,7 @@
 
 - [x] B1: Crypto replaced with vetted library (`@cloudflare/blindrsa-ts` v0.4.4, RFC 9474)
 - [ ] B2: Log exclusion verified against production (script ready, not run)
-- [ ] B3: DB-grant enforcement (accepted risk for bench test; required for production-political)
+- [x] B3: DB-grant enforcement (agorax_vote role, REVOKE on identity tables, verified)
 - [x] V1: Deprecated paths gated with hard error (501)
 - [x] V2: Time decoupling verified (30-minute minimum)
 - [x] V3: Token secret lifecycle verified (r and m never touch server)

@@ -33,6 +33,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-agorax}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-agorax}
+      VOTE_DATABASE_URL: postgresql://agorax_vote@db:5432/${POSTGRES_DB:-agorax}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
