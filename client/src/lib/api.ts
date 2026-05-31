@@ -83,6 +83,18 @@ export const api = {
     return { data, status: res.status, headers: res.headers };
   },
 
+  async put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: "include",
+    });
+    await throwIfResNotOk(res);
+    const data = await res.json();
+    return { data, status: res.status, headers: res.headers };
+  },
+
   async delete<T>(url: string): Promise<ApiResponse<T>> {
     const res = await fetch(url, {
       method: "DELETE",

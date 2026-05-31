@@ -22,6 +22,11 @@ import {
 } from '@shared/schema';
 import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput } from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
+import {
+  GOVERNABLE_SETTING_KEYS,
+  isGovernableSettingKey,
+  parseGovernableSetting,
+} from '@shared/governable-settings';
 
 export function registerCommunitiesRoutes(app: Express): void {
   app.get("/api/communities", async (req, res) => {
@@ -154,10 +159,86 @@ export function registerCommunitiesRoutes(app: Express): void {
         return res.status(403).json({ message: "Not authorized" });
       }
       const communitySettings = sanitizeCommunityUpdateInput(req.body);
+
+      // Autonomous communities decide governable settings by liquid majority
+      // vote. Direct admin edits to those keys are not allowed; only identity
+      // and lifecycle fields (name, description, type) can be edited here.
+      const existing = await communityRepo.getCommunity(communityId);
+      if (!existing) return res.status(404).json({ message: "Community not found" });
+
+      if (existing.type === 'autonomous') {
+        const blocked = (Object.keys(communitySettings) as Array<keyof typeof communitySettings>)
+          .filter((k) => isGovernableSettingKey(k));
+        if (blocked.length > 0) {
+          return res.status(409).json({
+            message: "Autonomous communities decide these settings by member vote; use /setting-votes",
+            blockedKeys: blocked,
+          });
+        }
+        if (communitySettings.type && communitySettings.type !== existing.type && role !== 'founder') {
+          return res.status(403).json({ message: "Only the founder can switch community type" });
+        }
+      }
+
       const community = await communityRepo.updateCommunity(communityId, communitySettings);
       res.json(community);
     } catch (error) {
       res.status(500).json({ message: "Failed to update community" });
+    }
+  });
+
+  // ─── Liquid setting votes (autonomous communities) ─────────────────────────
+
+  app.get("/api/communities/:id/setting-votes", async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      const rows = await communityRepo.listAllSettingTallies(communityId, userId);
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load setting votes" });
+    }
+  });
+
+  app.put("/api/communities/:id/setting-votes/:settingKey", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const settingKey = req.params.settingKey;
+      if (!isGovernableSettingKey(settingKey)) {
+        return res.status(400).json({ message: "Unknown setting key" });
+      }
+      const isMember = await communityRepo.isCommunityMember(communityId, req.user.id);
+      if (!isMember) return res.status(403).json({ message: "Members only" });
+
+      let canonical: string;
+      try {
+        canonical = parseGovernableSetting(settingKey, req.body?.value);
+      } catch (err) {
+        return res.status(400).json({ message: err instanceof Error ? err.message : 'Invalid value' });
+      }
+
+      await communityRepo.upsertSettingVote(communityId, settingKey, req.user.id, canonical);
+      const winner = await communityRepo.recomputeAutonomousSetting(communityId, settingKey);
+      const tally = await communityRepo.tallySettingVotes(communityId, settingKey);
+      res.json({ yourVote: canonical, currentValue: winner, tally });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cast setting vote" });
+    }
+  });
+
+  app.delete("/api/communities/:id/setting-votes/:settingKey", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const settingKey = req.params.settingKey;
+      if (!isGovernableSettingKey(settingKey)) {
+        return res.status(400).json({ message: "Unknown setting key" });
+      }
+      await communityRepo.removeSettingVote(communityId, settingKey, req.user.id);
+      const winner = await communityRepo.recomputeAutonomousSetting(communityId, settingKey);
+      const tally = await communityRepo.tallySettingVotes(communityId, settingKey);
+      res.json({ yourVote: null, currentValue: winner, tally });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear setting vote" });
     }
   });
   app.get("/api/communities/:id/members", async (req, res) => {

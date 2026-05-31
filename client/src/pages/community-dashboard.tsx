@@ -212,10 +212,12 @@ export default function CommunityDashboardPage() {
               {joinError && (
                 <span className="text-sm text-destructive" data-testid="join-error">{joinError}</span>
               )}
-              {canManageSettings && (
+              {user && (canManageSettings || isMember || community.type === 'autonomous') && (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
                   <Settings className="w-4 h-4 mr-2" />
-                  {t('community.settings_title')}
+                  {community.type === 'autonomous'
+                    ? (t('community.settings_vote_title') || t('community.settings_title'))
+                    : t('community.settings_title')}
                 </Button>
               )}
             </div>

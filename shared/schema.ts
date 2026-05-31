@@ -261,6 +261,22 @@ export const communityJoinRequests = pgTable("community_join_requests", {
   decidedByUserId: integer("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
 });
 
+// Liquid settings votes for autonomous communities. Each member can cast one
+// vote per (community, settingKey); the community setting tracks the
+// plurality winner. choiceValue is text — booleans serialise to 'true'/'false',
+// numbers/decimals to their string form, enums to the enum literal.
+export const communitySettingVotes = pgTable("community_setting_votes", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  settingKey: text("setting_key").notNull(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  choiceValue: text("choice_value").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  communitySettingVoteUnique: uniqueIndex('community_setting_votes_unique_idx').on(table.communityId, table.settingKey, table.userId),
+}));
+
 // ─── Demopolis: Proposals (Προβουλεύματα) ────────────────────────────────────
 
 export const proposals = pgTable("proposals", {
@@ -1164,6 +1180,7 @@ export type Community = typeof communities.$inferSelect;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type CommunityMember = typeof communityMembers.$inferSelect;
 export type CommunityJoinRequest = typeof communityJoinRequests.$inferSelect;
+export type CommunitySettingVote = typeof communitySettingVotes.$inferSelect;
 export type Proposal = typeof proposals.$inferSelect;
 export type ProposalAmendment = typeof proposalAmendments.$inferSelect;
 export type ValidationResult = typeof validationResults.$inferSelect;

@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
 import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunityType } from '@shared/community-settings';
+import { AutonomousSettingsView } from './community-settings-autonomous';
+import { useAuth } from '@/hooks/use-auth';
 
 interface CommunitySettingsForm {
   name: string;
@@ -66,7 +68,11 @@ export default function CommunitySettingsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
 
+  const { user } = useAuth();
   const [form, setForm] = useState<CommunitySettingsForm | null>(null);
+  const [community, setCommunity] = useState<Community | null>(null);
+  const [isMember, setIsMember] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +80,22 @@ export default function CommunitySettingsPage() {
   useEffect(() => {
     if (!communityId) return;
 
-    api.get<Community>(`/api/communities/${communityId}`)
-      .then((resp) => setForm(toForm(resp.data)))
+    Promise.all([
+      api.get<Community>(`/api/communities/${communityId}`),
+      api.get<Array<{ userId: number; role: string }>>(`/api/communities/${communityId}/members`).catch(() => ({ data: [] as Array<{ userId: number; role: string }> })),
+    ])
+      .then(([communityResp, membersResp]) => {
+        setCommunity(communityResp.data);
+        setForm(toForm(communityResp.data));
+        if (user) {
+          const me = membersResp.data.find((m) => m.userId === user.id);
+          setIsMember(!!me);
+          setCanEdit(me?.role === 'admin' || me?.role === 'founder');
+        }
+      })
       .catch((err) => setError(err instanceof Error ? err.message : t('community.settings_load_error')))
       .finally(() => setLoading(false));
-  }, [communityId, t]);
+  }, [communityId, t, user]);
 
   function update<K extends keyof CommunitySettingsForm>(key: K, value: CommunitySettingsForm[K]) {
     setForm((current) => current ? { ...current, [key]: value } : current);
@@ -131,10 +148,18 @@ export default function CommunitySettingsPage() {
           <CardContent>
             {loading ? (
               <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>
-            ) : !form ? (
+            ) : !form || !community ? (
               <div className="py-8 text-center text-muted-foreground">{t('community.not_found')}</div>
+            ) : community.type === 'autonomous' && communityId ? (
+              <AutonomousSettingsView communityId={communityId} isMember={isMember} />
             ) : (
               <form onSubmit={handleSubmit} className="space-y-8">
+                {!canEdit && (
+                  <div className="rounded-md border border-amber-300/40 bg-amber-50/40 p-3 text-sm">
+                    {t('community.settings_read_only') || 'Read-only view — only admins and the founder can change settings here.'}
+                  </div>
+                )}
+                <fieldset disabled={!canEdit} className="space-y-8">
                 <section className="space-y-4">
                   <div>
                     <h2 className="text-lg font-semibold">{t('community.settings_identity')}</h2>
@@ -270,13 +295,15 @@ export default function CommunitySettingsPage() {
                   </div>
                 </section>
 
+                </fieldset>
+
                 {error && <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <Button type="button" variant="outline" onClick={() => navigate(`/communities/${communityId}`)}>
                     {t('common.cancel')}
                   </Button>
-                  <Button type="submit" disabled={saving || !form.name.trim()}>
+                  <Button type="submit" disabled={saving || !form.name.trim() || !canEdit}>
                     <Save className="w-4 h-4 mr-2" />
                     {saving ? t('community.settings_saving') : t('community.settings_save')}
                   </Button>
