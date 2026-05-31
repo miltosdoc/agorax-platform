@@ -52,6 +52,7 @@ describe('community settings contract', () => {
       amendmentInclusionThreshold: '1',
       maxAmendmentsPerProposal: 8,
       requireGovgrVerification: true,
+      joinPolicy: 'open',
     });
   });
 
@@ -69,6 +70,7 @@ describe('community settings contract', () => {
       amendmentInclusionThreshold: '1',
       maxAmendmentsPerProposal: -1,
       requireGovgrVerification: false,
+      joinPolicy: 'open',
     });
   });
 

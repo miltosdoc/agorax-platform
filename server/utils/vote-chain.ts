@@ -14,9 +14,13 @@
  */
 
 import { createHash } from 'crypto';
-import type { DrizzleNodePostgresDatabase } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../db';
+
+// The drizzle-orm/node-postgres entry stopped exporting a stable type alias
+// in recent versions; we anchor to the live instance instead so callers can
+// pass either the main `db` or the dedicated vote-path connection.
+type DrizzleDb = typeof db;
 import { proposalVotes, type ProposalVote } from '@shared/schema';
 
 export const GENESIS_PREV_HASH = '0'.repeat(64);
@@ -196,13 +200,13 @@ export async function castAnonymousVoteWithChain(args: {
    * this connection — used for B3 DB-grant enforcement (agorax_vote role).
    * Defaults to the main db if not provided.
    */
-  database?: DrizzleNodePostgresDatabase;
+  database?: DrizzleDb;
 }): Promise<ProposalVote & { receipt: Omit<VoteReceipt, 'userId'> & { voteToken: string } }> {
   const { proposalId, voteToken, choice } = args;
   const weight = args.weight ?? '1';
   const targetDb = args.database ?? db;
 
-  return await targetDb.transaction(async (tx) => {
+  return await targetDb.transaction(async (tx: Parameters<Parameters<DrizzleDb['transaction']>[0]>[0]) => {
     await tx.execute(sql`SELECT id FROM proposals WHERE id = ${proposalId} FOR UPDATE`);
 
     const [prev] = await tx
