@@ -2,16 +2,22 @@
 
 [![CI](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml/badge.svg)](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](tsconfig.json)
-[![License](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![License](https://img.shields.io/badge/license-CC--BY--NC--4.0-yellow)](LICENSE)
 
 **A deliberative-democracy platform — structured deliberation, sortition, and
 verifiable voting for civic decision-making.**
 
 AgoraX implements the *Demopolis* framework: instead of a comment section and a
-poll, a proposal moves through a defined eight-state lifecycle — AI quality
-validation, community amendments, a randomly selected citizen jury, and a
-binding ratification vote whose count anyone can re-verify. It is built for
-Greek civic communities, bilingual (Ελληνικά / English) throughout.
+poll, a proposal moves through a defined eight-state lifecycle — community
+amendments, a randomly selected citizen jury, and a ratification vote whose
+count anyone can re-verify. It is built for Greek civic communities, bilingual
+(Ελληνικά / English) throughout.
+
+> **Status: pilot.** AgoraX runs as a single self-hosted instance and is
+> intended for **consultative** deliberation — verifiable but not yet
+> binding under Greek electoral law. See [§ Status & readiness](#status--readiness)
+> below for what is shipping, what is gated off in production, and what
+> a host community needs to know before adopting it.
 
 ---
 
@@ -19,16 +25,21 @@ Greek civic communities, bilingual (Ελληνικά / English) throughout.
 
 - **Structured deliberation** — every proposal follows the same eight-state
   lifecycle; transitions are validated, not ad hoc.
-- **AI quality gate** — proposals are scored by an LLM before they reach the
-  community, filtering noise without human moderators.
 - **Community amendments** — members propose improvements and counter-proposals;
   the author reviews them, and the community can override an author's rejection.
 - **Sortition** — a randomly selected citizen jury (Athenian-style) reviews and
   revises the proposal. Selection uses a CSPRNG with rejection sampling, so it
   is statistically unbiased and auditable.
-- **Verifiable ratification voting** — the binding yes/no/abstain vote runs
-  through a pluggable `VotingBackend`; every ballot lands in a tamper-evident
-  record anyone can re-check.
+- **Verifiable ratification voting** — the yes/no/abstain vote runs through a
+  pluggable `VotingBackend`; every ballot lands in a tamper-evident record
+  anyone can re-check. Today's shipping backend is consultative
+  (pseudonymous + cleartext); see [§ Verifiable voting](#verifiable-voting)
+  for the trust model and what changes in later phases.
+- **Communities, managed or autonomous** — every community is either
+  *managed* (admins/founders can edit settings directly) or *autonomous*
+  (every governable setting is a liquid majority vote; the value tracks
+  the plurality choice and ties keep the current value). Apply-to-join is
+  per-community: open, approval-gated, or invite-only.
 - **Gov.gr identity verification** — citizens verify with a digitally signed
   Responsible Declaration, giving one account per real person.
 - **Democracy Points** — civic participation is recorded as contribution
@@ -46,17 +57,18 @@ draft ─▶ review ─▶ author_review ─▶ community_signal ─▶ sortitio
 ```
 
 - **draft** — the author drafts the proposal.
-- **review** — automated LLM quality validation.
+- **review** — quality validation. A local-only stub today (every proposal
+  routes to the sortition body for human review); an external LLM gate was
+  removed by a GDPR audit decision and will only return as a local model.
 - **author_review** — the author accepts or rejects community amendments.
 - **community_signal** — the community votes on the author's rejections.
 - **sortition_synthesis** — a sortition jury scores the proposal and revises it.
-- **voting** — the binding ratification vote.
+- **voting** — the ratification vote (consultative in the current pilot).
 - **decided / archived** — terminal: a decision was reached, or it was closed
   without one.
 
 Progression is forward-only and each transition is validated at the API layer.
-A high LLM score can fast-path `review → voting`; `archived` is reachable from
-any active state.
+`archived` is reachable from any active state.
 
 ---
 
@@ -90,8 +102,12 @@ secured never touches proposals, sortition, amendments, or debate.
 
 ## Verifiable voting
 
-The binding ratification vote is routed through a `VotingBackend` interface
-(`server/voting/`), selected by the `VOTING_BACKEND` environment variable:
+The ratification vote is routed through a `VotingBackend` interface
+(`server/voting/`), selected by the `VOTING_BACKEND` environment variable.
+**The current pilot deployment runs `hash-chain` and is consultative, not
+binding under Greek electoral law.** ElectionGuard ships in the codebase but
+is hard-blocked in production until the cryptographic trust model is fully
+audited (see `server/voting/index.ts`). The selected backend is:
 
 | Backend | Status | Guarantees |
 |---|---|---|
@@ -176,7 +192,7 @@ shared/            Drizzle schema + types shared by client and server
 packages/
   voting-sdk/      @agorax/voting — ElectionGuard 2.1 protocol implementation
 ballot_service/    FastAPI service — Gov.gr declaration validation
-migrations/        Ordered SQL migrations (0000 … 0013)
+migrations/        Ordered SQL migrations (0000 … 0024)
 docs/              Architecture, API, runbook, and design documents
 ```
 
@@ -206,8 +222,64 @@ and [Code of Conduct](CODE_OF_CONDUCT.md). Before opening a pull request, run
 
 ## License
 
-See [LICENSE](LICENSE). *(Note: the `LICENSE` file is MIT while `package.json`
-declares `CC-BY-NC-4.0` — these should be reconciled.)*
+See [LICENSE](LICENSE) — CC-BY-NC-4.0. Reuse with attribution; no commercial
+relicensing without permission.
+
+---
+
+## Status & readiness
+
+This is the section a host community, a pilot partner, or a Greek political
+party reading this repo should look at first.
+
+**Technology readiness.** AgoraX is a **pilot** today, not a turnkey
+production platform. The deliberation layer (proposals, amendments,
+sortition, community settings, identity verification) is feature-complete
+and exercised end-to-end. The voting layer is feature-complete on the
+hash-chain backend; the cryptographic backend (ElectionGuard) ships in the
+code but is blocked in production until its trust model is audited.
+
+**Deployment shape.** A single self-hosted Linux box runs the Node API,
+PostgreSQL, and (optionally) the Python Ballot service for Gov.gr PDF
+validation. There is no managed-SaaS offering. There is no multi-region
+failover. Backups are the host operator's responsibility.
+
+**What current votes give you.**
+
+- *Tamper-evidence:* the hash-chain backend writes a per-proposal SHA-256
+  chain. Any post-hoc edit is detected by `/api/proposals/:id/election/verify`.
+- *One vote per real person:* the salted-AFM hash from a Gov.gr Solemn
+  Declaration (Υπεύθυνη Δήλωση) enforces this.
+- *Consultative outcome:* ballots are pseudonymous and cleartext on this
+  backend. The result is a reliable expression of the participating
+  community's will, **not** a legally binding electoral count under Greek
+  law. Binding-secret voting is a later phase (see ElectionGuard plan).
+
+**Data flow you are accepting.** Identity verification stores the
+verified-identity set (first/last name, DOB, municipality, postcode) and a
+salted AFM hash; ID-card number, parents' names, phone and street address
+are deliberately not collected. Ballot choices are linkable to the verified
+identity on the current backend — GDPR Art. 9 special-category processing
+which requires explicit consent at onboarding. Proposal text is treated
+as Art. 9 data and **does not leave the instance**: the previous external
+LLM quality-gate was removed by a documented audit decision.
+
+**What a partner community has to provide.**
+
+- A small Linux host (1 vCPU, 2 GB RAM is enough for ≤1000 members), a
+  Postgres they own, TLS, backups, and someone to be on call.
+- An onboarding flow that captures explicit GDPR Art. 9 consent.
+- A clear public statement to the community that the current pilot is
+  consultative, not binding.
+
+**What it cannot do yet.** Cryptographic secret ballots, anonymous-vote
+unlinkability under a malicious operator, multi-host federation, or
+serving as the system-of-record for a legally binding election.
+
+See `docs/compliance/` for the full audit set (vote linkage, data
+minimization, identity & vote anonymity, anonymous voting design) and
+`server/voting/index.ts` for the production gates that enforce the
+trust-model boundary at runtime.
 
 ---
 
