@@ -28,8 +28,9 @@ export type AnonymousChoice = 'yes' | 'no' | 'abstain';
 
 export interface AnonymousReceipt {
   proposalId: number;
-  token: string;       // base64 of the 32-byte random
-  signature: string;   // base64 RSA-FDH signature
+  token: string;       // base64 of the 40-byte token
+  preparedMsg: string; // base64 of the prepared message (RFC 9474 Randomized)
+  signature: string;   // base64 RSA-PSS signature
   publicKey: PublicKey;
   choice: AnonymousChoice;
   rowHash: string;     // server-returned chain row hash
@@ -91,8 +92,16 @@ export async function castAnonymousVote(
     { blindedToken: req.blinded },
   );
 
-  // 4. Unblind to recover a valid signature on `token`.
-  const sig = unblind(bsResp.data.signature, req.blindingFactor, bsResp.data.publicKey);
+  // 4. Unblind to recover a valid RSA-PSS signature on the prepared message.
+  // RFC 9474 Randomized variant: prepare() injects fresh entropy, so the
+  // prepared message must be stored and reused for finalize + verification.
+  const sig = await unblind(
+    bsResp.data.signature,
+    req.token,
+    req.preparedMsg,
+    req.blindingFactor,
+    bsResp.data.publicKey,
+  );
 
   // 5. Cast the vote (NO auth on this route — server-side CSRF + auth
   // are deliberately absent so the request cannot be correlated with
@@ -104,10 +113,11 @@ export async function castAnonymousVote(
   // session ID, defeating the blind-signature unlinkability guarantee.
   // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G5
   const tokenB64 = bytesToBase64(req.token);
+  const preparedMsgB64 = bytesToBase64(req.preparedMsg);
   const voteResp = await fetch(`/api/proposals/${proposalId}/anonymous-vote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token: tokenB64, signature: sig, choice }),
+    body: JSON.stringify({ token: tokenB64, preparedMsg: preparedMsgB64, signature: sig, choice }),
     credentials: 'omit', // GDPR: no session cookies on anonymous vote path
   });
   if (!voteResp.ok) {
@@ -131,6 +141,7 @@ export async function castAnonymousVote(
   const receipt: AnonymousReceipt = {
     proposalId,
     token: tokenB64,
+    preparedMsg: preparedMsgB64,
     signature: sig,
     publicKey: bsResp.data.publicKey,
     choice,

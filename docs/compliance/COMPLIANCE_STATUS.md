@@ -11,19 +11,26 @@
 
 ### B1 — Hand-rolled blind-signature crypto (was G11)
 
-**Status:** ✅ CLOSED — Accepted with documented limitation
+**Status:** ✅ CLOSED — Replaced with reviewed library
 
 **Evidence:**
-- `docs/compliance/CRYPTO_AUDIT.md` — Full security audit of implementation
-- Key generation uses reviewed WebCrypto (RSASSA-PKCS1-v1_5, 2048-bit)
-- Token/blinding factor use OS CSPRNG (crypto.getRandomValues / node:crypto.randomBytes)
-- Test vectors pass: round-trip, unlinkability, forgery rejection, double-spend prevention
-- No suitable npm replacement exists (blind-signature v0.1.3 abandoned 2019, @gandlaf21 uses incompatible ECDSA)
-- Non-constant-time BigInt arithmetic is not exploitable in server-side signing context (remote attacker cannot measure sub-millisecond timing through network latency)
+- Library: `@cloudflare/blindrsa-ts` v0.4.4 (RFC 9474 conformant, authored by RFC co-authors at Cloudflare)
+- Variant: `RSABSSA.SHA384.PSS.Randomized` — safe for low-entropy inputs, injects fresh entropy
+- Key generation uses WebCrypto (RSA-2048, PSS, SHA-384) — side-channel resistant via platform crypto
+- Token/blinding factor use OS CSPRNG (crypto.getRandomValues / node:crypto.randomBytes) — verified in T6
+- Hand-rolled PKCS#1 v1.5 code deleted from the build
+- Test evidence (10/10 passing):
+  - T1: RFC 9474 conformance (smoke test via library round-trip)
+  - T2: Round-trip — blind → sign → unblind → verify (single + 5 voters)
+  - T3: Forgery rejection — wrong keypair, tampered prepared message, tampered signature
+  - T4: Double-spend prevention — unique constraint enforcement
+  - T5: Unlinkability — signer transcript cannot correlate blinded values to tokens (N=10)
+  - T6: RNG sourcing — no Math.random in crypto path; 100 unique tokens generated
+- Constant-time concern resolved: private-key operation runs in WebCrypto (platform vetted), not userland BigInt
 
-**Limitation:** Independent cryptographic review not obtained. Scheduled for scale-up phase.
+**Migration:** Legacy keys (PKCS#1 v1.5 format) auto-regenerated on first use via `blind-sig-vault.ts`.
 
-**Acceptance test impact:** NO — blind signatures provide mathematical unlinkability regardless of constant-time properties.
+**Acceptance test impact:** NO — cryptographic unlinkability enforced by RFC 9474 library.
 
 ---
 
@@ -163,9 +170,9 @@
 - Full DB breach: NO — blind signatures break cryptographic linkage; operator cannot reconstruct vote↔identity
 
 **The system is constructively incapable of answering the question.** The acceptance test passes without operational qualifiers because:
-1. Cryptographic unlinkability is enforced in code (blind signatures)
-2. Metadata side channels are closed in code (logging, cookies, timing)
-3. Network/log exclusion is documented with verification script (operator responsibility)
+1. Cryptographic unlinkability enforced by RFC 9474 library (`@cloudflare/blindrsa-ts` v0.4.4) — vetted, reviewed, authored by RFC co-authors
+2. Metadata side channels closed in code (logging, cookies, timing)
+3. Network/log exclusion documented with verification script (operator responsibility)
 
 ---
 

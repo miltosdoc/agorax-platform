@@ -394,9 +394,9 @@ export function registerProposalsRoutes(app: Express): void {
       if (!Number.isFinite(proposalId)) {
         return res.status(400).json({ message: "Invalid proposal id" });
       }
-      const { token, signature, choice } = req.body ?? {};
-      if (typeof token !== 'string' || typeof signature !== 'string') {
-        return res.status(400).json({ message: "token + signature (base64) required" });
+      const { token, preparedMsg, signature, choice } = req.body ?? {};
+      if (typeof token !== 'string' || typeof preparedMsg !== 'string' || typeof signature !== 'string') {
+        return res.status(400).json({ message: "token + preparedMsg + signature (base64) required" });
       }
       if (choice !== 'yes' && choice !== 'no' && choice !== 'abstain') {
         return res.status(400).json({ message: "choice must be yes / no / abstain" });
@@ -415,7 +415,8 @@ export function registerProposalsRoutes(app: Express): void {
       const { verify, base64ToBytes } = await import('@shared/blind-sig');
       const pub = await ensureKey(proposalId);
       const tokenBytes = base64ToBytes(token);
-      const ok = await verify(tokenBytes, signature, pub);
+      const preparedMsgBytes = base64ToBytes(preparedMsg);
+      const ok = await verify(tokenBytes, preparedMsgBytes, signature, pub);
       if (!ok) return res.status(400).json({ message: "Invalid signature on token" });
 
       // GDPR: Enforce time decoupling — reject votes cast before the

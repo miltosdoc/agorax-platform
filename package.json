@@ -38,6 +38,7 @@
     "db:seed": "tsx server/seed-demo.ts"
   },
   "dependencies": {
+    "@cloudflare/blindrsa-ts": "^0.4.4",
     "@fingerprintjs/fingerprintjs": "^4.6.2",
     "@hookform/resolvers": "^3.9.1",
     "@jridgewell/trace-mapping": "^0.3.25",
