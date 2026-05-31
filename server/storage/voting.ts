@@ -1,8 +1,19 @@
 /**
- * Voting Repository
+ * Voting Repository — Legacy Polls
  *
  * Handles voting operations: poll creation, survey polls, vote casting,
  * results calculation, and participant tracking.
+ *
+ * ⚠️  DEPRECATED FOR BINDING VOTES — see docs/compliance/DEPLOYMENT_HARDENING.md
+ *
+ * This module stores votes with user_id + option_id in cleartext.
+ * The operator can see who voted for what — pseudonymous, not anonymous.
+ *
+ * For binding votes, use the blind-signature anonymous voting flow:
+ *   /api/proposals/:id/blind-sign  →  /api/proposals/:id/anonymous-vote
+ *
+ * Legacy polls are retained for consultative purposes only (surveys,
+ * preference gathering, non-binding opinions).
  */
 
 import { db } from '../db';

@@ -1,8 +1,19 @@
 /**
  * Ballot Client — HTTP client for the Python Ballot Validation Service.
  *
- * Proxies requests from the main Node.js API to the ballot-service container.
+ * Proxies requests from the Node.js API to the ballot-service container.
  * The ballot service runs on port 8000 and handles PDF validation.
+ *
+ * ⚠️  DEPRECATED FOR BINDING VOTES — see docs/compliance/DEPLOYMENT_HARDENING.md
+ *
+ * This module computes a deterministic voter_hash = SHA256(AFM + SALT).
+ * Greek AFM is 9 digits (~30 bits entropy) → brute-forceable via rainbow table.
+ * The voter_hash is a pseudonym, not an anonymiser — GDPR Art. 4(5) pseudonymisation.
+ *
+ * For binding votes, use the blind-signature anonymous voting flow:
+ *   /api/proposals/:id/blind-sign  →  /api/proposals/:id/anonymous-vote
+ *
+ * Ballot voting is retained for consultative purposes only.
  */
 
 import fetch from "node-fetch";
