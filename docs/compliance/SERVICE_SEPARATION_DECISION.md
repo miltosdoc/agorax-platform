@@ -66,13 +66,16 @@ To enforce Option B, the following measures are implemented:
 
 1. **Code separation** — Vote path (`server/utils/vote-chain.ts`, `server/utils/blind-sig-vault.ts`) cannot access identity tables. No imports from `server/storage/users.ts` in vote path.
 
-2. **Database grants** — Production DB user has read/write access to all tables. For scale-up, create separate DB users:
-   - `eligibility_user`: read/write users, account_activity, blind_sig_issuance
-   - `voting_user`: read/write proposal_votes, blind_sig_keys
+2. **Cryptographic separation (B1)** — Blind signatures (RFC 9474, `@cloudflare/blindrsa-ts` v0.4.4) break the linkage between identity and vote. Even with full DB access, the operator cannot reconstruct vote↔identity. This is the primary safety guarantee — not convention, not code structure, but mathematics.
 
 3. **Logging separation** — Vote endpoints excluded from application logs (G7). No shared request ID between identity and vote paths.
 
 4. **Memory separation** — No shared in-memory state between identity and vote paths. Each request is independent.
+
+5. **DB grants (scale-up)** — For national-scale deployment, create separate DB users:
+   - `eligibility_user`: read/write users, account_activity, blind_sig_issuance
+   - `voting_user`: read/write proposal_votes, blind_sig_keys
+   - Not implemented for bench-test — cryptographic separation (B1) is sufficient.
 
 ---
 
@@ -90,10 +93,11 @@ Until then, Option B with hard internal separation is sufficient for the product
 
 ## Verification
 
-- [ ] Code audit: vote path does not import identity storage
-- [ ] DB grants: separate users for eligibility vs voting (scale-up)
-- [ ] Logging: vote endpoints excluded (verified in server/index.ts)
-- [ ] Timing: 30-minute decoupling enforced (verified in blind-sig.ts)
+- [x] Code audit: vote path does not import identity storage
+- [x] Cryptographic separation: B1 closed — RFC 9474 library (`@cloudflare/blindrsa-ts` v0.4.4)
+- [x] Logging: vote endpoints excluded (verified in server/index.ts)
+- [x] Timing: 30-minute decoupling enforced (verified in blind-sig.ts)
+- [ ] DB grants: separate users for eligibility vs voting (scale-up only)
 
 ---
 

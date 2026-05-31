@@ -124,6 +124,8 @@ async function regenerateKey(proposalId: number): Promise<PublicKey> {
   const enc = encryptD(kp.d, proposalId);
   await db.update(blindSigKeys)
     .set({
+      publicN: kp.n,
+      publicE: kp.e,
       secretDCiphertext: enc.ciphertext,
       secretDIv: enc.iv,
       secretDTag: enc.tag,

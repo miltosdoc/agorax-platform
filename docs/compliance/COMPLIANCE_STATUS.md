@@ -42,8 +42,9 @@
 - `docs/compliance/DEPLOYMENT_HARDENING.md` — nginx/caddy configuration for vote endpoint exclusion
 - `scripts/verify_production_logs.sh` — Automated verification script for production deployment
 - Application-level exclusions verified in `server/index.ts` (G7 fix)
+- **Status:** Ready to verify — script exists, app-level exclusion verified in code. Requires production nginx deployment to run against.
 
-**Deployment requirement:** Operator must apply nginx/caddy config before production launch and run verification script.
+**Deployment requirement:** Operator must apply nginx/caddy config before production launch and run verification script. Empty grep output = B2 CLOSED.
 
 **Acceptance test impact:** Conditional on operator applying config. Script provides automated verification.
 
@@ -51,19 +52,20 @@
 
 ### B3 — Service separation (was G8)
 
-**Status:** ✅ CLOSED — Option B justified and documented
+**Status:** ✅ CLOSED — Conditional on B1 (cryptographic separation)
 
 **Evidence:**
 - `docs/compliance/SERVICE_SEPARATION_DECISION.md` — Full threat model analysis and justification
 - Single service with hard internal separation chosen for bench-test scale
-- Blind signatures provide cryptographic separation regardless of service architecture
+- **Primary guarantee:** B1 (RFC 9474 blind signatures) breaks linkage even with full DB access — not convention, mathematics
 - Code audit confirms: vote path cannot access identity tables
 - Logging exclusions prevent correlation (G7)
 - Time decoupling prevents timing correlation (G2)
+- DB grants (separate users) deferred to scale-up — not required when B1 provides cryptographic separation
 
-**Limitation:** Two-service split recommended for scale-up (open registration, nation-state threat model).
+**Limitation:** Two-service split + DB grants recommended for scale-up (open registration, nation-state threat model).
 
-**Acceptance test impact:** NO — blind signatures break linkage even with full DB access.
+**Acceptance test impact:** NO — blind signatures break linkage even with full DB access. B3's safety borrows from B1, which is now verified.
 
 ---
 
