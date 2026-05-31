@@ -24,12 +24,12 @@ export const db = drizzle(pool, { schema });
 // deployments that haven't applied the grants yet).
 
 let votePool: Pool | null = null;
-let voteDb: ReturnType<typeof drizzle> | null = null;
+let configuredVoteDb: ReturnType<typeof drizzle> | null = null;
 
 if (process.env.VOTE_DATABASE_URL) {
   votePool = new Pool({ connectionString: process.env.VOTE_DATABASE_URL });
-  voteDb = drizzle(votePool, { schema });
+  configuredVoteDb = drizzle(votePool, { schema });
 }
 
 export const votePoolConn = votePool ?? pool;
-export const voteDb = voteDb ?? db;
+export const voteDb = configuredVoteDb ?? db;
