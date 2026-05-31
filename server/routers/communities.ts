@@ -121,6 +121,7 @@ export function registerCommunitiesRoutes(app: Express): void {
       await communityRepo.addCommunityMember(community.id, req.user.id, 'founder');
       res.status(201).json(community);
     } catch (error) {
+      console.error('[create-community]', error);
       res.status(500).json({ message: "Failed to create community" });
     }
   });

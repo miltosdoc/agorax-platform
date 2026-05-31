@@ -49,6 +49,43 @@ interface ApiResponse<T> {
   headers: Headers;
 }
 
+// ─── CSRF double-submit ────────────────────────────────────────────────────
+// Server enforces X-CSRF-Token on all state-changing /api/* requests. The
+// token lives in a non-HttpOnly cookie set by GET /api/csrf (or any GET that
+// touches the middleware). We bootstrap on first non-GET and echo every call.
+const CSRF_COOKIE = 'agorax_csrf';
+let csrfBootstrap: Promise<void> | null = null;
+
+function readCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  for (const part of document.cookie.split(';')) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return undefined;
+}
+
+async function ensureCsrfCookie(): Promise<void> {
+  if (readCookie(CSRF_COOKIE)) return;
+  if (!csrfBootstrap) {
+    csrfBootstrap = fetch('/api/csrf', { credentials: 'include' })
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  await csrfBootstrap;
+  csrfBootstrap = null;
+}
+
+async function buildHeaders(body: unknown, includeCsrf: boolean): Promise<Record<string, string>> {
+  const headers: Record<string, string> = body ? { "Content-Type": "application/json" } : {};
+  if (includeCsrf) {
+    await ensureCsrfCookie();
+    const token = readCookie(CSRF_COOKIE);
+    if (token) headers["X-CSRF-Token"] = token;
+  }
+  return headers;
+}
+
 export const api = {
   async get<T>(url: string): Promise<ApiResponse<T>> {
     const res = await fetch(url, {
@@ -60,9 +97,10 @@ export const api = {
   },
 
   async post<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    const headers = await buildHeaders(body, true);
     const res = await fetch(url, {
       method: "POST",
-      headers: body ? { "Content-Type": "application/json" } : {},
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "include",
     });
@@ -72,9 +110,10 @@ export const api = {
   },
 
   async patch<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    const headers = await buildHeaders(body, true);
     const res = await fetch(url, {
       method: "PATCH",
-      headers: body ? { "Content-Type": "application/json" } : {},
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "include",
     });
@@ -84,9 +123,10 @@ export const api = {
   },
 
   async put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    const headers = await buildHeaders(body, true);
     const res = await fetch(url, {
       method: "PUT",
-      headers: body ? { "Content-Type": "application/json" } : {},
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "include",
     });
@@ -96,8 +136,10 @@ export const api = {
   },
 
   async delete<T>(url: string): Promise<ApiResponse<T>> {
+    const headers = await buildHeaders(undefined, true);
     const res = await fetch(url, {
       method: "DELETE",
+      headers,
       credentials: "include",
     });
     await throwIfResNotOk(res);
