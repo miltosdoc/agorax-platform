@@ -36,26 +36,11 @@ export class CommunityRepository {
   }
 
   /**
-   * Get all communities, optionally filtered by user membership.
-   * @returns Array of communities.
+   * List every community for discovery. Membership and approval state are
+   * surfaced through the join-request flow, not by hiding rows here.
+   * The userId argument is accepted for callers that still pass it.
    */
-  async getCommunities(userId?: number): Promise<Community[]> {
-    if (userId) {
-      const memberCommunities = await db
-        .select({ communityId: communityMembers.communityId })
-        .from(communityMembers)
-        .where(eq(communityMembers.userId, userId));
-
-      const communityIds = memberCommunities.map(m => m.communityId);
-      if (communityIds.length === 0) return [];
-
-      return await db
-        .select()
-        .from(communities)
-        .where(inArray(communities.id, communityIds))
-        .orderBy(desc(communities.createdAt));
-    }
-
+  async getCommunities(_userId?: number): Promise<Community[]> {
     return await db
       .select()
       .from(communities)
