@@ -32,9 +32,10 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   is statistically unbiased and auditable.
 - **Verifiable ratification voting** — the yes/no/abstain vote runs through a
   pluggable `VotingBackend`; every ballot lands in a tamper-evident record
-  anyone can re-check. Today's shipping backend is consultative
-  (pseudonymous + cleartext); see [§ Verifiable voting](#verifiable-voting)
-  for the trust model and what changes in later phases.
+  anyone can re-check. Two modes are available: *pseudonymous* (cleartext
+  votes linked to verified identity) and *anonymous* (blind-signed tokens
+  via RFC 9474, zero linkage between voter identity and vote choice).
+  See [§ Verifiable voting](#verifiable-voting) for the trust model.
 - **Communities, managed or autonomous** — every community is either
   *managed* (admins/founders can edit settings directly) or *autonomous*
   (every governable setting is a liquid majority vote; the value tracks
@@ -78,8 +79,16 @@ Progression is forward-only and each transition is validated at the API layer.
 ┌──────────────┐   ┌───────────────────┐   ┌──────────────────────┐
 │  Web client  │   │  Application API  │   │  Ballot service      │
 │  React + TS  │◀─▶│  Express + TS     │◀─▶│  FastAPI (Python)    │
-└──────────────┘   └─────────┬─────────┘   │  Gov.gr PDF validation│
-                             │             └──────────────────────┘
+└──────┬───────┘   └─────────┬─────────┘   │  Gov.gr PDF validation│
+       │                     │             └──────────────────────┘
+       │  Anonymous voting:  │
+       │  1. Browser generates token
+       │  2. Browser blinds token
+       │  3. Server signs blindly
+       │  4. Browser unblinds token
+       │  5. Browser casts vote with token
+       │     (server cannot link token to identity)
+       │
                    ┌─────────▼─────────┐
                    │ Domain repositories│  users · communities · proposals
                    │ + server/economy  │  amendments · sortition · voting
@@ -89,8 +98,10 @@ Progression is forward-only and each transition is validated at the API layer.
                    ┌─────────▼─────────┐   ┌──────────────────────┐
                    │ PostgreSQL        │   │ @agorax/voting        │
                    │ + Drizzle ORM     │   │ ElectionGuard 2.1 SDK │
-                   └───────────────────┘   │ (packages/voting-sdk) │
-                                           └──────────────────────┘
+                   │  (agorax_vote     │   │ (packages/voting-sdk) │
+                   │   role for anon   │   │  [DEV-ONLY, blocked]  │
+                   │   vote path)      │   └──────────────────────┘
+                   └───────────────────┘
 ```
 
 The server is organised by domain — one router and one repository per domain,
@@ -104,16 +115,39 @@ secured never touches proposals, sortition, amendments, or debate.
 
 The ratification vote is routed through a `VotingBackend` interface
 (`server/voting/`), selected by the `VOTING_BACKEND` environment variable.
-**The current pilot deployment runs `hash-chain` and is consultative, not
-binding under Greek electoral law.** ElectionGuard ships in the codebase but
-is hard-blocked in production until the cryptographic trust model is fully
-audited (see `server/voting/index.ts`). The selected backend is:
+**The current pilot deployment runs `hash-chain` (default) and supports an
+anonymous voting mode.** ElectionGuard ships in the codebase but is
+hard-blocked in production — see below.
 
-| Backend | Status | Guarantees |
-|---|---|---|
-| `hash-chain` *(default)* | Shipping | Tamper-evident inclusion — a per-proposal SHA-256 chain; any post-hoc edit is detected by `/api/proposals/:id/election/verify`. Votes are cleartext. |
-| `electionguard` | Development | ElGamal-encrypted ballots, zero-knowledge ballot-validity proofs, homomorphic tally, threshold-trustee decryption, public verifier. Verifiable integrity today; client-side encryption (full vote privacy) is a later phase — not for binding elections yet. |
-| `mobile-signed` | Planned | Voter-side signing in a device secure element — the server never holds the key. |
+### Voting backends
+
+- **`hash-chain` *(default, shipping)*** — Tamper-evident per-proposal SHA-256
+  chain. Votes are pseudonymous cleartext (linked to verified identity). Any
+  post-hoc edit is detected by `/api/proposals/:id/election/verify`.
+
+- **`anonymous` *(shipping)*** — Blind-signed tokens via
+  `@cloudflare/blindrsa-ts` (RFC 9474, RSABSSA.SHA384.PSS.Randomized). The
+  browser generates a token, blinds it, the server signs blindly, the browser
+  unblinds, then casts the vote. **Zero linkage** between voter identity and
+  vote choice — the server never sees the unblinded token before the vote is
+  cast. A 30-minute minimum time decoupling between token issuance and vote
+  casting prevents real-time correlation. Anonymous votes use minute-precision
+  timestamps. Vote endpoints (blind-sign, anonymous-vote, verify-receipt,
+  blind-key) are excluded from application logging. A dedicated database role
+  (`agorax_vote`) handles the anonymous vote path with revoked access to
+  identity tables.
+
+- **`electionguard` *(development-only, blocked in production)*** — ElGamal-encrypted
+  ballots, zero-knowledge ballot-validity proofs, homomorphic tally,
+  threshold-trustee decryption, public verifier. **Blocked because:** guardian
+  secrets are stored server-side, the ballot row still binds `user_id`, and
+  encryption happens server-side (not client-side). Self-labeled
+  *"DEVELOPMENT-ONLY, NOT FOR BINDING ELECTIONS"*. Re-enable gates are
+  documented in `docs/01_VOTE_LINKAGE_AUDIT.md` (SDK Phase 6+7, ballot-schema
+  refactor, independent crypto review).
+
+- **`mobile-signed` *(planned)*** — Voter-side signing in a device secure
+  element — the server never holds the key.
 
 The `electionguard` backend is powered by **`@agorax/voting`**, an in-house
 TypeScript implementation of the [ElectionGuard 2.1](https://www.electionguard.vote/)
@@ -137,6 +171,11 @@ verified-identity set (name, date of birth, place of birth, residence). The Tax
 ID (ΑΦΜ) is stored only as a salted hash, which guarantees **one account per
 real person**. ID-card number, parents' names, phone and street address are
 deliberately not stored.
+
+This verification is a **one-time registration step**, not a per-vote check.
+In anonymous voting mode, the verified identity is used only to confirm the
+voter is eligible; the actual vote is cast with a blind-signed token that is
+cryptographically unlinkable to the voter's identity.
 
 ## Democracy Points
 
@@ -236,13 +275,38 @@ party reading this repo should look at first.
 production platform. The deliberation layer (proposals, amendments,
 sortition, community settings, identity verification) is feature-complete
 and exercised end-to-end. The voting layer is feature-complete on the
-hash-chain backend; the cryptographic backend (ElectionGuard) ships in the
-code but is blocked in production until its trust model is audited.
+hash-chain backend and the anonymous voting mode.
 
-**Deployment shape.** A single self-hosted Linux box runs the Node API,
-PostgreSQL, and (optionally) the Python Ballot service for Gov.gr PDF
-validation. There is no managed-SaaS offering. There is no multi-region
-failover. Backups are the host operator's responsibility.
+**GDPR compliance.** The following rights and safeguards are implemented:
+
+- **Art. 15 data export** — `GET /api/user/data-export` returns all personal
+  data in a structured JSON bundle.
+- **Art. 17 erasure request** — `POST /api/user/erasure-request` initiates
+  account deletion. Vote rows undergo *crypto-shred* (user_id nulled, chain
+  integrity preserved). Democracy Points balance is deleted and transactions
+  anonymized (migration 0019).
+- **Consent gate** — `requires_consent` middleware blocks Art. 9 actions
+  (voting, proposal creation) until the member accepts the privacy text.
+- **Deferred erasure** — votes on active proposals are deferred until the
+  proposal closes, preserving tally integrity.
+- **Rate limits** — consent (10/15 min), data export (5/hour), erasure
+  (3/day) to prevent abuse.
+
+**Production hardening.**
+
+- **CORS allowlist** — controlled via `CORS_ALLOWED_ORIGINS` env var.
+- **CSRF protection** — double-submit cookie tokens on all state-changing
+  endpoints.
+- **Sentry error monitoring** — optional, gated on `SENTRY_DSN`; PII is
+  redacted before transmission.
+- **DB TLS check** — boot-time validation requires `sslmode=require` (or
+  `verify-ca` / `verify-full`) in production.
+- **Admin audit log** — migration 0018 tracks privileged admin actions.
+
+**Service separation.** The anonymous vote path uses a dedicated database
+role (`agorax_vote`) with `REVOKE` on all identity tables and `GRANT` only
+on vote tables. Verified: the `agorax_vote` role receives permission denied
+when attempting to read identity tables.
 
 **What current votes give you.**
 
@@ -250,19 +314,21 @@ failover. Backups are the host operator's responsibility.
   chain. Any post-hoc edit is detected by `/api/proposals/:id/election/verify`.
 - *One vote per real person:* the salted-AFM hash from a Gov.gr Solemn
   Declaration (Υπεύθυνη Δήλωση) enforces this.
-- *Consultative outcome:* ballots are pseudonymous and cleartext on this
-  backend. The result is a reliable expression of the participating
-  community's will, **not** a legally binding electoral count under Greek
-  law. Binding-secret voting is a later phase (see ElectionGuard plan).
+- *Anonymous mode:* blind-signed tokens (RFC 9474) provide zero linkage
+  between voter identity and vote choice. Opt-in per proposal.
+- *Consultative outcome:* the result is a reliable expression of the
+  participating community's will, **not** a legally binding electoral count
+  under Greek law.
 
 **Data flow you are accepting.** Identity verification stores the
 verified-identity set (first/last name, DOB, municipality, postcode) and a
 salted AFM hash; ID-card number, parents' names, phone and street address
-are deliberately not collected. Ballot choices are linkable to the verified
-identity on the current backend — GDPR Art. 9 special-category processing
-which requires explicit consent at onboarding. Proposal text is treated
-as Art. 9 data and **does not leave the instance**: the previous external
-LLM quality-gate was removed by a documented audit decision.
+are deliberately not collected. In pseudonymous mode, ballot choices are
+linkable to the verified identity — GDPR Art. 9 special-category processing
+requiring explicit consent at onboarding. In anonymous mode, the vote is
+cryptographically unlinkable to identity. Proposal text is treated as Art. 9
+data and **does not leave the instance**: the previous external LLM
+quality-gate was removed by a documented audit decision.
 
 **What a partner community has to provide.**
 
@@ -272,9 +338,10 @@ LLM quality-gate was removed by a documented audit decision.
 - A clear public statement to the community that the current pilot is
   consultative, not binding.
 
-**What it cannot do yet.** Cryptographic secret ballots, anonymous-vote
-unlinkability under a malicious operator, multi-host federation, or
-serving as the system-of-record for a legally binding election.
+**What it cannot do yet.** Real-time network-traffic correlation defense,
+voter-device compromise, coercion or vote-selling defense, multi-host
+federation, or serving as the system-of-record for a legally binding
+election under Greek law.
 
 See `docs/compliance/` for the full audit set (vote linkage, data
 minimization, identity & vote anonymity, anonymous voting design) and
