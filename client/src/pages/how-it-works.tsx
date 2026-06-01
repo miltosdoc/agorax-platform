@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useLocation } from "wouter";
 import {
   FileText, CheckCircle, Edit3, TrendingUp, Users, Vote,
-  Shield, ArrowRight, Zap, Globe, Lock
+  Shield, ArrowRight, Zap, Globe, Lock, Award
 } from "lucide-react";
 
 export default function HowItWorksPage() {
@@ -71,9 +71,9 @@ export default function HowItWorksPage() {
     },
     {
       step: 7,
-      icon: Shield,
-      color: "red",
-      title: t('walkthrough.step7_name') || "Verified Vote",
+      icon: CheckCircle,
+      color: "teal",
+      title: t('walkthrough.step7_name') || "Decided",
       description: t('walkthrough.step7_desc'),
       features: [t('walkthrough.hiw_feature7_1'), t('walkthrough.hiw_feature7_2'), t('walkthrough.hiw_feature7_3')]
     }
@@ -201,7 +201,7 @@ export default function HowItWorksPage() {
           {/* Key Innovations */}
           <div className="mt-16 mb-16">
             <h2 className="text-2xl font-bold text-center mb-8">{t('walkthrough.hiw_different_title')}</h2>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <Zap className="w-8 h-8 text-amber-500 mb-4" />
@@ -222,10 +222,19 @@ export default function HowItWorksPage() {
               </Card>
               <Card>
                 <CardContent className="p-6">
-                  <Shield className="w-8 h-8 text-red-500 mb-4" />
+                  <Award className="w-8 h-8 text-amber-500 mb-4" />
                   <h3 className="font-semibold text-lg mb-2">{t('walkthrough.hiw_innovation3_title')}</h3>
                   <p className="text-sm text-muted-foreground">
                     {t('walkthrough.hiw_innovation3_desc')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Lock className="w-8 h-8 text-cyan-500 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">{t('walkthrough.hiw_innovation4_title')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('walkthrough.hiw_innovation4_desc')}
                   </p>
                 </CardContent>
               </Card>
