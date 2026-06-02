@@ -71,6 +71,48 @@ export class LivekitRepository {
     return row;
   }
 
+  /**
+   * Rooms the user can currently join: every community room in a community
+   * where they're a member (active OR scheduled), plus every sortition
+   * room of a body they sit on. Ordered live-first then by start.
+   */
+  async listJoinableForUser(userId: number): Promise<LivekitRoom[]> {
+    const { communityMembers, sortitionMembers } = await import('../../shared/schema');
+    const myCommunities = await db
+      .select({ id: communityMembers.communityId })
+      .from(communityMembers)
+      .where(eq(communityMembers.userId, userId));
+    const myBodies = await db
+      .select({ id: sortitionMembers.bodyId })
+      .from(sortitionMembers)
+      .where(eq(sortitionMembers.userId, userId));
+    const communityIds = myCommunities.map(r => r.id);
+    const bodyIds = myBodies.map(r => r.id);
+    if (communityIds.length === 0 && bodyIds.length === 0) return [];
+
+    const conditions = [sql`${livekitRooms.status} IN ('scheduled', 'active')`];
+    const orParts: any[] = [];
+    if (communityIds.length) {
+      orParts.push(and(
+        eq(livekitRooms.kind, 'community'),
+        sql`${livekitRooms.communityId} IN (${sql.join(communityIds.map(id => sql`${id}`), sql`, `)})`,
+      ));
+    }
+    if (bodyIds.length) {
+      orParts.push(and(
+        eq(livekitRooms.kind, 'sortition'),
+        sql`${livekitRooms.sortitionBodyId} IN (${sql.join(bodyIds.map(id => sql`${id}`), sql`, `)})`,
+      ));
+    }
+    if (orParts.length === 0) return [];
+    const orClause = orParts.length === 1 ? orParts[0] : sql`(${sql.join(orParts, sql` OR `)})`;
+    return await db
+      .select()
+      .from(livekitRooms)
+      .where(and(...conditions, orClause))
+      .orderBy(desc(livekitRooms.status), desc(livekitRooms.createdAt));
+  }
+
   async setRecordingEnabled(id: number, enabled: boolean): Promise<LivekitRoom> {
     const [row] = await db
       .update(livekitRooms)

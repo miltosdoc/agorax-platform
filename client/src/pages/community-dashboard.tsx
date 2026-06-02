@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic } from 'lucide-react';
 import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
+import { ActiveCallBanner } from '@/components/livekit/ActiveCallBanner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -49,6 +50,7 @@ export default function CommunityDashboardPage() {
 
   const [summary, setSummary] = useState<CommunitySummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<string>('proposals');
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -269,7 +271,11 @@ export default function CommunityDashboardPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="proposals">
+      <ActiveCallBanner
+        communityId={community.id}
+        onJoinClick={() => setActiveTab('conferences')}
+      />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
           <TabsTrigger value="sortition">{t('community.tab_sortition')}</TabsTrigger>

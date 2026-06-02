@@ -1047,6 +1047,7 @@ const el: TranslationDictionary = {
   'livekit.leave': 'Αποχώρηση',
   'livekit.joinFailed': 'Η σύνδεση απέτυχε',
   'livekit.live': 'Σε εξέλιξη',
+  'livekit.liveNow': 'Σε εξέλιξη τώρα',
   'livekit.scheduled': 'Προγραμματισμένη',
   'livekit.permissionsHint': 'Θα σας ζητηθεί πρόσβαση σε μικρόφωνο και κάμερα.',
   'livekit.unavailableTitle': 'Οι τηλεδιασκέψεις είναι ανενεργές',

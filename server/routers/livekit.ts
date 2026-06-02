@@ -75,6 +75,17 @@ function newRoomName(prefix: string): string {
 
 export function registerLivekitRoutes(app: Express): void {
 
+  // ── My-rooms — what the logged-in user can currently join ───────────
+  app.get('/api/livekit/my-rooms', requireAuth, async (req: any, res) => {
+    try {
+      const rooms = await livekitRepo.listJoinableForUser(req.user.id);
+      res.json(rooms);
+    } catch (err: any) {
+      logger.error('list my rooms failed', { err: err?.message });
+      res.status(500).json({ message: 'failed to list rooms' });
+    }
+  });
+
   // ── Public config probe — client uses this to render the room UI ──────
   app.get('/api/livekit/config', (req, res) => {
     if (!isLivekitConfigured()) {

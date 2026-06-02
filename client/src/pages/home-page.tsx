@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, FileText, Plus, Users, Mic, Video } from 'lucide-react';
+import { ConferenceRoomCard } from '@/components/livekit/ConferenceRoomCard';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -79,6 +80,54 @@ interface FeedItem {
   durationS: string | null;
   proposalQuestion: string;
   communityName: string;
+}
+
+interface LivekitJoinable {
+  id: number;
+  kind: 'community' | 'sortition';
+  title: string;
+  status: 'scheduled' | 'active' | 'closed';
+}
+
+function DashboardActiveRoomsSection() {
+  const { t } = useTranslation();
+  const [rooms, setRooms] = useState<LivekitJoinable[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const refresh = () => api.get<LivekitJoinable[]>('/api/livekit/my-rooms')
+    .then(resp => setRooms((resp.data ?? []).filter(r => r.status !== 'closed')))
+    .catch(() => setRooms([]))
+    .finally(() => setLoaded(true));
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!loaded) return null;
+  if (rooms.length === 0) return null;
+
+  return (
+    <section data-testid="dashboard-active-rooms">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <Mic className="w-5 h-5" />
+          {t('livekit.communitySectionTitle')}
+        </h2>
+      </div>
+      <div className="space-y-3">
+        {rooms.map(room => (
+          <ConferenceRoomCard
+            key={room.id}
+            roomId={room.id}
+            title={room.title}
+            badge={room.status === 'active' ? t('livekit.liveNow') : t('livekit.scheduled')}
+          />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function DashboardFeedSection() {
@@ -237,6 +286,9 @@ export default function HomePage() {
               </div>
             )}
           </section>
+
+          {/* Active conferences — live + scheduled rooms the user can join */}
+          <DashboardActiveRoomsSection />
 
           {/* Recent media — embedded feed */}
           <DashboardFeedSection />

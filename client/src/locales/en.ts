@@ -1047,6 +1047,7 @@ const en: TranslationDictionary = {
   'livekit.leave': 'Leave',
   'livekit.joinFailed': 'Could not join the room',
   'livekit.live': 'Live',
+  'livekit.liveNow': 'Live now',
   'livekit.scheduled': 'Scheduled',
   'livekit.permissionsHint': "You'll be asked for microphone and camera access.",
   'livekit.unavailableTitle': 'Video conferencing is off',

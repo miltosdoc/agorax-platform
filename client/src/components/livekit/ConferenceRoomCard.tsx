@@ -49,18 +49,35 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
     setConnecting(true);
     try {
       const resp = await api.post<JoinTokenResponse>(`/api/livekit/rooms/${roomId}/token`);
+      // eslint-disable-next-line no-console
+      console.info('[livekit] join token received', { roomName: resp.data.roomName, url: resp.data.url, isHost: resp.data.isHost });
       setToken(resp.data.token);
       setUrl(resp.data.url);
       setJoined(true);
     } catch (err: any) {
-      if (err instanceof ApiError && err.status === 503) {
+      // eslint-disable-next-line no-console
+      console.error('[livekit] join failed', err);
+      const status = err instanceof ApiError ? err.status : undefined;
+      const detail = err?.message ?? String(err);
+      if (status === 503) {
         errorToast(t('livekit.unavailableTitle'), t('livekit.unavailableBody'));
+      } else if (status === 403) {
+        errorToast(t('livekit.joinFailed'), `403: ${detail}`);
+      } else if (status === 410) {
+        errorToast(t('livekit.joinFailed'), `Room is closed.`);
       } else {
-        errorToast(t('livekit.joinFailed'), err?.message ?? t('media.tryAgain'));
+        errorToast(t('livekit.joinFailed'), `${status ?? ''} ${detail}`.trim());
       }
     } finally {
       setConnecting(false);
     }
+  };
+
+  const handleRoomError = (err: Error) => {
+    // eslint-disable-next-line no-console
+    console.error('[livekit] in-room error', err);
+    errorToast(t('livekit.joinFailed'), err.message);
+    handleLeave();
   };
 
   const handleLeave = () => {
@@ -92,6 +109,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
               video={true}
               audio={true}
               onDisconnected={handleLeave}
+              onError={handleRoomError}
             >
               <VideoConference />
             </LiveKitRoom>
