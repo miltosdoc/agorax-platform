@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useTranslation } from '@/hooks/use-translation';
 import { api, ApiError } from '@/lib/api';
 import { Mic, Video, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2 } from 'lucide-react';
 
@@ -58,21 +59,17 @@ interface MediaStudioPanelProps {
 const KIND_CONFIG = {
   podcast: {
     icon: Mic,
-    title: 'Podcast (MP3)',
-    description: 'Δημιουργήστε ένα σύντομο podcast 3–5 λεπτών για την πρόταση.',
-    scriptLabel: 'Σενάριο podcast',
-    scriptHint: 'Επικολλήστε αυτό το σενάριο στο NotebookLM (Audio Overview) ή σε άλλο εργαλείο TTS για να παράξετε το ηχητικό. Έπειτα ανεβάστε το αρχείο MP3 εδώ.',
+    titleKey: 'media.podcastTitle',
+    descriptionKey: 'media.podcastDescription',
+    scriptHintKey: 'media.podcastScriptHint',
     accept: 'audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,.mp3,.m4a',
-    placeholder: 'Πατήστε «Δημιουργία σεναρίου» για να ξεκινήσετε.',
   },
   video: {
     icon: Video,
-    title: 'Σύντομο βίντεο (MP4)',
-    description: 'Δημιουργήστε ένα teaser ~45 δευτερολέπτων για κοινωνικά δίκτυα.',
-    scriptLabel: 'Σενάριο βίντεο',
-    scriptHint: 'Επικολλήστε αυτό το σενάριο στο NotebookLM (Video Overview) ή σε άλλο εργαλείο. Έπειτα ανεβάστε το MP4 εδώ.',
+    titleKey: 'media.videoTitle',
+    descriptionKey: 'media.videoDescription',
+    scriptHintKey: 'media.videoScriptHint',
     accept: 'video/mp4,video/quicktime,.mp4,.mov',
-    placeholder: 'Πατήστε «Δημιουργία σεναρίου» για να ξεκινήσετε.',
   },
 } as const;
 
@@ -127,6 +124,7 @@ function MediaKindCard(props: {
   const { proposalId, kind, onUploaded } = props;
   const cfg = KIND_CONFIG[kind];
   const Icon = cfg.icon;
+  const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
   const [script, setScript] = useState('');
@@ -148,7 +146,7 @@ function MediaKindCard(props: {
       setScript(resp.data.script);
       setSource(resp.data.source ?? null);
     } catch (err: any) {
-      errorToast('Σφάλμα δημιουργίας σεναρίου', err?.message || 'Δοκιμάστε ξανά.');
+      errorToast(t('media.scriptGenError'), err?.message || t('media.tryAgain'));
     } finally {
       setGenerating(false);
     }
@@ -158,9 +156,9 @@ function MediaKindCard(props: {
     if (!script) return;
     try {
       await navigator.clipboard.writeText(script);
-      toast({ title: 'Αντιγράφηκε στο πρόχειρο' });
+      toast({ title: t('media.copiedToClipboard') });
     } catch (err: any) {
-      errorToast('Η αντιγραφή απέτυχε', err?.message);
+      errorToast(t('media.copyFailed'), err?.message);
     }
   };
 
@@ -175,10 +173,10 @@ function MediaKindCard(props: {
       fd.append('kind', kind);
       fd.append('file', file);
       await uploadMultipart(`/api/proposals/${proposalId}/media`, fd);
-      toast({ title: 'Επιτυχής μεταφόρτωση', description: file.name });
+      toast({ title: t('media.uploadSuccess'), description: file.name });
       onUploaded();
     } catch (err: any) {
-      errorToast('Η μεταφόρτωση απέτυχε', err?.message || 'Δοκιμάστε ξανά.');
+      errorToast(t('media.uploadFailed'), err?.message || t('media.tryAgain'));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -190,20 +188,20 @@ function MediaKindCard(props: {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Icon className="w-5 h-5" />
-          {cfg.title}
+          {t(cfg.titleKey)}
         </CardTitle>
-        <CardDescription>{cfg.description}</CardDescription>
+        <CardDescription>{t(cfg.descriptionKey)}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <span className="text-xs text-muted-foreground">Συμπερίληψη στο σενάριο:</span>
+          <span className="text-xs text-muted-foreground">{t('media.includeLabel')}</span>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox
               checked={includeAmendments}
               onCheckedChange={(v) => setIncludeAmendments(v === true)}
               data-testid={`media-include-amendments-${kind}`}
             />
-            <span>Τροπολογίες</span>
+            <span>{t('media.includeAmendments')}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <Checkbox
@@ -211,7 +209,7 @@ function MediaKindCard(props: {
               onCheckedChange={(v) => setIncludeThreads(v === true)}
               data-testid={`media-include-threads-${kind}`}
             />
-            <span>Σχόλια συζήτησης</span>
+            <span>{t('media.includeThreads')}</span>
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -222,29 +220,29 @@ function MediaKindCard(props: {
             data-testid={`media-generate-${kind}`}
           >
             {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            {script ? 'Επαναδημιουργία σεναρίου' : 'Δημιουργία σεναρίου'}
+            {script ? t('media.regenerate') : t('media.generate')}
           </Button>
           {script && (
             <Button type="button" variant="outline" onClick={handleCopy} data-testid={`media-copy-${kind}`}>
               <Copy className="w-4 h-4 mr-2" />
-              Αντιγραφή σεναρίου
+              {t('media.copyScript')}
             </Button>
           )}
         </div>
         <Textarea
           value={script}
           onChange={(e) => setScript(e.target.value)}
-          placeholder={cfg.placeholder}
+          placeholder={t('media.scriptPlaceholder')}
           rows={10}
           className="font-mono text-xs"
           data-testid={`media-script-${kind}`}
         />
         {script && (
           <div className="flex items-start justify-between gap-2 flex-wrap">
-            <p className="text-xs text-muted-foreground flex-1">{cfg.scriptHint}</p>
+            <p className="text-xs text-muted-foreground flex-1">{t(cfg.scriptHintKey)}</p>
             {source && (
               <Badge variant="outline" className="text-xs">
-                {source === 'llm' ? 'Από LLM' : 'Από πρότυπο'}
+                {source === 'llm' ? t('media.sourceLlm') : t('media.sourceTemplate')}
               </Badge>
             )}
           </div>
@@ -266,9 +264,9 @@ function MediaKindCard(props: {
             data-testid={`media-upload-${kind}`}
           >
             {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-            {kind === 'podcast' ? 'Ανέβασμα MP3' : 'Ανέβασμα MP4'}
+            {kind === 'podcast' ? t('media.uploadMp3') : t('media.uploadMp4')}
           </Button>
-          <span className="text-xs text-muted-foreground">Έως 120 MB.</span>
+          <span className="text-xs text-muted-foreground">{t('media.sizeLimit')}</span>
         </div>
       </CardContent>
     </Card>
@@ -282,6 +280,7 @@ function MediaGalleryItem(props: {
   onChange: () => void;
 }) {
   const { media, userIsAuthor, currentUserId, onChange } = props;
+  const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
   const [acting, setActing] = useState(false);
@@ -294,10 +293,10 @@ function MediaGalleryItem(props: {
       await api.patch(`/api/proposals/${media.proposalId}/media/${media.id}`, {
         isFeatured: !media.isFeatured,
       });
-      toast({ title: media.isFeatured ? 'Αφαιρέθηκε από προτεινόμενα' : 'Ορίστηκε ως προτεινόμενο' });
+      toast({ title: media.isFeatured ? t('media.featuredOff') : t('media.featuredOn') });
       onChange();
     } catch (err: any) {
-      errorToast('Σφάλμα', err?.message);
+      errorToast(t('media.errorGeneric'), err?.message);
     } finally {
       setActing(false);
     }
@@ -309,24 +308,24 @@ function MediaGalleryItem(props: {
       await api.patch(`/api/proposals/${media.proposalId}/media/${media.id}`, {
         status: media.status === 'hidden' ? 'published' : 'hidden',
       });
-      toast({ title: media.status === 'hidden' ? 'Δημοσιεύτηκε' : 'Αποκρύφθηκε' });
+      toast({ title: media.status === 'hidden' ? t('media.wasPublished') : t('media.wasHidden') });
       onChange();
     } catch (err: any) {
-      errorToast('Σφάλμα', err?.message);
+      errorToast(t('media.errorGeneric'), err?.message);
     } finally {
       setActing(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Διαγραφή αυτού του αρχείου; Η ενέργεια δεν αναιρείται.')) return;
+    if (!confirm(t('media.deleteConfirm'))) return;
     setActing(true);
     try {
       await api.delete(`/api/proposals/${media.proposalId}/media/${media.id}`);
-      toast({ title: 'Διαγράφηκε' });
+      toast({ title: t('media.deleted') });
       onChange();
     } catch (err: any) {
-      errorToast('Σφάλμα', err?.message);
+      errorToast(t('media.errorGeneric'), err?.message);
     } finally {
       setActing(false);
     }
@@ -336,9 +335,9 @@ function MediaGalleryItem(props: {
     const url = `${window.location.origin}/p/${media.proposalId}/${media.kind}/${media.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: 'Σύνδεσμος αντιγράφηκε' });
+      toast({ title: t('media.linkCopied') });
     } catch (err: any) {
-      errorToast('Η αντιγραφή απέτυχε', err?.message);
+      errorToast(t('media.copyFailed'), err?.message);
     }
   };
 
@@ -355,16 +354,16 @@ function MediaGalleryItem(props: {
         <div className="flex items-center gap-2 text-sm">
           <Icon className="w-4 h-4" />
           <span className="font-medium">
-            {media.kind === 'podcast' ? 'Podcast' : 'Βίντεο'}
+            {media.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideo')}
           </span>
           {media.isFeatured && (
             <Badge variant="default" className="bg-amber-500">
               <Star className="w-3 h-3 mr-1" />
-              Προτεινόμενο
+              {t('media.featured')}
             </Badge>
           )}
           {media.status === 'hidden' && (
-            <Badge variant="outline">Κρυφό</Badge>
+            <Badge variant="outline">{t('media.hidden')}</Badge>
           )}
           <span className="text-xs text-muted-foreground">
             {formatDuration(media.durationS)} · {formatSize(media.sizeBytes)}
@@ -393,7 +392,7 @@ function MediaGalleryItem(props: {
           data-testid={`media-share-${media.id}`}
         >
           <Share2 className="w-3 h-3 mr-1" />
-          Αντιγραφή συνδέσμου
+          {t('media.copyLink')}
         </Button>
 
         {userIsAuthor && (
@@ -406,7 +405,7 @@ function MediaGalleryItem(props: {
             data-testid={`media-feature-${media.id}`}
           >
             <Star className="w-3 h-3 mr-1" />
-            {media.isFeatured ? 'Αφαίρεση από προτεινόμενα' : 'Όρισε ως προτεινόμενο'}
+            {media.isFeatured ? t('media.unfeature') : t('media.feature')}
           </Button>
         )}
 
@@ -420,7 +419,7 @@ function MediaGalleryItem(props: {
             data-testid={`media-hide-${media.id}`}
           >
             <EyeOff className="w-3 h-3 mr-1" />
-            {media.status === 'hidden' ? 'Επανεμφάνιση' : 'Απόκρυψη'}
+            {media.status === 'hidden' ? t('media.unhide') : t('media.hide')}
           </Button>
         )}
 
@@ -434,7 +433,7 @@ function MediaGalleryItem(props: {
             data-testid={`media-delete-${media.id}`}
           >
             <Trash2 className="w-3 h-3 mr-1" />
-            Διαγραφή
+            {t('media.delete')}
           </Button>
         )}
       </div>
@@ -443,6 +442,7 @@ function MediaGalleryItem(props: {
 }
 
 export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [items, setItems] = useState<MediaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -464,13 +464,8 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Media Studio</CardTitle>
-          <CardDescription>
-            Δημιουργήστε podcast και σύντομο βίντεο για την πρόταση. Η AgoraX
-            φτιάχνει το σενάριο· εσείς το παράγετε με NotebookLM ή άλλο
-            εργαλείο και το ανεβάζετε εδώ. Το προτεινόμενο podcast/βίντεο
-            εμφανίζεται στη ροή της πλατφόρμας και είναι κοινοποιήσιμο.
-          </CardDescription>
+          <CardTitle>{t('media.studio')}</CardTitle>
+          <CardDescription>{t('media.studioDescription')}</CardDescription>
         </CardHeader>
       </Card>
 
@@ -481,20 +476,16 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
 
       <Card>
         <CardHeader>
-          <CardTitle>Συλλογή προτάσης</CardTitle>
+          <CardTitle>{t('media.gallery')}</CardTitle>
           <CardDescription>
-            Όλα τα ανεβασμένα αρχεία. {userIsAuthor
-              ? 'Ως συγγραφέας/τρια μπορείτε να ορίσετε ένα ως «προτεινόμενο» — αυτό θα φαίνεται στο feed.'
-              : 'Ο/η συγγραφέας της πρότασης επιλέγει ποιο θα είναι προτεινόμενο.'}
+            {t('media.galleryAllUploaded')}{' '}
+            {userIsAuthor ? t('media.galleryAuthorHint') : t('media.galleryViewerHint')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {loading && <p className="text-sm text-muted-foreground">Φόρτωση…</p>}
+          {loading && <p className="text-sm text-muted-foreground">{t('media.loading')}</p>}
           {!loading && items.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Δεν έχουν ανεβεί αρχεία ακόμη. Δημιουργήστε ένα σενάριο παραπάνω
-              και ανεβάστε το πρώτο podcast ή βίντεο.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('media.galleryEmpty')}</p>
           )}
           {items.map((m) => (
             <MediaGalleryItem

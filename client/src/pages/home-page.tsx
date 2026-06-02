@@ -13,7 +13,7 @@ import AppShell from '@/components/layout/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, FileText, Plus, Users } from 'lucide-react';
+import { ArrowRight, FileText, Plus, Users, Mic, Video } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -67,6 +67,71 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         </CardContent>
       </Card>
     </Link>
+  );
+}
+
+interface FeedItem {
+  id: number;
+  proposalId: number;
+  kind: 'podcast' | 'video';
+  filePath: string;
+  thumbPath: string | null;
+  durationS: string | null;
+  proposalQuestion: string;
+  communityName: string;
+}
+
+function DashboardFeedSection() {
+  const { t } = useTranslation();
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    api.get<{ items: FeedItem[] }>('/api/feed?limit=4')
+      .then(resp => setItems(resp.data.items ?? []))
+      .catch(() => setItems([]))
+      .finally(() => setLoaded(true));
+  }, []);
+
+  if (!loaded) return null;
+  if (items.length === 0) return null;
+
+  return (
+    <section data-testid="dashboard-feed">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold">{t('feed.recent')}</h2>
+        <Link href="/feed" className="text-sm text-primary hover:underline flex items-center gap-1">
+          {t('feed.viewAll')}
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.map(item => {
+          const Icon = item.kind === 'podcast' ? Mic : Video;
+          const thumbUrl = item.thumbPath ? `/media/${item.thumbPath}` : undefined;
+          return (
+            <Link key={item.id} href={`/proposals/${item.proposalId}`} className="block">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                {item.kind === 'video' && thumbUrl && (
+                  <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
+                    <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{item.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideoShort')}</span>
+                    <span>·</span>
+                    <span className="truncate">{item.communityName}</span>
+                  </div>
+                  <h3 className="font-semibold text-sm line-clamp-2">{item.proposalQuestion}</h3>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -172,6 +237,9 @@ export default function HomePage() {
               </div>
             )}
           </section>
+
+          {/* Recent media — embedded feed */}
+          <DashboardFeedSection />
 
           {/* Recent Activity */}
           <section data-testid="dashboard-recent-activity">

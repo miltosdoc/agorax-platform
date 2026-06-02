@@ -185,7 +185,7 @@ export default function Header() {
               data-testid="button-feed"
             >
               <Rss className="h-4 w-4" />
-              <span>Ροή</span>
+              <span>{t('nav.feed')}</span>
             </button>
 
             {/* Notification Bell */}

@@ -67,17 +67,37 @@ export function rateLimit({
 
 // Pre-configured limiters for common use cases.
 // Dev gets generous limits so HMR polling + iteration doesn't lock you out.
+// "Dev" here means NODE_ENV !== 'production'. APP_ENV='production' is the
+// real production deploy switch — see server/config.ts. Limits are tuned
+// for normal browser use: a single SPA load can fire 10–20 /api/* calls.
 const isDev = process.env.NODE_ENV !== 'production';
 
 export const apiLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  maxRequests: isDev ? 10000 : 100,
+  maxRequests: isDev ? 10000 : 600,
 });
 export const authLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  maxRequests: isDev ? 1000 : 10,
+  maxRequests: isDev ? 1000 : 30,
 });
 export const votingLimit = rateLimit({
   windowMs: 60 * 1000,
-  maxRequests: isDev ? 1000 : 5,
+  maxRequests: isDev ? 1000 : 15,
 });
+
+/**
+ * Drop any rate-limit state for the given key prefix. Used at startup
+ * and for ops "unblock me" actions — restarting the process already
+ * clears the in-memory store, but this lets callers do it without
+ * cycling Node.
+ */
+export function resetRateLimit(prefix?: string): number {
+  let cleared = 0;
+  for (const key of Array.from(store.keys())) {
+    if (!prefix || key.startsWith(prefix)) {
+      store.delete(key);
+      cleared++;
+    }
+  }
+  return cleared;
+}

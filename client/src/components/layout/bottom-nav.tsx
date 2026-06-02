@@ -30,7 +30,7 @@ export default function BottomNav({ user }: BottomNavProps) {
       testId: "nav-create-proposal",
     },
     {
-      label: 'Ροή',
+      label: t('nav.feed'),
       icon: Rss,
       path: "/feed",
       testId: "nav-feed",

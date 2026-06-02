@@ -12,9 +12,11 @@
 import { useCallback } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/use-translation';
 import { useState } from 'react';
 
 function CopyErrorBody({ text }: { text: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
     try {
@@ -45,7 +47,7 @@ function CopyErrorBody({ text }: { text: string }) {
         data-testid="error-toast-copy"
       >
         {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-        {copied ? 'Αντιγράφηκε' : 'Αντιγραφή κειμένου'}
+        {copied ? t('errorToast.copied') : t('errorToast.copyText')}
       </button>
     </div>
   );

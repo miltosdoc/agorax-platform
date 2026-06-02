@@ -384,7 +384,7 @@ export default function ProposalDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="media" className="flex-col sm:flex-row gap-1 py-2">
             <Mic className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">Media</span>
+            <span className="text-xs sm:text-sm">{t('media.tabLabel')}</span>
           </TabsTrigger>
         </TabsList>
 

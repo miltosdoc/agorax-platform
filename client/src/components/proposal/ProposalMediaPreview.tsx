@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
+import { useTranslation } from '@/hooks/use-translation';
 import { api } from '@/lib/api';
 import { Mic, Video, Share2, Star } from 'lucide-react';
 
@@ -55,6 +56,7 @@ function formatDuration(durationS: string | null): string {
 }
 
 function MediaTile({ media }: { media: MediaRow }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
   const Icon = media.kind === 'podcast' ? Mic : Video;
@@ -71,9 +73,9 @@ function MediaTile({ media }: { media: MediaRow }) {
     }
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: 'Σύνδεσμος αντιγράφηκε' });
+      toast({ title: t('media.linkCopied') });
     } catch (err: any) {
-      errorToast('Η αντιγραφή απέτυχε', err?.message);
+      errorToast(t('media.copyFailed'), err?.message);
     }
   };
 
@@ -83,12 +85,12 @@ function MediaTile({ media }: { media: MediaRow }) {
         <div className="flex items-center gap-2 text-sm">
           <Icon className="w-4 h-4" />
           <span className="font-medium">
-            {media.kind === 'podcast' ? 'Podcast' : 'Σύντομο βίντεο'}
+            {media.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideoShort')}
           </span>
           {media.isFeatured && (
             <Badge variant="default" className="bg-amber-500">
               <Star className="w-3 h-3 mr-1" />
-              Προτεινόμενο
+              {t('media.featured')}
             </Badge>
           )}
           {formatDuration(media.durationS) && (
@@ -103,7 +105,7 @@ function MediaTile({ media }: { media: MediaRow }) {
           data-testid={`overview-share-${media.kind}`}
         >
           <Share2 className="w-3 h-3 mr-1" />
-          Κοινοποίηση
+          {t('media.share')}
         </Button>
       </div>
 
@@ -123,6 +125,7 @@ function MediaTile({ media }: { media: MediaRow }) {
 }
 
 export function ProposalMediaPreview({ proposalId }: Props) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<MediaRow[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -147,7 +150,7 @@ export function ProposalMediaPreview({ proposalId }: Props) {
 
   return (
     <div className="space-y-3" data-testid="overview-media-preview">
-      <h4 className="text-sm font-medium text-muted-foreground">Podcast & βίντεο</h4>
+      <h4 className="text-sm font-medium text-muted-foreground">{t('media.overviewHeading')}</h4>
       <div className="grid gap-3 md:grid-cols-2">
         {podcast && <MediaTile media={podcast} />}
         {video && <MediaTile media={video} />}

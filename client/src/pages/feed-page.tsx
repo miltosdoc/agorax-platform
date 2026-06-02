@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
+import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
 import { Mic, Video, Share2, Star, Loader2 } from 'lucide-react';
 
@@ -54,10 +55,13 @@ function formatDuration(durationS: string | null): string {
 }
 
 function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedItem) => void }) {
+  const { t, locale } = useTranslation();
   const Icon = item.kind === 'podcast' ? Mic : Video;
   const mediaUrl = `/media/${item.filePath}`;
   const thumbUrl = item.thumbPath ? `/media/${item.thumbPath}` : undefined;
-  const created = new Date(item.createdAt).toLocaleDateString('el-GR');
+  const dateLocale = locale === 'en' ? 'en-US' : 'el-GR';
+  const created = new Date(item.createdAt).toLocaleDateString(dateLocale);
+  const byline = t('feed.byUploader', { uploader: item.uploaderName });
 
   return (
     <Card data-testid={`feed-item-${item.id}`}>
@@ -76,7 +80,7 @@ function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedI
             {item.isFeatured && (
               <Badge variant="default" className="bg-amber-500">
                 <Star className="w-3 h-3 mr-1" />
-                Προτεινόμενο
+                {t('media.featured')}
               </Badge>
             )}
           </div>
@@ -107,7 +111,7 @@ function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedI
           <div className="text-xs text-muted-foreground">
             {formatDuration(item.durationS)}
             {item.durationS ? ' · ' : ''}
-            από {item.uploaderName}
+            {byline}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -117,11 +121,11 @@ function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedI
               data-testid={`feed-share-${item.id}`}
             >
               <Share2 className="w-3 h-3 mr-1" />
-              Κοινοποίηση
+              {t('media.share')}
             </Button>
             <Link href={`/proposals/${item.proposalId}`}>
               <Button size="sm" variant="default" data-testid={`feed-open-${item.id}`}>
-                Διαβάστε & ψηφίστε
+                {t('feed.openProposal')}
               </Button>
             </Link>
           </div>
@@ -132,6 +136,7 @@ function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedI
 }
 
 export default function FeedPage() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
   const [filter, setFilter] = useState<Filter>('all');
@@ -151,11 +156,11 @@ export default function FeedPage() {
       setCursor(resp.data.nextCursor);
       setReachedEnd(resp.data.nextCursor === null);
     } catch (err: any) {
-      errorToast('Σφάλμα φόρτωσης', err?.message);
+      errorToast(t('feed.loadError'), err?.message);
     } finally {
       setLoading(false);
     }
-  }, [filter, errorToast]);
+  }, [filter, errorToast, t]);
 
   useEffect(() => {
     setItems([]);
@@ -178,27 +183,24 @@ export default function FeedPage() {
     }
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: 'Σύνδεσμος αντιγράφηκε' });
+      toast({ title: t('media.linkCopied') });
     } catch (err: any) {
-      errorToast('Η αντιγραφή απέτυχε', err?.message);
+      errorToast(t('media.copyFailed'), err?.message);
     }
   };
 
-  const filters: Array<{ key: Filter; label: string }> = [
-    { key: 'all', label: 'Όλα' },
-    { key: 'podcast', label: 'Podcast' },
-    { key: 'video', label: 'Βίντεο' },
+  const filters: Array<{ key: Filter; labelKey: string }> = [
+    { key: 'all', labelKey: 'feed.filterAll' },
+    { key: 'podcast', labelKey: 'feed.filterPodcast' },
+    { key: 'video', labelKey: 'feed.filterVideo' },
   ];
 
   return (
-    <AppShell breadcrumb={[{ label: 'Ροή' }]}>
+    <AppShell breadcrumb={[{ label: t('feed.breadcrumb') }]}>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold mb-1">Ροή AgoraX</h1>
-          <p className="text-sm text-muted-foreground">
-            Σύντομα podcast και βίντεο από προτάσεις σε διαβούλευση. Επιλέξτε
-            μια πρόταση για να διαβάσετε, να συζητήσετε και να ψηφίσετε.
-          </p>
+          <h1 className="text-2xl font-bold mb-1">{t('feed.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('feed.subtitle')}</p>
         </div>
 
         <div className="flex gap-2" data-testid="feed-filter">
@@ -210,7 +212,7 @@ export default function FeedPage() {
               onClick={() => setFilter(f.key)}
               data-testid={`feed-filter-${f.key}`}
             >
-              {f.label}
+              {t(f.labelKey)}
             </Button>
           ))}
         </div>
@@ -219,8 +221,7 @@ export default function FeedPage() {
           {items.length === 0 && !loading && (
             <Card>
               <CardContent className="p-6 text-center text-muted-foreground">
-                Δεν υπάρχουν ακόμη ανεβασμένα media. Από μια πρόταση, ανοίξτε
-                το Media Studio για να δημιουργήσετε ένα podcast ή βίντεο.
+                {t('feed.empty')}
               </CardContent>
             </Card>
           )}
@@ -239,7 +240,7 @@ export default function FeedPage() {
                 onClick={() => fetchPage({ cursor, reset: false })}
                 data-testid="feed-load-more"
               >
-                Περισσότερα
+                {t('feed.loadMore')}
               </Button>
             </div>
           )}
