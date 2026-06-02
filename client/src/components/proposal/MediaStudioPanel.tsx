@@ -44,6 +44,7 @@ interface ScriptResponse {
   kind: 'podcast' | 'video';
   language: 'el';
   script: string;
+  source?: 'llm' | 'template';
 }
 
 interface MediaStudioPanelProps {
@@ -125,6 +126,7 @@ function MediaKindCard(props: {
   const Icon = cfg.icon;
   const { toast } = useToast();
   const [script, setScript] = useState('');
+  const [source, setSource] = useState<'llm' | 'template' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -134,6 +136,7 @@ function MediaKindCard(props: {
     try {
       const resp = await api.get<ScriptResponse>(`/api/proposals/${proposalId}/scripts/${kind}`);
       setScript(resp.data.script);
+      setSource(resp.data.source ?? null);
     } catch (err: any) {
       toast({
         title: 'Σφάλμα δημιουργίας σεναρίου',
@@ -216,7 +219,14 @@ function MediaKindCard(props: {
           data-testid={`media-script-${kind}`}
         />
         {script && (
-          <p className="text-xs text-muted-foreground">{cfg.scriptHint}</p>
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground flex-1">{cfg.scriptHint}</p>
+            {source && (
+              <Badge variant="outline" className="text-xs">
+                {source === 'llm' ? 'Από LLM' : 'Από πρότυπο'}
+              </Badge>
+            )}
+          </div>
         )}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
           <input
@@ -238,7 +248,7 @@ function MediaKindCard(props: {
             {kind === 'podcast' ? 'Ανέβασμα MP3' : 'Ανέβασμα MP4'}
           </Button>
           <span className="text-xs text-muted-foreground">
-            {kind === 'podcast' ? 'Έως 30 MB, έως 10 λεπτά.' : 'Έως 120 MB, έως 3 λεπτά.'}
+            {kind === 'podcast' ? 'Έως 120 MB, έως 10 λεπτά.' : 'Έως 120 MB, έως 3 λεπτά.'}
           </span>
         </div>
       </CardContent>

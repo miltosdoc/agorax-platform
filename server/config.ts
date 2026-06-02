@@ -70,16 +70,26 @@ export function validateRuntimeConfig() {
 
   // External LLM gate was removed for Art. 9 reasons in
   // docs/compliance/02_DATA_MINIMIZATION_AUDIT.md §4.2. If an LLM key is
-  // set in production it likely means someone is about to re-enable a
-  // removed external-disclosure path — fail loud so the controller decides.
+  // set in production we fail loud unless the controller has re-run the
+  // §4.2 audit for the configured endpoint and signed off via
+  // LLM_GATE_AUDITED=true. That flag is the audit-trail flip: setting it
+  // is the explicit acknowledgement that this LLM_API_URL is a private /
+  // EU endpoint with a DPA in place. OPENROUTER_API_KEY stays banned
+  // outright because the prior decision specifically called it out.
+  if (isProductionLike() && process.env.OPENROUTER_API_KEY) {
+    throw new Error(
+      "OPENROUTER_API_KEY is banned per GDPR audit §4.2. Unset the env var.",
+    );
+  }
   if (
     isProductionLike() &&
-    (process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY)
+    process.env.LLM_API_KEY &&
+    process.env.LLM_GATE_AUDITED !== "true"
   ) {
     throw new Error(
-      "LLM_API_KEY / OPENROUTER_API_KEY is set in production but the external " +
-      "LLM gate has been removed per GDPR audit. Unset the env var, or re-run " +
-      "the §4.2 audit decision before re-enabling.",
+      "LLM_API_KEY is set in production but LLM_GATE_AUDITED is not 'true'. " +
+      "Re-run the §4.2 audit for the configured LLM_API_URL and set " +
+      "LLM_GATE_AUDITED=true to acknowledge.",
     );
   }
 }

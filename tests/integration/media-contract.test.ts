@@ -142,3 +142,39 @@ describe('routes.ts wiring', () => {
     expect(routes).toMatch(/registerMediaRoutes/);
   });
 });
+
+describe('LLM client + script generator wiring', () => {
+  const llmClient = read('server/utils/llm-client.ts');
+  const scripts = read('server/utils/media-scripts.ts');
+  const config = read('server/config.ts');
+
+  it('exposes a configurable OpenAI-compatible chatCompletion', () => {
+    expect(llmClient).toMatch(/export.*function chatCompletion/);
+    expect(llmClient).toMatch(/LLM_API_URL/);
+    expect(llmClient).toMatch(/LLM_API_KEY/);
+    expect(llmClient).toMatch(/LLM_MODEL/);
+    expect(llmClient).toMatch(/\/chat\/completions/);
+  });
+
+  it('throws LlmUnavailableError on failure, never silently swallows', () => {
+    expect(llmClient).toMatch(/class LlmUnavailableError/);
+    expect(llmClient).toMatch(/throw new LlmUnavailableError/);
+  });
+
+  it('script generator prefers the LLM but falls back to the template', () => {
+    expect(scripts).toMatch(/isLlmConfigured\(\)/);
+    expect(scripts).toMatch(/templatePodcastScript/);
+    expect(scripts).toMatch(/templateTeaserScript/);
+    // Both branches must exist — LLM call inside try, template inside catch.
+    expect(scripts).toMatch(/catch\s*\(\s*err[^)]*\)\s*\{[\s\S]*?templatePodcastScript/);
+  });
+
+  it('exposes the source field on the script result', () => {
+    expect(scripts).toMatch(/source:\s*['"]llm['"]\s*\|\s*['"]template['"]/);
+  });
+
+  it('production boot allows LLM_API_KEY only with LLM_GATE_AUDITED=true', () => {
+    expect(config).toMatch(/LLM_GATE_AUDITED/);
+    expect(config).toMatch(/OPENROUTER_API_KEY is banned/);
+  });
+});

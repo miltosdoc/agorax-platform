@@ -31,13 +31,14 @@ import { logger } from '../utils/logger';
 const MEDIA_ROOT = process.env.AGORAX_MEDIA_DIR
   || path.resolve(process.cwd(), 'uploads', 'media');
 
-// Per-kind caps — these match what NotebookLM-style outputs realistically
-// produce, and keep one proposal's media under ~150MB total.
+// Per-kind caps. Same 120MB ceiling for both audio and video — large
+// enough for a full-length NotebookLM podcast plus a few minutes of
+// teaser video, while still bounded so one proposal can't blow up disk.
 const LIMITS = {
   podcast: {
-    maxBytes: 30 * 1024 * 1024,   // 30 MB
+    maxBytes: 120 * 1024 * 1024,  // 120 MB
     maxDurationS: 10 * 60,        // 10 min
-    mimes: new Set(['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a']),
+    mimes: new Set(['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a']),
     exts: new Set(['.mp3', '.m4a']),
   },
   video: {
