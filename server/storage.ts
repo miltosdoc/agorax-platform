@@ -19,6 +19,7 @@ export { VotingRepository } from './storage/voting';
 export { DebateRepository } from './storage/debate';
 export { NotificationRepository } from './storage/notifications';
 export { PlatformRepository } from './storage/platform';
+export { MediaRepository } from './storage/media';
 
 // Pre-instantiated repository instances (for use in routers)
 import { UserRepository } from './storage/users';
@@ -30,6 +31,7 @@ import { VotingRepository } from './storage/voting';
 import { DebateRepository } from './storage/debate';
 import { NotificationRepository } from './storage/notifications';
 import { PlatformRepository } from './storage/platform';
+import { MediaRepository } from './storage/media';
 
 export const userRepo = new UserRepository();
 export const communityRepo = new CommunityRepository();
@@ -40,6 +42,7 @@ export const votingRepo = new VotingRepository();
 export const debateRepo = new DebateRepository();
 export const notificationRepo = new NotificationRepository();
 export const platformRepo = new PlatformRepository();
+export const mediaRepo = new MediaRepository();
 
 // Legacy facade (backward compatibility)
 export { DatabaseStorage } from './storage/legacy';

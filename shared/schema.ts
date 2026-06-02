@@ -676,6 +676,32 @@ export const platformSettings = pgTable("platform_settings", {
   lastChangedAt: timestamp("last_changed_at").defaultNow(),
 });
 
+// ─── Proposal Media (Podcasts & Video Teasers per πρόταση) ──────────────────
+// User-uploaded audio (MP3) and video (MP4) content tied to a proposal.
+// The platform generates a script from the proposal text + top arguments;
+// the user takes that script to NotebookLM (or similar) externally to
+// produce media, then uploads the result here. The proposal author
+// curates: any community member can submit, but the author can feature,
+// hide, or delete. The "featured" entry is what appears in the global
+// /feed and on the public share routes.
+export const proposalMedia = pgTable("proposal_media", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  uploaderId: integer("uploader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),                          // 'podcast' | 'video'
+  filePath: text("file_path").notNull(),                 // relative to AGORAX_MEDIA_DIR
+  thumbPath: text("thumb_path"),                          // null for podcasts; jpg poster for videos
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  durationS: numeric("duration_s"),                       // ffprobe-derived; null if probe failed
+  status: text("status").notNull().default("published"), // 'published' | 'hidden'
+  isFeatured: boolean("is_featured").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  proposalMediaProposalIdx: index('proposal_media_proposal_idx').on(table.proposalId),
+  proposalMediaFeedIdx: index('proposal_media_feed_idx').on(table.status, table.createdAt),
+}));
+
 // ─── Job Queue ──────────────────────────────────────────────────────────────
 
 export const jobs = pgTable("jobs", {
@@ -1064,6 +1090,7 @@ export const insertDebateArgumentSchema = createInsertSchema(debateArguments).om
 export const insertDebateThreadSchema = createInsertSchema(debateThreads).omit({ id: true, createdAt: true, updatedAt: true, upvotes: true, downvotes: true });
 export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({ id: true, createdAt: true });
 export const insertProposalSupportSchema = createInsertSchema(proposalSupport).omit({ id: true, createdAt: true });
+export const insertProposalMediaSchema = createInsertSchema(proposalMedia).omit({ id: true, createdAt: true });
 export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true, prevHash: true, rowHash: true, supersededById: true });
 
 export const proposalVoteChoiceSchema = z.enum(['yes', 'no', 'abstain']);
@@ -1192,6 +1219,8 @@ export type DebateThread = typeof debateThreads.$inferSelect;
 export type DebateVote = typeof debateVotes.$inferSelect;
 export type ProposalSupport = typeof proposalSupport.$inferSelect;
 export type ProposalVote = typeof proposalVotes.$inferSelect;
+export type ProposalMedia = typeof proposalMedia.$inferSelect;
+export type ProposalMediaKind = 'podcast' | 'video';
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
 
@@ -1210,6 +1239,7 @@ export type InsertDebateThread = z.infer<typeof insertDebateThreadSchema>;
 export type InsertDebateVote = z.infer<typeof insertDebateVoteSchema>;
 export type InsertProposalSupport = z.infer<typeof insertProposalSupportSchema>;
 export type InsertProposalVote = z.infer<typeof insertProposalVoteSchema>;
+export type InsertProposalMedia = z.infer<typeof insertProposalMediaSchema>;
 export type InsertAdminAction = z.infer<typeof insertAdminActionSchema>;
 
 // Safe user type without sensitive auth/internal fields.

@@ -4,6 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+logs/
+uploads/
 
 # Python
 venv/

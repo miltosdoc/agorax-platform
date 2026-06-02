@@ -36,6 +36,7 @@ import { registerBallotRoutes } from "./routers/ballot";
 import { registerAdminRoutes } from "./routers/admin";
 import { registerAnalyticsRoutes } from "./routers/analytics";
 import { registerEconomyRoutes } from "./routers/economy";
+import { registerMediaRoutes } from "./routers/media";
 import { registerMiscRoutes } from "./routers/misc";
 
 /**
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAdminRoutes(app);
   registerAnalyticsRoutes(app);
   registerEconomyRoutes(app);
+  registerMediaRoutes(app);
   registerMiscRoutes(app);
 
   // Create and return the server
