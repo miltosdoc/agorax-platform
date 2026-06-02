@@ -16,6 +16,7 @@ import { db } from '../db';
 import { communityMembers, sortitionMembers } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { createNotification } from './notifications';
+import { pushToUsers } from './push-client';
 import { logger } from './logger';
 
 export interface ConferenceNotificationInput {
@@ -55,6 +56,14 @@ export async function notifyConferenceScheduled(
       communityId: input.communityId,
       actionUrl: input.actionUrl,
     })));
+    // Also fan out a Web Push so members who aren't in the tab right
+    // now still get a buzz. No-op if VAPID isn't configured.
+    void pushToUsers(recipients, {
+      title: input.title,
+      body: message,
+      url: input.actionUrl,
+      tag: `conf-${input.roomId}`,
+    });
   } catch (err: any) {
     // A notification failure must never block the room creation that
     // triggered it — we already returned the room row to the caller.
@@ -86,6 +95,12 @@ export async function notifyRoomOpened(
       communityId: input.communityId,
       actionUrl: input.actionUrl,
     })));
+    void pushToUsers(recipients, {
+      title: 'Αίθουσα συσκέψεων κληρωτού σώματος',
+      body: input.title,
+      url: input.actionUrl,
+      tag: `sortroom-${input.sortitionBodyId}`,
+    });
   } catch (err: any) {
     logger.warn('sortition room notify fan-out failed', { roomId: input.roomId, err: err?.message });
   }

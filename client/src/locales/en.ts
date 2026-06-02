@@ -1053,6 +1053,12 @@ const en: TranslationDictionary = {
   'livekit.unavailableBody': 'LiveKit is not configured on this instance.',
   'livekit.addToCalendar': 'Add to calendar',
 
+  'push.title': 'Device notifications',
+  'push.description': "Get notified when a conference is scheduled or a sortition deliberation room opens — even when AgoraX isn't open.",
+  'push.enable': 'Enable notifications',
+  'push.disable': 'Disable notifications',
+  'push.deniedHint': "You've blocked notifications in your browser. Open the site permissions to re-enable.",
+
 };
 
 export default en;

@@ -735,6 +735,25 @@ export const livekitRooms = pgTable("livekit_rooms", {
   livekitSortitionUnique: uniqueIndex('livekit_rooms_sortition_unique').on(table.sortitionBodyId),
 }));
 
+// ─── Web Push Subscriptions ─────────────────────────────────────────────────
+// One row per (user, browser instance). The browser produces (endpoint,
+// p256dh, auth) at subscribe-time via the Push API; we send notifications
+// by POST-ing an encrypted payload to that endpoint via the web-push lib.
+// Endpoint is unique because the same browser keeps the same endpoint for
+// its lifetime (until the user clears site data).
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),                      // bookkeeping for the user
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at"),
+}, (table) => ({
+  pushSubsUserIdx: index('push_subscriptions_user_idx').on(table.userId),
+}));
+
 // ─── Job Queue ──────────────────────────────────────────────────────────────
 
 export const jobs = pgTable("jobs", {
@@ -1258,6 +1277,7 @@ export type ProposalMediaKind = 'podcast' | 'video';
 export type LivekitRoom = typeof livekitRooms.$inferSelect;
 export type LivekitRoomKind = 'community' | 'sortition';
 export type LivekitRoomStatus = 'scheduled' | 'active' | 'closed';
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
 
