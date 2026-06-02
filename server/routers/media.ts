@@ -127,9 +127,16 @@ export function registerMediaRoutes(app: Express): void {
       if (kind !== 'podcast' && kind !== 'video') {
         return res.status(400).json({ message: 'kind must be podcast or video' });
       }
+      // `include` is a comma-separated list of optional context sources.
+      const include = String(req.query.include ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      const input = {
+        proposalId,
+        includeAmendments: include.includes('amendments'),
+        includeThreads: include.includes('threads'),
+      };
       const result = kind === 'podcast'
-        ? await generatePodcastScript({ proposalId })
-        : await generateTeaserScript({ proposalId });
+        ? await generatePodcastScript(input)
+        : await generateTeaserScript(input);
       res.json(result);
     } catch (err: any) {
       if (/not found/i.test(err?.message ?? '')) {

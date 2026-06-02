@@ -8,6 +8,21 @@
 
 const MAX_ARGS_PER_SIDE = 3;
 const ARG_MAX_CHARS = 280;
+const MAX_AMENDMENTS = 4;
+const AMENDMENT_MAX_CHARS = 320;
+const MAX_THREADS = 5;
+const THREAD_MAX_CHARS = 240;
+
+export interface AmendmentSummary {
+  text: string;
+  decision: 'accepted' | 'rejected' | 'pending';
+}
+
+export interface ThreadSummary {
+  text: string;
+  upvotes: number;
+  downvotes: number;
+}
 
 export interface ScriptContext {
   proposal: {
@@ -17,11 +32,17 @@ export interface ScriptContext {
   communityName: string | null;
   forArgs: string[];
   againstArgs: string[];
+  amendments?: AmendmentSummary[];
+  threads?: ThreadSummary[];
 }
 
 export const SCRIPT_LIMITS = {
   MAX_ARGS_PER_SIDE,
   ARG_MAX_CHARS,
+  MAX_AMENDMENTS,
+  AMENDMENT_MAX_CHARS,
+  MAX_THREADS,
+  THREAD_MAX_CHARS,
 } as const;
 
 export function trim(text: string, max: number): string {
@@ -43,6 +64,33 @@ export function podcastScript(ctx: ScriptContext): string {
   const againstBlock = againstArgs.length
     ? againstArgs.map((t, i) => `Α: Επιχείρημα ${i + 1} κατά. ${t}`).join('\n\n')
     : `Α: Δεν έχουν κατατεθεί ακόμη επιχειρήματα κατά. Η εικόνα μπορεί να αλλάξει καθώς προχωρά η διαβούλευση.`;
+
+  const amendmentsBlock = ctx.amendments && ctx.amendments.length
+    ? [
+        ``,
+        `## Τροπολογίες & βελτιώσεις`,
+        `Α: Η κοινότητα έχει καταθέσει και συγκεκριμένες αντιπροτάσεις. Ας τις δούμε.`,
+        ...ctx.amendments.map((a, i) => {
+          const tag = a.decision === 'accepted' ? '[αποδεκτή]'
+            : a.decision === 'rejected' ? '[απορρίφθηκε]'
+            : '[εκκρεμεί]';
+          return `Β: Τροπολογία ${i + 1} ${tag}. ${a.text}`;
+        }),
+      ].join('\n')
+    : '';
+
+  const threadsBlock = ctx.threads && ctx.threads.length
+    ? [
+        ``,
+        `## Από τη συζήτηση της κοινότητας`,
+        `Α: Δείτε δείγμα από όσα έχουν γραφτεί στο νήμα συζήτησης.`,
+        ...ctx.threads.map((t, i) => {
+          const net = (t.upvotes || 0) - (t.downvotes || 0);
+          const score = net > 0 ? `(+${net})` : net < 0 ? `(${net})` : '';
+          return `Β: Σχόλιο ${i + 1} ${score}. ${t.text}`.trim();
+        }),
+      ].join('\n')
+    : '';
 
   return [
     `# Σενάριο podcast — AgoraX`,
@@ -69,6 +117,8 @@ export function podcastScript(ctx: ScriptContext): string {
     `## Τι λένε όσοι αντιτίθενται`,
     `Α: Και τώρα τα επιχειρήματα κατά.`,
     againstBlock,
+    amendmentsBlock,
+    threadsBlock,
     ``,
     `## Σύνοψη & κάλεσμα`,
     `Α: Αυτά τα επιχειρήματα δεν είναι τα μόνα. Η δική σας φωνή λείπει.`,

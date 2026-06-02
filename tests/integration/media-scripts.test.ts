@@ -77,6 +77,46 @@ describe('podcastScript — structure', () => {
   });
 });
 
+describe('podcastScript — optional sections', () => {
+  it('renders an amendments section only when amendments are provided', () => {
+    const noAm = podcastScript(baseCtx);
+    expect(noAm).not.toMatch(/Τροπολογίες & βελτιώσεις/);
+    const withAm = podcastScript({
+      ...baseCtx,
+      amendments: [
+        { text: 'Επέκταση πιλοτικού σε 8 τετράγωνα μετά από 6 μήνες.', decision: 'accepted' },
+        { text: 'Εξαίρεση σχολικών διαδρομών από την πεζοδρόμηση.', decision: 'pending' },
+      ],
+    });
+    expect(withAm).toMatch(/## Τροπολογίες & βελτιώσεις/);
+    expect(withAm).toContain('Επέκταση πιλοτικού');
+    expect(withAm).toContain('[αποδεκτή]');
+    expect(withAm).toContain('[εκκρεμεί]');
+  });
+
+  it('renders a community-comments section only when threads are provided', () => {
+    const noThreads = podcastScript(baseCtx);
+    expect(noThreads).not.toMatch(/Από τη συζήτηση/);
+    const withThreads = podcastScript({
+      ...baseCtx,
+      threads: [
+        { text: 'Οι κάτοικοι στηρίζουν τη ιδέα αν διασφαλιστεί πρόσβαση ΑΜΕΑ.', upvotes: 12, downvotes: 1 },
+      ],
+    });
+    expect(withThreads).toMatch(/## Από τη συζήτηση της κοινότητας/);
+    expect(withThreads).toContain('πρόσβαση ΑΜΕΑ');
+    expect(withThreads).toContain('+11'); // net upvotes
+  });
+
+  it('omits both optional sections when the lists are empty arrays', () => {
+    const text = podcastScript({ ...baseCtx, amendments: [], threads: [] });
+    // The blocks render with their headings only when the list has items —
+    // an empty array is treated the same as "not opted in".
+    expect(text).not.toMatch(/## Τροπολογίες/);
+    expect(text).not.toMatch(/## Από τη συζήτηση/);
+  });
+});
+
 describe('teaserScript — structure', () => {
   it('runs five scenes', () => {
     const text = teaserScript(baseCtx);

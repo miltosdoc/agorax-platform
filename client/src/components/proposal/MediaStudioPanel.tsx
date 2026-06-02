@@ -19,6 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -131,12 +133,18 @@ function MediaKindCard(props: {
   const [source, setSource] = useState<'llm' | 'template' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [includeAmendments, setIncludeAmendments] = useState(false);
+  const [includeThreads, setIncludeThreads] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const resp = await api.get<ScriptResponse>(`/api/proposals/${proposalId}/scripts/${kind}`);
+      const include: string[] = [];
+      if (includeAmendments) include.push('amendments');
+      if (includeThreads) include.push('threads');
+      const qs = include.length ? `?include=${include.join(',')}` : '';
+      const resp = await api.get<ScriptResponse>(`/api/proposals/${proposalId}/scripts/${kind}${qs}`);
       setScript(resp.data.script);
       setSource(resp.data.source ?? null);
     } catch (err: any) {
@@ -187,6 +195,25 @@ function MediaKindCard(props: {
         <CardDescription>{cfg.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <span className="text-xs text-muted-foreground">Συμπερίληψη στο σενάριο:</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={includeAmendments}
+              onCheckedChange={(v) => setIncludeAmendments(v === true)}
+              data-testid={`media-include-amendments-${kind}`}
+            />
+            <span>Τροπολογίες</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={includeThreads}
+              onCheckedChange={(v) => setIncludeThreads(v === true)}
+              data-testid={`media-include-threads-${kind}`}
+            />
+            <span>Σχόλια συζήτησης</span>
+          </label>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"

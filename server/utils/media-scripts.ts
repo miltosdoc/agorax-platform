@@ -20,20 +20,32 @@
  */
 
 import { db } from '../db';
-import { proposals, communities, debateArguments } from '../../shared/schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import {
+  proposals,
+  communities,
+  debateArguments,
+  proposalAmendments,
+  debateThreads,
+} from '../../shared/schema';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import {
   SCRIPT_LIMITS,
   trim,
   podcastScript as templatePodcastScript,
   teaserScript as templateTeaserScript,
   type ScriptContext,
+  type AmendmentSummary,
+  type ThreadSummary,
 } from './media-script-templates';
 import { chatCompletion, isLlmConfigured, LlmUnavailableError } from './llm-client';
 import { logger } from './logger';
 
 export interface ScriptInput {
   proposalId: number;
+  /** Pull accepted + popular amendments into the script context. */
+  includeAmendments?: boolean;
+  /** Pull top-voted debate threads (comments) into the script context. */
+  includeThreads?: boolean;
 }
 
 export interface ScriptResult {
@@ -51,7 +63,10 @@ export interface ScriptResult {
   };
 }
 
-async function loadProposalContext(proposalId: number): Promise<ScriptContext> {
+async function loadProposalContext(
+  proposalId: number,
+  opts: { includeAmendments?: boolean; includeThreads?: boolean } = {},
+): Promise<ScriptContext> {
   const [proposal] = await db
     .select()
     .from(proposals)
@@ -91,11 +106,73 @@ async function loadProposalContext(proposalId: number): Promise<ScriptContext> {
     ) break;
   }
 
+  // Optional: top amendments. We rank author-accepted first, then by
+  // community signal (rejection_upvotes − rejection_downvotes), so the
+  // script reflects what the deliberation has actually privileged.
+  let amendments: AmendmentSummary[] | undefined;
+  if (opts.includeAmendments) {
+    const amendmentRows = await db
+      .select({
+        text: proposalAmendments.text,
+        authorDecision: proposalAmendments.authorDecision,
+        status: proposalAmendments.status,
+        rejectionUpvotes: proposalAmendments.rejectionUpvotes,
+        rejectionDownvotes: proposalAmendments.rejectionDownvotes,
+      })
+      .from(proposalAmendments)
+      .where(eq(proposalAmendments.proposalId, proposalId))
+      .orderBy(
+        // Accepted first (sorts 'accepted' before NULL/other), then by community score, then newest.
+        sql`CASE WHEN ${proposalAmendments.authorDecision} = 'accepted' THEN 0 ELSE 1 END`,
+        desc(sql`COALESCE(${proposalAmendments.rejectionUpvotes}, 0) - COALESCE(${proposalAmendments.rejectionDownvotes}, 0)`),
+        desc(proposalAmendments.createdAt),
+      )
+      .limit(SCRIPT_LIMITS.MAX_AMENDMENTS);
+    amendments = amendmentRows.map(row => {
+      const decision: AmendmentSummary['decision'] =
+        row.authorDecision === 'accepted' || row.status === 'accepted' ? 'accepted'
+        : row.authorDecision === 'rejected' || row.status === 'rejected' ? 'rejected'
+        : 'pending';
+      return {
+        text: trim(row.text, SCRIPT_LIMITS.AMENDMENT_MAX_CHARS),
+        decision,
+      };
+    });
+  }
+
+  // Optional: top-level debate threads (comments) ranked by net upvotes.
+  let threads: ThreadSummary[] | undefined;
+  if (opts.includeThreads) {
+    const threadRows = await db
+      .select({
+        content: debateThreads.content,
+        upvotes: debateThreads.upvotes,
+        downvotes: debateThreads.downvotes,
+      })
+      .from(debateThreads)
+      .where(and(
+        eq(debateThreads.proposalId, proposalId),
+        isNull(debateThreads.parentId), // top-level only — replies are noise here
+      ))
+      .orderBy(
+        desc(sql`COALESCE(${debateThreads.upvotes}, 0) - COALESCE(${debateThreads.downvotes}, 0)`),
+        desc(debateThreads.createdAt),
+      )
+      .limit(SCRIPT_LIMITS.MAX_THREADS);
+    threads = threadRows.map(row => ({
+      text: trim(row.content, SCRIPT_LIMITS.THREAD_MAX_CHARS),
+      upvotes: row.upvotes ?? 0,
+      downvotes: row.downvotes ?? 0,
+    }));
+  }
+
   return {
     proposal: { question: proposal.question, solution: proposal.solution },
     communityName: community?.name ?? null,
     forArgs,
     againstArgs,
+    amendments,
+    threads,
   };
 }
 
@@ -122,7 +199,8 @@ function buildContextBlock(ctx: ScriptContext): string {
   const againstBlock = ctx.againstArgs.length
     ? ctx.againstArgs.map((a, i) => `  ${i + 1}. ${a}`).join('\n')
     : '  (δεν έχουν κατατεθεί ακόμη επιχειρήματα)';
-  return [
+
+  const parts: string[] = [
     `Κοινότητα: ${ctx.communityName ?? '(γενική κοινότητα)'}`,
     `Ερώτημα της πρότασης:`,
     `  ${ctx.proposal.question}`,
@@ -132,7 +210,34 @@ function buildContextBlock(ctx: ScriptContext): string {
     forBlock,
     `Επιχειρήματα κατά (σε σειρά δημοτικότητας):`,
     againstBlock,
-  ].join('\n');
+  ];
+
+  if (ctx.amendments) {
+    const block = ctx.amendments.length
+      ? ctx.amendments.map((a, i) => {
+          const tag = a.decision === 'accepted' ? '[αποδεκτή]'
+            : a.decision === 'rejected' ? '[απορρίφθηκε]'
+            : '[εκκρεμεί]';
+          return `  ${i + 1}. ${tag} ${a.text}`;
+        }).join('\n')
+      : '  (δεν έχουν κατατεθεί ακόμη τροπολογίες)';
+    parts.push(`Τροπολογίες & βελτιώσεις (αυτές είναι μέρος της επίσημης διαδικασίας — αναφέρθου σε αυτές αν είναι χρήσιμες):`);
+    parts.push(block);
+  }
+
+  if (ctx.threads) {
+    const block = ctx.threads.length
+      ? ctx.threads.map((t, i) => {
+          const net = (t.upvotes || 0) - (t.downvotes || 0);
+          const score = net > 0 ? `(+${net})` : net < 0 ? `(${net})` : '';
+          return `  ${i + 1}. ${score} ${t.text}`.trim();
+        }).join('\n')
+      : '  (δεν έχουν γραφτεί ακόμη σχόλια)';
+    parts.push(`Σχόλια από τη συζήτηση της κοινότητας (πιο ψηφισμένα πρώτα — μπορείς να παραθέσεις γνώμη, χωρίς να την παρουσιάσεις ως επίσημη πρόταση):`);
+    parts.push(block);
+  }
+
+  return parts.join('\n');
 }
 
 function podcastUserPrompt(ctx: ScriptContext): string {
@@ -203,8 +308,9 @@ async function generateViaLlm(
 async function generate(
   kind: 'podcast' | 'video',
   proposalId: number,
+  opts: { includeAmendments?: boolean; includeThreads?: boolean } = {},
 ): Promise<ScriptResult> {
-  const ctx = await loadProposalContext(proposalId);
+  const ctx = await loadProposalContext(proposalId, opts);
   let script: string;
   let source: 'llm' | 'template' = 'template';
   if (isLlmConfigured()) {
@@ -242,9 +348,15 @@ async function generate(
 }
 
 export async function generatePodcastScript(input: ScriptInput): Promise<ScriptResult> {
-  return generate('podcast', input.proposalId);
+  return generate('podcast', input.proposalId, {
+    includeAmendments: !!input.includeAmendments,
+    includeThreads: !!input.includeThreads,
+  });
 }
 
 export async function generateTeaserScript(input: ScriptInput): Promise<ScriptResult> {
-  return generate('video', input.proposalId);
+  return generate('video', input.proposalId, {
+    includeAmendments: !!input.includeAmendments,
+    includeThreads: !!input.includeThreads,
+  });
 }
