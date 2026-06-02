@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye, Trash2, Mic } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
@@ -21,6 +21,7 @@ import NextActionPanel from '@/components/proposal/NextActionPanel';
 import { DebatePanel } from '@/components/debate/DebatePanel';
 import { AmendmentsPanel } from '@/components/proposal/AmendmentsPanel';
 import { SortitionPanel } from '@/components/proposal/SortitionPanel';
+import { MediaStudioPanel } from '@/components/proposal/MediaStudioPanel';
 import VotePanel from '@/components/voting/VotePanel';
 import { getStatusForProposal } from '@/lib/proposal-status';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -359,7 +360,7 @@ export default function ProposalDetailPage() {
           Default tab follows the lifecycle phase so users land on the
           relevant work surface for the proposal's current state. */}
       <Tabs defaultValue={defaultTabForStatus(proposal.status)}>
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 h-auto gap-1">
           <TabsTrigger value="overview" className="flex-col sm:flex-row gap-1 py-2">
             <Eye className="w-4 h-4 sm:mr-1" />
             <span className="text-xs sm:text-sm">{t('workspace.tabs.overview')}</span>
@@ -379,6 +380,10 @@ export default function ProposalDetailPage() {
           <TabsTrigger value="votes" className="flex-col sm:flex-row gap-1 py-2">
             <Vote className="w-4 h-4 sm:mr-1" />
             <span className="text-xs sm:text-sm">{t('workspace.tabs.votes')}</span>
+          </TabsTrigger>
+          <TabsTrigger value="media" className="flex-col sm:flex-row gap-1 py-2">
+            <Mic className="w-4 h-4 sm:mr-1" />
+            <span className="text-xs sm:text-sm">Media</span>
           </TabsTrigger>
         </TabsList>
 
@@ -447,6 +452,10 @@ export default function ProposalDetailPage() {
           {voteError && (
             <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
           )}
+        </TabsContent>
+
+        <TabsContent value="media">
+          <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} />
         </TabsContent>
       </Tabs>
     </AppShell>
