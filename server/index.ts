@@ -16,8 +16,49 @@ validateRuntimeConfig();
 initSentry();
 
 const app = express();
+
+// CSP. In dev we disable it (Vite HMR + cross-origin assets). In prod we
+// take helmet's default and widen `connect-src` to include any external
+// services the browser needs to reach directly. The only one today is
+// the LiveKit SFU (LIVEKIT_URL — wss + the matching https/http for the
+// SDK's /rtc/v1/validate fetch). Add Sentry's ingest URL the same way
+// when/if you wire it.
+function buildCspDirectives(): Record<string, string[]> | undefined {
+  if (process.env.NODE_ENV !== "production") return undefined;
+  const connectSrc = ["'self'"];
+  const lkUrl = process.env.LIVEKIT_URL;
+  if (lkUrl) {
+    // LIVEKIT_URL is wss:// — the SDK opens both that and the matching
+    // http(s):// for /rtc/v1/validate. Add both.
+    connectSrc.push(lkUrl);
+    connectSrc.push(
+      lkUrl
+        .replace(/^wss:\/\//, 'https://')
+        .replace(/^ws:\/\//, 'http://'),
+    );
+  }
+  return {
+    "default-src": ["'self'"],
+    "base-uri": ["'self'"],
+    "font-src": ["'self'", "https:", "data:"],
+    "form-action": ["'self'"],
+    "frame-ancestors": ["'self'"],
+    "img-src": ["'self'", "data:", "blob:"],
+    "object-src": ["'none'"],
+    "script-src": ["'self'"],
+    "script-src-attr": ["'none'"],
+    "style-src": ["'self'", "https:", "'unsafe-inline'"],
+    "media-src": ["'self'", "blob:"],
+    "connect-src": connectSrc,
+    "upgrade-insecure-requests": [],
+  };
+}
+
+const cspDirectives = buildCspDirectives();
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  contentSecurityPolicy: cspDirectives
+    ? { directives: cspDirectives, useDefaults: false }
+    : false,
 }));
 
 // CORS allowlist. In production, only origins explicitly enumerated in
