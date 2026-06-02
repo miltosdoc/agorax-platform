@@ -108,6 +108,37 @@ export function registerLivekitRoutes(app: Express): void {
     }
   });
 
+  // ── Past calls: closed community rooms with duration + participants ─
+  app.get('/api/communities/:id/rooms/history', async (req, res) => {
+    try {
+      const communityId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(communityId)) return res.status(400).json({ message: 'invalid community id' });
+      const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) ?? '10', 10) || 10));
+      const history = await livekitRepo.listHistoryForCommunity(communityId, limit);
+      res.json(history);
+    } catch (err: any) {
+      logger.error('list community history failed', { err: err?.message });
+      res.status(500).json({ message: 'failed to list call history' });
+    }
+  });
+
+  // ── Leave beacon — accepts a navigator.sendBeacon payload ────────────
+  // sendBeacon ignores the response, so we keep the body small and the
+  // logic forgiving; auth is best-effort, anonymous leaves are a no-op.
+  app.post('/api/livekit/rooms/:id/leave', async (req: any, res) => {
+    try {
+      const roomId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(roomId)) return res.status(204).end();
+      const userId: number | undefined = req.user?.id;
+      if (!userId) return res.status(204).end();
+      await livekitRepo.recordLeave(roomId, userId);
+      res.status(204).end();
+    } catch (err: any) {
+      logger.warn('leave beacon failed', { err: err?.message });
+      res.status(204).end();
+    }
+  });
+
   app.post('/api/communities/:id/rooms', requireAuth, async (req: any, res) => {
     try {
       if (!isLivekitConfigured()) return unavailable(res);
@@ -272,7 +303,15 @@ export function registerLivekitRoutes(app: Express): void {
         name: displayName,
         isAdmin: isHost,
       });
-      res.json({ token, url: publicLivekitUrl(), roomName: room.roomName, isHost });
+      // Best-effort participation log. A failure here must not block the
+      // join — the user is allowed into the room either way.
+      let participationId: number | null = null;
+      try {
+        participationId = await livekitRepo.recordJoin(room.id, userId);
+      } catch (logErr: any) {
+        logger.warn('participation record failed', { roomId: room.id, err: logErr?.message });
+      }
+      res.json({ token, url: publicLivekitUrl(), roomName: room.roomName, isHost, participationId });
     } catch (err: any) {
       if (err instanceof LivekitUnavailableError) return unavailable(res);
       logger.error('issue livekit token failed', { err: err?.message });

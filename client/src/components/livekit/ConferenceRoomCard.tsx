@@ -28,6 +28,32 @@ interface JoinTokenResponse {
   url: string;
   roomName: string;
   isHost: boolean;
+  participationId?: number | null;
+}
+
+function readCsrfCookie(): string {
+  if (typeof document === 'undefined') return '';
+  const part = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('agorax_csrf='));
+  return part ? decodeURIComponent(part.slice('agorax_csrf='.length)) : '';
+}
+
+/**
+ * Fire-and-forget leave beacon. `keepalive: true` is the modern
+ * equivalent of navigator.sendBeacon and still lets us set the CSRF
+ * header (sendBeacon doesn't). We don't await — the user has already
+ * disconnected, the network call's fate doesn't matter to them.
+ */
+function fireLeaveBeacon(roomId: number) {
+  try {
+    fetch(`/api/livekit/rooms/${roomId}/leave`, {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+      headers: {
+        'X-CSRF-Token': readCsrfCookie(),
+      },
+    }).catch(() => { /* fire-and-forget */ });
+  } catch { /* noop */ }
 }
 
 interface Props {
@@ -99,10 +125,22 @@ export function ConferenceRoomCard({
   };
 
   const handleLeave = () => {
+    // Fire the participation-end beacon before tearing down state.
+    if (joined) fireLeaveBeacon(roomId);
     setToken(null);
     setUrl(null);
     setJoined(false);
   };
+
+  // Fire the leave beacon if the tab is closing while still joined. The
+  // LiveKitRoom's onDisconnected won't run for a hard tab kill, but
+  // fetch({keepalive:true}) inside pagehide survives the unload.
+  useEffect(() => {
+    if (!joined) return;
+    const onPageHide = () => fireLeaveBeacon(roomId);
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [joined, roomId]);
 
   const handleEnd = async () => {
     if (!window.confirm(t('livekit.endConfirm'))) return;

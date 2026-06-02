@@ -735,6 +735,26 @@ export const livekitRooms = pgTable("livekit_rooms", {
   livekitSortitionUnique: uniqueIndex('livekit_rooms_sortition_unique').on(table.sortitionBodyId),
 }));
 
+// ─── LiveKit participation log ──────────────────────────────────────────────
+// One row per (room, user) join. We insert at token-issue time (since
+// that's the last server-side touchpoint before the browser opens the
+// wss) and update left_at via a navigator.sendBeacon when the LiveKit
+// React provider fires onDisconnected. If the beacon never lands —
+// laptop closed, network dropped, tab killed — left_at stays NULL and
+// the "recent calls" UI falls back to the room's closed_at for
+// duration accounting. A user can join the same room multiple times,
+// each producing its own row, which is the honest record.
+export const livekitParticipations = pgTable("livekit_participations", {
+  id: serial("id").primaryKey(),
+  roomId: integer("room_id").notNull().references(() => livekitRooms.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  leftAt: timestamp("left_at"),
+}, (table) => ({
+  livekitPartRoomIdx: index('livekit_participations_room_idx').on(table.roomId),
+  livekitPartUserIdx: index('livekit_participations_user_idx').on(table.userId),
+}));
+
 // ─── Web Push Subscriptions ─────────────────────────────────────────────────
 // One row per (user, browser instance). The browser produces (endpoint,
 // p256dh, auth) at subscribe-time via the Push API; we send notifications
@@ -1278,6 +1298,7 @@ export type LivekitRoom = typeof livekitRooms.$inferSelect;
 export type LivekitRoomKind = 'community' | 'sortition';
 export type LivekitRoomStatus = 'scheduled' | 'active' | 'closed';
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type LivekitParticipation = typeof livekitParticipations.$inferSelect;
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
 

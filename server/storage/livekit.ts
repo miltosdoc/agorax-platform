@@ -8,10 +8,17 @@
 import { db } from '../db';
 import {
   livekitRooms,
+  livekitParticipations,
+  users,
   type LivekitRoom,
   type InsertLivekitRoom,
 } from '../../shared/schema';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+
+export interface RoomHistoryEntry extends LivekitRoom {
+  durationSeconds: number | null;
+  participants: Array<{ userId: number; name: string; joinedAt: Date; leftAt: Date | null }>;
+}
 
 export class LivekitRepository {
 
@@ -111,6 +118,103 @@ export class LivekitRepository {
       .from(livekitRooms)
       .where(and(...conditions, orClause))
       .orderBy(desc(livekitRooms.status), desc(livekitRooms.createdAt));
+  }
+
+  // ── Participation log ──────────────────────────────────────────────
+
+  /** Insert a join row; returns the participation id for the beacon. */
+  async recordJoin(roomId: number, userId: number): Promise<number> {
+    const [row] = await db
+      .insert(livekitParticipations)
+      .values({ roomId, userId })
+      .returning({ id: livekitParticipations.id });
+    return row.id;
+  }
+
+  /**
+   * Stamp left_at on the most recent un-closed row for this (room,user).
+   * The beacon endpoint passes (roomId, userId) — we don't need the
+   * specific participation id because we always close the freshest row,
+   * which is unambiguous: a user can't be on two devices in the same
+   * room with the same user_id.
+   */
+  async recordLeave(roomId: number, userId: number): Promise<void> {
+    const [row] = await db
+      .select({ id: livekitParticipations.id })
+      .from(livekitParticipations)
+      .where(and(
+        eq(livekitParticipations.roomId, roomId),
+        eq(livekitParticipations.userId, userId),
+        isNull(livekitParticipations.leftAt),
+      ))
+      .orderBy(desc(livekitParticipations.joinedAt))
+      .limit(1);
+    if (!row) return;
+    await db.update(livekitParticipations)
+      .set({ leftAt: new Date() })
+      .where(eq(livekitParticipations.id, row.id));
+  }
+
+  /**
+   * Recent closed/finished rooms for a community with computed duration
+   * and a deduped participant list (one entry per user, earliest join
+   * & latest leave wins). Powers the "Recent calls" widget.
+   */
+  async listHistoryForCommunity(
+    communityId: number,
+    limit: number = 10,
+  ): Promise<RoomHistoryEntry[]> {
+    const rooms = await db
+      .select()
+      .from(livekitRooms)
+      .where(and(
+        eq(livekitRooms.communityId, communityId),
+        eq(livekitRooms.kind, 'community'),
+        eq(livekitRooms.status, 'closed'),
+      ))
+      .orderBy(desc(livekitRooms.closedAt))
+      .limit(limit);
+
+    if (rooms.length === 0) return [];
+
+    const roomIds = rooms.map(r => r.id);
+    const parts = await db
+      .select({
+        roomId: livekitParticipations.roomId,
+        userId: livekitParticipations.userId,
+        joinedAt: livekitParticipations.joinedAt,
+        leftAt: livekitParticipations.leftAt,
+        name: users.name,
+      })
+      .from(livekitParticipations)
+      .innerJoin(users, eq(livekitParticipations.userId, users.id))
+      .where(sql`${livekitParticipations.roomId} IN (${sql.join(roomIds.map(id => sql`${id}`), sql`, `)})`)
+      .orderBy(livekitParticipations.joinedAt);
+
+    // Group + dedupe by user per room.
+    const grouped = new Map<number, Map<number, { name: string; joinedAt: Date; leftAt: Date | null }>>();
+    for (const p of parts) {
+      let perRoom = grouped.get(p.roomId);
+      if (!perRoom) { perRoom = new Map(); grouped.set(p.roomId, perRoom); }
+      const existing = perRoom.get(p.userId);
+      if (!existing) {
+        perRoom.set(p.userId, { name: p.name, joinedAt: p.joinedAt, leftAt: p.leftAt });
+      } else {
+        if (p.joinedAt < existing.joinedAt) existing.joinedAt = p.joinedAt;
+        if (p.leftAt && (!existing.leftAt || p.leftAt > existing.leftAt)) existing.leftAt = p.leftAt;
+      }
+    }
+
+    return rooms.map(room => {
+      const end = room.closedAt ?? new Date();
+      const start = room.createdAt;
+      const durationSeconds = Math.max(0, Math.round((+end - +start) / 1000));
+      const perRoom = grouped.get(room.id) ?? new Map();
+      const participants = Array.from(perRoom.entries())
+        .map(([userId, v]) => ({ userId, name: v.name, joinedAt: v.joinedAt, leftAt: v.leftAt }))
+        .sort((a, b) => +a.joinedAt - +b.joinedAt);
+      return { ...room, durationSeconds, participants };
+    });
   }
 
   async setRecordingEnabled(id: number, enabled: boolean): Promise<LivekitRoom> {

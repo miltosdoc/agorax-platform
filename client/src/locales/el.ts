@@ -1054,6 +1054,7 @@ const el: TranslationDictionary = {
   'livekit.unavailableBody': 'Δεν έχει διαμορφωθεί υπηρεσία LiveKit σε αυτό το instance.',
   'livekit.addToCalendar': 'Προσθήκη στο ημερολόγιο',
   'livekit.endCall': 'Τερματισμός κλήσης',
+  'livekit.historyTitle': 'Πρόσφατες κλήσεις',
   'livekit.endConfirm': 'Τερματισμός της κλήσης για όλους τους συμμετέχοντες; Η ενέργεια δεν αναιρείται.',
   'livekit.endFailed': 'Ο τερματισμός απέτυχε',
 

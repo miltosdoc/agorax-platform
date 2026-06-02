@@ -1054,6 +1054,7 @@ const en: TranslationDictionary = {
   'livekit.unavailableBody': 'LiveKit is not configured on this instance.',
   'livekit.addToCalendar': 'Add to calendar',
   'livekit.endCall': 'End call',
+  'livekit.historyTitle': 'Recent calls',
   'livekit.endConfirm': 'End the call for all participants? This cannot be undone.',
   'livekit.endFailed': 'Could not end the call',
 
