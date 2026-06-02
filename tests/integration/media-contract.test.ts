@@ -139,6 +139,15 @@ describe('storage/media.ts — repository contract', () => {
     expect(storage).toMatch(/innerJoin\(communities/);
     expect(storage).toMatch(/innerJoin\(users/);
   });
+
+  it('listForProposal accepts a userId so uploaders see their own hidden rows', () => {
+    // Regression guard: without this, an uploader who hides their own
+    // upload on another author's proposal loses the ability to find it
+    // to unhide it.
+    expect(storage).toMatch(/listForProposal\([\s\S]*?userId\?:\s*number/);
+    expect(storage).toMatch(/eq\(proposalMedia\.uploaderId,\s*opts\.userId\)/);
+    expect(router).toMatch(/listForProposal\([\s\S]*?userId\s*[,\}]/);
+  });
 });
 
 describe('routes.ts wiring', () => {
