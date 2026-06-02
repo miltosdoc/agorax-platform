@@ -1053,6 +1053,9 @@ const en: TranslationDictionary = {
   'livekit.unavailableTitle': 'Video conferencing is off',
   'livekit.unavailableBody': 'LiveKit is not configured on this instance.',
   'livekit.addToCalendar': 'Add to calendar',
+  'livekit.endCall': 'End call',
+  'livekit.endConfirm': 'End the call for all participants? This cannot be undone.',
+  'livekit.endFailed': 'Could not end the call',
 
   'push.title': 'Device notifications',
   'push.description': "Get notified when a conference is scheduled or a sortition deliberation room opens — even when AgoraX isn't open.",

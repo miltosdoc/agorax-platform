@@ -134,6 +134,8 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
               roomId={room.id}
               title={room.title}
               badge={room.status === 'active' ? t('livekit.live') : t('livekit.scheduled')}
+              viewerIsAdmin={viewerIsAdmin}
+              onEnded={refresh}
             />
           ))}
         </div>

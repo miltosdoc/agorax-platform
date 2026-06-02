@@ -18,7 +18,7 @@ import '@livekit/components-styles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mic, PhoneOff, Loader2, CalendarPlus } from 'lucide-react';
+import { Mic, PhoneOff, Loader2, CalendarPlus, XCircle } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
@@ -35,15 +35,32 @@ interface Props {
   title: string;
   description?: string;
   badge?: string;
+  /**
+   * Hint that the viewer can host this room (community admin/founder).
+   * The server still gates the action — this just shows the End button
+   * in the pre-join view. In-room, we trust the server-issued isHost.
+   */
+  viewerIsAdmin?: boolean;
+  /** Called after the room has been ended so the parent can refresh. */
+  onEnded?: () => void;
 }
 
-export function ConferenceRoomCard({ roomId, title, description, badge }: Props) {
+export function ConferenceRoomCard({
+  roomId,
+  title,
+  description,
+  badge,
+  viewerIsAdmin,
+  onEnded,
+}: Props) {
   const { t } = useTranslation();
   const errorToast = useErrorToast();
   const [token, setToken] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [isHost, setIsHost] = useState(false);
 
   const handleJoin = async () => {
     setConnecting(true);
@@ -53,6 +70,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
       console.info('[livekit] join token received', { roomName: resp.data.roomName, url: resp.data.url, isHost: resp.data.isHost });
       setToken(resp.data.token);
       setUrl(resp.data.url);
+      setIsHost(!!resp.data.isHost);
       setJoined(true);
     } catch (err: any) {
       // eslint-disable-next-line no-console
@@ -86,6 +104,23 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
     setJoined(false);
   };
 
+  const handleEnd = async () => {
+    if (!window.confirm(t('livekit.endConfirm'))) return;
+    setEnding(true);
+    try {
+      await api.patch(`/api/livekit/rooms/${roomId}`, { status: 'closed' });
+      // Kick our own session — onDisconnected from the SFU will fire too,
+      // but doing this here makes the UI snap before the network round-trip.
+      handleLeave();
+      onEnded?.();
+    } catch (err: any) {
+      const status = err instanceof ApiError ? err.status : undefined;
+      errorToast(t('livekit.endFailed'), `${status ?? ''} ${err?.message ?? ''}`.trim());
+    } finally {
+      setEnding(false);
+    }
+  };
+
   // ── In-room view ─────────────────────────────────────────────────────
   if (joined && token && url) {
     return (
@@ -95,10 +130,25 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
             <CardTitle className="truncate">{title}</CardTitle>
             {description && <CardDescription className="truncate">{description}</CardDescription>}
           </div>
-          <Button type="button" variant="destructive" size="sm" onClick={handleLeave} data-testid="livekit-leave">
-            <PhoneOff className="w-4 h-4 mr-1" />
-            {t('livekit.leave')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isHost && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleEnd}
+                disabled={ending}
+                data-testid="livekit-end-inroom"
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                {t('livekit.endCall')}
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={handleLeave} data-testid="livekit-leave">
+              <PhoneOff className="w-4 h-4 mr-1" />
+              {t('livekit.leave')}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[600px] rounded-lg overflow-hidden bg-black" data-lk-theme="default">
@@ -147,6 +197,19 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
             <CalendarPlus className="w-4 h-4" />
             {t('livekit.addToCalendar')}
           </a>
+          {viewerIsAdmin && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleEnd}
+              disabled={ending}
+              className="text-red-700 border-red-200 hover:bg-red-50"
+              data-testid="livekit-end-prejoin"
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              {t('livekit.endCall')}
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-2">{t('livekit.permissionsHint')}</p>
       </CardContent>

@@ -1053,6 +1053,9 @@ const el: TranslationDictionary = {
   'livekit.unavailableTitle': 'Οι τηλεδιασκέψεις είναι ανενεργές',
   'livekit.unavailableBody': 'Δεν έχει διαμορφωθεί υπηρεσία LiveKit σε αυτό το instance.',
   'livekit.addToCalendar': 'Προσθήκη στο ημερολόγιο',
+  'livekit.endCall': 'Τερματισμός κλήσης',
+  'livekit.endConfirm': 'Τερματισμός της κλήσης για όλους τους συμμετέχοντες; Η ενέργεια δεν αναιρείται.',
+  'livekit.endFailed': 'Ο τερματισμός απέτυχε',
 
   'push.title': 'Ειδοποιήσεις στη συσκευή',
   'push.description': 'Λάβετε ειδοποίηση όταν προγραμματιστεί συνάντηση ή ανοίξει αίθουσα κληρωτού σώματος — ακόμα και όταν η AgoraX δεν είναι ανοιχτή.',
