@@ -45,6 +45,26 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   Responsible Declaration, giving one account per real person.
 - **Democracy Points** — civic participation is recorded as contribution
   credit (*ο μισθός εκκλησιαστικός*), honestly phase-gated and never a token.
+- **Real-time meetings (LiveKit)** — community conferences and private
+  sortition-body deliberation rooms run on a self-hosted LiveKit SFU.
+  Host-only End-call control, one-click calendar invite (`.ics`), automatic
+  in-app + Web Push notification to every eligible member, a *Recent calls*
+  list with duration and participants. Recording is off by default;
+  AgoraX is not in the recording business.
+- **Media Studio** — each proposal page can generate, locally and in Greek,
+  a podcast script (two-voice dialogue) and a short video script from the
+  proposal's data plus optional amendments/comments. The user produces the
+  MP3 / MP4 externally (NotebookLM, ElevenLabs, anything) and uploads it
+  back. The author marks one as *Featured* — that one surfaces in the
+  global Feed with a shareable social-card preview.
+- **AgoraX Feed (`/feed`)** — a single discovery page listing the most
+  recent featured media from every proposal in deliberation. Filter by
+  type, play inline, deep-link to the proposal to participate.
+- **In-app + Web Push notifications** — the header bell and `/notifications`
+  cover the lifecycle (you were drawn, amendments ready, voting opened,
+  conference scheduled, deliberation room opened). An opt-in toggle subscribes
+  the browser to Web Push so the same events fire on phone or laptop even
+  when AgoraX is closed. Push payloads are end-to-end encrypted (VAPID).
 
 ---
 
@@ -231,7 +251,7 @@ shared/            Drizzle schema + types shared by client and server
 packages/
   voting-sdk/      @agorax/voting — ElectionGuard 2.1 protocol implementation
 ballot_service/    FastAPI service — Gov.gr declaration validation
-migrations/        Ordered SQL migrations (0000 … 0024)
+migrations/        Ordered SQL migrations (0000 … 0029)
 docs/              Architecture, API, runbook, and design documents
 ```
 
@@ -250,6 +270,12 @@ docs/              Architecture, API, runbook, and design documents
 - [Architecture Guide](docs/ARCHITECTURE.md) — domain-driven design
 - [Verifiable Voting SDK Plan](docs/VERIFIABLE_VOTING_SDK_PLAN.md) — the
   ElectionGuard build plan, threat model, and privacy checklist
+- [LiveKit conference rooms](docs/livekit-setup.md) — sidecar deploy, TLS,
+  TURN, recording posture
+- [Web Push notifications](docs/push-setup.md) — VAPID keys, service worker,
+  opt-in surface, privacy notes
+- [Media pipeline](docs/media-pipeline.md) — script generation, upload
+  validation, featured selection, share URLs
 - [Migration Strategy](docs/MIGRATION_STRATEGY.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Tests](docs/TESTS.md)
 
 ## Contributing

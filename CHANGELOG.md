@@ -8,26 +8,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Comprehensive E2E test suite with Playwright (7 test files)
-- Load testing script (`scripts/load-test.js`)
-- Security audit checklist (`docs/SECURITY_AUDIT.md`)
-- Performance optimization guide (`docs/PERFORMANCE_OPTIMIZATION.md`)
-- Migration strategy documentation (`docs/MIGRATION_STRATEGY.md`)
-- Contributing guide (`CONTRIBUTING.md`)
+- **Real-time conferences via LiveKit** — self-hosted SFU sidecar, two room
+  kinds (community, sortition deliberation), JWT-token join, host-only
+  End-call, in-app banner showing active calls on the community dashboard
+  and /home, idempotent sortition-room creation. Migration `0027_livekit_rooms`.
+- **Calendar invite (`.ics`)** — every room exposes `/api/livekit/rooms/:id/ics`
+  with a well-formed `VEVENT` (UID, DTSTART/DTEND, SUMMARY, URL); one-click
+  "Add to calendar" link on the room card.
+- **Recent calls history** — `livekit_participations` log records joins on
+  token issue and leaves via `fetch({keepalive:true})` beacon (covers
+  pagehide / hard tab close). New `/api/communities/:id/rooms/history`
+  endpoint returns closed rooms with duration and de-duped participant
+  list. Surfaced as a *Recent calls* card under the Conferences tab.
+  Migration `0029_livekit_participations`.
+- **Web Push notifications** — VAPID-signed push for conference scheduled /
+  starting and sortition room opened events; subscriptions persisted in
+  `push_subscriptions` (one row per browser, unique by endpoint, 404/410
+  auto-purged). Opt-in card on `/notifications`. Service worker at
+  `client/public/sw.js` handles `push` and `notificationclick`. Migration
+  `0028_push_subscriptions`.
+- **Conference notifications fan-out** — three new notification types
+  (`conference_scheduled`, `conference_starting`, `sortition_room_opened`)
+  fired in-app and via Web Push to every other community/body member when
+  a room is created. Non-blocking — a notification failure can't block room
+  creation.
+- **Media Studio** — per-proposal Greek script generation for a podcast
+  (two-voice, 3–5 min) and a video teaser (~45s). LLM-backed when
+  `LLM_API_URL` is configured (deterministic template fallback otherwise).
+  Optional opt-in toggles to include amendments and discussion comments
+  in the script context. MP3/MP4 upload (120MB cap, m4a + mov also accepted),
+  ffprobe validation, ffmpeg poster-frame extraction. Migration
+  `0026_proposal_media`.
+- **Featured media + author curation** — gallery on each proposal page;
+  author/uploader can hide/delete; only the author can feature one entry per
+  kind (enforced by a partial unique index). Public share routes
+  `/p/:pid/(podcast|video)/:mid` render server-side OG + Twitter unfurl tags.
+- **AgoraX Feed (`/feed`)** — global discovery page listing the most recent
+  featured podcasts and videos across all proposals; filter by kind, inline
+  player, deep-link to the proposal. Embedded preview on `/home`.
+- **FAQ + How It Works refresh** — four new FAQs (q17–q20) covering Media
+  Studio, Feed, Conferences, Notifications; new "Engagement tools" section
+  on `/how-it-works` with the same four surfaces. Both locales in lockstep
+  — i18n key check passes.
 
 ### Changed
-- Migrated all 13 routers from legacy `DatabaseStorage` facade to domain-specific repositories
-- Created pre-instantiated repository instances (`userRepo`, `communityRepo`, etc.)
-- Updated README with comprehensive documentation and architecture diagrams
+- **Production CSP** — `connect-src` widened on-the-fly from `LIVEKIT_URL`
+  (both `wss://` and the matching `https://`) so the SFU connection
+  isn't blocked under the default helmet policy.
+- **Production rate limits** — `apiLimit` 100→600 per 15 min, `authLimit`
+  10→30. The previous 100/15 min was tripping normal browser sessions
+  during login (a single page load fires 10–20 `/api/*` calls).
+- **Voting backend boot guard** — `LLM_API_KEY` now allowed in production
+  when `LLM_GATE_AUDITED=true` is explicitly set; `OPENROUTER_API_KEY`
+  stays banned outright. Lets you wire a private / EU LLM endpoint that
+  has been re-audited under §4.2 of the data-minimisation audit.
 
 ### Fixed
-- Fixed variable shadowing conflicts between repo instances and Drizzle schema tables
-- Fixed `getAttendanceSummary()` return type in SortitionRepository
-- Fixed `upsertAttendance()` parameter format in proposals router
+- **Hide/unhide visibility** — `mediaRepo.listForProposal` now accepts
+  `userId` so an uploader who hides their own row on someone else's
+  proposal can still see it in the list to unhide. Regression-guarded
+  with a contract test + an end-to-end smoke script.
+- **Migrated all 13 routers** from legacy `DatabaseStorage` facade to
+  domain-specific repositories.
+- **Variable shadowing** between repo instances and Drizzle schema tables.
+- **`getAttendanceSummary()`** return type in SortitionRepository.
+- **`upsertAttendance()`** parameter format in proposals router.
 
 ### Removed
-- Removed 106 `console.log` statements from production code
-- Removed legacy `DatabaseStorage` facade usage from all routers
+- 106 `console.log` statements from production code.
+- Legacy `DatabaseStorage` facade usage from all routers.
 
 ## [0.1.0] - 2026-05-12
 

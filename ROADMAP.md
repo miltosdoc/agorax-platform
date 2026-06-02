@@ -1,8 +1,8 @@
 # AgoraX Roadmap
 
-Updated: 2026-04-27
+Updated: 2026-06-03
 
-**Current status:** Coherence Layer complete. Backend is functional — proposal lifecycle, sortition, amendments, debate, communities, LLM validation all wired. **UI is the bottleneck** — many pages lack app shell, proposal detail is not a workspace, debate has no frontend, community system shows no autonomous/managed distinction.
+**Current status:** Engagement Layer shipped. Proposal lifecycle, sortition, amendments, debate, communities, LLM validation are wired and the UI matches. On top of the deliberation pipeline, four engagement surfaces are now live: real-time conferences (LiveKit), per-proposal media production (script gen + upload), a global Feed for discovery, and in-app + Web Push notifications. **Next bottlenecks:** binding-vote crypto (Phase 6 of the SDK plan), production TURN for conferences behind strict NATs, and a pilot host.
 
 ---
 
@@ -32,6 +32,45 @@ Updated: 2026-04-27
 - ❌ Proposal creation doesn't require community selection
 - ❌ No lifecycle stepper on proposal detail
 - ❌ No authenticated dashboard — `/` and `/home` are the same page
+
+---
+
+## Phase 6 — Engagement Layer ✅ DONE
+
+Shipped: 2026-06.
+
+The four surfaces built on top of the deliberation pipeline:
+
+- [x] **Real-time conferences (LiveKit)** — self-hosted SFU sidecar; two
+      room kinds (community, sortition deliberation); host-only End-call;
+      `.ics` calendar invite; in-app banner showing active calls on the
+      community dashboard and `/home`; idempotent sortition-room creation.
+- [x] **Recent calls history** — `livekit_participations` log + leave beacon
+      (`fetch({keepalive:true})` survives `pagehide`); per-room duration +
+      de-duped participant list under the Conferences tab.
+- [x] **Media Studio** — per-proposal Greek script generation for a podcast
+      (two-voice, 3–5 min) and a video teaser (~45 s). LLM-backed when
+      `LLM_API_URL` is set, deterministic template fallback otherwise.
+      Optional toggles for amendments + discussion-comment context.
+      MP3/MP4 upload, ffprobe validation, ffmpeg poster-frame extraction.
+- [x] **Featured media + share routes** — gallery on each proposal page;
+      author features one entry per kind (partial unique index);
+      `/p/:pid/(podcast|video)/:mid` renders OG + Twitter unfurl tags.
+- [x] **AgoraX Feed (`/feed`)** — global discovery surface; filters,
+      inline player, embedded preview on `/home`.
+- [x] **In-app + Web Push notifications** — VAPID-signed push for room
+      events; service worker; opt-in card on `/notifications`; in-app
+      bell carries the same three new types (conference_scheduled,
+      conference_starting, sortition_room_opened).
+- [x] **FAQ + How It Works** — refreshed (q17–q20 + "Engagement tools"
+      section), both locales in lockstep.
+
+**Not done (deliberate):** Egress recording — recording_enabled is a
+data-model flag but not wired to a livekit-egress worker. Voice + faces
+is Art. 9 personal data, so recording ships with a consent surface or it
+doesn't ship. Auto-close of sortition rooms when the parent body
+completes is also out of scope for this cut — easy to add to
+`server/utils/sortition-timeout.ts` when the next pilot needs it.
 
 ---
 
