@@ -13,7 +13,7 @@ import {
   type ProposalMedia,
   type InsertProposalMedia,
 } from '../../shared/schema';
-import { and, desc, eq, sql, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, or, sql, inArray, isNull } from 'drizzle-orm';
 
 export interface MediaWithContext extends ProposalMedia {
   proposalQuestion: string;
@@ -38,13 +38,30 @@ export class MediaRepository {
   /**
    * List media attached to a proposal. Hidden entries are filtered out
    * unless `includeHidden` is true (the author/admin view).
+   * When `userId` is provided, the uploader's own hidden entries are
+   * always included so they can unhide them.
    */
   async listForProposal(
     proposalId: number,
-    opts: { includeHidden?: boolean } = {},
+    opts: { includeHidden?: boolean; userId?: number } = {},
   ): Promise<ProposalMedia[]> {
     const conditions = [eq(proposalMedia.proposalId, proposalId)];
-    if (!opts.includeHidden) conditions.push(eq(proposalMedia.status, 'published'));
+    if (!opts.includeHidden) {
+      if (opts.userId) {
+        // Show published items + this user's own hidden items.
+        const publishedFilter = eq(proposalMedia.status, 'published');
+        const ownHiddenFilter = and(
+          eq(proposalMedia.status, 'hidden'),
+          eq(proposalMedia.uploaderId, opts.userId),
+        );
+        if (ownHiddenFilter) {
+          const combined = or(publishedFilter, ownHiddenFilter);
+          if (combined) conditions.push(combined);
+        }
+      } else {
+        conditions.push(eq(proposalMedia.status, 'published'));
+      }
+    }
     return await db
       .select()
       .from(proposalMedia)

@@ -261,11 +261,15 @@ export function registerMediaRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: 'proposal not found' });
-      // Author and admin see hidden entries too.
+      // Author and admin see all entries (including hidden).
+      // Uploaders see their own hidden entries so they can unhide them.
       const userId: number | undefined = req.user?.id;
-      const includeHidden = !!userId
-        && (req.user.isAdmin || proposal.authorId === userId);
-      const list = await mediaRepo.listForProposal(proposalId, { includeHidden });
+      const isAuthor = !!userId && proposal.authorId === userId;
+      const isAdmin = !!userId && req.user.isAdmin;
+      const list = await mediaRepo.listForProposal(proposalId, {
+        includeHidden: isAuthor || isAdmin,
+        userId,
+      });
       res.json(list);
     } catch (err: any) {
       logger.error('list media failed', { err: err?.message });
