@@ -1029,6 +1029,29 @@ const en: TranslationDictionary = {
   'errorToast.copyText': 'Copy text',
   'errorToast.copied': 'Copied',
 
+  // ─── LiveKit conference rooms ────────────────────────────────────────────
+  'livekit.communitySectionTitle': 'Community conferences',
+  'livekit.sortitionSectionTitle': 'Sortition deliberation room',
+  'livekit.sortitionRoomDescription': 'Private room — only members of this sortition body can join.',
+  'livekit.sortitionStartTitle': 'Open the deliberation room',
+  'livekit.sortitionStartDescription': 'Start a real-time room for the body to deliberate. Only sortition members can connect.',
+  'livekit.startRoom': 'Open room',
+  'livekit.newRoom': 'New conference',
+  'livekit.newRoomDescription': 'Schedule a community-wide meeting. All members can join.',
+  'livekit.titlePlaceholder': 'Conference title',
+  'livekit.createButton': 'Create',
+  'livekit.created': 'Conference created',
+  'livekit.createFailed': 'Failed to create conference',
+  'livekit.noRooms': 'No scheduled or active conferences.',
+  'livekit.join': 'Join the room',
+  'livekit.leave': 'Leave',
+  'livekit.joinFailed': 'Could not join the room',
+  'livekit.live': 'Live',
+  'livekit.scheduled': 'Scheduled',
+  'livekit.permissionsHint': "You'll be asked for microphone and camera access.",
+  'livekit.unavailableTitle': 'Video conferencing is off',
+  'livekit.unavailableBody': 'LiveKit is not configured on this instance.',
+
 };
 
 export default en;

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react';
 import { api } from '@/lib/api';
+import { SortitionRoomSection } from '@/components/livekit/SortitionRoomSection';
 
 interface BodyMember {
   id: number;
@@ -117,6 +118,10 @@ export default function SortitionBodyDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            <div className="mb-6">
+              <SortitionRoomSection bodyId={body.id} />
+            </div>
 
             <Card>
               <CardHeader>

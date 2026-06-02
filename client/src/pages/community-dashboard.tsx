@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic } from 'lucide-react';
+import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -273,6 +274,10 @@ export default function CommunityDashboardPage() {
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
           <TabsTrigger value="sortition">{t('community.tab_sortition')}</TabsTrigger>
           <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
+          <TabsTrigger value="conferences">
+            <Mic className="w-4 h-4 mr-1" />
+            {t('livekit.communitySectionTitle')}
+          </TabsTrigger>
           <TabsTrigger value="merge">{t('community.tab_merge')}</TabsTrigger>
         </TabsList>
         
@@ -438,6 +443,13 @@ export default function CommunityDashboardPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="conferences">
+          <CommunityRoomsSection
+            communityId={community.id}
+            viewerIsAdmin={canManageSettings}
+          />
         </TabsContent>
 
         <TabsContent value="merge">

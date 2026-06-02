@@ -702,6 +702,39 @@ export const proposalMedia = pgTable("proposal_media", {
   proposalMediaFeedIdx: index('proposal_media_feed_idx').on(table.status, table.createdAt),
 }));
 
+// ─── LiveKit Conference Rooms ───────────────────────────────────────────────
+// Two flavours, gated by `kind`:
+//   • 'community'  — open to every member of `communityId`; only admins can
+//                    schedule/close. `sortitionBodyId` is null.
+//   • 'sortition'  — restricted to members of `sortitionBodyId`. Auto-closed
+//                    when the body's status flips to completed. `communityId`
+//                    is the body's parent community (for listing/filtering).
+//
+// The Node app issues join tokens against the configured LiveKit SFU
+// (LIVEKIT_URL/API_KEY/API_SECRET). The SFU itself runs as a sidecar.
+// Recordings are off by default; flipping `recordingEnabled` tells the
+// frontend to expose the record-toggle UI and the server to authorise
+// the egress action. Storage path for any produced recording lives in
+// `recordingPath` (relative to AGORAX_MEDIA_DIR).
+export const livekitRooms = pgTable("livekit_rooms", {
+  id: serial("id").primaryKey(),
+  roomName: text("room_name").notNull().unique(),       // LiveKit room identifier
+  kind: text("kind").notNull(),                          // 'community' | 'sortition'
+  title: text("title").notNull(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  sortitionBodyId: integer("sortition_body_id").references(() => sortitionBodies.id, { onDelete: "cascade" }),
+  createdById: integer("created_by_id").notNull().references(() => users.id),
+  scheduledAt: timestamp("scheduled_at"),
+  status: text("status").notNull().default("active"),    // 'scheduled' | 'active' | 'closed'
+  recordingEnabled: boolean("recording_enabled").notNull().default(false),
+  recordingPath: text("recording_path"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+}, (table) => ({
+  livekitCommunityIdx: index('livekit_rooms_community_idx').on(table.communityId, table.status),
+  livekitSortitionUnique: uniqueIndex('livekit_rooms_sortition_unique').on(table.sortitionBodyId),
+}));
+
 // ─── Job Queue ──────────────────────────────────────────────────────────────
 
 export const jobs = pgTable("jobs", {
@@ -1091,6 +1124,7 @@ export const insertDebateThreadSchema = createInsertSchema(debateThreads).omit({
 export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({ id: true, createdAt: true });
 export const insertProposalSupportSchema = createInsertSchema(proposalSupport).omit({ id: true, createdAt: true });
 export const insertProposalMediaSchema = createInsertSchema(proposalMedia).omit({ id: true, createdAt: true });
+export const insertLivekitRoomSchema = createInsertSchema(livekitRooms).omit({ id: true, createdAt: true, closedAt: true });
 export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true, prevHash: true, rowHash: true, supersededById: true });
 
 export const proposalVoteChoiceSchema = z.enum(['yes', 'no', 'abstain']);
@@ -1221,6 +1255,9 @@ export type ProposalSupport = typeof proposalSupport.$inferSelect;
 export type ProposalVote = typeof proposalVotes.$inferSelect;
 export type ProposalMedia = typeof proposalMedia.$inferSelect;
 export type ProposalMediaKind = 'podcast' | 'video';
+export type LivekitRoom = typeof livekitRooms.$inferSelect;
+export type LivekitRoomKind = 'community' | 'sortition';
+export type LivekitRoomStatus = 'scheduled' | 'active' | 'closed';
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
 
@@ -1240,6 +1277,7 @@ export type InsertDebateVote = z.infer<typeof insertDebateVoteSchema>;
 export type InsertProposalSupport = z.infer<typeof insertProposalSupportSchema>;
 export type InsertProposalVote = z.infer<typeof insertProposalVoteSchema>;
 export type InsertProposalMedia = z.infer<typeof insertProposalMediaSchema>;
+export type InsertLivekitRoom = z.infer<typeof insertLivekitRoomSchema>;
 export type InsertAdminAction = z.infer<typeof insertAdminActionSchema>;
 
 // Safe user type without sensitive auth/internal fields.

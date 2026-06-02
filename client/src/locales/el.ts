@@ -1029,6 +1029,29 @@ const el: TranslationDictionary = {
   'errorToast.copyText': 'Αντιγραφή κειμένου',
   'errorToast.copied': 'Αντιγράφηκε',
 
+  // ─── LiveKit conference rooms ────────────────────────────────────────────
+  'livekit.communitySectionTitle': 'Συναντήσεις κοινότητας',
+  'livekit.sortitionSectionTitle': 'Αίθουσα συσκέψεων κληρωτού σώματος',
+  'livekit.sortitionRoomDescription': 'Ιδιωτική αίθουσα μόνο για τα μέλη του κληρωτού σώματος.',
+  'livekit.sortitionStartTitle': 'Ανοίξτε αίθουσα συσκέψεων',
+  'livekit.sortitionStartDescription': 'Δημιουργήστε μια αίθουσα για διαβούλευση σε πραγματικό χρόνο. Μόνο τα μέλη του σώματος μπορούν να συνδεθούν.',
+  'livekit.startRoom': 'Άνοιγμα αίθουσας',
+  'livekit.newRoom': 'Νέα συνάντηση',
+  'livekit.newRoomDescription': 'Προγραμματίστε μια συνάντηση για την κοινότητα. Όλα τα μέλη μπορούν να συμμετάσχουν.',
+  'livekit.titlePlaceholder': 'Τίτλος συνάντησης',
+  'livekit.createButton': 'Δημιουργία',
+  'livekit.created': 'Η συνάντηση δημιουργήθηκε',
+  'livekit.createFailed': 'Δεν δημιουργήθηκε η συνάντηση',
+  'livekit.noRooms': 'Δεν υπάρχουν προγραμματισμένες ή ενεργές συναντήσεις.',
+  'livekit.join': 'Σύνδεση στην αίθουσα',
+  'livekit.leave': 'Αποχώρηση',
+  'livekit.joinFailed': 'Η σύνδεση απέτυχε',
+  'livekit.live': 'Σε εξέλιξη',
+  'livekit.scheduled': 'Προγραμματισμένη',
+  'livekit.permissionsHint': 'Θα σας ζητηθεί πρόσβαση σε μικρόφωνο και κάμερα.',
+  'livekit.unavailableTitle': 'Οι τηλεδιασκέψεις είναι ανενεργές',
+  'livekit.unavailableBody': 'Δεν έχει διαμορφωθεί υπηρεσία LiveKit σε αυτό το instance.',
+
 };
 
 export default el;

@@ -84,6 +84,32 @@ services:
   # implemented natively in the Node app (server/economy/) — see
   # economy_service/DEPRECATED.md.
 
+  # ─── LiveKit SFU (real-time video/audio) ───────────────────────────────────
+  # Self-hosted WebRTC selective-forwarding unit. Issues join tokens out of
+  # the Node API (`server/utils/livekit-client.ts`) — only that token is
+  # ever shipped to the browser. The container also speaks TURN on UDP/TCP
+  # 7881-7882 so users behind strict NATs can still relay through it.
+  #
+  # Required env: LIVEKIT_KEYS="<api_key>: <api_secret>"  (yes, with the space)
+  # The Node app reads LIVEKIT_API_KEY + LIVEKIT_API_SECRET — keep them in
+  # sync. Generate with `openssl rand -hex 32` for each.
+  livekit:
+    image: livekit/livekit-server:v1.7
+    container_name: agorax_livekit
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0
+    environment:
+      LIVEKIT_KEYS: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY is required}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET is required}
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"     # signalling (HTTP/WS)
+      - "${LIVEKIT_TLS_PORT:-7881}:7881" # TURN over TCP
+      - "50000-50100:50000-50100/udp"    # WebRTC media (UDP); narrow as needed
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
     driver: local

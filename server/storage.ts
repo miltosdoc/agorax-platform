@@ -20,6 +20,7 @@ export { DebateRepository } from './storage/debate';
 export { NotificationRepository } from './storage/notifications';
 export { PlatformRepository } from './storage/platform';
 export { MediaRepository } from './storage/media';
+export { LivekitRepository } from './storage/livekit';
 
 // Pre-instantiated repository instances (for use in routers)
 import { UserRepository } from './storage/users';
@@ -32,6 +33,7 @@ import { DebateRepository } from './storage/debate';
 import { NotificationRepository } from './storage/notifications';
 import { PlatformRepository } from './storage/platform';
 import { MediaRepository } from './storage/media';
+import { LivekitRepository } from './storage/livekit';
 
 export const userRepo = new UserRepository();
 export const communityRepo = new CommunityRepository();
@@ -43,6 +45,7 @@ export const debateRepo = new DebateRepository();
 export const notificationRepo = new NotificationRepository();
 export const platformRepo = new PlatformRepository();
 export const mediaRepo = new MediaRepository();
+export const livekitRepo = new LivekitRepository();
 
 // Legacy facade (backward compatibility)
 export { DatabaseStorage } from './storage/legacy';
