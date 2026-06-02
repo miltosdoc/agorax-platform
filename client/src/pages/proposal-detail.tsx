@@ -22,6 +22,7 @@ import { DebatePanel } from '@/components/debate/DebatePanel';
 import { AmendmentsPanel } from '@/components/proposal/AmendmentsPanel';
 import { SortitionPanel } from '@/components/proposal/SortitionPanel';
 import { MediaStudioPanel } from '@/components/proposal/MediaStudioPanel';
+import { ProposalMediaPreview } from '@/components/proposal/ProposalMediaPreview';
 import VotePanel from '@/components/voting/VotePanel';
 import { getStatusForProposal } from '@/lib/proposal-status';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -417,6 +418,7 @@ export default function ProposalDetailPage() {
                     <Badge variant="secondary">{proposal.category}</Badge>
                   </div>
                 )}
+                <ProposalMediaPreview proposalId={proposal.id} />
               </div>
             </CardContent>
           </Card>
