@@ -21,6 +21,7 @@ import { PlatformSettingsPage } from "@/pages/platform-settings";
 import NotificationsPage from "@/pages/notifications";
 import ProposalDetailPage from "@/pages/proposal-detail";
 import ProposalsPage from "@/pages/proposals-page";
+import FeedPage from "@/pages/feed-page";
 import SortitionScoringPage from "@/pages/sortition-scoring";
 import SortitionSynthesisPage from "@/pages/sortition-synthesis";
 import SortitionDashboardPage from "@/pages/sortition-dashboard";
@@ -123,6 +124,7 @@ function AppRouter() {
         <Route path="/proposals" component={ProposalsPage} />
         <ProtectedRoute path="/proposals/new" component={ProposalFormPage} />
         <ProtectedRoute path="/proposals/:id" component={ProposalDetailPage} />
+        <Route path="/feed" component={FeedPage} />
         <ProtectedRoute path="/sortition" component={SortitionDashboardPage} />
         <ProtectedRoute path="/sortition/body/:bodyId" component={SortitionBodyDetailPage} />
         <ProtectedRoute path="/sortition/:bodyId/ceremony" component={SortitionCeremonyPage} />

@@ -16,7 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Rss } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -177,6 +177,15 @@ export default function Header() {
             >
               <Users className="h-4 w-4" />
               <span>{t('nav.communities')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/feed")}
+              className="hidden md:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
+              data-testid="button-feed"
+            >
+              <Rss className="h-4 w-4" />
+              <span>Ροή</span>
             </button>
 
             {/* Notification Bell */}

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PlusCircle, FileText, Users, User } from "lucide-react";
+import { Home, PlusCircle, FileText, Users, User, Rss } from "lucide-react";
 import { SafeUser } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
@@ -30,10 +30,10 @@ export default function BottomNav({ user }: BottomNavProps) {
       testId: "nav-create-proposal",
     },
     {
-      label: t('nav.walkthrough'),
-      icon: FileText,
-      path: "/walkthrough",
-      testId: "nav-process",
+      label: 'Ροή',
+      icon: Rss,
+      path: "/feed",
+      testId: "nav-feed",
     },
     {
       label: t('nav.communities'),
