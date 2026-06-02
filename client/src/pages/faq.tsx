@@ -175,6 +175,42 @@ export default function FAQPage() {
                 {t('faq.q16_answer')}
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-17" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q17_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q17_answer')}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-18" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q18_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q18_answer')}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-19" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q19_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q19_answer')}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-20" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q20_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q20_answer')}
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
 
           <div className="mt-12 text-center p-8 bg-muted/30 rounded-lg border">

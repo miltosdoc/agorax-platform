@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator";
 import { useLocation } from "wouter";
 import {
   FileText, CheckCircle, Edit3, TrendingUp, Users, Vote,
-  Shield, ArrowRight, Zap, Globe, Lock, Award
+  Shield, ArrowRight, Zap, Globe, Lock, Award,
+  Mic, Rss, Bell, Video
 } from "lucide-react";
 
 export default function HowItWorksPage() {
@@ -196,6 +197,52 @@ export default function HowItWorksPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          {/* Engagement tools — surfaces built on top of the lifecycle */}
+          <div className="mt-16 mb-16">
+            <h2 className="text-2xl font-bold text-center mb-2">{t('hiw.engagement_title')}</h2>
+            <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+              {t('hiw.engagement_subtitle')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardContent className="p-6">
+                  <Video className="w-8 h-8 text-teal-500 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.engagement_conferences_title')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('hiw.engagement_conferences_desc')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Mic className="w-8 h-8 text-purple-500 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.engagement_media_title')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('hiw.engagement_media_desc')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Rss className="w-8 h-8 text-blue-500 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.engagement_feed_title')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('hiw.engagement_feed_desc')}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Bell className="w-8 h-8 text-amber-500 mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.engagement_notifications_title')}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('hiw.engagement_notifications_desc')}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Key Innovations */}
