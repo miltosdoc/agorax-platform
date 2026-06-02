@@ -31,6 +31,11 @@ import {
   publicLivekitUrl,
   LivekitUnavailableError,
 } from '../utils/livekit-client';
+import {
+  notifyConferenceScheduled,
+  notifyRoomOpened,
+  buildIcs,
+} from '../utils/conference-notify';
 import { logger } from '../utils/logger';
 
 function unavailable(res: any): void {
@@ -120,6 +125,17 @@ export function registerLivekitRoutes(app: Express): void {
         recordingEnabled,
         recordingPath: null,
       } as any);
+
+      // Fan out an in-app notification to every other member of the
+      // community. Failure here doesn't block the response.
+      void notifyConferenceScheduled({
+        roomId: room.id,
+        communityId,
+        title: room.title,
+        scheduledAt,
+        actionUrl: `/communities/${communityId}?room=${room.id}`,
+      }, userId, room.status === 'scheduled' ? 'conference_scheduled' : 'conference_starting');
+
       res.status(201).json(room);
     } catch (err: any) {
       logger.error('create community room failed', { err: err?.message });
@@ -180,6 +196,16 @@ export function registerLivekitRoutes(app: Express): void {
         recordingEnabled: false,
         recordingPath: null,
       } as any);
+
+      // Fan out to every other body member.
+      void notifyRoomOpened({
+        roomId: room.id,
+        communityId: body.communityId,
+        sortitionBodyId: bodyId,
+        title: room.title,
+        actionUrl: `/sortition/body/${bodyId}`,
+      }, userId);
+
       res.status(201).json(room);
     } catch (err: any) {
       logger.error('create sortition room failed', { err: err?.message });
@@ -240,6 +266,40 @@ export function registerLivekitRoutes(app: Express): void {
       if (err instanceof LivekitUnavailableError) return unavailable(res);
       logger.error('issue livekit token failed', { err: err?.message });
       res.status(500).json({ message: 'failed to issue join token' });
+    }
+  });
+
+  // ── iCalendar download — adds the conference to the user's calendar ─
+  // No auth gate: the URL is short-lived (room dies on close) and contains
+  // no secrets, just the room title + the public landing URL.
+  app.get('/api/livekit/rooms/:id/ics', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).send('invalid room id');
+      const room = await livekitRepo.getById(id);
+      if (!room) return res.status(404).send('not found');
+      const host = req.get('host') ?? 'agorax';
+      const proto = (req.headers['x-forwarded-proto'] as string | undefined) || req.protocol;
+      const landingUrl = room.kind === 'sortition' && room.sortitionBodyId
+        ? `${proto}://${host}/sortition/body/${room.sortitionBodyId}`
+        : `${proto}://${host}/communities/${room.communityId}?room=${room.id}`;
+      const start = room.scheduledAt ?? room.createdAt;
+      const ics = buildIcs({
+        uid: `agorax-room-${room.id}@${host}`,
+        title: room.title,
+        description: room.kind === 'sortition'
+          ? 'Σύσκεψη κληρωτού σώματος στο AgoraX'
+          : 'Συνάντηση κοινότητας στο AgoraX',
+        url: landingUrl,
+        start: start ? new Date(start) : new Date(),
+        durationMinutes: 60,
+      });
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="agorax-room-${room.id}.ics"`);
+      res.send(ics);
+    } catch (err: any) {
+      logger.error('ics generation failed', { err: err?.message });
+      res.status(500).send('failed to build calendar entry');
     }
   });
 

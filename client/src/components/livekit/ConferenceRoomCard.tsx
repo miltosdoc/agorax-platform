@@ -18,7 +18,7 @@ import '@livekit/components-styles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mic, PhoneOff, Loader2 } from 'lucide-react';
+import { Mic, PhoneOff, Loader2, CalendarPlus } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
@@ -115,10 +115,21 @@ export function ConferenceRoomCard({ roomId, title, description, badge }: Props)
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent>
-        <Button type="button" onClick={handleJoin} disabled={connecting} data-testid="livekit-join">
-          {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-          {t('livekit.join')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={handleJoin} disabled={connecting} data-testid="livekit-join">
+            {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            {t('livekit.join')}
+          </Button>
+          <a
+            href={`/api/livekit/rooms/${roomId}/ics`}
+            download={`agorax-room-${roomId}.ics`}
+            className="inline-flex items-center gap-1 text-sm px-3 py-2 border rounded-md hover:bg-muted"
+            data-testid="livekit-ics"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            {t('livekit.addToCalendar')}
+          </a>
+        </div>
         <p className="text-xs text-muted-foreground mt-2">{t('livekit.permissionsHint')}</p>
       </CardContent>
     </Card>

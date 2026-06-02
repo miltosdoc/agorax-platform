@@ -1051,6 +1051,7 @@ const en: TranslationDictionary = {
   'livekit.permissionsHint': "You'll be asked for microphone and camera access.",
   'livekit.unavailableTitle': 'Video conferencing is off',
   'livekit.unavailableBody': 'LiveKit is not configured on this instance.',
+  'livekit.addToCalendar': 'Add to calendar',
 
 };
 

@@ -117,6 +117,65 @@ describe('routes.ts wiring', () => {
   });
 });
 
+describe('conference notifications + .ics', () => {
+  const notifyMod = read('server/utils/conference-notify.ts');
+  const notifTypes = read('server/utils/notifications.ts');
+
+  it('declares the three new notification types', () => {
+    expect(notifTypes).toMatch(/'conference_scheduled'/);
+    expect(notifTypes).toMatch(/'conference_starting'/);
+    expect(notifTypes).toMatch(/'sortition_room_opened'/);
+  });
+
+  it('isNotificationEnabled defaults unknown types to on', () => {
+    // Future-proofing: a new type added to NotificationType but not yet
+    // mapped to a preference column should still ship a notification.
+    expect(notifTypes).toMatch(/if \(!key\) return true/);
+  });
+
+  it('exposes the two fan-out helpers', () => {
+    expect(notifyMod).toMatch(/export async function notifyConferenceScheduled/);
+    expect(notifyMod).toMatch(/export async function notifyRoomOpened/);
+  });
+
+  it('community fan-out excludes the room author', () => {
+    expect(notifyMod).toMatch(/filter\(uid => uid !== authorUserId\)/);
+  });
+
+  it('sortition fan-out excludes the opener', () => {
+    expect(notifyMod).toMatch(/filter\(uid => uid !== openerUserId\)/);
+  });
+
+  it('LiveKit router calls notifyConferenceScheduled after community room creation', () => {
+    expect(router).toMatch(/notifyConferenceScheduled\(/);
+  });
+
+  it('LiveKit router calls notifyRoomOpened after sortition room creation', () => {
+    expect(router).toMatch(/notifyRoomOpened\(/);
+  });
+
+  it('exposes the .ics download endpoint', () => {
+    expect(router).toMatch(/app\.get\(['"]\/api\/livekit\/rooms\/:id\/ics['"]/);
+    expect(router).toMatch(/text\/calendar/);
+  });
+
+  it('buildIcs emits a well-formed VEVENT with URL + UID', () => {
+    expect(notifyMod).toMatch(/export function buildIcs/);
+    expect(notifyMod).toMatch(/BEGIN:VCALENDAR/);
+    expect(notifyMod).toMatch(/BEGIN:VEVENT/);
+    expect(notifyMod).toMatch(/UID:/);
+    expect(notifyMod).toMatch(/URL:/);
+  });
+
+  it('buildIcs escapes commas, semicolons, and newlines per RFC 5545', () => {
+    expect(notifyMod).toMatch(/function icsEscape/);
+    // The escape function must handle all three special characters.
+    expect(notifyMod).toContain(`replace(/,/g, '\\\\,')`);
+    expect(notifyMod).toContain(`replace(/;/g, '\\\\;')`);
+    expect(notifyMod).toContain(`'\\\\n'`); // newline replacement target
+  });
+});
+
 describe('docker-compose sidecar', () => {
   it('declares the livekit service with LIVEKIT_KEYS env mapping', () => {
     expect(compose).toMatch(/livekit\/livekit-server/);

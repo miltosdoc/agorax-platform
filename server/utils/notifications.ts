@@ -22,7 +22,10 @@ export type NotificationType =
   | 'sortition_reminder'
   | 'proposal_advanced'
   | 'amendment_ready'
-  | 'vote_started';
+  | 'vote_started'
+  | 'conference_scheduled'
+  | 'conference_starting'
+  | 'sortition_room_opened';
 
 interface CreateNotificationParams {
   userId: number;
@@ -225,7 +228,7 @@ async function getUserPreferences(userId: number): Promise<NotificationPreferenc
 }
 
 function isNotificationEnabled(prefs: NotificationPreferences, type: NotificationType): boolean {
-  const map: Record<NotificationType, keyof NotificationPreferences> = {
+  const map: Partial<Record<NotificationType, keyof NotificationPreferences>> = {
     sortition_assigned: 'sortition_assigned',
     sortition_deadline: 'sortition_deadline',
     sortition_reminder: 'sortition_reminder',
@@ -233,7 +236,12 @@ function isNotificationEnabled(prefs: NotificationPreferences, type: Notificatio
     amendment_ready: 'amendment_ready',
     vote_started: 'vote_started',
   };
-  return prefs[map[type]] as boolean;
+  const key = map[type];
+  // New notification types (conference_*, sortition_room_opened) don't have
+  // a dedicated preference yet — they're on by default. A future migration
+  // can add columns and an opt-out UI.
+  if (!key) return true;
+  return prefs[key] as boolean;
 }
 
 export async function getOrCreatePreferences(userId: number): Promise<NotificationPreferences> {

@@ -1,7 +1,16 @@
 export interface SortitionNotification {
   id: number;
   userId: number;
-  type: 'sortition_assigned' | 'sortition_deadline' | 'sortition_reminder' | 'proposal_advanced' | 'amendment_ready' | 'vote_started';
+  type:
+    | 'sortition_assigned'
+    | 'sortition_deadline'
+    | 'sortition_reminder'
+    | 'proposal_advanced'
+    | 'amendment_ready'
+    | 'vote_started'
+    | 'conference_scheduled'
+    | 'conference_starting'
+    | 'sortition_room_opened';
   title: string;
   message: string | null;
   sortitionBodyId: number | null;
@@ -26,4 +35,7 @@ export const notificationTypeConfig: Record<SortitionNotification['type'], { ico
   proposal_advanced: { icon: '📈', color: 'bg-green-50 border-green-200' },
   amendment_ready: { icon: '✏️', color: 'bg-purple-50 border-purple-200' },
   vote_started: { icon: '🗳️', color: 'bg-indigo-50 border-indigo-200' },
+  conference_scheduled: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
+  conference_starting: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
+  sortition_room_opened: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
 };

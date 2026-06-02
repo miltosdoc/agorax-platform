@@ -1051,6 +1051,7 @@ const el: TranslationDictionary = {
   'livekit.permissionsHint': 'Θα σας ζητηθεί πρόσβαση σε μικρόφωνο και κάμερα.',
   'livekit.unavailableTitle': 'Οι τηλεδιασκέψεις είναι ανενεργές',
   'livekit.unavailableBody': 'Δεν έχει διαμορφωθεί υπηρεσία LiveKit σε αυτό το instance.',
+  'livekit.addToCalendar': 'Προσθήκη στο ημερολόγιο',
 
 };
 
