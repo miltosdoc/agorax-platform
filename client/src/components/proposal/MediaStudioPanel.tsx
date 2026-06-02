@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { api, ApiError } from '@/lib/api';
 import { Mic, Video, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2 } from 'lucide-react';
@@ -125,6 +126,7 @@ function MediaKindCard(props: {
   const cfg = KIND_CONFIG[kind];
   const Icon = cfg.icon;
   const { toast } = useToast();
+  const errorToast = useErrorToast();
   const [script, setScript] = useState('');
   const [source, setSource] = useState<'llm' | 'template' | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -138,11 +140,7 @@ function MediaKindCard(props: {
       setScript(resp.data.script);
       setSource(resp.data.source ?? null);
     } catch (err: any) {
-      toast({
-        title: 'Σφάλμα δημιουργίας σεναρίου',
-        description: err?.message || 'Δοκιμάστε ξανά.',
-        variant: 'destructive',
-      });
+      errorToast('Σφάλμα δημιουργίας σεναρίου', err?.message || 'Δοκιμάστε ξανά.');
     } finally {
       setGenerating(false);
     }
@@ -153,8 +151,8 @@ function MediaKindCard(props: {
     try {
       await navigator.clipboard.writeText(script);
       toast({ title: 'Αντιγράφηκε στο πρόχειρο' });
-    } catch {
-      toast({ title: 'Η αντιγραφή απέτυχε', variant: 'destructive' });
+    } catch (err: any) {
+      errorToast('Η αντιγραφή απέτυχε', err?.message);
     }
   };
 
@@ -172,11 +170,7 @@ function MediaKindCard(props: {
       toast({ title: 'Επιτυχής μεταφόρτωση', description: file.name });
       onUploaded();
     } catch (err: any) {
-      toast({
-        title: 'Η μεταφόρτωση απέτυχε',
-        description: err?.message || 'Δοκιμάστε ξανά.',
-        variant: 'destructive',
-      });
+      errorToast('Η μεταφόρτωση απέτυχε', err?.message || 'Δοκιμάστε ξανά.');
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -247,9 +241,7 @@ function MediaKindCard(props: {
             {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
             {kind === 'podcast' ? 'Ανέβασμα MP3' : 'Ανέβασμα MP4'}
           </Button>
-          <span className="text-xs text-muted-foreground">
-            {kind === 'podcast' ? 'Έως 120 MB, έως 10 λεπτά.' : 'Έως 120 MB, έως 3 λεπτά.'}
-          </span>
+          <span className="text-xs text-muted-foreground">Έως 120 MB.</span>
         </div>
       </CardContent>
     </Card>
@@ -264,6 +256,7 @@ function MediaGalleryItem(props: {
 }) {
   const { media, userIsAuthor, currentUserId, onChange } = props;
   const { toast } = useToast();
+  const errorToast = useErrorToast();
   const [acting, setActing] = useState(false);
   const isUploader = currentUserId === media.uploaderId;
   const canCurate = userIsAuthor || isUploader;
@@ -277,7 +270,7 @@ function MediaGalleryItem(props: {
       toast({ title: media.isFeatured ? 'Αφαιρέθηκε από προτεινόμενα' : 'Ορίστηκε ως προτεινόμενο' });
       onChange();
     } catch (err: any) {
-      toast({ title: 'Σφάλμα', description: err?.message, variant: 'destructive' });
+      errorToast('Σφάλμα', err?.message);
     } finally {
       setActing(false);
     }
@@ -292,7 +285,7 @@ function MediaGalleryItem(props: {
       toast({ title: media.status === 'hidden' ? 'Δημοσιεύτηκε' : 'Αποκρύφθηκε' });
       onChange();
     } catch (err: any) {
-      toast({ title: 'Σφάλμα', description: err?.message, variant: 'destructive' });
+      errorToast('Σφάλμα', err?.message);
     } finally {
       setActing(false);
     }
@@ -306,7 +299,7 @@ function MediaGalleryItem(props: {
       toast({ title: 'Διαγράφηκε' });
       onChange();
     } catch (err: any) {
-      toast({ title: 'Σφάλμα', description: err?.message, variant: 'destructive' });
+      errorToast('Σφάλμα', err?.message);
     } finally {
       setActing(false);
     }
@@ -317,8 +310,8 @@ function MediaGalleryItem(props: {
     try {
       await navigator.clipboard.writeText(url);
       toast({ title: 'Σύνδεσμος αντιγράφηκε' });
-    } catch {
-      toast({ title: 'Η αντιγραφή απέτυχε', variant: 'destructive' });
+    } catch (err: any) {
+      errorToast('Η αντιγραφή απέτυχε', err?.message);
     }
   };
 

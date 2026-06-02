@@ -105,9 +105,13 @@ describe('media router — security gates', () => {
     expect(router).toMatch(/isCommunityMember/);
   });
 
-  it('enforces per-kind size & duration limits', () => {
+  it('enforces a per-kind file-size limit', () => {
     expect(router).toMatch(/maxBytes/);
-    expect(router).toMatch(/maxDurationS/);
+  });
+
+  it('does not reject on duration — size is the only limit', () => {
+    expect(router).not.toMatch(/maxDurationS/);
+    expect(router).not.toMatch(/too long;\s*max/);
   });
 
   it('validates file extension and mime', () => {

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorToast } from '@/hooks/use-error-toast';
 import AppShell from '@/components/layout/AppShell';
 import { Mic, Video, Share2, Star, Loader2 } from 'lucide-react';
 
@@ -132,6 +133,7 @@ function FeedItemCard({ item, onShare }: { item: FeedItem; onShare: (item: FeedI
 
 export default function FeedPage() {
   const { toast } = useToast();
+  const errorToast = useErrorToast();
   const [filter, setFilter] = useState<Filter>('all');
   const [items, setItems] = useState<FeedItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -149,11 +151,11 @@ export default function FeedPage() {
       setCursor(resp.data.nextCursor);
       setReachedEnd(resp.data.nextCursor === null);
     } catch (err: any) {
-      toast({ title: 'Σφάλμα φόρτωσης', description: err?.message, variant: 'destructive' });
+      errorToast('Σφάλμα φόρτωσης', err?.message);
     } finally {
       setLoading(false);
     }
-  }, [filter, toast]);
+  }, [filter, errorToast]);
 
   useEffect(() => {
     setItems([]);
@@ -177,8 +179,8 @@ export default function FeedPage() {
     try {
       await navigator.clipboard.writeText(url);
       toast({ title: 'Σύνδεσμος αντιγράφηκε' });
-    } catch {
-      toast({ title: 'Η αντιγραφή απέτυχε', variant: 'destructive' });
+    } catch (err: any) {
+      errorToast('Η αντιγραφή απέτυχε', err?.message);
     }
   };
 

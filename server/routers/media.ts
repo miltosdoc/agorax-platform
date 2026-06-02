@@ -31,19 +31,18 @@ import { logger } from '../utils/logger';
 const MEDIA_ROOT = process.env.AGORAX_MEDIA_DIR
   || path.resolve(process.cwd(), 'uploads', 'media');
 
-// Per-kind caps. Same 120MB ceiling for both audio and video — large
-// enough for a full-length NotebookLM podcast plus a few minutes of
-// teaser video, while still bounded so one proposal can't blow up disk.
+// Per-kind caps. Size is the only enforced limit (same 120MB ceiling for
+// audio and video). Duration is still probed and stored so the UI can
+// display it, but is no longer a rejection reason — the proposal author
+// decides what length makes sense for their content.
 const LIMITS = {
   podcast: {
-    maxBytes: 120 * 1024 * 1024,  // 120 MB
-    maxDurationS: 10 * 60,        // 10 min
+    maxBytes: 120 * 1024 * 1024,
     mimes: new Set(['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a']),
     exts: new Set(['.mp3', '.m4a']),
   },
   video: {
-    maxBytes: 120 * 1024 * 1024,  // 120 MB
-    maxDurationS: 180,            // 3 min — teaser, not feature length
+    maxBytes: 120 * 1024 * 1024,
     mimes: new Set(['video/mp4', 'video/quicktime']),
     exts: new Set(['.mp4', '.mov']),
   },
@@ -209,12 +208,6 @@ export function registerMediaRoutes(app: Express): void {
         if (kind === 'video' && !probed.hasVideo) {
           await unlink(filePath);
           return res.status(415).json({ message: 'file has no video stream' });
-        }
-        if (durationS > 0 && durationS > limits.maxDurationS) {
-          await unlink(filePath);
-          return res.status(413).json({
-            message: `${kind} too long; max ${Math.round(limits.maxDurationS)}s, got ${Math.round(durationS)}s`,
-          });
         }
         if (kind === 'video') {
           const thumbName = `${kind}-${id}.jpg`;
