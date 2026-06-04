@@ -298,7 +298,20 @@ export default function CommunityDashboardPage() {
               ) : (
                 <div className="space-y-2">
                   {proposals.map((proposal) => (
-                    <div key={proposal.id} className="flex items-center justify-between gap-3 p-3 border rounded">
+                    <div
+                      key={proposal.id}
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => setLocation(`/proposals/${proposal.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setLocation(`/proposals/${proposal.id}`);
+                        }
+                      }}
+                      className="flex items-center justify-between gap-3 p-3 border rounded cursor-pointer hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+                      data-testid={`community-proposal-${proposal.id}`}
+                    >
                       <div>
                         <div className="font-medium">{proposal.question}</div>
                         <div className="text-sm text-muted-foreground">
