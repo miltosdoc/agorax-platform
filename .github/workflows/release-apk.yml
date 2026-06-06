@@ -1,0 +1,85 @@
+name: Release Android APK
+
+# Builds the AgoraX Android wrapper (Capacitor) and uploads the resulting
+# debug APK as a GitHub Release asset.
+#
+# Triggers:
+#   - push of a tag matching v* (e.g. v0.1.0-mobile) → publishes a Release
+#   - manual workflow_dispatch                       → uploads as artifact only
+#
+# Debug-signed only. A Play-Store release-signed APK requires a keystore +
+# secrets; see docs/ANDROID_APP.md for that path when ready.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Capacitor APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Sync Android platform
+        working-directory: mobile
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p dist-apk
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk \
+             "dist-apk/agorax-${GITHUB_REF_NAME:-dev}.apk"
+          ls -lh dist-apk/
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agorax-apk
+          path: dist-apk/*.apk
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-apk/*.apk
+          generate_release_notes: true
+          body: |
+            AgoraX Android app — debug build.
+
+            Sideload on Android: download the .apk, allow "Install unknown apps"
+            for your browser, tap to install. See docs/ANDROID_APP.md for setup.
+
+            This build loads the live AgoraX site (URL set in
+            `mobile/capacitor.config.json`). Real-time notifications use SSE +
+            @capacitor/local-notifications; background push (FCM) is documented
+            but not yet wired.

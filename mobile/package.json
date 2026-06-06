@@ -1,0 +1,12 @@
+{
+  "name": "agorax-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgoraX Android wrapper (Capacitor)",
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/local-notifications": "^6.1.3"
+  }
+}

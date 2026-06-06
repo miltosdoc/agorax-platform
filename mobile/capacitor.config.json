@@ -1,0 +1,10 @@
+{
+  "appId": "gr.agorax.app",
+  "appName": "AgoraX",
+  "webDir": "www",
+  "server": {
+    "url": "https://elude-willed-bunion.ngrok-free.dev/",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
