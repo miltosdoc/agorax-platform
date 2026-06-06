@@ -59,7 +59,7 @@ function isNativeApp(): boolean {
   return !!window.Capacitor?.isNativePlatform?.();
 }
 
-async function fireSystemNotification(n: IncomingNotification): Promise<void> {
+async function fireNativeNotification(n: IncomingNotification): Promise<void> {
   const plugin = window.Capacitor?.Plugins?.LocalNotifications;
   if (!plugin) return;
   try {
@@ -75,6 +75,29 @@ async function fireSystemNotification(n: IncomingNotification): Promise<void> {
     });
   } catch {
     // best-effort; permission may not be granted
+  }
+}
+
+function fireBrowserNotification(n: IncomingNotification): void {
+  // Page-context Notification — surfaces an OS-level toast while the tab is
+  // open. For the closed-tab case the server fans out via Web Push (VAPID)
+  // and the service worker shows the notification instead.
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'granted') return;
+  try {
+    const notif = new Notification(n.title, {
+      body: n.message ?? '',
+      tag: n.actionUrl ?? `${n.type}-${Date.now()}`,
+      data: { actionUrl: n.actionUrl ?? '/notifications' },
+    });
+    notif.onclick = () => {
+      window.focus();
+      const url = n.actionUrl ?? '/notifications';
+      if (url) window.location.href = url;
+      notif.close();
+    };
+  } catch {
+    // some browsers throw if called outside a user gesture during dev; ignore
   }
 }
 
@@ -101,7 +124,9 @@ export function useNotificationStream(enabled: boolean): void {
       queryClient.invalidateQueries({ queryKey: ['/api/sortition-notifications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sortition-notifications/unread-count'] });
       if (isNativeApp()) {
-        void fireSystemNotification(payload);
+        void fireNativeNotification(payload);
+      } else {
+        fireBrowserNotification(payload);
       }
     });
 

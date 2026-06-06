@@ -14,6 +14,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { sortitionNotifications } from '@shared/schema';
 import { notificationBus } from './notification-bus';
+import { pushToUsers } from './push-client';
 
 // ─── Notification Types ─────────────────────────────────────────────────────
 
@@ -71,6 +72,16 @@ export async function createNotification(params: CreateNotificationParams): Prom
     communityId: params.communityId ?? null,
     actionUrl: params.actionUrl ?? null,
     createdAt: new Date().toISOString(),
+  });
+
+  // Fan out to Web Push subscriptions so opted-in browsers get a real OS
+  // notification even when the tab is closed. Silent no-op if VAPID isn't
+  // configured or the user has no active subscription.
+  void pushToUsers([params.userId], {
+    title: params.title,
+    body: params.message ?? '',
+    url: params.actionUrl ?? '/notifications',
+    tag: `agorax-${params.type}-${params.proposalId ?? params.sortitionBodyId ?? 'x'}`,
   });
 }
 
