@@ -35,10 +35,11 @@ async function computeVoteResults(
   view: VoterView,
 ) {
   const [community] = await db
-    .select({ minParticipationPct: communities.minParticipationPct })
+    .select({ minParticipationPct: communities.minParticipationPct, votePassThreshold: communities.votePassThreshold })
     .from(communities)
     .where(eq(communities.id, proposal.communityId));
   const minParticipationPct = Number(community?.minParticipationPct ?? 0);
+  const votePassThreshold = Number(community?.votePassThreshold ?? 0.5);
 
   const [memberRow] = await db
     .select({ c: count() })
@@ -55,14 +56,15 @@ async function computeVoteResults(
   const no = tally?.no ?? 0;
   const abstain = tally?.abstain ?? 0;
   const total = tally?.total ?? view.ballotCount;
-  const passes = !!tally && meetsQuorum && yes + no > 0 && yes > no;
+  const yesRatio = yes + no > 0 ? yes / (yes + no) : 0;
+  const passes = !!tally && meetsQuorum && yes + no > 0 && yesRatio > votePassThreshold;
 
   return {
     yes, no, abstain, total,
     sealed: view.tallySealed || !tally,
     hasVoted: view.hasVoted,
     ballotCount: view.ballotCount,
-    participants, participationPct, meetsQuorum, passes, minParticipationPct,
+    participants, participationPct, meetsQuorum, passes, minParticipationPct, votePassThreshold,
     userVote: view.userChoice,
   };
 }
@@ -117,6 +119,13 @@ export function registerProposalsRoutes(app: Express): void {
         category,
         status: INITIAL_PROPOSAL_STATE,
       });
+      // Best-effort fan-out to community members; failures must not block the response.
+      try {
+        const { notifyNewProposal } = await import('../utils/notifications');
+        await notifyNewProposal(proposal.id, communityId, question, userId);
+      } catch (notifyErr) {
+        console.error('notifyNewProposal failed:', notifyErr);
+      }
       res.status(201).json(proposal);
     } catch (error) {
       console.error("create-proposal failed:", error);

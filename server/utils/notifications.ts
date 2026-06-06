@@ -13,6 +13,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { sortitionNotifications } from '@shared/schema';
+import { notificationBus } from './notification-bus';
 
 // ─── Notification Types ─────────────────────────────────────────────────────
 
@@ -25,7 +26,9 @@ export type NotificationType =
   | 'vote_started'
   | 'conference_scheduled'
   | 'conference_starting'
-  | 'sortition_room_opened';
+  | 'sortition_room_opened'
+  | 'new_proposal'
+  | 'new_media';
 
 interface CreateNotificationParams {
   userId: number;
@@ -57,6 +60,84 @@ export async function createNotification(params: CreateNotificationParams): Prom
     communityId: params.communityId ?? null,
     actionUrl: params.actionUrl ?? null,
   });
+
+  notificationBus.publish({
+    userId: params.userId,
+    type: params.type,
+    title: params.title,
+    message: params.message ?? null,
+    sortitionBodyId: params.sortitionBodyId ?? null,
+    proposalId: params.proposalId ?? null,
+    communityId: params.communityId ?? null,
+    actionUrl: params.actionUrl ?? null,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+// ─── Batch: Notify Community of New Proposal ────────────────────────────────
+
+export async function notifyNewProposal(
+  proposalId: number,
+  communityId: number,
+  proposalQuestion: string,
+  authorUserId: number,
+): Promise<number> {
+  const members = await db.execute(sql`
+    SELECT cm.user_id FROM community_members cm
+    WHERE cm.community_id = ${communityId} AND cm.user_id <> ${authorUserId}
+  `);
+  let notified = 0;
+  const short = proposalQuestion.length > 120
+    ? proposalQuestion.slice(0, 117) + '…'
+    : proposalQuestion;
+  for (const member of members.rows) {
+    const userId = member.user_id as number;
+    await createNotification({
+      userId,
+      type: 'new_proposal',
+      title: 'Νέα πρόταση στην κοινότητά σου',
+      message: short,
+      proposalId,
+      communityId,
+      actionUrl: `/proposals/${proposalId}`,
+    });
+    notified++;
+  }
+  return notified;
+}
+
+// ─── Batch: Notify Community of New Media on a Proposal ─────────────────────
+
+export async function notifyNewMedia(
+  proposalId: number,
+  communityId: number,
+  kind: 'podcast' | 'video',
+  uploaderUserId: number,
+  proposalQuestion: string,
+): Promise<number> {
+  const members = await db.execute(sql`
+    SELECT cm.user_id FROM community_members cm
+    WHERE cm.community_id = ${communityId} AND cm.user_id <> ${uploaderUserId}
+  `);
+  let notified = 0;
+  const label = kind === 'podcast' ? 'podcast' : 'βίντεο';
+  const short = proposalQuestion.length > 100
+    ? proposalQuestion.slice(0, 97) + '…'
+    : proposalQuestion;
+  for (const member of members.rows) {
+    const userId = member.user_id as number;
+    await createNotification({
+      userId,
+      type: 'new_media',
+      title: `Νέο ${label} σε πρόταση`,
+      message: short,
+      proposalId,
+      communityId,
+      actionUrl: `/proposals/${proposalId}`,
+    });
+    notified++;
+  }
+  return notified;
 }
 
 // ─── Batch: Notify Sortition Members ────────────────────────────────────────

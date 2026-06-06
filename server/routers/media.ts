@@ -247,6 +247,13 @@ export function registerMediaRoutes(app: Express): void {
         isFeatured: false,
       } as any);
 
+      try {
+        const { notifyNewMedia } = await import('../utils/notifications');
+        await notifyNewMedia(proposalId, proposal.communityId, kind, userId, proposal.question);
+      } catch (notifyErr: any) {
+        logger.warn('notifyNewMedia failed', { proposalId, err: notifyErr?.message });
+      }
+
       res.status(201).json(row);
     },
   );

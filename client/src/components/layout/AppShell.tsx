@@ -5,6 +5,7 @@ import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import BottomNav from "@/components/layout/bottom-nav";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotificationStream } from "@/hooks/use-notification-stream";
 import { ConsentInterstitial } from "@/components/user/consent-interstitial";
 
 export interface BreadcrumbItem {
@@ -21,6 +22,7 @@ interface AppShellProps {
 
 export default function AppShell({ title, breadcrumb, actions, children }: AppShellProps) {
   const { user } = useAuth();
+  useNotificationStream(!!user);
 
   return (
     <div className="flex flex-col min-h-screen pb-16 sm:pb-0">

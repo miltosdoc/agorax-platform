@@ -10,7 +10,9 @@ export interface SortitionNotification {
     | 'vote_started'
     | 'conference_scheduled'
     | 'conference_starting'
-    | 'sortition_room_opened';
+    | 'sortition_room_opened'
+    | 'new_proposal'
+    | 'new_media';
   title: string;
   message: string | null;
   sortitionBodyId: number | null;
@@ -38,4 +40,6 @@ export const notificationTypeConfig: Record<SortitionNotification['type'], { ico
   conference_scheduled: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
   conference_starting: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
   sortition_room_opened: { icon: '🎙️', color: 'bg-teal-50 border-teal-200' },
+  new_proposal: { icon: '📝', color: 'bg-emerald-50 border-emerald-200' },
+  new_media: { icon: '🎧', color: 'bg-rose-50 border-rose-200' },
 };

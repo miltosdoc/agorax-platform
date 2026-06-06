@@ -11,6 +11,7 @@ import { db } from '../db';
 import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { sortitionNotifications } from '@shared/schema';
+import { notificationBus, type NotificationEvent } from '../utils/notification-bus';
 
 export function registerNotificationsRoutes(app: Express): void {
 
@@ -125,6 +126,43 @@ export function registerNotificationsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to mark as read" });
     }
   });
+  // ─── SSE: Real-time notification stream ─────────────────────────────────
+  // GET /api/sortition-notifications/stream — keeps a long-lived connection
+  // open and pushes each new notification as a `data:` SSE frame. Clients use
+  // EventSource() and update their bell badge / show a local toast on receive.
+  app.get("/api/sortition-notifications/stream", requireAuth, async (req: any, res) => {
+    const userId: number = req.user!.id;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering if proxied
+    res.flushHeaders?.();
+
+    // Initial comment so the client knows we're live.
+    res.write(': connected\n\n');
+
+    const send = (event: NotificationEvent) => {
+      try {
+        res.write(`event: notification\ndata: ${JSON.stringify(event)}\n\n`);
+      } catch {
+        // socket likely dropped — cleanup handler will run
+      }
+    };
+    const unsubscribe = notificationBus.subscribe(userId, send);
+
+    // Heartbeat every 25s — keeps proxies from idling the connection, and
+    // lets us detect dead clients via the write throwing.
+    const heartbeat = setInterval(() => {
+      try { res.write(': ping\n\n'); } catch { /* noop */ }
+    }, 25_000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+  });
+
   app.post("/api/sortition-notifications/mark-all-read", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user!.id;
