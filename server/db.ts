@@ -9,6 +9,15 @@ if (!process.env.DATABASE_URL) {
 }
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Force every connection to UTC so `NOW()` writes UTC wallclock into our
+// `timestamp` (no-TZ) columns and the node-pg driver's symmetric "treat
+// bare wallclocks as UTC" read produces the correct Date. Without this,
+// the Postgres server's local timezone (Europe/Stockholm) was shifting
+// every stored createdAt forward by +2h, which made notifications render
+// as if they were 2 hours in the future on the client.
+pool.on('connect', (client) => {
+  client.query(`SET TIME ZONE 'UTC'`).catch(() => { /* noop */ });
+});
 export const db = drizzle(pool, { schema });
 
 // ─── Vote-path connection (B3: DB-grant enforcement) ────────────────────────
@@ -28,6 +37,9 @@ let configuredVoteDb: typeof db | null = null;
 
 if (process.env.VOTE_DATABASE_URL) {
   votePool = new Pool({ connectionString: process.env.VOTE_DATABASE_URL });
+  votePool.on('connect', (client) => {
+    client.query(`SET TIME ZONE 'UTC'`).catch(() => { /* noop */ });
+  });
   configuredVoteDb = drizzle(votePool, { schema });
 }
 
