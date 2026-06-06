@@ -25,12 +25,20 @@ declare global {
 
 async function fireLocalNotification(title: string, body: string): Promise<void> {
   const plugin = window.Capacitor?.Plugins?.LocalNotifications;
-  if (!plugin || !window.Capacitor?.isNativePlatform?.()) return;
+  const isNative = window.Capacitor?.isNativePlatform?.();
+  console.log('[notif] fireLocalNotification:', { title, body, isNative, hasPlugin: !!plugin });
+  if (!plugin || !isNative) {
+    console.log('[notif] skipping: not native or no plugin');
+    return;
+  }
   try {
     await plugin.schedule({
       notifications: [{ id: Date.now() % 2_147_483_647, title, body }],
     });
-  } catch { /* permission denied or not granted */ }
+    console.log('[notif] scheduled successfully');
+  } catch (e) {
+    console.error('[notif] failed to schedule:', e);
+  }
 }
 
 export function useUnreadCount() {
@@ -39,20 +47,22 @@ export function useUnreadCount() {
     refetchInterval: 30000,
   });
 
-  // Fire a local notification when unread count increases (new notification arrived)
-  const prevCount = useRef(query.data?.count ?? 0);
+  // Fire a local notification when unread count increases or on initial load with unread
+  const prevCount = useRef<number | null>(null);
   useEffect(() => {
+    if (!query.isSuccess) return;
     const current = query.data?.count ?? 0;
-    if (query.isSuccess && current > prevCount.current) {
-      // Fetch the latest notification to show in the toast
+    const isNew = prevCount.current === null;
+    const increased = prevCount.current !== null && current > prevCount.current;
+    if ((isNew || increased) && current > 0) {
       apiRequest("GET", "/api/sortition-notifications?limit=1&unread=true")
         .then((res: any) => {
           const n = (Array.isArray(res) ? res : res.notifications?.[0]) ?? null;
           if (n) fireLocalNotification(n.title ?? "Νέα ειδοποίηση", n.message ?? "");
         })
         .catch(() => {});
-      prevCount.current = current;
     }
+    prevCount.current = current;
   }, [query.data?.count, query.isSuccess]);
 
   return query;
