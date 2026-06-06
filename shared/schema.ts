@@ -214,6 +214,7 @@ export const communities = pgTable("communities", {
   // Deliberation parameters (per-community config)
   maxConcurrentVotes: integer("max_concurrent_votes").default(-1), // -1 = unlimited
   minParticipationPct: numeric("min_participation_pct").default("0"),
+  votePassThreshold: numeric("vote_pass_threshold").default("0.5"), // yes votes / (yes+no) must exceed this to pass
   sortitionSize: integer("sortition_size").default(20),
   sortitionMode: text("sortition_mode").default("absolute"), // 'absolute' | 'percentage'
   sortitionResponseHours: integer("sortition_response_hours").default(72),

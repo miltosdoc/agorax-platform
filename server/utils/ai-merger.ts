@@ -1,23 +1,25 @@
 /**
- * Amendment merger — local-only.
+ * Amendment merger — local LLM merge with deterministic fallback.
  *
- * Builds a single coherent solution text by concatenating accepted (and
- * popular-enough) amendments onto the original solution, with type tags
- * (Βελτίωση / Προσθήκη / Αφαίρεση / Αντιπρόταση). Output goes to
- * `proposal.finalText` — we never mutate `question` / `solution` so the
- * original deliberation surface stays intact and the UI can show a diff.
+ * Calls the configured local inference endpoint to intelligently merge
+ * accepted (and community-flagged) amendments into the original proposal
+ * text. The AI produces a single coherent solution that incorporates all
+ * included amendments — not a concatenation of tagged blocks.
  *
- * Previously this module also called an external LLM (OpenRouter) to
- * smooth-merge amendments into flowing prose. Per the GDPR audit
- * (`docs/compliance/02_DATA_MINIMIZATION_AUDIT.md §4.2`) that external
- * disclosure was removed — proposal text never leaves the instance.
- * Until a local model is wired, we use the deterministic concat
- * fallback that was already in place for the no-API-key path.
+ * If the LLM is unavailable, falls back to deterministic concatenation
+ * (type-tagged blocks appended to the original solution).
+ *
+ * GDPR §4.2 compliance: proposal text never leaves the instance.
+ * The LLM endpoint must be self-hosted / private.
+ *
+ * The merged text is written to `proposal.finalText`. The original
+ * `question` / `solution` are never mutated — the UI can show a diff.
  */
 
 import { db } from '../db';
 import { proposalAmendments, proposals, communities } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { chatCompletion, isLlmConfigured, LlmUnavailableError } from './llm-client';
 
 interface AiMergeOptions {
   /**
@@ -66,6 +68,79 @@ function localConcat(question: string, solution: string, accepted: Array<{ id: n
   ].join('');
 }
 
+const MERGE_PROMPT = `Είσαι ειδικός στη σύνταξη πολιτικών κειμένων.
+Έχεις μια αρχική πρόταση και μια λίστα αποδεκτών τροπολογιών.
+Ενσωμάτωσε ΟΛΕΣ τις τροπολογίες στην αρχική πρόταση, παράγοντας ένα ενιαίο, συνεκτικό κείμενο.
+
+ΚΑΝΟΝΕΣ:
+1. ΔΙΑΤΗΡΕΣΕ το νόημα και τον τόνο της αρχικής πρότασης.
+2. ΕΝΣΩΜΑΤΩΣΕ κάθε τροπολογία φυσικά στο κείμενο — ΜΗΝ τις προσθέσεις ως ξεχωριστά μπλοκ.
+3. Αν μια τροπολογία είναι "Αφαίρεση", ΑΦΑΙΡΕΣΕ το αντίστοιχο τμήμα από την αρχική πρόταση.
+4. Αν μια τροπολογία είναι "Αντιπρόταση", ΑΝΤΙΚΑΤΑΣΤΗΣΕ το αντίστοιχο τμήμα.
+5. Αν μια τροπολογία είναι "Βελτίωση" ή "Προσθήκη", ΕΝΣΩΜΑΤΩΣΕ το νέο περιεχόμενο φυσικά.
+6. Το τελικό κείμενο πρέπει να διαβάζεται ως ενιαίο έγγραφο, όχι ως παζλ.
+7. Απάντησε ΜΟΝΟ το τελικό κείμενο, χωρίς σχόλια ή μεταδεδομένα.
+
+ΑΡΧΙΚΗ ΠΡΟΤΑΣΗ:
+---
+{solution}
+---
+
+ΤΡΟΠΟΛΟΓΙΕΣ:
+{amendments}
+
+ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:`;
+
+async function llmMerge(
+  question: string,
+  solution: string,
+  amendments: Array<{ id: number; type: string; text: string }>,
+): Promise<{ text: string; success: boolean }> {
+  if (!isLlmConfigured()) {
+    return { text: '', success: false };
+  }
+
+  const amendmentsText = amendments
+    .map((a, i) => {
+      const typeLabel =
+        a.type === 'improvement' ? 'Βελτίωση' :
+        a.type === 'addition' ? 'Προσθήκη' :
+        a.type === 'removal' ? 'Αφαίρεση' :
+        a.type === 'counter_proposal' ? 'Αντιπρόταση' : 'Τροπολογία';
+      return `${i + 1}. [${typeLabel}] ${a.text}`;
+    })
+    .join('\n\n');
+
+  const prompt = MERGE_PROMPT
+    .replace('{solution}', solution.slice(0, 4000))
+    .replace('{amendments}', amendmentsText.slice(0, 4000));
+
+  try {
+    const response = await chatCompletion({
+      messages: [
+        { role: 'system', content: 'Είσαι ειδικός στη σύνταξη και επεξεργασία πολιτικών κειμένων. Ενσωματώνεις τροπολογίες σε προτάσεις με φυσικό και συνεκτικό τρόπο.' },
+        { role: 'user', content: prompt },
+      ],
+      maxTokens: 4000,
+      temperature: 0.3,
+      timeoutMs: 45_000,
+      enableThinking: false,
+    });
+
+    if (response.trim().length > 0) {
+      return { text: response.trim(), success: true };
+    }
+  } catch (err) {
+    if (err instanceof LlmUnavailableError) {
+      console.warn(`[ai-merger] LLM unavailable: ${err.message}`);
+    } else {
+      console.warn(`[ai-merger] Unexpected error: ${err}`);
+    }
+  }
+
+  return { text: '', success: false };
+}
+
 export async function aiMergeAmendments(
   proposalId: number,
   options: AiMergeOptions = {},
@@ -96,10 +171,8 @@ export async function aiMergeAmendments(
     if (decision === 'accepted') {
       included.push({ id: a.id, type: a.type, text: a.text, reason: 'author-accepted' });
     } else if (decision !== 'rejected' && threshold < 1 && ratio >= threshold) {
-      // Pending amendments with strong community support get pulled in.
       included.push({ id: a.id, type: a.type, text: a.text, reason: `popularity ${(ratio * 100).toFixed(0)}%` });
     } else if (decision === 'rejected' && ratio >= Math.max(threshold, 0.7)) {
-      // Author rejected but community strongly disagrees — still include.
       included.push({ id: a.id, type: a.type, text: a.text, reason: `community-override ${(ratio * 100).toFixed(0)}%` });
     } else {
       excluded.push(a.id);
@@ -120,9 +193,17 @@ export async function aiMergeAmendments(
     return base; // nothing to merge — return original verbatim
   }
 
-  // GDPR §4.2 audit decision: external LLM merge removed. Until a local
-  // inference path is wired, we always use the deterministic concat.
-  base.mergedSolution = localConcat(proposal.question, proposal.solution, included);
+  // Try LLM merge first; fall back to deterministic concat.
+  const llmResult = await llmMerge(proposal.question, proposal.solution, included);
+  if (llmResult.success) {
+    base.mergedSolution = llmResult.text;
+    base.source = 'llm';
+    const cfg = (await import('./llm-client')).readLlmConfig();
+    base.llmModel = cfg?.model;
+  } else {
+    base.mergedSolution = localConcat(proposal.question, proposal.solution, included);
+  }
+
   return base;
 }
 
