@@ -2,11 +2,13 @@ import 'dotenv/config';
 import { db } from '../server/db';
 import { sql } from 'drizzle-orm';
 (async () => {
-  console.log('=== sortition_bodies for community 10 ===');
-  const b = await db.execute(sql`
-    SELECT id, proposal_id, status, size, purpose, selected_at, completed_at
-    FROM sortition_bodies WHERE community_id = 10 ORDER BY id DESC
+  console.log('=== latest jobs across all proposals ===');
+  const j = await db.execute(sql`
+    SELECT to_char(created_at,'HH24:MI:SS') as created, type, status, error,
+           (payload->'data'->>'proposalId')::int as proposal_id,
+           payload->'data'->>'purpose' as purpose
+    FROM jobs ORDER BY created_at DESC LIMIT 12
   `);
-  for (const row of b.rows) console.log(row);
+  console.table(j.rows);
   process.exit(0);
 })();
