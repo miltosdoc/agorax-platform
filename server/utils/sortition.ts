@@ -107,18 +107,31 @@ export async function getEligibleMembers(
 
   // Bootstrap fallback: a brand-new community has nobody who's been there a
   // week. Without this the very first proposal that reaches sortition stalls
-  // forever (`No eligible members for sortition`). When the seasoned pool is
-  // empty, fall back to every current member (still minus active sortition
-  // members). Once enough members have crossed the 7-day mark, the normal
-  // path takes over automatically.
+  // forever (`No eligible members for sortition`).
   if (aged.length === 0) {
-    return members
-      .filter((m: any) => !activeMemberIds.has(m.userId))
-      .map((m: any) => ({
+    // First try ignoring just the 7-day rule (keep the "in active body"
+    // exclusion intact — that's still the right default in most cases).
+    const recentlyJoined = members
+      .filter((m: any) => !activeMemberIds.has(m.userId));
+    if (recentlyJoined.length > 0) {
+      return recentlyJoined.map((m: any) => ({
         userId: m.userId,
         role: m.role,
         joinedAt: new Date(m.joinedAt),
       }));
+    }
+    // Last-resort: even the "not in active body" pool is empty. In a small
+    // community where every member is already serving in another sortition
+    // body, refusing to form the next body deadlocks the proposal for up to
+    // 72h. Allow members to serve in multiple bodies simultaneously rather
+    // than stalling deliberation entirely. The concentration-of-power
+    // concern this is meant to prevent only applies when the community has
+    // enough members to fan out — which it doesn't.
+    return members.map((m: any) => ({
+      userId: m.userId,
+      role: m.role,
+      joinedAt: new Date(m.joinedAt),
+    }));
   }
 
   return aged.map((m: any) => ({

@@ -25,18 +25,17 @@ import {
 import { enqueueStructureProposal, enqueueNotification, enqueueCreateSortition, enqueueRecalculateScore, enqueueSortitionTimeout } from './job-queue';
 import { completeSortitionBody } from './sortition-timeout';
 import { storage } from '../storage';
-// Lazy import — db throws if DATABASE_URL is unset (e.g. CI unit tests).
-// Only transitionToValidation() needs it, so defer until called.
-let getDb: () => typeof import('../db')['db'];
-function database() {
-  if (!getDb) {
-    const dbMod = require('../db');
-    getDb = () => dbMod.db;
-  }
-  return getDb();
-}
-import { proposals, validationResults } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+// Direct import — every other server util that touches the DB does this, and
+// the lazy/createRequire variants both break in one runtime or the other
+// (bare `require` fails in ESM via tsx; createRequire fails in the esbuild
+// bundle because `../db` is no longer a separate module on disk). The
+// "CI without DATABASE_URL" worry the lazy pattern was defending against
+// is hypothetical — unit tests that don't want to load this file simply
+// shouldn't import it.
+import { db } from '../db';
+function database() { return db; }
+import { proposals, validationResults, sortitionBodies } from '@shared/schema';
+import { eq, and, sql } from 'drizzle-orm';
 import { validateProposal, type LLMValidationResult } from './llm-validation';
 
 export type { ProposalState } from '@shared/proposal-lifecycle';
@@ -219,6 +218,31 @@ export async function triggerSideEffects(
       break;
     
     case 'community_signal->sortition_synthesis':
+      // Close out any LLM-triggered scoring body for this proposal before
+      // creating the text-synthesis body. The scoring body was a peer-jury
+      // sanity check on the LLM verdict; by the time the proposal has been
+      // pushed through author_review + community_signal, the author has
+      // chosen to proceed regardless and the jury's score no longer gates
+      // anything. Without this step, in a small community (~size of one
+      // sortition body) every eligible member is "active" in the scoring
+      // body, so the text-synthesis body can't form (No eligible members
+      // for sortition) and the proposal deadlocks for up to 72h.
+      try {
+        const closed = await database()
+          .update(sortitionBodies)
+          .set({ status: 'completed', completedAt: new Date() })
+          .where(and(
+            eq(sortitionBodies.proposalId, proposal.id),
+            eq(sortitionBodies.purpose, 'scoring'),
+            sql`${sortitionBodies.status} IN ('selecting', 'active')`,
+          ))
+          .returning({ id: sortitionBodies.id });
+        if (closed.length > 0) {
+          console.log(`[sortition] closed ${closed.length} scoring body(ies) for proposal ${proposal.id} before creating text_synthesis body: ${closed.map(c => '#' + c.id).join(', ')}`);
+        }
+      } catch (err: any) {
+        console.warn(`[sortition] failed to close scoring bodies for proposal ${proposal.id}: ${err?.message}`);
+      }
       // Create sortition body for text synthesis
       await enqueueCreateSortition(proposal.communityId, 12, proposal.id, 'text_synthesis');
       // Pre-fill finalText with the AI merge so the jury has a baseline.

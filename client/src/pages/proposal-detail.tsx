@@ -124,6 +124,19 @@ export default function ProposalDetailPage() {
       .catch(() => setSortitionRevisions([]));
   }, [proposalId]);
 
+  // While LLM validation is in flight the proposal sits in 'review' for
+  // ~10–15s. Poll every 3s so the page reflects the post-validation status
+  // (author_review, voting, or draft) without the user needing to refresh.
+  useEffect(() => {
+    if (!proposalId || proposal?.status !== 'review') return;
+    const interval = setInterval(() => {
+      api.get<Proposal>(`/api/proposals/${proposalId}`)
+        .then((resp) => setProposal(resp.data))
+        .catch(() => { /* transient; next tick will retry */ });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [proposalId, proposal?.status]);
+
   const handleFinalize = async () => {
     if (!proposalId || finalizing) return;
     setFinalizing(true);
@@ -194,6 +207,21 @@ export default function ProposalDetailPage() {
           userIsAuthor={userIsAuthor}
         />
       </div>
+
+      {/* While the LLM is scoring (status='review'), tell the user what's
+          happening — the page polls every 3s and updates itself. */}
+      {proposal.status === 'review' && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-3" data-testid="proposal-validation-banner">
+          <span className="text-lg leading-none mt-0.5">🤖</span>
+          <div>
+            <div className="font-medium">Η πρόταση επικυρώνεται…</div>
+            <div className="text-amber-800">
+              Το σύστημα αξιολογεί την πρότασή σου. Αυτό διαρκεί συνήθως 10–15
+              δευτερόλεπτα. Η σελίδα θα ανανεωθεί αυτόματα μόλις ολοκληρωθεί.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lifecycle Stepper */}
       <Card className="mb-4">
