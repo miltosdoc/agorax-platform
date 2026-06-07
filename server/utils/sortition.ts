@@ -90,22 +90,42 @@ export async function getEligibleMembers(
   storage: any,
 ): Promise<EligibleMember[]> {
   const members = await storage.getCommunityMembers(communityId);
-  
-  // Filter out members who joined less than 7 days ago
+
+  // Anti-sybil heuristic: members must have been in the community for at least
+  // 7 days before they can be drawn for sortition. Without this a flood of
+  // freshly-created accounts could be selected and skew a vote.
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  
-  // Get currently active sortition members to exclude
+
+  // Already-serving members are excluded so deliberative power doesn't pool
+  // in the same handful of citizens.
   const activeMemberIds = await getActiveSortitionMembers(communityId);
-  
-  return members
+
+  const aged = members
     .filter((m: any) => new Date(m.joinedAt) <= sevenDaysAgo)
-    .filter((m: any) => !activeMemberIds.has(m.userId))
-    .map((m: any) => ({
-      userId: m.userId,
-      role: m.role,
-      joinedAt: new Date(m.joinedAt),
-    }));
+    .filter((m: any) => !activeMemberIds.has(m.userId));
+
+  // Bootstrap fallback: a brand-new community has nobody who's been there a
+  // week. Without this the very first proposal that reaches sortition stalls
+  // forever (`No eligible members for sortition`). When the seasoned pool is
+  // empty, fall back to every current member (still minus active sortition
+  // members). Once enough members have crossed the 7-day mark, the normal
+  // path takes over automatically.
+  if (aged.length === 0) {
+    return members
+      .filter((m: any) => !activeMemberIds.has(m.userId))
+      .map((m: any) => ({
+        userId: m.userId,
+        role: m.role,
+        joinedAt: new Date(m.joinedAt),
+      }));
+  }
+
+  return aged.map((m: any) => ({
+    userId: m.userId,
+    role: m.role,
+    joinedAt: new Date(m.joinedAt),
+  }));
 }
 
 /**
