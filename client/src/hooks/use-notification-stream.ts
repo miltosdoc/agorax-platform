@@ -45,13 +45,59 @@ declare global {
               id: number;
               title: string;
               body: string;
+              channelId?: string;
+              smallIcon?: string;
               extra?: Record<string, unknown>;
             }>;
           }) => Promise<unknown>;
           requestPermissions?: () => Promise<{ display: string }>;
+          createChannel?: (opts: {
+            id: string;
+            name: string;
+            description?: string;
+            importance: 1 | 2 | 3 | 4 | 5;  // 5 = IMPORTANCE_HIGH (pop-up + sound)
+            visibility?: -1 | 0 | 1;
+            sound?: string;
+            vibration?: boolean;
+            lights?: boolean;
+            lightColor?: string;
+          }) => Promise<unknown>;
         };
       };
     };
+  }
+}
+
+// Channel id used by every native notification we schedule. Android 8+
+// notifications need a channel; the channel's importance controls whether
+// the notification pops as a banner or just lands silently in the tray.
+// Capacitor's auto-created default channel uses importance 4 (Default —
+// no pop-up), so we make and use our own at importance 5 (High).
+const ANDROID_CHANNEL_ID = 'agorax-default-high';
+let channelEnsured = false;
+
+async function ensureAndroidChannel(): Promise<void> {
+  if (channelEnsured) return;
+  const plugin = window.Capacitor?.Plugins?.LocalNotifications;
+  if (!plugin?.createChannel) {
+    channelEnsured = true;
+    return;
+  }
+  try {
+    await plugin.createChannel({
+      id: ANDROID_CHANNEL_ID,
+      name: 'AgoraX',
+      description: 'AgoraX notifications',
+      importance: 5,        // HIGH: heads-up banner + sound
+      visibility: 1,        // public on lock screen
+      vibration: true,
+      lights: true,
+      sound: 'default',
+    });
+  } catch {
+    // channel might already exist; createChannel is idempotent in Capacitor
+  } finally {
+    channelEnsured = true;
   }
 }
 
@@ -62,6 +108,7 @@ function isNativeApp(): boolean {
 async function fireNativeNotification(n: IncomingNotification): Promise<void> {
   const plugin = window.Capacitor?.Plugins?.LocalNotifications;
   if (!plugin) return;
+  await ensureAndroidChannel();
   try {
     await plugin.schedule({
       notifications: [
@@ -69,6 +116,7 @@ async function fireNativeNotification(n: IncomingNotification): Promise<void> {
           id: Date.now() % 2_147_483_647,
           title: n.title,
           body: n.message ?? '',
+          channelId: ANDROID_CHANNEL_ID,
           extra: { actionUrl: n.actionUrl ?? '/notifications' },
         },
       ],
@@ -111,6 +159,7 @@ export function useNotificationStream(enabled: boolean): void {
       if (plugin?.requestPermissions) {
         void plugin.requestPermissions().catch(() => { /* user can deny; we'll just skip native toasts */ });
       }
+      void ensureAndroidChannel();
     }
 
     const es = new EventSource('/api/sortition-notifications/stream', {

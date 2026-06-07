@@ -3,41 +3,39 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { SortitionNotification, NotificationsResponse } from "@/types/notifications";
 
-declare global {
-  interface Window {
-    Capacitor?: {
-      isNativePlatform?: () => boolean;
-      Plugins?: {
-        LocalNotifications?: {
-          schedule: (opts: {
-            notifications: Array<{
-              id: number;
-              title: string;
-              body: string;
-              extra?: Record<string, unknown>;
-            }>;
-          }) => Promise<unknown>;
-        };
-      };
-    };
-  }
-}
+// Shared with use-notification-stream — keep the channel id in sync.
+const ANDROID_CHANNEL_ID = 'agorax-default-high';
 
 async function fireLocalNotification(title: string, body: string): Promise<void> {
   const plugin = window.Capacitor?.Plugins?.LocalNotifications;
   const isNative = window.Capacitor?.isNativePlatform?.();
-  console.log('[notif] fireLocalNotification:', { title, body, isNative, hasPlugin: !!plugin });
-  if (!plugin || !isNative) {
-    console.log('[notif] skipping: not native or no plugin');
-    return;
-  }
+  if (!plugin || !isNative) return;
   try {
+    // Make sure the high-importance channel exists (idempotent).
+    if (plugin.createChannel) {
+      try {
+        await plugin.createChannel({
+          id: ANDROID_CHANNEL_ID,
+          name: 'AgoraX',
+          description: 'AgoraX notifications',
+          importance: 5,
+          visibility: 1,
+          vibration: true,
+          lights: true,
+          sound: 'default',
+        });
+      } catch { /* already exists */ }
+    }
     await plugin.schedule({
-      notifications: [{ id: Date.now() % 2_147_483_647, title, body }],
+      notifications: [{
+        id: Date.now() % 2_147_483_647,
+        title,
+        body,
+        channelId: ANDROID_CHANNEL_ID,
+      }],
     });
-    console.log('[notif] scheduled successfully');
-  } catch (e) {
-    console.error('[notif] failed to schedule:', e);
+  } catch {
+    // best-effort; permission may not be granted
   }
 }
 

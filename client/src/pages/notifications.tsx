@@ -8,6 +8,7 @@ import { Bell, CheckCheck, FileText } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import AppShell from "@/components/layout/AppShell";
 import { PushOptIn } from "@/components/notifications/PushOptIn";
+import { LocalNotifTestButton } from "@/components/notifications/LocalNotifTestButton";
 
 export default function NotificationsPage() {
   const { t } = useTranslation();
@@ -43,6 +44,7 @@ export default function NotificationsPage() {
       <div className="mb-4">
         <PushOptIn />
       </div>
+      <LocalNotifTestButton />
       <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread")}>
         <TabsList className="mb-4">
           <TabsTrigger value="all">
