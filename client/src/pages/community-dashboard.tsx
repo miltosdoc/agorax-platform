@@ -19,6 +19,7 @@ import { ActiveCallBanner } from '@/components/livekit/ActiveCallBanner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
+import { ImpactMetricsDashboard } from '@/components/community/ImpactMetricsDashboard';
 import {
   getCommunityDashboardMetrics,
   getGovernanceTranslationKey,
@@ -257,6 +258,21 @@ export default function CommunityDashboardPage() {
               <div className="mt-1 text-2xl font-semibold">{metrics.decidedProposalCount}</div>
             </div>
           </div>
+
+          {/* Impact Metrics Dashboard — Civic Tech Best Practice */}
+          <ImpactMetricsDashboard
+            metrics={{
+              totalProposals: metrics.proposalCount,
+              proposalsImplemented: metrics.decidedProposalCount,
+              totalParticipants: metrics.memberCount,
+              totalVotes: 0, // TODO: fetch from API
+              activeProposals: metrics.activeProposalCount,
+              proposalsInVoting: 0, // TODO: fetch from API
+              proposalsInDeliberation: 0, // TODO: fetch from API
+              averageParticipationRate: 0, // TODO: fetch from API
+            }}
+            onViewAll={() => setLocation('/analytics')}
+          />
 
           <div className="rounded-lg border bg-background/70 p-4">
             <div className="flex items-center justify-between text-sm mb-2">
