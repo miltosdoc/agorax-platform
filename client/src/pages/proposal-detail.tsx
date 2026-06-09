@@ -26,6 +26,7 @@ import { ProposalMediaPreview } from '@/components/proposal/ProposalMediaPreview
 import VotePanel from '@/components/voting/VotePanel';
 import { getStatusForProposal } from '@/lib/proposal-status';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
+import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
 
 interface Proposal {
   id: number;
@@ -323,7 +324,6 @@ export default function ProposalDetailPage() {
             {(() => {
               const numericScore = proposal.llmScore != null ? Number(proposal.llmScore) : null;
               const score = Number.isFinite(numericScore) ? (numericScore as number) : null;
-              const category = categoryFromScore(score);
               if (score === null) {
                 return userIsAuthor ? (
                   <div className="mt-4 p-4 border rounded">
@@ -339,42 +339,12 @@ export default function ProposalDetailPage() {
                 ) : null;
               }
               return (
-                <div className={`mt-4 p-4 border rounded ${scoreColor(score)}`} data-testid="proposal-llm-validation">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <h4 className="text-sm font-medium mb-1">{t('proposal.llmValidation')}</h4>
-                      <div className="flex items-center gap-3 flex-wrap text-sm">
-                        <span data-testid="proposal-llm-score">
-                          <span className="text-muted-foreground">{t('proposal.score')}</span>
-                          <span className="ml-2 font-semibold">{Math.round(score)}/100</span>
-                        </span>
-                        {category && (
-                          <Badge variant="outline" data-testid="proposal-llm-category">
-                            {t(`proposal.llmCategory.${category}`)}
-                          </Badge>
-                        )}
-                        {proposal.llmValidationRound != null && (
-                          <span className="text-xs text-muted-foreground" data-testid="proposal-llm-round">
-                            {t('proposal.llmRound', { round: proposal.llmValidationRound })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {userIsAuthor && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleRevalidate}
-                        disabled={revalidating}
-                        data-testid="proposal-revalidate"
-                      >
-                        {revalidating ? t('proposal.revalidating') : t('proposal.requestRevalidation')}
-                      </Button>
-                    )}
-                  </div>
-                  {proposal.llmFeedback && (
-                    <p className="text-sm mt-3 whitespace-pre-wrap">{proposal.llmFeedback}</p>
-                  )}
+                <div className="mt-4" data-testid="proposal-llm-validation">
+                  <AIValidationBadge
+                    score={score}
+                    feedback={proposal.llmFeedback || undefined}
+                    onDisagree={userIsAuthor ? handleRevalidate : undefined}
+                  />
                   {revalidateError && (
                     <p className="text-xs text-red-600 mt-2">{revalidateError}</p>
                   )}
