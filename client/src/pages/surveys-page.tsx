@@ -133,7 +133,7 @@ export default function SurveysPage() {
                 {poll.completion ? `${poll.completion.completed} συμμετοχές` : ''}
               </span>
               <div className="flex gap-2">
-                {poll.status === 'live' && isPanelist && (
+                {poll.status === 'live' && (
                   <Link href={`/surveys/${poll.id}/take`}>
                     <Button size="sm">Συμμετοχή</Button>
                   </Link>

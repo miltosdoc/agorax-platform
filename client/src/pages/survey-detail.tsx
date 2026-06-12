@@ -148,11 +148,16 @@ export default function SurveyDetailPage() {
       )}
       {isCreator && poll.status === 'live' && (
         <Card className="mb-4">
-          <CardContent className="py-4 flex items-center justify-between gap-3">
+          <CardContent className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <p className="text-sm">Η δημοσκόπηση τρέχει. Το κλείσιμο υπολογίζει τα σταθμισμένα αποτελέσματα και παγώνει τη μεθοδολογία.</p>
-            <Button variant="outline" onClick={() => action('close')} disabled={busy}>
-              <Lock className="w-4 h-4 mr-1" /> Κλείσιμο & αποτελέσματα
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button onClick={() => navigate(`/surveys/${poll.id}/take`)} disabled={busy}>
+                Συμμετοχή
+              </Button>
+              <Button variant="outline" onClick={() => action('close')} disabled={busy}>
+                <Lock className="w-4 h-4 mr-1" /> Κλείσιμο & αποτελέσματα
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -305,7 +310,7 @@ export default function SurveyDetailPage() {
         </Card>
       )}
 
-      {poll.status === 'live' && !isCreator && (
+      {poll.status === 'live' && (
         <Button onClick={() => navigate(`/surveys/${poll.id}/take`)}>Συμμετοχή στη δημοσκόπηση</Button>
       )}
     </AppShell>
