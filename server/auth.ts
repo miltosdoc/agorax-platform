@@ -304,7 +304,7 @@ export function setupAuth(app: Express) {
       }
 
       // Store any returnTo info
-      const returnTo = req.body.returnTo || '/home';
+      const returnTo = req.body.returnTo || '/feed';
 
       // Extract client IP
       const clientIp = (req.ip || req.headers['x-forwarded-for'] || (req.connection as any).remoteAddress) as string;
@@ -395,7 +395,7 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", authLimiter, (req, res, next) => {
     // Store any returnTo info from the session or request body
-    const returnTo = req.body.returnTo || '/home';
+    const returnTo = req.body.returnTo || '/feed';
 
     // Extract client IP and device fingerprint
     const clientIp = (req.ip || req.headers['x-forwarded-for'] || (req.connection as any).remoteAddress) as string;
@@ -526,7 +526,7 @@ export function setupAuth(app: Express) {
         }
 
         // Get the returnTo URL from the session and clear it
-        const returnTo = req.session.returnTo || '/home';
+        const returnTo = req.session.returnTo || '/feed';
         delete req.session.returnTo;
 
         // Redirect to the original URL or homepage after successful authentication

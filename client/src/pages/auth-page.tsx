@@ -43,7 +43,7 @@ export default function AuthPage() {
 
   // Extract URL parameters
   const params = new URLSearchParams(location.split("?")[1]);
-  const returnTo = params.get("returnTo") || "/home";
+  const returnTo = params.get("returnTo") || "/feed";
 
   const [tab, setTab] = useState(() => {
     // Check if URL has a tab parameter
