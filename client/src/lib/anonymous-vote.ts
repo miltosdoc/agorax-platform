@@ -116,7 +116,10 @@ export async function castAnonymousVote(
   const preparedMsgB64 = bytesToBase64(req.preparedMsg);
   const voteResp = await fetch(`/api/proposals/${proposalId}/anonymous-vote`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // ngrok-skip-browser-warning: a cookieless request through an ngrok
+    // tunnel otherwise gets the HTML warning interstitial (the bypass
+    // cookie is stripped along with the session). Harmless elsewhere.
+    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
     body: JSON.stringify({ token: tokenB64, preparedMsg: preparedMsgB64, signature: sig, choice }),
     credentials: 'omit', // GDPR: no session cookies on anonymous vote path
   });

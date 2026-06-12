@@ -70,9 +70,12 @@ export async function enrollInPanel(
   const tokenB64 = bytesToBase64(req.token);
   // credentials: 'omit' — the anonymous registration must not carry the
   // session cookie, or the operator could correlate panelist ↔ user.
+  // ngrok-skip-browser-warning: cookieless requests through an ngrok
+  // tunnel would otherwise get the HTML warning interstitial (the bypass
+  // cookie is stripped along with everything else). Harmless elsewhere.
   const res = await fetch('/api/panel/register', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' },
     credentials: 'omit',
     body: JSON.stringify({
       token: tokenB64,
@@ -103,10 +106,17 @@ export async function panelFetch<T>(
     credentials: 'omit',
     headers: {
       'X-Panel-Token': token,
+      // Cookieless fetches through ngrok need this to skip the HTML
+      // interstitial (see enrollInPanel). Harmless on other hosts.
+      'ngrok-skip-browser-warning': '1',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
+  const contentType = res.headers.get('content-type') ?? '';
+  if (res.ok && !contentType.includes('application/json')) {
+    throw new Error('Μη αναμενόμενη απάντηση διακομιστή — δοκίμασε ξανά.');
+  }
   if (res.status === 401) {
     throw new Error('not_panelist');
   }
