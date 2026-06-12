@@ -23,6 +23,9 @@ import { existsSync, createReadStream } from 'fs';
 import path from 'path';
 import express from 'express';
 import { mediaRepo, proposalRepo, communityRepo } from '../storage';
+import { db } from '../db';
+import { proposals, communities, users, surveyPolls } from '@shared/schema';
+import { desc, eq, inArray, ne } from 'drizzle-orm';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
 import { generatePodcastScript, generateTeaserScript } from '../utils/media-scripts';
@@ -349,6 +352,11 @@ export function registerMediaRoutes(app: Express): void {
   });
 
   // ── Global feed ──────────────────────────────────────────────────────
+  // type=podcast|video      → media only, cursor-paginated (original behavior)
+  // type=proposal|survey    → that stream only, newest first
+  // type omitted / 'all'    → unified stream: media + non-draft proposals +
+  //                           live/closed survey polls, merged by date.
+  // Every item carries feedType so the client can render the right card.
 
   app.get('/api/feed', async (req, res) => {
     try {
@@ -357,11 +365,79 @@ export function registerMediaRoutes(app: Express): void {
       const cursorRaw = req.query.cursor as string | undefined;
       const cursor = cursorRaw ? parseInt(cursorRaw, 10) : undefined;
       const limit = req.query.limit ? Math.min(50, parseInt(req.query.limit as string, 10)) : 20;
-      const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
-      res.json({
-        items: rows,
-        nextCursor: rows.length === limit ? rows[rows.length - 1].id : null,
-      });
+
+      if (kind) {
+        const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
+        res.json({
+          items: rows.map((r) => ({ feedType: 'media' as const, ...r })),
+          nextCursor: rows.length === limit ? rows[rows.length - 1].id : null,
+        });
+        return;
+      }
+
+      const wantProposals = kindRaw === undefined || kindRaw === 'all' || kindRaw === 'proposal';
+      const wantSurveys = kindRaw === undefined || kindRaw === 'all' || kindRaw === 'survey';
+      const wantMedia = kindRaw === undefined || kindRaw === 'all';
+
+      const [mediaRows, proposalRows, surveyRows] = await Promise.all([
+        wantMedia ? mediaRepo.feed({ limit: 20 }) : Promise.resolve([]),
+        wantProposals
+          ? db.select({
+              id: proposals.id,
+              question: proposals.question,
+              solution: proposals.solution,
+              status: proposals.status,
+              createdAt: proposals.createdAt,
+              communityId: proposals.communityId,
+              communityName: communities.name,
+              authorName: users.name,
+            })
+            .from(proposals)
+            .innerJoin(communities, eq(proposals.communityId, communities.id))
+            .innerJoin(users, eq(proposals.authorId, users.id))
+            .where(ne(proposals.status, 'draft'))
+            .orderBy(desc(proposals.createdAt))
+            .limit(20)
+          : Promise.resolve([]),
+        wantSurveys
+          ? db.select()
+              .from(surveyPolls)
+              .where(inArray(surveyPolls.status, ['live', 'closed']))
+              .orderBy(desc(surveyPolls.createdAt))
+              .limit(20)
+          : Promise.resolve([]),
+      ]);
+
+      const items = [
+        ...mediaRows.map((r: any) => ({ feedType: 'media' as const, sortAt: r.createdAt, ...r })),
+        ...proposalRows.map((p) => ({
+          feedType: 'proposal' as const,
+          sortAt: p.createdAt,
+          id: p.id,
+          question: p.question,
+          solution: p.solution?.slice(0, 200) ?? '',
+          status: p.status,
+          createdAt: p.createdAt,
+          communityId: p.communityId,
+          communityName: p.communityName,
+          authorName: p.authorName,
+        })),
+        ...surveyRows.map((s) => ({
+          feedType: 'survey' as const,
+          sortAt: s.createdAt,
+          id: s.id,
+          title: s.title,
+          topicTag: s.topicTag,
+          tier: s.tier,
+          status: s.status,
+          createdAt: s.createdAt,
+        })),
+      ]
+        .sort((a, b) => new Date(b.sortAt as any).getTime() - new Date(a.sortAt as any).getTime())
+        .slice(0, limit > 20 ? limit : 40)
+        .map(({ sortAt, ...rest }) => rest);
+
+      res.json({ items, nextCursor: null });
     } catch (err: any) {
       logger.error('feed failed', { err: err?.message });
       res.status(500).json({ message: 'failed to load feed' });
