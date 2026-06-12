@@ -6,7 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { useLocation } from "wouter";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { POLL_HOW_SECTIONS } from "@/components/surveys/HowPollsWork";
+import { Link, useLocation } from "wouter";
 import {
   FileText, CheckCircle, Edit3, TrendingUp, Users, Vote,
   Shield, ArrowRight, Zap, Globe, Lock, Award,
@@ -14,7 +16,7 @@ import {
 } from "lucide-react";
 
 export default function HowItWorksPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -243,6 +245,35 @@ export default function HowItWorksPage() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+
+          {/* Polls & anonymous panel */}
+          <div className="mt-16 mb-16">
+            <h2 className="text-2xl font-bold text-center mb-2">{t('hiw.polls_title')}</h2>
+            <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+              {t('hiw.polls_subtitle')}
+            </p>
+            <Card className="max-w-3xl mx-auto">
+              <CardContent className="p-6">
+                <Accordion type="single" collapsible>
+                  {POLL_HOW_SECTIONS.map((s, i) => (
+                    <AccordionItem key={i} value={`poll-${i}`}>
+                      <AccordionTrigger className="text-sm text-left">
+                        {s.title[locale === 'en' ? 'en' : 'el']}
+                      </AccordionTrigger>
+                      <AccordionContent className="text-sm text-muted-foreground">
+                        {s.body[locale === 'en' ? 'en' : 'el']}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+                <div className="text-center mt-4">
+                  <Link href="/surveys">
+                    <Button variant="outline" size="sm">{t('hiw.polls_cta')}</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Key Innovations */}

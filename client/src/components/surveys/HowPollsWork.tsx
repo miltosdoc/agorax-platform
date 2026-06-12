@@ -10,9 +10,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { HelpCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 
-interface Section { title: { el: string; en: string }; body: { el: string; en: string } }
+export interface Section { title: { el: string; en: string }; body: { el: string; en: string } }
 
-const SECTIONS: Section[] = [
+export const POLL_HOW_SECTIONS: Section[] = [
   {
     title: { el: "Τι είναι οι δημοσκοπήσεις του AgoraX;", en: "What are AgoraX polls?" },
     body: { el: "Ένα ανοιχτό εργαλείο μέτρησης της κοινής γνώμης: οποιοδήποτε μέλος περιγράφει με απλά λόγια τι θέλει να μάθει, το σύστημα χτίζει ουδέτερο ερωτηματολόγιο, και το ανώνυμο πάνελ απαντά. Κάθε αποτέλεσμα συνοδεύεται από πλήρη σελίδα μεθοδολογίας — δείγμα, στάθμιση, ακριβής διατύπωση. Η διαφάνεια δεν είναι υποσημείωση· είναι το προϊόν.", en: "An open public-opinion measurement tool: any member describes in plain words what they want to learn, the system builds a neutral questionnaire, and the anonymous panel answers. Every result ships with a full methodology page — sample, weighting, exact wording. Transparency is not a footnote; it is the product." },
@@ -67,7 +67,7 @@ export default function HowPollsWork() {
           </DialogTitle>
         </DialogHeader>
         <Accordion type="single" collapsible defaultValue="item-0">
-          {SECTIONS.map((s, i) => (
+          {POLL_HOW_SECTIONS.map((s, i) => (
             <AccordionItem key={i} value={`item-${i}`}>
               <AccordionTrigger className="text-sm text-left">{s.title[lang]}</AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground">{s.body[lang]}</AccordionContent>
