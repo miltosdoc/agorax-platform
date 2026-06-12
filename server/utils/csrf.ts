@@ -30,11 +30,16 @@ const EXEMPT_PATHS = new Set<string>([
 ]);
 
 // Pattern exemptions — used for path families where every member is exempt.
-// /api/proposals/*/anonymous-vote: deliberately unauthenticated (the whole
-// privacy property depends on no session cookie being carried), so there is
-// no session for CSRF to protect.
+// /api/proposals/*/anonymous-vote and the anonymous panel routes are
+// deliberately unauthenticated (the whole privacy property depends on no
+// session cookie being carried), so there is no session for CSRF to
+// protect. Panel routes authenticate via the X-Panel-Token bearer header,
+// which a cross-site attacker can neither read nor forge.
 const EXEMPT_PATH_PATTERNS: RegExp[] = [
   /^\/api\/proposals\/\d+\/anonymous-vote$/,
+  /^\/api\/panel\/register$/,
+  /^\/api\/panel\/profile$/,
+  /^\/api\/surveys\/\d+\/respond$/,
 ];
 
 function newToken(): string {

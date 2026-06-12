@@ -108,6 +108,14 @@ const VOTE_ENDPOINTS = new Set([
   "/anonymous-vote",
   "/verify-receipt",
   "/blind-key",
+  // Anonymous panel paths — same unlinkability rationale (the enrollment
+  // token and panel-token-authenticated requests must not be timestamped
+  // next to authenticated /panel/enroll/sign calls in the same log).
+  "/panel/register",
+  "/panel/me",
+  "/panel/profile",
+  "/instrument",
+  "/respond",
 ]);
 
 function isVoteEndpoint(path: string): boolean {

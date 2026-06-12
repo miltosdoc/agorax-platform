@@ -252,6 +252,90 @@ export function registerSurveysRoutes(app: Express): void {
     res.json({ poll, items, completion: await completionStats(id) });
   });
 
+  // Edit a draft: title/topic + item wording/options. The creator owns the
+  // draft — the compiler is a starting point, not an authority. Module
+  // items and the attention check are excluded (canonical wording).
+  // Edits are recorded in compilerMeta for the methodology page.
+  app.patch('/api/surveys/:id', requireAuth, async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    const poll = await loadPoll(id);
+    if (!poll) return res.status(404).json({ message: 'Not found' });
+    if (poll.creatorId !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Only the creator can edit this poll' });
+    }
+    if (poll.status !== 'draft') return res.status(409).json({ message: 'Only drafts are editable' });
+
+    const { title, topicTag, items: itemEdits, deleteItemIds } = req.body ?? {};
+    const existing = await db.select().from(surveyItems).where(eq(surveyItems.pollId, id));
+    const byId = new Map(existing.map((i) => [i.id, i]));
+
+    const editable = (itemId: number) => {
+      const item = byId.get(itemId);
+      if (!item) return null;
+      if (item.isModuleItem || item.isAttentionCheck) return null;
+      return item;
+    };
+
+    // Validate everything before writing anything.
+    const updates: Array<{ id: number; text: string; options: string[] | null }> = [];
+    if (Array.isArray(itemEdits)) {
+      for (const edit of itemEdits) {
+        const item = editable(Number(edit?.id));
+        if (!item) return res.status(400).json({ message: `Item ${edit?.id} is not editable` });
+        const text = typeof edit.text === 'string' ? edit.text.trim() : '';
+        if (text.length < 5 || text.length > 500) {
+          return res.status(400).json({ message: `Item ${item.id}: text must be 5–500 characters` });
+        }
+        let options: string[] | null = null;
+        if (item.itemType !== 'open_text') {
+          const opts: string[] = Array.isArray(edit.options)
+            ? edit.options.map((o: unknown) => String(o).trim()).filter((o: string) => o.length > 0)
+            : [];
+          if (opts.length < 2 || opts.length > 12) {
+            return res.status(400).json({ message: `Item ${item.id}: 2–12 options required` });
+          }
+          options = opts;
+        }
+        updates.push({ id: item.id, text, options });
+      }
+    }
+    const deletions: number[] = [];
+    if (Array.isArray(deleteItemIds)) {
+      for (const rawId of deleteItemIds) {
+        const item = editable(Number(rawId));
+        if (!item) return res.status(400).json({ message: `Item ${rawId} cannot be deleted` });
+        deletions.push(item.id);
+      }
+      const remainingHost = existing.filter((i) =>
+        !i.isModuleItem && !i.isAttentionCheck && !deletions.includes(i.id),
+      ).length;
+      if (remainingHost < 1) {
+        return res.status(400).json({ message: 'A poll needs at least one question besides the attention check' });
+      }
+    }
+
+    for (const u of updates) {
+      await db.update(surveyItems).set({ text: u.text, options: u.options }).where(eq(surveyItems.id, u.id));
+    }
+    if (deletions.length > 0) {
+      await db.delete(surveyItems).where(inArray(surveyItems.id, deletions));
+    }
+    const pollPatch: Record<string, unknown> = {
+      compilerMeta: { ...(poll.compilerMeta as object ?? {}), creatorEdited: true },
+    };
+    if (typeof title === 'string' && title.trim().length >= 5 && title.trim().length <= 200) {
+      pollPatch.title = title.trim();
+    }
+    if (typeof topicTag === 'string' && topicTag.trim().length >= 2 && topicTag.trim().length <= 60) {
+      pollPatch.topicTag = topicTag.trim();
+    }
+    const [updated] = await db.update(surveyPolls).set(pollPatch).where(eq(surveyPolls.id, id)).returning();
+
+    const items = await db.select().from(surveyItems)
+      .where(eq(surveyItems.pollId, id)).orderBy(asc(surveyItems.position));
+    res.json({ poll: updated, items });
+  });
+
   // Field a draft: inject the piggyback module, open the poll.
   app.post('/api/surveys/:id/field', requireAuth, async (req: any, res) => {
     const id = parseInt(req.params.id, 10);

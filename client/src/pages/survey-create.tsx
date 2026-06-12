@@ -1,8 +1,10 @@
 /**
- * Survey creation — natural-language intent → LLM Poll Compiler → preview →
- * field. The compiler enforces methodology (neutral wording, balanced
- * scales) and the adversarial reviewer blocks push-poll attempts with a
- * visible explanation.
+ * Survey creation — natural-language intent → LLM Poll Compiler → EDITABLE
+ * preview → field. The compiler produces a starting point; every text field
+ * (title, question wording, options) belongs to the creator before
+ * publication. The attention check keeps its canonical machine-checkable
+ * wording; the piggyback module is added at fielding and is not editable.
+ * Creator edits are recorded in the methodology (compilerMeta.creatorEdited).
  */
 import { useState } from 'react';
 import { useLocation } from 'wouter';
@@ -10,17 +12,24 @@ import AppShell from '@/components/layout/AppShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Sparkles, Send } from 'lucide-react';
+import { AlertTriangle, Plus, Sparkles, Send, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { TierBadge } from './surveys-page';
 
+interface CompiledItem {
+  id: number;
+  text: string;
+  itemType: string;
+  options: string[] | null;
+  randomizeOptions: boolean;
+  isAttentionCheck: boolean;
+}
+
 interface CompiledPollResponse {
   poll: { id: number; title: string; topicTag: string; tier: string };
-  items: Array<{
-    id: number; text: string; itemType: string; options: string[] | null;
-    randomizeOptions: boolean; isAttentionCheck: boolean;
-  }>;
+  items: CompiledItem[];
   verdict: { approved: boolean; flags: Array<{ issue: string; explanation: string; severity: string }>; reasoning: string };
 }
 
@@ -31,12 +40,18 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   open_text: 'Ελεύθερο κείμενο',
 };
 
+interface EditableItem extends CompiledItem {
+  deleted: boolean;
+}
+
 export default function SurveyCreatePage() {
   const [, navigate] = useLocation();
   const [intent, setIntent] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compiled, setCompiled] = useState<CompiledPollResponse | null>(null);
+  const [title, setTitle] = useState('');
+  const [items, setItems] = useState<EditableItem[]>([]);
 
   async function compile() {
     setBusy(true);
@@ -44,6 +59,8 @@ export default function SurveyCreatePage() {
     try {
       const resp = await api.post<CompiledPollResponse>('/api/surveys', { intent });
       setCompiled(resp.data);
+      setTitle(resp.data.poll.title);
+      setItems(resp.data.items.map((i) => ({ ...i, deleted: false })));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Η μεταγλώττιση απέτυχε');
     } finally {
@@ -51,10 +68,38 @@ export default function SurveyCreatePage() {
     }
   }
 
-  async function field() {
-    if (!compiled) return;
+  function patchItem(id: number, patch: Partial<EditableItem>) {
+    setItems((list) => list.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
+
+  function patchOption(id: number, idx: number, value: string) {
+    setItems((list) => list.map((i) =>
+      i.id === id && i.options ? { ...i, options: i.options.map((o, j) => (j === idx ? value : o)) } : i,
+    ));
+  }
+
+  const editedValid = title.trim().length >= 5 && items.some((i) => !i.deleted && !i.isAttentionCheck) &&
+    items.every((i) => i.deleted || i.isAttentionCheck || (
+      i.text.trim().length >= 5 &&
+      (i.itemType === 'open_text' || ((i.options?.filter((o) => o.trim()).length ?? 0) >= 2))
+    ));
+
+  async function publish() {
+    if (!compiled || !editedValid) return;
     setBusy(true);
+    setError(null);
     try {
+      await api.patch(`/api/surveys/${compiled.poll.id}`, {
+        title: title.trim(),
+        items: items
+          .filter((i) => !i.deleted && !i.isAttentionCheck)
+          .map((i) => ({
+            id: i.id,
+            text: i.text.trim(),
+            options: i.itemType === 'open_text' ? undefined : i.options?.map((o) => o.trim()).filter(Boolean),
+          })),
+        deleteItemIds: items.filter((i) => i.deleted).map((i) => i.id),
+      });
       await api.post(`/api/surveys/${compiled.poll.id}/field`, {});
       navigate(`/surveys/${compiled.poll.id}`);
     } catch (e) {
@@ -67,9 +112,9 @@ export default function SurveyCreatePage() {
   return (
     <AppShell title="Νέα Δημοσκόπηση">
       <p className="text-sm text-muted-foreground -mt-4 mb-6">
-        Περιέγραψε τι θέλεις να μετρήσεις. Ο μεταγλωττιστής χτίζει ουδέτερο
-        ερωτηματολόγιο — και ένας ανεξάρτητος έλεγχος απορρίπτει προσπάθειες
-        προπαγάνδας.
+        Περιέγραψε τι θέλεις να μετρήσεις. Ο μεταγλωττιστής χτίζει ένα πρώτο
+        ερωτηματολόγιο — μετά είναι δικό σου: επεξεργάσου τίτλο, ερωτήσεις και
+        επιλογές πριν τη δημοσίευση.
       </p>
 
       {!compiled && (
@@ -108,10 +153,17 @@ export default function SurveyCreatePage() {
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-3">
-                <CardTitle className="text-base">{compiled.poll.title}</CardTitle>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={200}
+                    className="text-base font-semibold"
+                  />
+                  <CardDescription>Θέμα: {compiled.poll.topicTag}</CardDescription>
+                </div>
                 <TierBadge tier={compiled.poll.tier} />
               </div>
-              <CardDescription>Θέμα: {compiled.poll.topicTag}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {compiled.verdict.flags.length > 0 && (
@@ -122,9 +174,10 @@ export default function SurveyCreatePage() {
                 }`}>
                   {!compiled.verdict.approved && (
                     <p className="font-medium">
-                      Ο ανεξάρτητος έλεγχος μεθοδολογίας έχει ενστάσεις. Μπορείς να
-                      δημοσιεύσεις — οι ενστάσεις θα εμφανίζονται μόνιμα στη σελίδα
-                      μεθοδολογίας — ή να ξαναγράψεις την πρόθεση πιο ουδέτερα.
+                      Ο ανεξάρτητος έλεγχος μεθοδολογίας έχει ενστάσεις — μπορείς να
+                      τις διορθώσεις επεξεργαζόμενος τις ερωτήσεις παρακάτω, ή να
+                      δημοσιεύσεις ως έχει (οι ενστάσεις θα εμφανίζονται στη σελίδα
+                      μεθοδολογίας).
                     </p>
                   )}
                   {compiled.verdict.flags.map((f, i) => (
@@ -132,35 +185,91 @@ export default function SurveyCreatePage() {
                   ))}
                 </div>
               )}
+
               <ol className="space-y-3">
-                {compiled.items.map((item, i) => (
-                  <li key={item.id} className="border rounded p-3">
+                {items.filter((i) => !i.deleted).map((item, i) => (
+                  <li key={item.id} className="border rounded p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium">{i + 1}. {item.text}</p>
+                      <span className="text-sm font-medium text-muted-foreground shrink-0 pt-2">{i + 1}.</span>
+                      {item.isAttentionCheck ? (
+                        <p className="text-sm flex-1 pt-2">{item.text}</p>
+                      ) : (
+                        <Textarea
+                          value={item.text}
+                          onChange={(e) => patchItem(item.id, { text: e.target.value })}
+                          rows={2}
+                          maxLength={500}
+                          className="text-sm flex-1"
+                        />
+                      )}
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <Badge variant="outline" className="text-xs">{ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}</Badge>
                         {item.isAttentionCheck && <Badge variant="secondary" className="text-xs">έλεγχος προσοχής</Badge>}
                         {item.randomizeOptions && <Badge variant="secondary" className="text-xs">τυχαία σειρά</Badge>}
+                        {!item.isAttentionCheck && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 h-7 px-2"
+                            onClick={() => patchItem(item.id, { deleted: true })}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </div>
+
                     {item.options && (
-                      <ul className="mt-2 text-xs text-muted-foreground list-disc pl-5">
-                        {item.options.map((o, j) => <li key={j}>{o}</li>)}
-                      </ul>
+                      <div className="space-y-1.5 pl-6">
+                        {item.options.map((opt, j) => (
+                          item.isAttentionCheck ? (
+                            <p key={j} className="text-xs text-muted-foreground">• {opt}</p>
+                          ) : (
+                            <div key={j} className="flex items-center gap-1.5">
+                              <Input
+                                value={opt}
+                                onChange={(e) => patchOption(item.id, j, e.target.value)}
+                                maxLength={200}
+                                className="text-xs h-8"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 shrink-0"
+                                disabled={(item.options?.length ?? 0) <= 2}
+                                onClick={() => patchItem(item.id, { options: item.options!.filter((_, k) => k !== j) })}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          )
+                        ))}
+                        {!item.isAttentionCheck && (item.options.length < 12) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => patchItem(item.id, { options: [...item.options!, ''] })}
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Προσθήκη επιλογής
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </li>
                 ))}
               </ol>
+
               <p className="text-xs text-muted-foreground">
                 Στην αρχή του ερωτηματολογίου θα προστεθούν αυτόματα 2–3 πάγιες
                 ερωτήσεις της πλατφόρμας (κοινό σύστημα ερωτήσεων — δηλώνεται και
-                στους συμμετέχοντες).
+                στους συμμετέχοντες). Οι αλλαγές σου καταγράφονται στη μεθοδολογία.
               </p>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
               )}
               <div className="flex gap-2">
-                <Button onClick={field} disabled={busy}>
+                <Button onClick={publish} disabled={busy || !editedValid}>
                   <Send className="w-4 h-4 mr-1" /> {busy ? 'Δημοσίευση…' : 'Δημοσίευση στο πάνελ'}
                 </Button>
                 <Button variant="outline" onClick={() => { setCompiled(null); setError(null); }}>
