@@ -115,7 +115,18 @@ export default function SurveyCreatePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {compiled.verdict.flags.length > 0 && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 space-y-1">
+                <div className={`p-3 rounded text-xs space-y-1 border ${
+                  compiled.verdict.approved
+                    ? 'bg-amber-50 border-amber-200 text-amber-800'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
+                  {!compiled.verdict.approved && (
+                    <p className="font-medium">
+                      Ο ανεξάρτητος έλεγχος μεθοδολογίας έχει ενστάσεις. Μπορείς να
+                      δημοσιεύσεις — οι ενστάσεις θα εμφανίζονται μόνιμα στη σελίδα
+                      μεθοδολογίας — ή να ξαναγράψεις την πρόθεση πιο ουδέτερα.
+                    </p>
+                  )}
                   {compiled.verdict.flags.map((f, i) => (
                     <p key={i}><strong>{f.issue}</strong>: {f.explanation}</p>
                   ))}

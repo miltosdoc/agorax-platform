@@ -267,6 +267,20 @@ export default function SurveyDetailPage() {
                   {poll.methodology.weighting?.marginsSource && (
                     <p className="text-muted-foreground">Πηγή πληθυσμιακών περιθωρίων: {poll.methodology.weighting.marginsSource}</p>
                   )}
+                  {poll.methodology.gatekeeper?.flags?.length > 0 && (
+                    <div className={poll.methodology.gatekeeper.approved ? 'text-muted-foreground' : 'text-red-700'}>
+                      <p className="font-medium">
+                        {poll.methodology.gatekeeper.approved
+                          ? 'Παρατηρήσεις ελέγχου μεθοδολογίας:'
+                          : 'Ο ανεξάρτητος έλεγχος μεθοδολογίας είχε ενστάσεις που ο δημιουργός επέλεξε να μη διορθώσει:'}
+                      </p>
+                      <ul className="list-disc pl-4">
+                        {poll.methodology.gatekeeper.flags.map((f: any, i: number) => (
+                          <li key={i}><strong>{f.issue}</strong>: {f.explanation}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

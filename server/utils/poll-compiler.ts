@@ -120,10 +120,17 @@ export class CompilerRefusedError extends Error {
   }
 }
 
-async function generateOnce(intent: string, repairHint?: string): Promise<CompiledSurvey> {
+async function generateOnce(
+  intent: string,
+  repairHint?: string,
+  previousSurvey?: CompiledSurvey,
+): Promise<CompiledSurvey> {
   const messages = [
     { role: 'system' as const, content: GENERATOR_SYSTEM },
     { role: 'user' as const, content: intent },
+    ...(previousSurvey
+      ? [{ role: 'assistant' as const, content: JSON.stringify(previousSurvey) }]
+      : []),
     ...(repairHint
       ? [{ role: 'user' as const, content: `Η προηγούμενη έξοδος απορρίφθηκε από τον validator: ${repairHint}. Δώσε διορθωμένο JSON.` }]
       : []),
@@ -218,11 +225,13 @@ export async function compileSurvey(intent: string): Promise<CompilerOutput> {
       if (err instanceof CompilerRefusedError) throw err;
       if (err instanceof LlmUnavailableError) throw err;
       // Schema/parse failure → one repair round with the errors fed back.
+      console.warn('[poll-compiler] generator round 1 failed schema:', err instanceof Error ? err.message.slice(0, 300) : err);
       rounds = 2;
       survey = await generateOnce(intent, err instanceof Error ? err.message.slice(0, 500) : 'invalid JSON');
     }
   } catch (err) {
     if (err instanceof CompilerRefusedError) throw err;
+    console.warn('[poll-compiler] falling back to deterministic compile:', err instanceof Error ? err.message.slice(0, 300) : err);
     return {
       survey: fallbackCompile(intent),
       verdict: { approved: true, flags: [], reasoning: 'LLM unavailable — deterministic fallback compilation, no adversarial review performed.' },
@@ -243,11 +252,40 @@ export async function compileSurvey(intent: string): Promise<CompilerOutput> {
     };
   }
 
+  // A block verdict usually means the GENERATOR produced flawed wording, not
+  // that the creator's intent is a push-poll. Feed the objections back for a
+  // neutral rewrite and re-review. The compiler's job is to BUILD A DRAFT:
+  // if the repair is still flagged, the draft ships anyway with the failing
+  // verdict attached — visible in the preview and frozen into the
+  // methodology block. Flag, don't refuse (only the generator's own
+  // {"refused": true} for outright propaganda intent refuses).
   if (!verdict.approved) {
-    const blocks = verdict.flags.filter(f => f.severity === 'block');
-    throw new CompilerRefusedError(
-      blocks.map(b => `${b.issue}: ${b.explanation}`).join(' · ') || verdict.reasoning,
-    );
+    const objections = verdict.flags
+      .filter(f => f.severity === 'block')
+      .map(b => `${b.issue}: ${b.explanation}`)
+      .join(' · ') || verdict.reasoning;
+    try {
+      rounds += 1;
+      const repaired = await generateOnce(
+        intent,
+        `Ο ανεξάρτητος κριτής μεθοδολογίας απέρριψε το ερωτηματολόγιο — ${objections}. ` +
+        'Ξαναγράψε τις προβληματικές ερωτήσεις με ουδέτερη διατύπωση: καμία προϋπόθεση συμπεράσματος, ' +
+        'ισορροπημένες επιλογές (θετικές ΚΑΙ αρνητικές), χωρίς φορτισμένο λεξιλόγιο',
+        survey,
+      );
+      const reverdict = await reviewOnce(intent, repaired);
+      return {
+        survey: repaired,
+        verdict: reverdict,
+        meta: { generator: 'llm', reviewer: 'llm', model, generatorRounds: rounds },
+      };
+    } catch (err) {
+      if (err instanceof CompilerRefusedError) throw err;
+      // Repair round failed technically (LLM error) — ship the original
+      // draft with the original objections visible.
+      console.warn('[poll-compiler] reviewer-repair round failed:', err instanceof Error ? err.message.slice(0, 300) : err);
+      return { survey, verdict, meta: { generator: 'llm', reviewer: 'llm', model, generatorRounds: rounds } };
+    }
   }
 
   return { survey, verdict, meta: { generator: 'llm', reviewer: 'llm', model, generatorRounds: rounds } };
