@@ -1013,6 +1013,8 @@ const en: TranslationDictionary = {
   'media.copyLink': 'Copy link',
   'media.linkCopied': 'Link copied',
   'media.share': 'Share',
+  'share.copyLink': 'Copy link',
+  'share.more': 'More…',
   'media.feature': 'Set as featured',
   'media.unfeature': 'Remove from featured',
   'media.featuredOn': 'Set as featured',

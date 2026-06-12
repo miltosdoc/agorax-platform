@@ -135,7 +135,7 @@ async function generateOnce(
       ? [{ role: 'user' as const, content: `Η προηγούμενη έξοδος απορρίφθηκε από τον validator: ${repairHint}. Δώσε διορθωμένο JSON.` }]
       : []),
   ];
-  const raw = await chatCompletion({ messages, temperature: 0.3, maxTokens: 2500, enableThinking: false });
+  const raw = await chatCompletion({ messages, temperature: 0.3, maxTokens: 2500, enableThinking: false, jsonMode: true });
   const json = extractJson(raw) as Record<string, unknown>;
   if (json && (json as any).refused === true) {
     throw new CompilerRefusedError(String((json as any).reason ?? 'push-poll intent'));
@@ -168,6 +168,7 @@ async function reviewOnce(intent: string, survey: CompiledSurvey): Promise<Gatek
     temperature: 0,
     maxTokens: 1500,
     enableThinking: false,
+    jsonMode: true,
   });
   return gatekeeperVerdictSchema.parse(extractJson(raw));
 }

@@ -1013,6 +1013,8 @@ const el: TranslationDictionary = {
   'media.copyLink': 'Αντιγραφή συνδέσμου',
   'media.linkCopied': 'Σύνδεσμος αντιγράφηκε',
   'media.share': 'Κοινοποίηση',
+  'share.copyLink': 'Αντιγραφή συνδέσμου',
+  'share.more': 'Περισσότερα…',
   'media.feature': 'Όρισε ως προτεινόμενο',
   'media.unfeature': 'Αφαίρεση από προτεινόμενα',
   'media.featuredOn': 'Ορίστηκε ως προτεινόμενο',

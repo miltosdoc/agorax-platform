@@ -40,6 +40,13 @@ export interface ChatCompletionOptions {
    * before emitting any content, which is useless for our use-case.
    */
   enableThinking?: boolean;
+  /**
+   * Enforce structured JSON output via OpenAI-compatible
+   * `response_format: {type:'json_object'}` (verified supported by the
+   * configured xsilico endpoint). The caller still validates the parsed
+   * object against its schema — this only guarantees syntax, not shape.
+   */
+  jsonMode?: boolean;
 }
 
 export interface LlmConfig {
@@ -92,6 +99,7 @@ export async function chatCompletion(opts: ChatCompletionOptions): Promise<strin
         // OpenRouter / xsilico-style reasoning control. Older / non-
         // reasoning models simply ignore unknown keys.
         ...(opts.enableThinking === false ? { reasoning: { enabled: false } } : {}),
+        ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
     if (!res.ok) {
