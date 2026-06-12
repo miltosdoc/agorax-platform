@@ -502,13 +502,13 @@ export default function CommunityDashboardPage() {
                   <p className="text-sm">{t('community.already_merged')}</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{t('community.select_target')}</span>
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <select
                       value={targetCommunityId || ''}
                       onChange={(e) => setTargetCommunityId(parseInt(e.target.value))}
-                      className="border rounded px-3 py-1 text-sm"
+                      className="border rounded px-3 py-2 text-sm flex-1 min-w-0"
+                      aria-label={t('community.select_target')}
                     >
                       <option value="">{t('community.choose_community')}</option>
                       {allCommunities
@@ -517,19 +517,14 @@ export default function CommunityDashboardPage() {
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                     </select>
+                    <Button
+                      onClick={handleMerge}
+                      disabled={!targetCommunityId || merging}
+                      className="shrink-0"
+                    >
+                      {merging ? t('common.loading') : t('community.merge_button')}
+                    </Button>
                   </div>
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <p>• {t('community.merge_members')}</p>
-                    <p>• {t('community.merge_proposals')}</p>
-                    <p>• {t('community.merge_archived')}</p>
-                  </div>
-                  <Button
-                    onClick={handleMerge}
-                    disabled={!targetCommunityId || merging}
-                    className="w-full"
-                  >
-                    {merging ? t('common.loading') : t('community.merge_button')}
-                  </Button>
                   {mergeError && (
                     <p className="text-sm text-destructive">{mergeError}</p>
                   )}

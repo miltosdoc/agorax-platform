@@ -12,7 +12,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +25,9 @@ import {
 import { FileText, Plus, Search } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
-import { getStatusForProposal, ORDERED_STATES } from '@/lib/proposal-status';
+import { ORDERED_STATES } from '@/lib/proposal-status';
+import StatusBadge from '@/components/proposal/StatusBadge';
+import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 
 type SortOption = 'created_desc' | 'created_asc' | 'score_desc' | 'score_asc';
 
@@ -252,25 +253,22 @@ export default function ProposalsPage() {
       </Card>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
-          {t('general.loading')}
-        </div>
+        <LoadingState label={t('general.loading')} />
       ) : visible.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 flex flex-col items-center text-center gap-4" data-testid="proposals-empty">
-            <FileText className="h-12 w-12 text-muted-foreground/40" />
-            <p className="text-lg font-medium">{t('proposals.empty')}</p>
-            {/* Clear-filters already lives in the filter bar above. */}
+        <EmptyState
+          icon={<FileText className="h-12 w-12" />}
+          title={t('proposals.empty')}
+          action={
+            /* Clear-filters already lives in the filter bar above. */
             <Button onClick={() => navigate('/proposals/new')} data-testid="proposals-empty-cta">
               <Plus className="w-4 h-4 mr-2" />
               {t('home.submitProposal')}
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <div className="space-y-3" data-testid="proposals-list">
           {visible.map((proposal) => {
-            const status = getStatusForProposal(proposal);
             const score = parseScore(proposal.llmScore);
             return (
               <Link
@@ -304,10 +302,7 @@ export default function ProposalsPage() {
                           )}
                         </div>
                       </div>
-                      <Badge className={`${status.color} self-start`} variant="outline">
-                        <span className="mr-1">{status.icon}</span>
-                        {getStatusLabel(proposal.status, t)}
-                      </Badge>
+                      <StatusBadge status={proposal.status} className="self-start" />
                     </div>
                   </CardContent>
                 </Card>

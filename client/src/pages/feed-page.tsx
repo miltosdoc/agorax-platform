@@ -18,7 +18,9 @@ import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
 import ShareButton from '@/components/ShareButton';
-import { getStatusLabelForLocale } from '@/lib/proposal-status';
+import StatusBadge from '@/components/proposal/StatusBadge';
+import TierBadge from '@/components/surveys/TierBadge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Mic, Video, Share2, Star, Loader2, FileText, BarChart3 } from 'lucide-react';
 
 interface MediaFeedItem {
@@ -97,7 +99,7 @@ function ProposalFeedCard({ item }: { item: ProposalFeedItem }) {
           </Link>
           <span>·</span>
           <span>{new Date(item.createdAt).toLocaleDateString(dateLocale)}</span>
-          <Badge variant="secondary">{getStatusLabelForLocale(item.status, locale === 'en' ? 'en' : 'el')}</Badge>
+          <StatusBadge status={item.status} />
         </div>
         <Link href={`/proposals/${item.id}`} className="block">
           <h3 className="text-lg font-semibold hover:underline">{item.question}</h3>
@@ -123,13 +125,7 @@ function SurveyFeedCard({ item }: { item: SurveyFeedItem }) {
         <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
           <BarChart3 className="w-4 h-4" />
           <Badge variant="outline">{t('feed.newSurvey')}</Badge>
-          {item.tier === 'certified' ? (
-            <Badge className="bg-primary">{t('surveys.tier.certified')}</Badge>
-          ) : (
-            <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-              {t('surveys.tier.community')}
-            </Badge>
-          )}
+          <TierBadge tier={item.tier} />
           <span>{new Date(item.createdAt).toLocaleDateString(dateLocale)}</span>
         </div>
         <Link href={`/surveys/${item.id}`} className="block">
@@ -320,11 +316,7 @@ export default function FeedPage() {
 
         <div className="space-y-4" data-testid="feed-list">
           {items.length === 0 && !loading && (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                {t('feed.empty')}
-              </CardContent>
-            </Card>
+            <EmptyState title={t('feed.empty')} />
           )}
           {items.map(item => (
             item.feedType === 'proposal' ? (

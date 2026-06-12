@@ -11,13 +11,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, KeyRound, PlusCircle, ShieldCheck, Users } from 'lucide-react';
+import { BarChart3, KeyRound, PlusCircle, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { fetchPanelMe } from '@/lib/panel-client';
 import ShareButton from '@/components/ShareButton';
 import HowPollsWork from '@/components/surveys/HowPollsWork';
+import TierBadge from '@/components/surveys/TierBadge';
+import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 
 interface SurveyListPoll {
   id: number;
@@ -28,17 +30,6 @@ interface SurveyListPoll {
   creatorId: number | null;
   createdAt: string;
   completion: { completed: number; qualityPassed: number } | null;
-}
-
-export function TierBadge({ tier }: { tier: string }) {
-  const { t } = useTranslation();
-  return tier === 'certified' ? (
-    <Badge className="bg-primary"><ShieldCheck className="w-3 h-3 mr-1" />{t('surveys.tier.certified')}</Badge>
-  ) : (
-    <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-      {t('surveys.tier.community')}
-    </Badge>
-  );
 }
 
 export default function SurveysPage() {
@@ -106,14 +97,10 @@ export default function SurveysPage() {
         </TabsList>
       </Tabs>
 
-      {polls === null && <div className="py-12 text-center text-sm text-muted-foreground">{t('surveys.loading')}</div>}
+      {polls === null && <LoadingState label={t('surveys.loading')} />}
 
       {polls !== null && list.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            {t('surveys.empty')}
-          </CardContent>
-        </Card>
+        <EmptyState icon={<BarChart3 className="h-12 w-12" />} title={t('surveys.empty')} />
       )}
 
       <div className="grid gap-4">

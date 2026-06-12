@@ -25,8 +25,8 @@ import { SortitionPanel } from '@/components/proposal/SortitionPanel';
 import { MediaStudioPanel } from '@/components/proposal/MediaStudioPanel';
 import { ProposalMediaPreview } from '@/components/proposal/ProposalMediaPreview';
 import VotePanel from '@/components/voting/VotePanel';
-import { getStatusForProposal } from '@/lib/proposal-status';
-import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
+import StatusBadge from '@/components/proposal/StatusBadge';
+import { useTranslation } from '@/hooks/use-translation';
 import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
 
 interface Proposal {
@@ -249,10 +249,7 @@ export default function ProposalDetailPage() {
                 text={proposal.solution ?? undefined}
                 iconOnly
               />
-              <Badge className={getStatusForProposal(proposal).color} variant="outline" style={{ whiteSpace: 'nowrap' }}>
-                <span className="mr-1">{getStatusForProposal(proposal).icon}</span>
-                {getStatusLabel(proposal.status, t)}
-              </Badge>
+              <StatusBadge status={proposal.status} />
               {userIsAuthor && proposal.status === 'draft' && (
                 <Button
                   size="sm"

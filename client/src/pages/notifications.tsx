@@ -9,6 +9,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import AppShell from "@/components/layout/AppShell";
 import { PushOptIn } from "@/components/notifications/PushOptIn";
 import { LocalNotifTestButton } from "@/components/notifications/LocalNotifTestButton";
+import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 
 export default function NotificationsPage() {
   const { t } = useTranslation();
@@ -62,24 +63,20 @@ export default function NotificationsPage() {
 
         <TabsContent value={filter}>
           {isLoading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Bell className="mr-2 h-5 w-5 animate-pulse" />
-              {t('notification.loading')}
-            </div>
+            <LoadingState label={t('notification.loading')} />
           ) : notifications.length === 0 ? (
-            <div className="text-center py-12 flex flex-col items-center gap-3">
-              <Bell className="h-12 w-12 text-muted-foreground/50" />
-              <div className="space-y-1 text-muted-foreground">
-                <p className="text-lg font-medium">{t('notification.empty')}</p>
-                <p className="text-sm">{t('notification.noNew')}</p>
-              </div>
-              <Button asChild variant="outline" data-testid="notifications-empty-cta">
-                <Link href="/proposals">
-                  <FileText className="mr-2 h-4 w-4" />
-                  {t('notification.browseProposals')}
-                </Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={<Bell className="h-12 w-12" />}
+              title={t('notification.empty')}
+              action={
+                <Button asChild variant="outline" data-testid="notifications-empty-cta">
+                  <Link href="/proposals">
+                    <FileText className="mr-2 h-4 w-4" />
+                    {t('notification.browseProposals')}
+                  </Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="border border-border rounded-lg overflow-hidden bg-background">
               {notifications.map((notif) => (

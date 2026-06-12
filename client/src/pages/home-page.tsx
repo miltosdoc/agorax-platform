@@ -17,8 +17,9 @@ import { ArrowRight, FileText, Plus, Users, Mic, Video } from 'lucide-react';
 import { ConferenceRoomCard } from '@/components/livekit/ConferenceRoomCard';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
-import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
-import { getStatusForProposal } from '@/lib/proposal-status';
+import { useTranslation } from '@/hooks/use-translation';
+import StatusBadge from '@/components/proposal/StatusBadge';
+import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 
 interface Proposal {
   id: number;
@@ -44,7 +45,6 @@ interface SortitionBody {
 
 function ProposalCard({ proposal }: { proposal: Proposal }) {
   const { t } = useTranslation();
-  const status = getStatusForProposal(proposal);
   return (
     <Link href={`/proposals/${proposal.id}`} className="block">
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
@@ -60,10 +60,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
                 <span>{new Date(proposal.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
-            <Badge className={status.color} variant="outline">
-              <span className="mr-1">{status.icon}</span>
-              {getStatusLabel(proposal.status, t)}
-            </Badge>
+            <StatusBadge status={proposal.status} />
           </div>
         </CardContent>
       </Card>
@@ -211,9 +208,7 @@ export default function HomePage() {
   return (
     <AppShell title={t('dashboard.title')}>
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
-          {t('general.loading')}
-        </div>
+        <LoadingState label={t('general.loading')} />
       ) : (
         <div className="space-y-10">
           {/* My Proposals */}
@@ -222,15 +217,15 @@ export default function HomePage() {
               <h2 className="text-xl font-semibold">{t('dashboard.myProposals')}</h2>
             </div>
             {myProposals.length === 0 ? (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-muted-foreground mb-4">{t('home.noProposals')}</p>
+              <EmptyState
+                title={t('home.noProposals')}
+                action={
                   <Button onClick={() => navigate('/proposals/new')}>
                     <Plus className="w-4 h-4 mr-2" />
                     {t('home.submitProposal')}
                   </Button>
-                </CardContent>
-              </Card>
+                }
+              />
             ) : (
               <div className="space-y-2">
                 {myProposals.slice(0, 6).map((p) => (
@@ -249,11 +244,7 @@ export default function HomePage() {
               </Link>
             </div>
             {activeBodies.length === 0 ? (
-              <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  {t('home.noProposals')}
-                </CardContent>
-              </Card>
+              <EmptyState title={t('home.noSortitions')} />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {activeBodies.slice(0, 4).map((body) => (
@@ -303,11 +294,7 @@ export default function HomePage() {
               </Link>
             </div>
             {othersProposals.length === 0 ? (
-              <Card>
-                <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                  {t('home.noProposals')}
-                </CardContent>
-              </Card>
+              <EmptyState title={t('home.noProposals')} />
             ) : (
               <div className="space-y-2">
                 {othersProposals.slice(0, 6).map((p) => (

@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Plus, Sparkles, Send, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
-import { TierBadge } from './surveys-page';
+import TierBadge from '@/components/surveys/TierBadge';
 
 interface CompiledItem {
   id: number;

@@ -14,7 +14,7 @@ import { AlertTriangle, Lock, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
-import { TierBadge } from './surveys-page';
+import TierBadge from '@/components/surveys/TierBadge';
 import ShareButton from '@/components/ShareButton';
 
 interface PollDetail {
