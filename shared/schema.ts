@@ -1419,3 +1419,8 @@ export const sortitionAttendance = pgTable(
 
 export type SortitionAttendance = InferSelectModel<typeof sortitionAttendance>;
 export type InsertSortitionAttendance = InferInsertModel<typeof sortitionAttendance>;
+
+// ─── Polling module (panel, question bank, two-tier polls) ──────────────────
+// Tables live in their own file to keep this one navigable; re-exported here
+// so drizzle-kit and `import * as schema from '@shared/schema'` pick them up.
+export * from "./polling-schema";
