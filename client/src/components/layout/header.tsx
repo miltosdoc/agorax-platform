@@ -353,6 +353,14 @@ export default function Header() {
                   {t('nav.sortition')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  onClick={() => navigate("/surveys")}
+                  className="cursor-pointer transition-smooth"
+                  data-testid="menu-surveys"
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  {t('nav.surveys')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => navigate("/points")}
                   className="cursor-pointer transition-smooth"
                   data-testid="menu-points"

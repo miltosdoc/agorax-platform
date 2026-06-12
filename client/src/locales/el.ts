@@ -9,6 +9,7 @@ const el: TranslationDictionary = {
   'nav.profile': 'Προφίλ',
   'nav.process': 'Διαδικασία',
   'nav.communities': 'Κοινότητες',
+  'nav.surveys': 'Δημοσκοπήσεις',
   'nav.sortition': 'Κλήρωση',
   'nav.points': 'Πόντοι',
 

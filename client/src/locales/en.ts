@@ -9,6 +9,7 @@ const en: TranslationDictionary = {
   'nav.profile': 'Profile',
   'nav.process': 'Process',
   'nav.communities': 'Communities',
+  'nav.surveys': 'Polls',
   'nav.sortition': 'Sortition',
   'nav.points': 'Points',
 

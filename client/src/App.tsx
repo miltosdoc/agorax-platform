@@ -31,6 +31,12 @@ import AmendmentAuthorReview from "@/pages/amendment-author-review";
 import AmendmentCommunitySignal from "@/pages/amendment-community-signal";
 import DeliberationWalkthrough from "@/pages/deliberation-walkthrough";
 import DemocracyPointsPage from "@/pages/democracy-points";
+import SurveysPage from "@/pages/surveys-page";
+import SurveyCreatePage from "@/pages/survey-create";
+import SurveyDetailPage from "@/pages/survey-detail";
+import SurveyTakePage from "@/pages/survey-take";
+import PanelOnboardingPage from "@/pages/panel-onboarding";
+import SurveyTrendsPage from "@/pages/survey-trends";
 import { CommunityForm } from "@/components/community/community-form";
 import { CommunityList } from "@/components/community/community-list";
 import { ProposalForm } from "@/components/proposal/proposal-form";
@@ -105,12 +111,19 @@ function AppRouter() {
         <Route path="/polls/:id/extend">
           <Redirect to="/home" />
         </Route>
+        {/* Polling module — registered BEFORE the legacy redirects below. */}
+        <Route path="/surveys" component={SurveysPage} />
+        <ProtectedRoute path="/surveys/new" component={SurveyCreatePage} />
+        <ProtectedRoute path="/surveys/trends" component={SurveyTrendsPage} />
+        <ProtectedRoute path="/panel" component={PanelOnboardingPage} />
+        <Route path="/surveys/:id/take" component={SurveyTakePage} />
         <Route path="/surveys/create">
           <Redirect to="/proposals/new" />
         </Route>
         <Route path="/surveys/:id/edit">
           <Redirect to="/home" />
         </Route>
+        <Route path="/surveys/:id" component={SurveyDetailPage} />
         <ProtectedRoute path="/analytics" component={AnalyticsDashboard} />
         <ProtectedRoute path="/admin/accounts" component={AdminAccountsPage} />
         <ProtectedRoute path="/profile" component={ProfilePage} />
