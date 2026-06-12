@@ -38,6 +38,19 @@ credential (`X-Panel-Token`) for instruments and responses. All anonymous-
 side tables are accessed through the `voteDb` connection (the `agorax_vote`
 role that cannot read identity tables, where the storage split is applied).
 
+**Device transfer**: because the server cannot link panelist↔user, it also
+cannot sync the identity across devices. `/panel` on the enrolled device
+reveals the identity code; `/panel` on a second device imports it
+(validated against `/api/panel/me` before storing). The member carries the
+secret themselves.
+
+**Ops notes**: the anonymous routes (`/api/panel/register`,
+`/api/panel/profile`, `/api/surveys/:id/respond`) are CSRF-exempt — they
+deliberately carry no session, so there is none to protect — and excluded
+from request logging (timing-correlation hygiene, same as blind-sign). The
+cookieless client fetches send `ngrok-skip-browser-warning`, or ngrok's
+free-tier interstitial would swallow them.
+
 **Profile** (once at onboarding, annual refresh prompt): age band, gender,
 NUTS-2 region, education, urbanity, 2023 past vote (recall-flagged), plus
 calibration benchmarks with known ELSTAT values (smoking, household car,
@@ -52,19 +65,29 @@ private `cohort='all'` computation.
 
 Two **separate** model calls — the generator never grades its own homework:
 
-1. **Generator**: NL intent → strict JSON (`compiledSurveySchema`, zod).
-   Hard rules in the system prompt: no leading/double-barreled questions,
-   balanced likert scales, deliberate randomization flags, loaded-language
-   ban. Schema failures get one repair round with the validator errors fed
-   back, then reject — output is never silently patched.
+1. **Generator**: NL intent → strict JSON (`compiledSurveySchema`, zod),
+   with API-level JSON mode (`response_format: json_object`) on top of the
+   schema validation. Hard rules in the system prompt: no leading/
+   double-barreled questions, balanced likert scales, deliberate
+   randomization flags, loaded-language ban. Schema failures get one
+   repair round with the validator errors fed back — output is never
+   silently patched.
 2. **Adversarial reviewer**: attacks the generated survey (push-poll,
-   leading, unbalanced scale…). A `block`-severity flag refuses the poll;
-   refused attempts are kept as `gatekeeper_flagged` rows for audit.
+   leading, unbalanced scale…). A `block` verdict triggers a **neutral
+   rewrite** (the objections go back to the generator with the previous
+   draft as context) and a re-review. The compiler's job is to BUILD A
+   DRAFT: remaining objections ship as visible flags on the preview and
+   freeze into the methodology page — they never block the creator. Only
+   the generator's own refusal of outright propaganda intent rejects
+   (kept as `gatekeeper_flagged` rows for audit).
 
-An attention check is inserted **mechanically** (canonical Greek wording,
-machine-checkable expected answer) — never by the LLM. With no LLM
-configured the compiler falls back to a deterministic single-scale build,
-recorded as `compilerMeta.generator='fallback'`.
+The draft is **fully editable** before fielding (`PATCH /api/surveys/:id`:
+title, wording, options, item deletion; edits recorded as
+`compilerMeta.creatorEdited`). An attention check is inserted
+**mechanically** (canonical Greek wording, machine-checkable expected
+answer) — never by the AI; it and the module items stay non-editable. With
+no LLM configured the compiler falls back to a deterministic single-scale
+build, recorded as `compilerMeta.generator='fallback'`.
 
 ## Question bank & piggyback module
 

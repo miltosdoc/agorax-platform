@@ -57,9 +57,12 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   MP3 / MP4 externally (NotebookLM, ElevenLabs, anything) and uploads it
   back. The author marks one as *Featured* — that one surfaces in the
   global Feed with a shareable social-card preview.
-- **AgoraX Feed (`/feed`)** — a single discovery page listing the most
-  recent featured media from every proposal in deliberation. Filter by
-  type, play inline, deep-link to the proposal to participate.
+- **AgoraX Feed (`/feed`)** — a unified activity stream merging three
+  date-sorted sources: new proposals (with lifecycle status), live and
+  closed polls (with their tier badge), and featured podcasts/videos
+  played inline. Filterable per stream; every card is shareable to social
+  networks (X, Facebook, WhatsApp, Viber, Telegram…) with server-rendered
+  link previews for crawlers, and the post-login landing page.
 - **In-app + Web Push notifications** — the header bell and `/notifications`
   cover the lifecycle (you were drawn, amendments ready, voting opened, a new
   proposal or new media in your community, conference scheduled, deliberation
@@ -75,11 +78,14 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   future FCM background-push path.
 - **Polling platform (`/surveys`)** — a self-serve civic measurement tool:
   an anonymous panel (blind-signature enrolled, demographics never linkable
-  to identity), an LLM Poll Compiler with an adversarial methodology
-  reviewer, a piggyback tracker module on every poll, raking-weighted
-  results (raw + weighted always together), and an auto-generated
-  methodology page per poll. Two hard-separated tiers: community
-  (unofficial) and certified (the only published findings). See
+  to identity, identity transferable between devices by the member alone),
+  an AI Poll Compiler with an adversarial methodology reviewer (objections
+  trigger a neutral rewrite, then ship as visible flags — drafts are always
+  produced and fully editable before fielding), a piggyback tracker module
+  on every poll, quality-gated Democracy Points, raking-weighted results
+  (raw + weighted always together), and an auto-generated methodology page
+  per poll. Two hard-separated tiers: community (unofficial) and certified
+  (the only published findings). Bilingual el/en. See
   [docs/POLLING.md](docs/POLLING.md).
 
 ---
