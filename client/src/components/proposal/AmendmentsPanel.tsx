@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
+import { AmendmentTree } from '@/components/proposal/AmendmentTree';
 import {
   FileText,
   Plus,
@@ -68,6 +69,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voting, setVoting] = useState<Record<number, boolean>>({});
+  const [showTree, setShowTree] = useState(false);
 
   const refresh = () =>
     api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`)
@@ -321,6 +323,49 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
               </Button>
             </div>
           </div>
+        )}
+
+        {/* Tree view toggle */}
+        {amendments.length > 0 && (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => setShowTree(!showTree)}
+            >
+              {showTree
+                ? (t('amendment.listView') || 'List view')
+                : (t('amendment.treeView') || 'Tree view')}
+            </Button>
+          </div>
+        )}
+
+        {/* Tree view */}
+        {showTree && amendments.length > 0 && (
+          <AmendmentTree
+            root={{
+              id: -1,
+              text: '',
+              authorName: '',
+              createdAt: '',
+              status: 'accepted',
+              children: amendments.map((a) => ({
+                id: a.id,
+                text: a.text,
+                authorName: a.authorName || `User #${a.authorId}`,
+                createdAt: a.createdAt,
+                status: a.status as any,
+                children: [],
+              })),
+            }}
+            onAction={(id, action) => {
+              const status = action === 'accept' ? 'accepted' : 'rejected';
+              api.put(`/api/proposals/${proposalId}/amendments/${id}/review`, { status })
+                .then(() => refresh())
+                .catch(() => {});
+            }}
+          />
         )}
       </CardContent>
     </Card>

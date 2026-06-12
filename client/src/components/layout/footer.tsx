@@ -14,8 +14,15 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo & Tagline */}
           <div>
-            <div className="flex items-center gap-2 mb-4 cursor-pointer" onClick={() => navigate("/")}>
-              <img src={logoImage} alt="" className="h-8 w-auto" />
+            <div
+              className="flex items-center gap-2 mb-4 cursor-pointer"
+              role="button"
+              tabIndex={0}
+              aria-label="Go to home page"
+              onClick={() => navigate("/")}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
+            >
+              <img src={logoImage} alt="AgoraX logo" className="h-8 w-auto" />
               <span className="text-white text-xl font-bold">AgoraX</span>
             </div>
             <p className="text-sm text-slate-400">
