@@ -61,6 +61,12 @@ export const POINT_SCHEDULE: Record<string, PointRule> = {
     points: 10,
     label: 'Vote in a community-signal round on a rejected amendment',
   },
+  survey_complete: {
+    actionKey: 'survey_complete',
+    points: 40,
+    label: 'Complete a panel survey that passes the quality gate (attention check, no speeding/straight-lining)',
+    cap: { windowDays: 30, max: 20 },
+  },
 };
 
 /** The schedule as an ordered list (highest-value first) — for the public API. */

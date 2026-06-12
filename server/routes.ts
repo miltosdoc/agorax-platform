@@ -39,6 +39,7 @@ import { registerEconomyRoutes } from "./routers/economy";
 import { registerMediaRoutes } from "./routers/media";
 import { registerLivekitRoutes } from "./routers/livekit";
 import { registerPushRoutes } from "./routers/push";
+import { registerSurveysRoutes } from "./routers/surveys";
 import { registerMiscRoutes } from "./routers/misc";
 
 /**
@@ -65,6 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerMediaRoutes(app);
   registerLivekitRoutes(app);
   registerPushRoutes(app);
+  registerSurveysRoutes(app);
   registerMiscRoutes(app);
 
   // Create and return the server
