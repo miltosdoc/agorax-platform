@@ -142,7 +142,7 @@ export default function AdminAccountsPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-6 pb-16 sm:pb-6">
+      <main className="flex-1 container mx-auto max-w-6xl px-4 py-6 pb-16 sm:pb-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-page-title">
             {t('admin.manageAccounts')}

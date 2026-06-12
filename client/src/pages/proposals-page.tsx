@@ -259,19 +259,12 @@ export default function ProposalsPage() {
         <Card>
           <CardContent className="py-16 flex flex-col items-center text-center gap-4" data-testid="proposals-empty">
             <FileText className="h-12 w-12 text-muted-foreground/40" />
-            <div className="space-y-1">
-              <p className="text-lg font-medium">{t('proposals.empty')}</p>
-              <p className="text-sm text-muted-foreground">{t('proposals.emptyHint')}</p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button onClick={() => navigate('/proposals/new')} data-testid="proposals-empty-cta">
-                <Plus className="w-4 h-4 mr-2" />
-                {t('home.submitProposal')}
-              </Button>
-              <Button variant="outline" onClick={clearFilters} data-testid="proposals-empty-clear">
-                {t('proposals.clearFilters')}
-              </Button>
-            </div>
+            <p className="text-lg font-medium">{t('proposals.empty')}</p>
+            {/* Clear-filters already lives in the filter bar above. */}
+            <Button onClick={() => navigate('/proposals/new')} data-testid="proposals-empty-cta">
+              <Plus className="w-4 h-4 mr-2" />
+              {t('home.submitProposal')}
+            </Button>
           </CardContent>
         </Card>
       ) : (

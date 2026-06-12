@@ -315,7 +315,8 @@ export default function SurveyDetailPage() {
         </Card>
       )}
 
-      {poll.status === 'live' && (
+      {/* Creators already get a take button in the lifecycle card above. */}
+      {poll.status === 'live' && !isCreator && (
         <Button onClick={() => navigate(`/surveys/${poll.id}/take`)}>{t('surveys.detail.takeCta')}</Button>
       )}
     </AppShell>

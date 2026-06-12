@@ -207,7 +207,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
 
   const handleSubmit = async (values: z.infer<typeof loginUserSchema>) => {
     const deviceFingerprint = await getFingerprint();
-    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/home';
+    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/feed';
     loginMutation.mutate({
       ...values,
       deviceFingerprint,
@@ -276,7 +276,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           className="w-full flex items-center justify-center gap-2"
           onClick={() => {
             const currentUrl = new URL(window.location.href);
-            const returnToParam = currentUrl.searchParams.get('returnTo') || '/home';
+            const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
             const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
             window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}`;
           }}
@@ -307,7 +307,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
   const handleSubmit = async (values: z.infer<typeof registerUserSchema>) => {
     if (!acceptTerms) return;
     const deviceFingerprint = await getFingerprint();
-    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/home';
+    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/feed';
     const consentLocale: 'el' | 'en' = locale === 'en' ? 'en' : 'el';
     registerMutation.mutate({
       ...values,
@@ -428,7 +428,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
           className="w-full flex items-center justify-center gap-2"
           onClick={() => {
             const currentUrl = new URL(window.location.href);
-            const returnToParam = currentUrl.searchParams.get('returnTo') || '/home';
+            const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
             const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
             window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}`;
           }}

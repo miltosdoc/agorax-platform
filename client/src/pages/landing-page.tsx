@@ -2,7 +2,7 @@
  * Public Landing Page (/)
  *
  * The unauthenticated front door. Authenticated visitors get redirected
- * to /home; everyone else sees the platform pitch and a Get Started CTA.
+ * to /feed; everyone else sees the platform pitch and a Get Started CTA.
  */
 
 import { useEffect } from 'react';
@@ -28,7 +28,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (user) {
-      navigate('/home');
+      navigate('/feed');
     }
   }, [user, navigate]);
 

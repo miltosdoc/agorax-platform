@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PlusCircle, FileText, Users, User, Rss } from "lucide-react";
+import { Home, PlusCircle, FileText, Users, User } from "lucide-react";
 import { SafeUser } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
@@ -16,24 +16,25 @@ export default function BottomNav({ user }: BottomNavProps) {
     return null;
   }
 
+  // «Αρχική» is the feed — the same place login lands and the logo points to.
   const navItems = [
     {
       label: t('nav.home'),
       icon: Home,
-      path: "/home",
+      path: "/feed",
       testId: "nav-home",
+    },
+    {
+      label: t('nav.proposals'),
+      icon: FileText,
+      path: "/proposals",
+      testId: "nav-proposals",
     },
     {
       label: t('nav.newProposal'),
       icon: PlusCircle,
       path: "/proposals/new",
       testId: "nav-create-proposal",
-    },
-    {
-      label: t('nav.feed'),
-      icon: Rss,
-      path: "/feed",
-      testId: "nav-feed",
     },
     {
       label: t('nav.communities'),

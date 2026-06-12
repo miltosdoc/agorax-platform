@@ -16,7 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Rss } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Home } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -78,7 +78,7 @@ export default function Header() {
       <div className="container mx-auto px-4 py-2 sm:py-3 flex justify-between items-center gap-3 sm:gap-4">
         <div className="flex items-center min-w-0">
           <Link
-            href={user ? "/home" : "/"}
+            href={user ? "/feed" : "/"}
             className="flex items-center gap-2 sm:gap-3 transition-smooth hover:opacity-80"
             data-testid="logo-link"
           >
@@ -158,34 +158,16 @@ export default function Header() {
             <div className="flex-1 max-w-md min-w-0">
               <SearchBar />
             </div>
-            {/* Primary CTA + Communities (the main navigation hub).
-                Proposals / Sortition / Points stay in the user dropdown. */}
+            {/* Single primary CTA; every destination lives once in the
+                user dropdown (mobile additionally gets the bottom nav). */}
             <button
               type="button"
               onClick={() => navigate("/proposals/new")}
-              className="hidden md:flex items-center gap-2 min-h-[44px] bg-primary hover:bg-primary/90 text-white transition-smooth shadow-sm hover:shadow-md rounded-md px-3 py-2 cursor-pointer"
+              className="hidden sm:flex items-center gap-2 min-h-[44px] bg-primary hover:bg-primary/90 text-white transition-smooth shadow-sm hover:shadow-md rounded-md px-3 py-2 cursor-pointer"
               data-testid="button-new-proposal"
             >
               <PlusCircle className="h-4 w-4" />
               <span>{t('nav.newProposal')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/communities")}
-              className="hidden md:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-communities"
-            >
-              <Users className="h-4 w-4" />
-              <span>{t('nav.communities')}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/feed")}
-              className="hidden md:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted hover:border-primary rounded-md border border-border px-3 py-2 cursor-pointer"
-              data-testid="button-feed"
-            >
-              <Rss className="h-4 w-4" />
-              <span>{t('nav.feed')}</span>
             </button>
 
             {/* Notification Bell */}
@@ -307,19 +289,13 @@ export default function Header() {
                 )}
 
                 <DropdownMenuItem
-                  onClick={() => navigate("/notifications")}
+                  onClick={() => navigate("/home")}
                   className="cursor-pointer transition-smooth"
-                  data-testid="menu-notifications"
+                  data-testid="menu-dashboard"
                 >
-                  <Bell className="mr-2 h-4 w-4" />
-                  {t('notification.title')}
-                  {unreadCount > 0 && (
-                    <span className="ml-auto px-1.5 py-0.5 text-xs bg-primary text-primary-foreground rounded-full">
-                      {unreadCount}
-                    </span>
-                  )}
+                  <Home className="mr-2 h-4 w-4" />
+                  {t('dashboard.title')}
                 </DropdownMenuItem>
-
                 <DropdownMenuItem
                   onClick={() => navigate("/profile")}
                   className="cursor-pointer transition-smooth"
@@ -367,14 +343,6 @@ export default function Header() {
                 >
                   <Coins className="mr-2 h-4 w-4" />
                   {t('nav.points')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/proposals/new")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-new-proposal"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  {t('nav.newProposal')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/walkthrough")}

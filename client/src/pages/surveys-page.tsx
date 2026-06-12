@@ -66,9 +66,12 @@ export default function SurveysPage() {
       title={t('surveys.title')}
       actions={user ? (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => navigate('/panel')}>
-            <KeyRound className="w-4 h-4 mr-1" /> {t('surveys.panelButton')}
-          </Button>
+          {/* Non-members get the enrollment card below instead — one path each. */}
+          {isPanelist && (
+            <Button size="sm" variant="outline" onClick={() => navigate('/panel')}>
+              <KeyRound className="w-4 h-4 mr-1" /> {t('surveys.panelButton')}
+            </Button>
+          )}
           <Button size="sm" onClick={() => navigate('/surveys/new')}>
             <PlusCircle className="w-4 h-4 mr-1" /> {t('surveys.new')}
           </Button>
