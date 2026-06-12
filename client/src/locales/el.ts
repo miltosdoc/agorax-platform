@@ -898,6 +898,7 @@ const el: TranslationDictionary = {
   'surveys.tabs.open': 'Ενεργές',
   'surveys.tabs.closed': 'Ολοκληρωμένες',
   'surveys.tabs.mine': 'Οι δικές μου',
+  'surveys.panelButton': 'Το πάνελ μου',
   'surveys.panelCta.title': 'Γίνε μέλος του ανώνυμου πάνελ',
   'surveys.panelCta.body': 'Απάντησε σε δημοσκοπήσεις και κέρδισε Πόντους Δημοκρατίας. Οι απαντήσεις σου δεν συνδέονται ποτέ με την ταυτότητά σου.',
   'surveys.panelCta.button': 'Εγγραφή στο πάνελ',

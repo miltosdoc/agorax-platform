@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, PlusCircle, ShieldCheck, Users } from 'lucide-react';
+import { BarChart3, KeyRound, PlusCircle, ShieldCheck, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
@@ -65,9 +65,14 @@ export default function SurveysPage() {
     <AppShell
       title={t('surveys.title')}
       actions={user ? (
-        <Button size="sm" onClick={() => navigate('/surveys/new')}>
-          <PlusCircle className="w-4 h-4 mr-1" /> {t('surveys.new')}
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate('/panel')}>
+            <KeyRound className="w-4 h-4 mr-1" /> {t('surveys.panelButton')}
+          </Button>
+          <Button size="sm" onClick={() => navigate('/surveys/new')}>
+            <PlusCircle className="w-4 h-4 mr-1" /> {t('surveys.new')}
+          </Button>
+        </div>
       ) : undefined}
     >
       <div className="flex items-center justify-between gap-2 -mt-4 mb-4 flex-wrap">

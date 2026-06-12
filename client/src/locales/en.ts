@@ -898,6 +898,7 @@ const en: TranslationDictionary = {
   'surveys.tabs.open': 'Open',
   'surveys.tabs.closed': 'Closed',
   'surveys.tabs.mine': 'Mine',
+  'surveys.panelButton': 'My panel',
   'surveys.panelCta.title': 'Join the anonymous panel',
   'surveys.panelCta.body': 'Answer polls and earn Democracy Points. Your responses are never linkable to your identity.',
   'surveys.panelCta.button': 'Join the panel',
