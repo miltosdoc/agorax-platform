@@ -16,6 +16,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { fetchPanelMe } from '@/lib/panel-client';
 import ShareButton from '@/components/ShareButton';
+import HowPollsWork from '@/components/surveys/HowPollsWork';
 
 interface SurveyListPoll {
   id: number;
@@ -95,6 +96,8 @@ export default function SurveysPage() {
           </CardContent>
         </Card>
       )}
+
+      <HowPollsWork />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mb-4">
         <TabsList>

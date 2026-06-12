@@ -884,6 +884,10 @@ const en: TranslationDictionary = {
 
   'faq.q16_title': 'When I verify with a Gov.gr declaration, what data does AgoraX keep?',
   'faq.q16_answer': 'You upload the PDF of your Responsible Declaration; AgoraX validates its digital signature offline and never contacts Gov.gr. It stores a minimal verified-identity set — your name, date of birth, place of birth and residence municipality — used for age eligibility and representative sortition. Your Tax ID (ΑΦΜ) is never stored in the clear; only a salted hash, which lets the platform guarantee one account per real person. Your ID-card number, parents’ names, phone and full street address are deliberately not stored.',
+  'faq.q21_title': 'What are Polls and the anonymous panel?',
+  'faq.q21_answer': 'On /surveys any member can create a poll by describing in natural language what they want to measure — the system drafts a neutral questionnaire and an independent automated review flags methodological problems. Answers come from the anonymous panel: you enroll once using cryptographic blind signatures, so your responses can never be linked to your identity — not even by us. Community polls are explicitly unofficial; only certified polls are published as findings. Every result ships with a methodology page: sample size, weighting, exact question wording.',
+  'faq.q22_title': 'Why does my panel identity only work on the device where I enrolled?',
+  'faq.q22_answer': 'Because enrollment is genuinely anonymous: the server confirmed you are a member without learning which panel identity you received, so it cannot transfer it to another device either. The identity lives in the browser or app where you enrolled. If you clear browser data it is lost — that is the necessary cost of unlinkability. Each account can enroll in the panel exactly once.',
   'faq.no_answer_title': "Didn't find your answer?",
   'faq.no_answer_text': 'Visit the process explanation page or register to see it up close.',
   'faq.how_it_works': 'How it Works',

@@ -211,6 +211,24 @@ export default function FAQPage() {
                 {t('faq.q20_answer')}
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-21" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q21_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q21_answer')}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-22" className="border rounded-lg px-4">
+              <AccordionTrigger className="text-left font-medium text-base">
+                {t('faq.q22_title')}
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground pb-4">
+                {t('faq.q22_answer')}
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
 
           <div className="mt-12 text-center p-8 bg-muted/30 rounded-lg border">
