@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
+import { useTranslation } from '@/hooks/use-translation';
 import { useToast } from '@/hooks/use-toast';
 import { panelFetch, getPanelToken } from '@/lib/panel-client';
 
@@ -47,6 +48,7 @@ export default function SurveyTakePage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const id = params?.id ? parseInt(params.id, 10) : NaN;
 
   const [instrument, setInstrument] = useState<Instrument | null>(null);
@@ -66,12 +68,12 @@ export default function SurveyTakePage() {
     }
     panelFetch<Instrument>(`/api/surveys/${id}/instrument`)
       .then((inst) => {
-        if (inst.status === 'completed') setError('Έχεις ήδη ολοκληρώσει αυτή τη δημοσκόπηση.');
+        if (inst.status === 'completed') setError(t('surveys.take.alreadyDone'));
         else setInstrument(inst);
       })
       .catch((e) => {
         if (e instanceof Error && e.message === 'not_panelist') navigate('/panel');
-        else setError(e?.message ?? 'Σφάλμα φόρτωσης');
+        else setError(e?.message ?? t('surveys.detail.loadError'));
       });
   }, [id, navigate]);
 
@@ -79,7 +81,7 @@ export default function SurveyTakePage() {
 
   if (error) {
     return (
-      <AppShell title="Δημοσκόπηση">
+      <AppShell title={t('surveys.detail.title')}>
         <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" /> {error}
         </div>
@@ -87,7 +89,7 @@ export default function SurveyTakePage() {
     );
   }
   if (!instrument) {
-    return <AppShell title="Δημοσκόπηση"><div className="py-12 text-center text-sm text-muted-foreground">Φόρτωση…</div></AppShell>;
+    return <AppShell title={t('surveys.detail.title')}><div className="py-12 text-center text-sm text-muted-foreground">{t('surveys.loading')}</div></AppShell>;
   }
 
   if (done) {
@@ -96,14 +98,11 @@ export default function SurveyTakePage() {
         <Card>
           <CardContent className="py-10 text-center space-y-3">
             <CheckCircle2 className="w-10 h-10 mx-auto text-green-600" />
-            <p className="font-medium">Ευχαριστούμε για τη συμμετοχή σου!</p>
+            <p className="font-medium">{t('surveys.take.thanks')}</p>
             {!done.qualityPassed && (
-              <p className="text-xs text-muted-foreground">
-                Η απάντησή σου καταχωρήθηκε αλλά δεν πέρασε τον έλεγχο ποιότητας,
-                οπότε δεν προσμετράται στα αποτελέσματα ούτε αποδίδει πόντους.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('surveys.take.qualityFailNote')}</p>
             )}
-            <Button onClick={() => navigate('/surveys')}>Πίσω στις δημοσκοπήσεις</Button>
+            <Button onClick={() => navigate('/surveys')}>{t('surveys.take.backToList')}</Button>
           </CardContent>
         </Card>
       </AppShell>
@@ -148,13 +147,13 @@ export default function SurveyTakePage() {
             { claimCode: result.claimCode },
           );
           if (claim.data.award.awarded) {
-            toast({ title: `+${claim.data.award.points} Πόντοι Δημοκρατίας`, description: 'Ποιοτική συμμετοχή σε δημοσκόπηση.' });
+            toast({ title: t('surveys.take.pointsToast', { points: claim.data.award.points }), description: t('surveys.take.pointsToastSub') });
           }
         } catch { /* points are best-effort; the response itself is in */ }
       }
       setDone({ qualityPassed: result.qualityPassed });
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Η υποβολή απέτυχε');
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : t('surveys.take.submitFailed'));
     } finally {
       setBusy(false);
     }
@@ -164,19 +163,18 @@ export default function SurveyTakePage() {
     <AppShell title={instrument.title}>
       <div className="max-w-xl mx-auto">
         <Progress value={((step + 1) / total) * 100} className="h-1.5 mb-3" />
-        <p className="text-xs text-muted-foreground mb-4">Ερώτηση {step + 1} από {total}</p>
+        <p className="text-xs text-muted-foreground mb-4">{t('surveys.take.progress', { current: step + 1, total })}</p>
 
         {item.isModuleItem && step === 0 && instrument.moduleDisclosure && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800 mb-4">
-            Οι πρώτες ερωτήσεις είναι πάγιες ερωτήσεις της πλατφόρμας — ίδιες σε
-            κάθε δημοσκόπηση, για τη μέτρηση τάσεων σε βάθος χρόνου.
+            {t('surveys.take.moduleBanner')}
           </div>
         )}
 
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base leading-relaxed">
-              {item.isModuleItem && <Badge variant="outline" className="mr-2 text-xs align-middle">πάγια</Badge>}
+              {item.isModuleItem && <Badge variant="outline" className="mr-2 text-xs align-middle">{t('surveys.detail.module')}</Badge>}
               {item.text}
             </CardTitle>
           </CardHeader>
@@ -186,7 +184,7 @@ export default function SurveyTakePage() {
                 rows={4}
                 value={typeof current === 'string' ? current : ''}
                 onChange={(e) => record(e.target.value)}
-                placeholder="Η απάντησή σου…"
+                placeholder={t('surveys.take.openPlaceholder')}
               />
             )}
 
@@ -236,10 +234,10 @@ export default function SurveyTakePage() {
 
         <div className="flex items-center justify-between mt-4">
           <Button variant="ghost" size="sm" disabled={step === 0 || busy} onClick={() => { stampTime(); setStep(step - 1); }}>
-            <ChevronLeft className="w-4 h-4 mr-1" /> Πίσω
+            <ChevronLeft className="w-4 h-4 mr-1" /> {t('surveys.take.back')}
           </Button>
           <Button size="sm" disabled={(!answered && !canSkip) || busy} onClick={next}>
-            {busy ? 'Υποβολή…' : step === total - 1 ? 'Ολοκλήρωση' : 'Επόμενη'}
+            {busy ? t('surveys.take.submitting') : step === total - 1 ? t('surveys.take.finish') : t('surveys.take.next')}
             {step < total - 1 && <ChevronRight className="w-4 h-4 ml-1" />}
           </Button>
         </div>

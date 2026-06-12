@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, Plus, Sparkles, Send, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { useTranslation } from '@/hooks/use-translation';
 import { TierBadge } from './surveys-page';
 
 interface CompiledItem {
@@ -33,19 +34,13 @@ interface CompiledPollResponse {
   verdict: { approved: boolean; flags: Array<{ issue: string; explanation: string; severity: string }>; reasoning: string };
 }
 
-const ITEM_TYPE_LABELS: Record<string, string> = {
-  single_choice: 'Μοναδική επιλογή',
-  multi_choice: 'Πολλαπλή επιλογή',
-  likert: 'Κλίμακα',
-  open_text: 'Ελεύθερο κείμενο',
-};
-
 interface EditableItem extends CompiledItem {
   deleted: boolean;
 }
 
 export default function SurveyCreatePage() {
   const [, navigate] = useLocation();
+  const { t } = useTranslation();
   const [intent, setIntent] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +57,7 @@ export default function SurveyCreatePage() {
       setTitle(resp.data.poll.title);
       setItems(resp.data.items.map((i) => ({ ...i, deleted: false })));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Η μεταγλώττιση απέτυχε');
+      setError(e instanceof ApiError ? e.message : t('surveys.create.compileFailed'));
     } finally {
       setBusy(false);
     }
@@ -103,30 +98,23 @@ export default function SurveyCreatePage() {
       await api.post(`/api/surveys/${compiled.poll.id}/field`, {});
       navigate(`/surveys/${compiled.poll.id}`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Η δημοσίευση απέτυχε');
+      setError(e instanceof ApiError ? e.message : t('surveys.create.publishFailed'));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <AppShell title="Νέα Δημοσκόπηση">
-      <p className="text-sm text-muted-foreground -mt-4 mb-6">
-        Περιέγραψε τι θέλεις να μετρήσεις. Ο μεταγλωττιστής χτίζει ένα πρώτο
-        ερωτηματολόγιο — μετά είναι δικό σου: επεξεργάσου τίτλο, ερωτήσεις και
-        επιλογές πριν τη δημοσίευση.
-      </p>
+    <AppShell title={t('surveys.create.title')}>
+      <p className="text-sm text-muted-foreground -mt-4 mb-6">{t('surveys.create.intro')}</p>
 
       {!compiled && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> Τι θέλεις να μάθεις;
+              <Sparkles className="w-4 h-4" /> {t('surveys.create.promptTitle')}
             </CardTitle>
-            <CardDescription>
-              π.χ. «Θέλω να μάθω αν οι κάτοικοι της γειτονιάς μου θα χρησιμοποιούσαν
-              νέους ποδηλατοδρόμους στο κέντρο»
-            </CardDescription>
+            <CardDescription>{t('surveys.create.promptHint')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Textarea
@@ -134,7 +122,7 @@ export default function SurveyCreatePage() {
               onChange={(e) => setIntent(e.target.value)}
               rows={4}
               maxLength={2000}
-              placeholder="Περιέγραψε την πρόθεσή σου με φυσική γλώσσα…"
+              placeholder={t('surveys.create.placeholder')}
             />
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-start gap-2">
@@ -142,7 +130,7 @@ export default function SurveyCreatePage() {
               </div>
             )}
             <Button onClick={compile} disabled={intent.trim().length < 10 || busy}>
-              {busy ? 'Μεταγλώττιση…' : 'Δημιουργία ερωτηματολογίου'}
+              {busy ? t('surveys.create.compiling') : t('surveys.create.compile')}
             </Button>
           </CardContent>
         </Card>
@@ -160,7 +148,7 @@ export default function SurveyCreatePage() {
                     maxLength={200}
                     className="text-base font-semibold"
                   />
-                  <CardDescription>Θέμα: {compiled.poll.topicTag}</CardDescription>
+                  <CardDescription>{t('surveys.create.topic', { topic: compiled.poll.topicTag })}</CardDescription>
                 </div>
                 <TierBadge tier={compiled.poll.tier} />
               </div>
@@ -173,12 +161,7 @@ export default function SurveyCreatePage() {
                     : 'bg-red-50 border-red-200 text-red-800'
                 }`}>
                   {!compiled.verdict.approved && (
-                    <p className="font-medium">
-                      Ο ανεξάρτητος έλεγχος μεθοδολογίας έχει ενστάσεις — μπορείς να
-                      τις διορθώσεις επεξεργαζόμενος τις ερωτήσεις παρακάτω, ή να
-                      δημοσιεύσεις ως έχει (οι ενστάσεις θα εμφανίζονται στη σελίδα
-                      μεθοδολογίας).
-                    </p>
+                    <p className="font-medium">{t('surveys.create.flagsBlocked')}</p>
                   )}
                   {compiled.verdict.flags.map((f, i) => (
                     <p key={i}><strong>{f.issue}</strong>: {f.explanation}</p>
@@ -203,9 +186,9 @@ export default function SurveyCreatePage() {
                         />
                       )}
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <Badge variant="outline" className="text-xs">{ITEM_TYPE_LABELS[item.itemType] ?? item.itemType}</Badge>
-                        {item.isAttentionCheck && <Badge variant="secondary" className="text-xs">έλεγχος προσοχής</Badge>}
-                        {item.randomizeOptions && <Badge variant="secondary" className="text-xs">τυχαία σειρά</Badge>}
+                        <Badge variant="outline" className="text-xs">{t(`surveys.itemType.${item.itemType}`)}</Badge>
+                        {item.isAttentionCheck && <Badge variant="secondary" className="text-xs">{t('surveys.create.attention')}</Badge>}
+                        {item.randomizeOptions && <Badge variant="secondary" className="text-xs">{t('surveys.create.randomized')}</Badge>}
                         {!item.isAttentionCheck && (
                           <Button
                             variant="ghost"
@@ -251,7 +234,7 @@ export default function SurveyCreatePage() {
                             className="h-7 text-xs"
                             onClick={() => patchItem(item.id, { options: [...item.options!, ''] })}
                           >
-                            <Plus className="w-3.5 h-3.5 mr-1" /> Προσθήκη επιλογής
+                            <Plus className="w-3.5 h-3.5 mr-1" /> {t('surveys.create.addOption')}
                           </Button>
                         )}
                       </div>
@@ -260,20 +243,16 @@ export default function SurveyCreatePage() {
                 ))}
               </ol>
 
-              <p className="text-xs text-muted-foreground">
-                Στην αρχή του ερωτηματολογίου θα προστεθούν αυτόματα 2–3 πάγιες
-                ερωτήσεις της πλατφόρμας (κοινό σύστημα ερωτήσεων — δηλώνεται και
-                στους συμμετέχοντες). Οι αλλαγές σου καταγράφονται στη μεθοδολογία.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('surveys.create.moduleNote')}</p>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
               )}
               <div className="flex gap-2">
                 <Button onClick={publish} disabled={busy || !editedValid}>
-                  <Send className="w-4 h-4 mr-1" /> {busy ? 'Δημοσίευση…' : 'Δημοσίευση στο πάνελ'}
+                  <Send className="w-4 h-4 mr-1" /> {busy ? t('surveys.create.publishing') : t('surveys.create.publish')}
                 </Button>
                 <Button variant="outline" onClick={() => { setCompiled(null); setError(null); }}>
-                  Νέα προσπάθεια
+                  {t('surveys.create.retry')}
                 </Button>
               </div>
             </CardContent>

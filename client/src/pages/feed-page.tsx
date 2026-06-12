@@ -18,6 +18,7 @@ import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
 import ShareButton from '@/components/ShareButton';
+import { getStatusLabelForLocale } from '@/lib/proposal-status';
 import { Mic, Video, Share2, Star, Loader2, FileText, BarChart3 } from 'lucide-react';
 
 interface MediaFeedItem {
@@ -71,15 +72,7 @@ interface FeedResponse {
 
 type Filter = 'all' | 'proposal' | 'survey' | 'podcast' | 'video';
 
-const PROPOSAL_STATUS_LABELS: Record<string, string> = {
-  review: 'Σε επικύρωση',
-  author_review: 'Κρίση συγγραφέα',
-  community_signal: 'Σήμα κοινότητας',
-  sortition_synthesis: 'Κληρωτό σώμα',
-  voting: 'Σε ψηφοφορία',
-  decided: 'Αποφασίστηκε',
-  archived: 'Αρχειοθετήθηκε',
-};
+
 
 function formatDuration(durationS: string | null): string {
   if (!durationS) return '';
@@ -104,7 +97,7 @@ function ProposalFeedCard({ item }: { item: ProposalFeedItem }) {
           </Link>
           <span>·</span>
           <span>{new Date(item.createdAt).toLocaleDateString(dateLocale)}</span>
-          <Badge variant="secondary">{PROPOSAL_STATUS_LABELS[item.status] ?? item.status}</Badge>
+          <Badge variant="secondary">{getStatusLabelForLocale(item.status, locale === 'en' ? 'en' : 'el')}</Badge>
         </div>
         <Link href={`/proposals/${item.id}`} className="block">
           <h3 className="text-lg font-semibold hover:underline">{item.question}</h3>
@@ -131,10 +124,10 @@ function SurveyFeedCard({ item }: { item: SurveyFeedItem }) {
           <BarChart3 className="w-4 h-4" />
           <Badge variant="outline">{t('feed.newSurvey')}</Badge>
           {item.tier === 'certified' ? (
-            <Badge className="bg-primary">Πιστοποιημένη</Badge>
+            <Badge className="bg-primary">{t('surveys.tier.certified')}</Badge>
           ) : (
             <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-              Κοινοτική · Ανεπίσημη
+              {t('surveys.tier.community')}
             </Badge>
           )}
           <span>{new Date(item.createdAt).toLocaleDateString(dateLocale)}</span>

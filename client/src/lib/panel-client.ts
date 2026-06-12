@@ -32,6 +32,23 @@ export function clearPanelToken(): void {
   try { localStorage.removeItem(TOKEN_KEY); } catch { /* noop */ }
 }
 
+/**
+ * Import a panel identity from another device. The token is the bearer
+ * credential — we validate it against /api/panel/me before storing, so a
+ * typo can't silently brick the panel UI.
+ */
+export async function importPanelToken(token: string): Promise<boolean> {
+  const trimmed = token.trim();
+  if (!trimmed || trimmed.length > 200) return false;
+  const res = await fetch('/api/panel/me', {
+    credentials: 'omit',
+    headers: { 'X-Panel-Token': trimmed, 'ngrok-skip-browser-warning': '1' },
+  });
+  if (!res.ok) return false;
+  try { localStorage.setItem(TOKEN_KEY, trimmed); } catch { return false; }
+  return true;
+}
+
 export interface EnrollKeyInfo {
   publicKey: PublicKey;
   alreadyEnrolled: boolean;

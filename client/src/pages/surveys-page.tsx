@@ -1,8 +1,8 @@
 /**
  * Surveys hub — live + closed polls for everyone, the caller's drafts, and
  * the panel-enrollment call-to-action. The two tiers carry a hard visual
- * split: community polls are amber-flagged «Ανεπίσημη», certified polls are
- * the platform's published findings.
+ * split: community polls are amber-flagged unofficial, certified polls are
+ * the platform's published findings. Fully bilingual (el/en).
  */
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, PlusCircle, ShieldCheck, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
+import { useTranslation } from '@/hooks/use-translation';
 import { fetchPanelMe } from '@/lib/panel-client';
 import ShareButton from '@/components/ShareButton';
 import HowPollsWork from '@/components/surveys/HowPollsWork';
@@ -30,24 +31,19 @@ interface SurveyListPoll {
 }
 
 export function TierBadge({ tier }: { tier: string }) {
+  const { t } = useTranslation();
   return tier === 'certified' ? (
-    <Badge className="bg-primary"><ShieldCheck className="w-3 h-3 mr-1" />Πιστοποιημένη</Badge>
+    <Badge className="bg-primary"><ShieldCheck className="w-3 h-3 mr-1" />{t('surveys.tier.certified')}</Badge>
   ) : (
     <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-      Κοινοτική · Ανεπίσημη
+      {t('surveys.tier.community')}
     </Badge>
   );
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Πρόχειρο',
-  live: 'Σε εξέλιξη',
-  closed: 'Ολοκληρώθηκε',
-  gatekeeper_flagged: 'Απορρίφθηκε',
-};
-
 export default function SurveysPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const [polls, setPolls] = useState<SurveyListPoll[] | null>(null);
   const [mine, setMine] = useState<SurveyListPoll[]>([]);
@@ -67,17 +63,14 @@ export default function SurveysPage() {
 
   return (
     <AppShell
-      title="Δημοσκοπήσεις"
+      title={t('surveys.title')}
       actions={user ? (
         <Button size="sm" onClick={() => navigate('/surveys/new')}>
-          <PlusCircle className="w-4 h-4 mr-1" /> Νέα δημοσκόπηση
+          <PlusCircle className="w-4 h-4 mr-1" /> {t('surveys.new')}
         </Button>
       ) : undefined}
     >
-      <p className="text-sm text-muted-foreground -mt-4 mb-4">
-        Ανοιχτή πλατφόρμα μέτρησης της κοινής γνώμης — με πλήρη μεθοδολογική
-        διαφάνεια σε κάθε αποτέλεσμα.
-      </p>
+      <p className="text-sm text-muted-foreground -mt-4 mb-4">{t('surveys.subtitle')}</p>
 
       {isPanelist === false && (
         <Card className="mb-6 border-primary/40">
@@ -85,14 +78,11 @@ export default function SurveysPage() {
             <div className="flex items-start gap-3">
               <Users className="w-6 h-6 text-primary shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-sm">Γίνε μέλος του ανώνυμου πάνελ</p>
-                <p className="text-xs text-muted-foreground">
-                  Απάντησε σε δημοσκοπήσεις και κέρδισε Πόντους Δημοκρατίας. Οι
-                  απαντήσεις σου δεν συνδέονται ποτέ με την ταυτότητά σου.
-                </p>
+                <p className="font-medium text-sm">{t('surveys.panelCta.title')}</p>
+                <p className="text-xs text-muted-foreground">{t('surveys.panelCta.body')}</p>
               </div>
             </div>
-            <Button size="sm" onClick={() => navigate('/panel')}>Εγγραφή στο πάνελ</Button>
+            <Button size="sm" onClick={() => navigate('/panel')}>{t('surveys.panelCta.button')}</Button>
           </CardContent>
         </Card>
       )}
@@ -101,18 +91,18 @@ export default function SurveysPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mb-4">
         <TabsList>
-          <TabsTrigger value="open">Ενεργές</TabsTrigger>
-          <TabsTrigger value="closed">Ολοκληρωμένες</TabsTrigger>
-          {user && <TabsTrigger value="mine">Οι δικές μου</TabsTrigger>}
+          <TabsTrigger value="open">{t('surveys.tabs.open')}</TabsTrigger>
+          <TabsTrigger value="closed">{t('surveys.tabs.closed')}</TabsTrigger>
+          {user && <TabsTrigger value="mine">{t('surveys.tabs.mine')}</TabsTrigger>}
         </TabsList>
       </Tabs>
 
-      {polls === null && <div className="py-12 text-center text-sm text-muted-foreground">Φόρτωση…</div>}
+      {polls === null && <div className="py-12 text-center text-sm text-muted-foreground">{t('surveys.loading')}</div>}
 
       {polls !== null && list.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Δεν υπάρχουν δημοσκοπήσεις εδώ ακόμη.
+            {t('surveys.empty')}
           </CardContent>
         </Card>
       )}
@@ -128,13 +118,13 @@ export default function SurveysPage() {
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <TierBadge tier={poll.tier} />
-                  <Badge variant="secondary">{STATUS_LABELS[poll.status] ?? poll.status}</Badge>
+                  <Badge variant="secondary">{t(`surveys.status.${poll.status}`)}</Badge>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {poll.completion ? `${poll.completion.completed} συμμετοχές` : ''}
+                {poll.completion ? t('surveys.completions', { n: poll.completion.completed }) : ''}
               </span>
               <div className="flex gap-2">
                 {(poll.status === 'live' || poll.status === 'closed') && (
@@ -142,14 +132,14 @@ export default function SurveysPage() {
                 )}
                 {poll.status === 'live' && (
                   <Link href={`/surveys/${poll.id}/take`}>
-                    <Button size="sm">Συμμετοχή</Button>
+                    <Button size="sm">{t('surveys.take')}</Button>
                   </Link>
                 )}
                 {(poll.status === 'closed' || (user && poll.creatorId === user.id)) && (
                   <Link href={`/surveys/${poll.id}`}>
                     <Button size="sm" variant="ghost">
                       <BarChart3 className="w-4 h-4 mr-1" />
-                      {poll.status === 'draft' ? 'Προεπισκόπηση & δημοσίευση' : 'Αποτελέσματα'}
+                      {poll.status === 'draft' ? t('surveys.previewPublish') : t('surveys.results')}
                     </Button>
                   </Link>
                 )}

@@ -13,6 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { AlertTriangle, Lock, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
+import { useTranslation } from '@/hooks/use-translation';
 import { TierBadge } from './surveys-page';
 import ShareButton from '@/components/ShareButton';
 
@@ -63,6 +64,7 @@ export default function SurveyDetailPage() {
   const [, params] = useRoute('/surveys/:id');
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { t, locale } = useTranslation();
   const id = params?.id ? parseInt(params.id, 10) : NaN;
 
   const [detail, setDetail] = useState<PollDetail | null>(null);
@@ -83,7 +85,7 @@ export default function SurveyDetailPage() {
             .catch(() => {});
         }
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : 'Σφάλμα φόρτωσης'));
+      .catch((e) => setError(e instanceof ApiError ? e.message : t('surveys.detail.loadError')));
   }, [id, user]);
 
   useEffect(load, [load]);
@@ -96,7 +98,7 @@ export default function SurveyDetailPage() {
       setResults(null);
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Η ενέργεια απέτυχε');
+      setError(e instanceof ApiError ? e.message : t('surveys.detail.actionFailed'));
     } finally {
       setBusy(false);
     }
@@ -104,10 +106,10 @@ export default function SurveyDetailPage() {
 
   if (!detail) {
     return (
-      <AppShell title="Δημοσκόπηση">
+      <AppShell title={t('surveys.detail.title')}>
         {error
           ? <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
-          : <div className="py-12 text-center text-sm text-muted-foreground">Φόρτωση…</div>}
+          : <div className="py-12 text-center text-sm text-muted-foreground">{t('surveys.loading')}</div>}
       </AppShell>
     );
   }
@@ -117,11 +119,11 @@ export default function SurveyDetailPage() {
   const weighting = results?.weighting;
 
   return (
-    <AppShell title={poll.title} breadcrumb={[{ label: 'Δημοσκοπήσεις', href: '/surveys' }, { label: `#${poll.id}` }]}>
+    <AppShell title={poll.title} breadcrumb={[{ label: t('surveys.title'), href: '/surveys' }, { label: `#${poll.id}` }]}>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <TierBadge tier={poll.tier} />
-        <Badge variant="secondary">{poll.status === 'live' ? 'Σε εξέλιξη' : poll.status === 'closed' ? 'Ολοκληρώθηκε' : poll.status === 'draft' ? 'Πρόχειρο' : poll.status}</Badge>
-        <span className="text-xs text-muted-foreground">{completion.completed} συμμετοχές · {completion.qualityPassed} έγκυρες</span>
+        <Badge variant="secondary">{t(`surveys.status.${poll.status}`)}</Badge>
+        <span className="text-xs text-muted-foreground">{t('surveys.detail.completions', { completed: completion.completed, passed: completion.qualityPassed })}</span>
         {(poll.status === 'live' || poll.status === 'closed') && (
           <ShareButton url={`/surveys/${poll.id}`} title={poll.title} text={poll.topicTag} variant="ghost" iconOnly />
         )}
@@ -129,8 +131,7 @@ export default function SurveyDetailPage() {
 
       {poll.tier === 'community' && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 mb-4">
-          Κοινοτική δημοσκόπηση: τα αποτελέσματα είναι <strong>ανεπίσημα</strong> και
-          δεν αποτελούν δημοσιευμένο εύρημα της πλατφόρμας.
+          {t('surveys.detail.unofficialNote')}
         </div>
       )}
 
@@ -143,9 +144,9 @@ export default function SurveyDetailPage() {
       {isCreator && poll.status === 'draft' && (
         <Card className="mb-4">
           <CardContent className="py-4 flex items-center justify-between gap-3">
-            <p className="text-sm">Το ερωτηματολόγιο είναι έτοιμο. Με τη δημοσίευση προστίθενται οι πάγιες ερωτήσεις της πλατφόρμας.</p>
+            <p className="text-sm">{t('surveys.detail.draftReady')}</p>
             <Button onClick={() => action('field')} disabled={busy}>
-              <Send className="w-4 h-4 mr-1" /> Δημοσίευση
+              <Send className="w-4 h-4 mr-1" /> {t('surveys.detail.publish')}
             </Button>
           </CardContent>
         </Card>
@@ -153,13 +154,13 @@ export default function SurveyDetailPage() {
       {isCreator && poll.status === 'live' && (
         <Card className="mb-4">
           <CardContent className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <p className="text-sm">Η δημοσκόπηση τρέχει. Το κλείσιμο υπολογίζει τα σταθμισμένα αποτελέσματα και παγώνει τη μεθοδολογία.</p>
+            <p className="text-sm">{t('surveys.detail.liveNote')}</p>
             <div className="flex gap-2 shrink-0">
               <Button onClick={() => navigate(`/surveys/${poll.id}/take`)} disabled={busy}>
-                Συμμετοχή
+                {t('surveys.take')}
               </Button>
               <Button variant="outline" onClick={() => action('close')} disabled={busy}>
-                <Lock className="w-4 h-4 mr-1" /> Κλείσιμο & αποτελέσματα
+                <Lock className="w-4 h-4 mr-1" /> {t('surveys.detail.close')}
               </Button>
             </div>
           </CardContent>
@@ -177,17 +178,17 @@ export default function SurveyDetailPage() {
         <div className="grid gap-4 mb-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Αποτελέσματα</CardTitle>
+              <CardTitle className="text-base">{t('surveys.results')}</CardTitle>
               <CardDescription>
                 n={results.completes}
-                {typeof results.qualityExcluded === 'number' && results.qualityExcluded > 0 && ` (+${results.qualityExcluded} εκτός λόγω ποιότητας)`}
+                {typeof results.qualityExcluded === 'number' && results.qualityExcluded > 0 && ` ${t('surveys.detail.qualityExcluded', { n: results.qualityExcluded })}`}
                 {weighting?.applied
-                  ? ` · σταθμισμένο (effective n=${weighting.effectiveN}, design effect=${weighting.designEffect})`
-                  : ' · μόνο αστάθμιστο'}
+                  ? ` · ${t('surveys.detail.weighted', { effn: weighting.effectiveN ?? '—', deff: weighting.designEffect ?? '—' })}`
+                  : ` · ${t('surveys.detail.unweighted')}`}
               </CardDescription>
               {weighting?.applied && (
                 <p className="text-xs text-muted-foreground">
-                  Αχνή μπάρα = αστάθμιστο, έντονη = σταθμισμένο ({weighting.variablesUsed.join(', ')})
+                  {t('surveys.detail.barsLegend', { vars: weighting.variablesUsed.join(', ') })}
                 </p>
               )}
             </CardHeader>
@@ -195,11 +196,11 @@ export default function SurveyDetailPage() {
               {results.marginals.map((m) => (
                 <div key={m.itemId}>
                   <p className="text-sm font-medium mb-2">
-                    {m.isModuleItem && <Badge variant="outline" className="mr-1 text-xs">πάγια</Badge>}
+                    {m.isModuleItem && <Badge variant="outline" className="mr-1 text-xs">{t('surveys.detail.module')}</Badge>}
                     {m.text}
                   </p>
                   {m.itemType === 'open_text' ? (
-                    <p className="text-xs text-muted-foreground">{m.openTextCount ?? 0} γραπτές απαντήσεις (δεν αθροίζονται)</p>
+                    <p className="text-xs text-muted-foreground">{t('surveys.detail.openTextCount', { n: m.openTextCount ?? 0 })}</p>
                   ) : m.options && m.shares ? (
                     <div className="space-y-2">
                       {m.options.map((opt, idx) => (
@@ -230,34 +231,34 @@ export default function SurveyDetailPage() {
       {poll.status === 'closed' && poll.methodology && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Μεθοδολογία</CardTitle>
-            <CardDescription>Δημιουργείται αυτόματα και παγώνει με το κλείσιμο — η διαφάνεια είναι το προϊόν.</CardDescription>
+            <CardTitle className="text-base">{t('surveys.detail.methodology')}</CardTitle>
+            <CardDescription>{t('surveys.detail.methodologySub')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 gap-3 text-sm mb-3">
-              <div><span className="text-muted-foreground">Δείγμα (n):</span> {poll.methodology.n}</div>
-              <div><span className="text-muted-foreground">Εκτός λόγω ποιότητας:</span> {poll.methodology.qualityExcluded}</div>
-              <div><span className="text-muted-foreground">Περίοδος:</span> {poll.methodology.fieldStart ? new Date(poll.methodology.fieldStart).toLocaleDateString('el-GR') : '—'} – {poll.methodology.fieldEnd ? new Date(poll.methodology.fieldEnd).toLocaleDateString('el-GR') : '—'}</div>
-              <div><span className="text-muted-foreground">Κοόρτη:</span> {poll.methodology.cohortNote}</div>
+              <div><span className="text-muted-foreground">{t('surveys.detail.sample')}</span> {poll.methodology.n}</div>
+              <div><span className="text-muted-foreground">{t('surveys.detail.excluded')}</span> {poll.methodology.qualityExcluded}</div>
+              <div><span className="text-muted-foreground">{t('surveys.detail.period')}</span> {poll.methodology.fieldStart ? new Date(poll.methodology.fieldStart).toLocaleDateString(locale === 'en' ? 'en-US' : 'el-GR') : '—'} – {poll.methodology.fieldEnd ? new Date(poll.methodology.fieldEnd).toLocaleDateString(locale === 'en' ? 'en-US' : 'el-GR') : '—'}</div>
+              <div><span className="text-muted-foreground">{t('surveys.detail.cohort')}</span> {poll.methodology.cohortNote}</div>
               {poll.methodology.weighting?.method !== 'none' ? (
                 <>
-                  <div><span className="text-muted-foreground">Στάθμιση:</span> {poll.methodology.weighting.method}</div>
-                  <div><span className="text-muted-foreground">Μεταβλητές:</span> {poll.methodology.weighting.variables?.join(', ')}</div>
+                  <div><span className="text-muted-foreground">{t('surveys.detail.weighting')}</span> {poll.methodology.weighting.method}</div>
+                  <div><span className="text-muted-foreground">{t('surveys.detail.variables')}</span> {poll.methodology.weighting.variables?.join(', ')}</div>
                   <div><span className="text-muted-foreground">Effective n:</span> {poll.methodology.weighting.effectiveN}</div>
                   <div><span className="text-muted-foreground">Design effect:</span> {poll.methodology.weighting.designEffect}</div>
                 </>
               ) : (
-                <div className="sm:col-span-2"><span className="text-muted-foreground">Στάθμιση:</span> καμία ({poll.methodology.weighting?.reason})</div>
+                <div className="sm:col-span-2"><span className="text-muted-foreground">{t('surveys.detail.weighting')}</span> {t('surveys.detail.noWeighting', { reason: poll.methodology.weighting?.reason })}</div>
               )}
             </div>
             <Accordion type="single" collapsible>
               <AccordionItem value="wording">
-                <AccordionTrigger className="text-sm">Ακριβής διατύπωση ερωτήσεων</AccordionTrigger>
+                <AccordionTrigger className="text-sm">{t('surveys.detail.wording')}</AccordionTrigger>
                 <AccordionContent>
                   <ol className="space-y-2 text-xs">
                     {(poll.methodology.questionWording ?? []).map((q: any, i: number) => (
                       <li key={i}>
-                        <p className="font-medium">{q.isModuleItem ? '[πάγια] ' : ''}{q.text}</p>
+                        <p className="font-medium">{q.isModuleItem ? `[${t('surveys.detail.module')}] ` : ''}{q.text}</p>
                         {q.options && <p className="text-muted-foreground">{q.options.join(' · ')}</p>}
                       </li>
                     ))}
@@ -265,23 +266,23 @@ export default function SurveyDetailPage() {
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="disclosure">
-                <AccordionTrigger className="text-sm">Κοινό σύστημα ερωτήσεων & προέλευση</AccordionTrigger>
+                <AccordionTrigger className="text-sm">{t('surveys.detail.provenance')}</AccordionTrigger>
                 <AccordionContent className="text-xs space-y-2">
                   <p>{poll.methodology.disclosure}</p>
                   {poll.methodology.compiler && (
                     <p className="text-muted-foreground">
-                      Σύνταξη: {poll.methodology.compiler.generator === 'llm' ? 'LLM compiler με ανεξάρτητο έλεγχο μεθοδολογίας' : poll.methodology.compiler.generator}
+                      {poll.methodology.compiler.generator === 'llm' ? t('surveys.detail.compilerLlm') : poll.methodology.compiler.generator}
                     </p>
                   )}
                   {poll.methodology.weighting?.marginsSource && (
-                    <p className="text-muted-foreground">Πηγή πληθυσμιακών περιθωρίων: {poll.methodology.weighting.marginsSource}</p>
+                    <p className="text-muted-foreground">{t('surveys.detail.marginsSource', { src: poll.methodology.weighting.marginsSource })}</p>
                   )}
                   {poll.methodology.gatekeeper?.flags?.length > 0 && (
                     <div className={poll.methodology.gatekeeper.approved ? 'text-muted-foreground' : 'text-red-700'}>
                       <p className="font-medium">
                         {poll.methodology.gatekeeper.approved
-                          ? 'Παρατηρήσεις ελέγχου μεθοδολογίας:'
-                          : 'Ο ανεξάρτητος έλεγχος μεθοδολογίας είχε ενστάσεις που ο δημιουργός επέλεξε να μη διορθώσει:'}
+                          ? t('surveys.detail.gkWarn')
+                          : t('surveys.detail.gkBlocked')}
                       </p>
                       <ul className="list-disc pl-4">
                         {poll.methodology.gatekeeper.flags.map((f: any, i: number) => (
@@ -300,12 +301,12 @@ export default function SurveyDetailPage() {
       {/* ── Item preview for drafts ── */}
       {poll.status === 'draft' && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">Ερωτήσεις</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base">{t('surveys.detail.questions')}</CardTitle></CardHeader>
           <CardContent>
             <ol className="space-y-3 text-sm">
               {items.map((item, i) => (
                 <li key={item.id}>
-                  <p className="font-medium">{i + 1}. {item.text} {item.isAttentionCheck && <Badge variant="secondary" className="ml-1 text-xs">έλεγχος προσοχής</Badge>}</p>
+                  <p className="font-medium">{i + 1}. {item.text} {item.isAttentionCheck && <Badge variant="secondary" className="ml-1 text-xs">{t('surveys.create.attention')}</Badge>}</p>
                   {item.options && <p className="text-xs text-muted-foreground">{item.options.join(' · ')}</p>}
                 </li>
               ))}
@@ -315,7 +316,7 @@ export default function SurveyDetailPage() {
       )}
 
       {poll.status === 'live' && (
-        <Button onClick={() => navigate(`/surveys/${poll.id}/take`)}>Συμμετοχή στη δημοσκόπηση</Button>
+        <Button onClick={() => navigate(`/surveys/${poll.id}/take`)}>{t('surveys.detail.takeCta')}</Button>
       )}
     </AppShell>
   );
