@@ -120,48 +120,41 @@ export default function ProfilePage() {
                 <CardDescription>{t('profile.identityVerificationDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="rounded-lg border p-4">
-                  <p className="text-sm font-medium text-muted-foreground">{t('profile.govgrStatus')}</p>
-                  <p className="mt-1 font-semibold">
+                <div className="rounded-lg border p-4 space-y-1.5 text-sm">
+                  <p className="font-semibold text-base">
                     {effectiveUser.govgrVerified ? t('profile.verified') : t('profile.notVerified')}
                   </p>
-                </div>
-                {effectiveUser.govgrVerified &&
-                  (effectiveUser.govgrFirstName || effectiveUser.govgrMunicipality) && (
-                    <div className="rounded-lg border p-4 space-y-1.5 text-sm">
-                      <p className="font-medium text-muted-foreground">
-                        {t('profile.verifiedIdentity')}
-                      </p>
-                      {(effectiveUser.govgrFirstName || effectiveUser.govgrLastName) && (
-                        <p>
-                          <span className="text-muted-foreground">{t('profile.verifiedName')}:</span>{' '}
-                          {[effectiveUser.govgrFirstName, effectiveUser.govgrLastName]
-                            .filter(Boolean)
-                            .join(' ')}
-                        </p>
-                      )}
-                      {(effectiveUser.govgrMunicipality || effectiveUser.govgrPostcode) && (
-                        <p>
-                          <span className="text-muted-foreground">
-                            {t('profile.verifiedResidence')}:
-                          </span>{' '}
-                          {[effectiveUser.govgrMunicipality, effectiveUser.govgrPostcode]
-                            .filter(Boolean)
-                            .join(' ')}
-                        </p>
-                      )}
-                    </div>
+                  {(effectiveUser.govgrFirstName || effectiveUser.govgrLastName) && (
+                    <p>
+                      <span className="text-muted-foreground">{t('profile.verifiedName')}:</span>{' '}
+                      {[effectiveUser.govgrFirstName, effectiveUser.govgrLastName]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </p>
                   )}
-                <p className="text-sm text-muted-foreground">{t('profile.identityActionUnavailable')}</p>
+                  {(effectiveUser.govgrMunicipality || effectiveUser.govgrPostcode) && (
+                    <p>
+                      <span className="text-muted-foreground">
+                        {t('profile.verifiedResidence')}:
+                      </span>{' '}
+                      {[effectiveUser.govgrMunicipality, effectiveUser.govgrPostcode]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </p>
+                  )}
+                </div>
                 {!effectiveUser.govgrVerified && (
-                  <Button
-                    onClick={() => setIsVerifyModalOpen(true)}
-                    data-testid="button-verify-identity"
-                    className="gap-2"
-                  >
-                    <Shield className="h-4 w-4" />
-                    {t('profile.verifyIdentity')}
-                  </Button>
+                  <>
+                    <p className="text-sm text-muted-foreground">{t('profile.identityActionUnavailable')}</p>
+                    <Button
+                      onClick={() => setIsVerifyModalOpen(true)}
+                      data-testid="button-verify-identity"
+                      className="gap-2"
+                    >
+                      <Shield className="h-4 w-4" />
+                      {t('profile.verifyIdentity')}
+                    </Button>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -172,10 +165,9 @@ export default function ProfilePage() {
                   <Trash2 className="h-5 w-5 text-destructive" />
                   {t('profile.accountDangerZone')}
                 </CardTitle>
-                <CardDescription>{t('profile.accountDangerZoneDescription')}</CardDescription>
+                <CardDescription>{t('profile.accountDeletionUnavailable')}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{t('profile.accountDeletionUnavailable')}</p>
+              <CardContent>
                 <DeleteAccount />
               </CardContent>
             </Card>

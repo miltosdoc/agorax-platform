@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bell, CheckCheck, FileText } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
+import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
 import { PushOptIn } from "@/components/notifications/PushOptIn";
 import { LocalNotifTestButton } from "@/components/notifications/LocalNotifTestButton";
@@ -13,6 +14,7 @@ import { EmptyState, LoadingState } from "@/components/ui/empty-state";
 
 export default function NotificationsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const markAllAsRead = useMarkAllAsRead();
   
@@ -45,7 +47,8 @@ export default function NotificationsPage() {
       <div className="mb-4">
         <PushOptIn />
       </div>
-      <LocalNotifTestButton />
+      {/* Capacitor plugin-chain debug harness — admins only. */}
+      {user?.isAdmin && <LocalNotifTestButton />}
       <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread")}>
         <TabsList className="mb-4">
           <TabsTrigger value="all">

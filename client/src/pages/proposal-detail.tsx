@@ -213,15 +213,9 @@ export default function ProposalDetailPage() {
       {/* While the LLM is scoring (status='review'), tell the user what's
           happening — the page polls every 3s and updates itself. */}
       {proposal.status === 'review' && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-3" data-testid="proposal-validation-banner">
-          <span className="text-lg leading-none mt-0.5">🤖</span>
-          <div>
-            <div className="font-medium">Η πρόταση επικυρώνεται…</div>
-            <div className="text-amber-800">
-              Το σύστημα αξιολογεί την πρότασή σου. Αυτό διαρκεί συνήθως 10–15
-              δευτερόλεπτα. Η σελίδα θα ανανεωθεί αυτόματα μόλις ολοκληρωθεί.
-            </div>
-          </div>
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-3" data-testid="proposal-validation-banner">
+          <span className="text-lg leading-none">🤖</span>
+          <span>{t('proposal.validating')}</span>
         </div>
       )}
 
@@ -320,7 +314,6 @@ export default function ProposalDetailPage() {
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">{t('proposal.mergedFinalTextHint') || 'Παράγεται αυτόματα ή από το κληρωτό σώμα. Το αρχικό κείμενο παραμένει αμετάβλητο πιο πάνω.'}</p>
                 <p className="whitespace-pre-wrap">{proposal.finalText}</p>
               </div>
             )}

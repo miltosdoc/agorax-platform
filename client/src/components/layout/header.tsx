@@ -352,14 +352,16 @@ export default function Header() {
                   <MessageSquare className="mr-2 h-4 w-4" />
                   {t('nav.walkthrough')}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/analytics")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-analytics"
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  {t('nav.analytics')}
-                </DropdownMenuItem>
+                {user.isAdmin && (
+                  <DropdownMenuItem
+                    onClick={() => navigate("/analytics")}
+                    className="cursor-pointer transition-smooth"
+                    data-testid="menu-analytics"
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    {t('nav.analytics')}
+                  </DropdownMenuItem>
+                )}
                 {user.isAdmin && (
                   <DropdownMenuItem
                     onClick={() => navigate("/admin/accounts")}
