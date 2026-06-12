@@ -70,7 +70,10 @@ export default function SurveysPage() {
         </Button>
       ) : undefined}
     >
-      <p className="text-sm text-muted-foreground -mt-4 mb-4">{t('surveys.subtitle')}</p>
+      <div className="flex items-center justify-between gap-2 -mt-4 mb-4 flex-wrap">
+        <p className="text-sm text-muted-foreground">{t('surveys.subtitle')}</p>
+        <HowPollsWork />
+      </div>
 
       {isPanelist === false && (
         <Card className="mb-6 border-primary/40">
@@ -86,8 +89,6 @@ export default function SurveysPage() {
           </CardContent>
         </Card>
       )}
-
-      <HowPollsWork />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mb-4">
         <TabsList>

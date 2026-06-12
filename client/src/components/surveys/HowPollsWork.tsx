@@ -1,15 +1,14 @@
 /**
- * «Πώς λειτουργεί;» — the user-facing explainer for the polling module,
- * shown collapsed on /surveys and expanded on first visit (localStorage
- * flag). Plain language; the technical version lives in docs/POLLING.md.
+ * «Πώς λειτουργεί;» — the user-facing explainer for the polling module.
+ * Lives behind a small help button that opens a dialog, so it never
+ * crowds the surveys page. Plain language; the technical version is in
+ * docs/POLLING.md.
  */
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { HelpCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
-
-const SEEN_KEY = 'agorax_polls_explainer_seen_v1';
 
 interface Section { title: { el: string; en: string }; body: { el: string; en: string } }
 
@@ -51,25 +50,23 @@ const SECTIONS: Section[] = [
 export default function HowPollsWork() {
   const { locale } = useTranslation();
   const lang: 'el' | 'en' = locale === 'en' ? 'en' : 'el';
-  const [open, setOpen] = useState<string | undefined>(() => {
-    try {
-      if (!localStorage.getItem(SEEN_KEY)) {
-        localStorage.setItem(SEEN_KEY, '1');
-        return 'item-0';
-      }
-    } catch { /* private mode */ }
-    return undefined;
-  });
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-1">
-        <CardTitle className="text-base flex items-center gap-2">
-          <HelpCircle className="w-4 h-4" /> {lang === 'en' ? 'How does it work?' : 'Πώς λειτουργεί;'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Accordion type="single" collapsible value={open} onValueChange={setOpen}>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <HelpCircle className="w-4 h-4 mr-1" />
+          {lang === 'en' ? 'How does it work?' : 'Πώς λειτουργεί;'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <HelpCircle className="w-4 h-4" />
+            {lang === 'en' ? 'How polls work' : 'Πώς λειτουργούν οι δημοσκοπήσεις'}
+          </DialogTitle>
+        </DialogHeader>
+        <Accordion type="single" collapsible defaultValue="item-0">
           {SECTIONS.map((s, i) => (
             <AccordionItem key={i} value={`item-${i}`}>
               <AccordionTrigger className="text-sm text-left">{s.title[lang]}</AccordionTrigger>
@@ -77,7 +74,7 @@ export default function HowPollsWork() {
             </AccordionItem>
           ))}
         </Accordion>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
