@@ -12,13 +12,14 @@ import { join } from 'path';
 import { POINT_SCHEDULE, publishedSchedule } from '../../server/economy/schedule';
 
 describe('Democracy Points — schedule', () => {
-  it('defines the five participation actions', () => {
+  it('defines the six participation actions', () => {
     expect(Object.keys(POINT_SCHEDULE).sort()).toEqual([
       'amendment',
       'proposal_validated',
       'ratification_vote',
       'signal_vote',
       'sortition_score',
+      'survey_complete',
     ]);
   });
 

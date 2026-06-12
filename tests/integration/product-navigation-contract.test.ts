@@ -35,7 +35,10 @@ describe('product navigation contract', () => {
   it('does not route authenticated users into legacy poll management screens', () => {
     expect(appSource).not.toContain('component={MyPollsPage}');
     expect(appSource).not.toContain('component={PollCreatePage}');
-    expect(appSource).not.toContain('component={SurveyCreatePage}');
+    // Legacy /surveys/create + /surveys/:id/edit stay redirected; the
+    // polling MODULE pages (pages/survey-*.tsx) are a different product
+    // and are allowed.
+    expect(appSource).toContain('path="/surveys/create"');
     expect(appSource).toContain('<Redirect to="/proposals/new" />');
   });
 });

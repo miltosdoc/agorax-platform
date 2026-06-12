@@ -73,6 +73,14 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   [GitHub Releases](https://github.com/miltosdoc/agoraxdemocracy/releases);
   see [docs/ANDROID_APP.md](docs/ANDROID_APP.md) for install, build, and the
   future FCM background-push path.
+- **Polling platform (`/surveys`)** — a self-serve civic measurement tool:
+  an anonymous panel (blind-signature enrolled, demographics never linkable
+  to identity), an LLM Poll Compiler with an adversarial methodology
+  reviewer, a piggyback tracker module on every poll, raking-weighted
+  results (raw + weighted always together), and an auto-generated
+  methodology page per poll. Two hard-separated tiers: community
+  (unofficial) and certified (the only published findings). See
+  [docs/POLLING.md](docs/POLLING.md).
 
 ---
 
@@ -262,7 +270,8 @@ packages/
   voting-sdk/      @agorax/voting — ElectionGuard 2.1 protocol implementation
 ballot_service/    FastAPI service — Gov.gr declaration validation
 mobile/            Capacitor Android wrapper (APK via GitHub Releases)
-migrations/        Ordered SQL migrations (0000 … 0030)
+stats-sidecar/     Optional Python raking service (stdlib-only)
+migrations/        Ordered SQL migrations (0000 … 0031)
 docs/              Architecture, API, runbook, and design documents
 ```
 
@@ -287,6 +296,8 @@ docs/              Architecture, API, runbook, and design documents
   opt-in surface, privacy notes
 - [Android app](docs/ANDROID_APP.md) — Capacitor wrapper, APK build &
   release pipeline, native notifications, FCM roadmap
+- [Polling module](docs/POLLING.md) — anonymous panel, LLM Poll Compiler,
+  piggyback trackers, raking/weighting, methodology pages
 - [Media pipeline](docs/media-pipeline.md) — script generation, upload
   validation, featured selection, share URLs
 - [Migration Strategy](docs/MIGRATION_STRATEGY.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Tests](docs/TESTS.md)
