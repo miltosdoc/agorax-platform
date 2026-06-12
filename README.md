@@ -61,10 +61,18 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   recent featured media from every proposal in deliberation. Filter by
   type, play inline, deep-link to the proposal to participate.
 - **In-app + Web Push notifications** — the header bell and `/notifications`
-  cover the lifecycle (you were drawn, amendments ready, voting opened,
-  conference scheduled, deliberation room opened). An opt-in toggle subscribes
-  the browser to Web Push so the same events fire on phone or laptop even
-  when AgoraX is closed. Push payloads are end-to-end encrypted (VAPID).
+  cover the lifecycle (you were drawn, amendments ready, voting opened, a new
+  proposal or new media in your community, conference scheduled, deliberation
+  room opened). Delivery is real-time over a server-sent-events stream while
+  AgoraX is open; an opt-in toggle additionally subscribes the browser to Web
+  Push so the same events fire on phone or laptop even when AgoraX is closed.
+  Push payloads are end-to-end encrypted (VAPID).
+- **Android app** — a thin Capacitor wrapper around the web client that
+  installs as a real app and surfaces notifications as native Android system
+  toasts. Debug APKs are published on every `v*` tag to
+  [GitHub Releases](https://github.com/miltosdoc/agoraxdemocracy/releases);
+  see [docs/ANDROID_APP.md](docs/ANDROID_APP.md) for install, build, and the
+  future FCM background-push path.
 
 ---
 
@@ -78,9 +86,11 @@ draft ─▶ review ─▶ author_review ─▶ community_signal ─▶ sortitio
 ```
 
 - **draft** — the author drafts the proposal.
-- **review** — quality validation. A local-only stub today (every proposal
-  routes to the sortition body for human review); an external LLM gate was
-  removed by a GDPR audit decision and will only return as a local model.
+- **review** — quality validation by a **self-hosted local LLM**
+  (`LLM_API_URL`); scores route the proposal onward (return to draft /
+  deliberation / direct to vote) with a deterministic fallback when the
+  model is unavailable. An earlier external-LLM gate was removed by a GDPR
+  audit decision — proposal text never leaves the instance.
 - **author_review** — the author accepts or rejects community amendments.
 - **community_signal** — the community votes on the author's rejections.
 - **sortition_synthesis** — a sortition jury scores the proposal and revises it.
@@ -251,7 +261,8 @@ shared/            Drizzle schema + types shared by client and server
 packages/
   voting-sdk/      @agorax/voting — ElectionGuard 2.1 protocol implementation
 ballot_service/    FastAPI service — Gov.gr declaration validation
-migrations/        Ordered SQL migrations (0000 … 0029)
+mobile/            Capacitor Android wrapper (APK via GitHub Releases)
+migrations/        Ordered SQL migrations (0000 … 0030)
 docs/              Architecture, API, runbook, and design documents
 ```
 
@@ -274,6 +285,8 @@ docs/              Architecture, API, runbook, and design documents
   TURN, recording posture
 - [Web Push notifications](docs/push-setup.md) — VAPID keys, service worker,
   opt-in surface, privacy notes
+- [Android app](docs/ANDROID_APP.md) — Capacitor wrapper, APK build &
+  release pipeline, native notifications, FCM roadmap
 - [Media pipeline](docs/media-pipeline.md) — script generation, upload
   validation, featured selection, share URLs
 - [Migration Strategy](docs/MIGRATION_STRATEGY.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Tests](docs/TESTS.md)
