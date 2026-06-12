@@ -14,6 +14,7 @@ import { AlertTriangle, Lock, Send } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { TierBadge } from './surveys-page';
+import ShareButton from '@/components/ShareButton';
 
 interface PollDetail {
   poll: {
@@ -121,6 +122,9 @@ export default function SurveyDetailPage() {
         <TierBadge tier={poll.tier} />
         <Badge variant="secondary">{poll.status === 'live' ? 'Σε εξέλιξη' : poll.status === 'closed' ? 'Ολοκληρώθηκε' : poll.status === 'draft' ? 'Πρόχειρο' : poll.status}</Badge>
         <span className="text-xs text-muted-foreground">{completion.completed} συμμετοχές · {completion.qualityPassed} έγκυρες</span>
+        {(poll.status === 'live' || poll.status === 'closed') && (
+          <ShareButton url={`/surveys/${poll.id}`} title={poll.title} text={poll.topicTag} variant="ghost" iconOnly />
+        )}
       </div>
 
       {poll.tier === 'community' && (

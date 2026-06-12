@@ -15,6 +15,7 @@ import { BarChart3, PlusCircle, ShieldCheck, Users } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { fetchPanelMe } from '@/lib/panel-client';
+import ShareButton from '@/components/ShareButton';
 
 interface SurveyListPoll {
   id: number;
@@ -133,6 +134,9 @@ export default function SurveysPage() {
                 {poll.completion ? `${poll.completion.completed} συμμετοχές` : ''}
               </span>
               <div className="flex gap-2">
+                {(poll.status === 'live' || poll.status === 'closed') && (
+                  <ShareButton url={`/surveys/${poll.id}`} title={poll.title} text={poll.topicTag} variant="ghost" iconOnly />
+                )}
                 {poll.status === 'live' && (
                   <Link href={`/surveys/${poll.id}/take`}>
                     <Button size="sm">Συμμετοχή</Button>

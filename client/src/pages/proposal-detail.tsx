@@ -16,6 +16,7 @@ import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye, Trash2, Mic } fro
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
+import ShareButton from '@/components/ShareButton';
 import LifecycleStepper from '@/components/ui/LifecycleStepper';
 import NextActionPanel from '@/components/proposal/NextActionPanel';
 import { DebatePanel } from '@/components/debate/DebatePanel';
@@ -242,6 +243,12 @@ export default function ProposalDetailPage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 self-start">
+              <ShareButton
+                url={`/proposals/${proposal.id}`}
+                title={proposal.question}
+                text={proposal.solution ?? undefined}
+                iconOnly
+              />
               <Badge className={getStatusForProposal(proposal).color} variant="outline" style={{ whiteSpace: 'nowrap' }}>
                 <span className="mr-1">{getStatusForProposal(proposal).icon}</span>
                 {getStatusLabel(proposal.status, t)}

@@ -5,11 +5,103 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import { votingRepo } from '../storage';
+import { votingRepo, proposalRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { db } from '../db';
+import { eq } from 'drizzle-orm';
+import { surveyPolls, communities } from '@shared/schema';
+
+const SOCIAL_BOT_RE = /facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|skypeuripreview|slackbot|discordbot|viber|pinterest|redditbot|mastodon/i;
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Minimal OG/Twitter unfurl page for social crawlers. */
+function renderOgPage(opts: { url: string; title: string; description: string; image: string }): string {
+  const title = escapeHtml(opts.title);
+  const description = escapeHtml(opts.description);
+  return `<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <title>${title} - AgoraX</title>
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="${opts.url}">
+    <meta property="og:title" content="${title}">
+    <meta property="og:description" content="${description}">
+    <meta property="og:image" content="${opts.image}">
+    <meta property="og:site_name" content="AgoraX">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${title}">
+    <meta name="twitter:description" content="${description}">
+    <meta name="twitter:image" content="${opts.image}">
+    <meta name="description" content="${description}">
+</head>
+<body>
+    <div style="font-family: Arial; max-width: 600px; margin: 2rem auto; padding: 2rem;">
+        <h1>${title}</h1>
+        <p>${description}</p>
+        <a href="${opts.url}" style="background: #2563eb; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; display: inline-block;">Άνοιγμα στο AgoraX</a>
+    </div>
+</body>
+</html>`;
+}
 
 export function registerMiscRoutes(app: Express): void {
+  // ── Social-crawler OG pages for proposals & survey polls ─────────────
+  // Same pattern as the legacy /polls/:id route below: humans fall through
+  // to the SPA, preview bots get server-rendered Open Graph tags so links
+  // unfurl properly on every social network / messenger.
+
+  app.get('/proposals/:id', async (req, res, next) => {
+    if (!SOCIAL_BOT_RE.test(req.get('User-Agent') || '')) return next();
+    try {
+      const id = parseInt(req.params.id, 10);
+      const proposal = await proposalRepo.getProposal(id);
+      if (!proposal) return next();
+      const [community] = await db.select().from(communities).where(eq(communities.id, proposal.communityId)).limit(1);
+      const base = `${req.protocol}://${req.get('host')}`;
+      const description = `${(proposal.solution ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)} — Πρόταση στην κοινότητα ${community?.name ?? 'AgoraX'}. Συμμετοχή στη διαβούλευση στο AgoraX.`;
+      res.send(renderOgPage({
+        url: `${base}/proposals/${id}`,
+        title: proposal.question,
+        description,
+        image: `${base}/logo-share.png`,
+      }));
+    } catch {
+      next();
+    }
+  });
+
+  app.get('/surveys/:id', async (req, res, next) => {
+    if (!SOCIAL_BOT_RE.test(req.get('User-Agent') || '')) return next();
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [poll] = await db.select().from(surveyPolls).where(eq(surveyPolls.id, id)).limit(1);
+      if (!poll || (poll.status !== 'live' && poll.status !== 'closed')) return next();
+      const base = `${req.protocol}://${req.get('host')}`;
+      const tierNote = poll.tier === 'certified'
+        ? 'Πιστοποιημένη δημοσκόπηση AgoraX'
+        : 'Κοινοτική (ανεπίσημη) δημοσκόπηση';
+      const action = poll.status === 'live'
+        ? '🗳️ Συμμετοχή τώρα — ανώνυμα, με πλήρη μεθοδολογική διαφάνεια.'
+        : 'Δείτε τα αποτελέσματα και τη μεθοδολογία.';
+      res.send(renderOgPage({
+        url: `${base}/surveys/${id}`,
+        title: poll.title,
+        description: `${tierNote} · ${poll.topicTag}. ${action}`,
+        image: `${base}/logo-share.png`,
+      }));
+    } catch {
+      next();
+    }
+  });
+
   app.get("/polls/:id", async (req, res, next) => {
     const userAgent = req.get('User-Agent') || '';
     // Detect social media crawlers and preview bots

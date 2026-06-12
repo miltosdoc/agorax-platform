@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
+import ShareButton from '@/components/ShareButton';
 import { Mic, Video, Share2, Star, Loader2, FileText, BarChart3 } from 'lucide-react';
 
 interface MediaFeedItem {
@@ -109,7 +110,8 @@ function ProposalFeedCard({ item }: { item: ProposalFeedItem }) {
           <h3 className="text-lg font-semibold hover:underline">{item.question}</h3>
         </Link>
         {item.solution && <p className="text-sm text-muted-foreground line-clamp-2">{item.solution}</p>}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <ShareButton url={`/proposals/${item.id}`} title={item.question} text={item.solution} />
           <Link href={`/proposals/${item.id}`}>
             <Button size="sm" variant="default">{t('feed.openProposal')}</Button>
           </Link>
@@ -142,6 +144,7 @@ function SurveyFeedCard({ item }: { item: SurveyFeedItem }) {
         </Link>
         <p className="text-sm text-muted-foreground">{item.topicTag}</p>
         <div className="flex justify-end gap-2">
+          <ShareButton url={`/surveys/${item.id}`} title={item.title} text={item.topicTag} />
           {item.status === 'live' ? (
             <Link href={`/surveys/${item.id}/take`}>
               <Button size="sm">{t('feed.openSurvey')}</Button>
