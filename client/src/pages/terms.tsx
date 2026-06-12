@@ -89,7 +89,7 @@ function GreekTerms() {
           ποιότητας πριν προχωρήσει στη φάση τροπολογιών και ψηφοφορίας.
         </p>
         <p>
-          <strong className="text-foreground">Σημείωση:</strong> ο αυτόματος έλεγχος LLM είναι προσωρινά
+          <strong className="text-foreground">Σημείωση:</strong> ο αυτόματος έλεγχος AI είναι προσωρινά
           ανενεργός — όλες οι προτάσεις δρομολογούνται σε κληρωτό σώμα για ανθρώπινη αξιολόγηση. Καμία
           πρόταση ή κείμενο δεν αποστέλλεται σε εξωτερική υπηρεσία τεχνητής νοημοσύνης.
         </p>
@@ -226,7 +226,7 @@ function EnglishTerms() {
           before moving to the amendment phase and the vote.
         </p>
         <p>
-          <strong className="text-foreground">Note:</strong> the automated LLM quality check is
+          <strong className="text-foreground">Note:</strong> the automated AI quality check is
           temporarily disabled — all proposals route to a sortition body for human review. No proposal
           text leaves the instance to any external AI service.
         </p>

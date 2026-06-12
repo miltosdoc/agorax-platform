@@ -396,7 +396,7 @@ function EnglishContent() {
             <strong className="text-foreground">No transfers outside the EEA.</strong>
           </li>
           <li>
-            <strong className="text-foreground">No external AI processing.</strong> The previous LLM
+            <strong className="text-foreground">No external AI processing.</strong> The previous AI
             quality-gate that forwarded proposal text to OpenRouter has been removed as part of this
             audit.
           </li>

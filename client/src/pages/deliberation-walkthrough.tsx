@@ -434,7 +434,7 @@ function StepSortitionSynthesis() {
           </span>
         </div>
         <p className="text-xs text-purple-700">
-          {t('walkthrough.ai_premerge_desc') || 'Το LLM ενσωματώνει τις τροπολογίες που αποδέχθηκε ο συγγραφέας — και όσες υπερβαίνουν το όριο δημοφιλίας της κοινότητας (amendmentInclusionThreshold) — σε ρέοντα κείμενο. Το κληρωτό σώμα ξεκινά από αυτό αντί για άδειο πεδίο.'}
+          {t('walkthrough.ai_premerge_desc') || 'Το AI ενσωματώνει τις τροπολογίες που αποδέχθηκε ο συγγραφέας — και όσες υπερβαίνουν το όριο δημοφιλίας της κοινότητας (amendmentInclusionThreshold) — σε ρέοντα κείμενο. Το κληρωτό σώμα ξεκινά από αυτό αντί για άδειο πεδίο.'}
         </p>
       </div>
 
