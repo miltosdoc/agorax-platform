@@ -1,0 +1,427 @@
+Skip to main content
+GitHub Docs
+
+Home
+REST API
+The REST API is now versioned. For more information, see "About API versioning."
+REST API/Git database/
+REST API endpoints for Git references
+Use the REST API to interact with references in your Git database on GitHub
+
+About Git references
+A Git reference (git ref) is a file that contains a Git commit SHA-1 hash. When referring to a Git commit, you can use the Git reference, which is an easy-to-remember name, rather than the hash. The Git reference can be rewritten to point to a new commit. A branch is a Git reference that stores the new Git commit hash. These endpoints allow you to read and write references to your Git database on GitHub.
+
+List matching references
+Returns an array of references from your Git database that match the supplied name. The :ref in the URL must be formatted as heads/<branch name> for branches and tags/<tag name> for tags. If the :ref doesn't exist in the repository, but existing refs start with :ref, they will be returned as an array.
+
+When you use this endpoint without providing a :ref, it will return an array of all the references from your Git database, including notes and stashes if they exist on the server. Anything in the namespace is returned, not just heads and tags.
+
+Note
+
+You need to explicitly request a pull request to trigger a test merge commit, which checks the mergeability of pull requests. For more information, see "Checking mergeability of pull requests".
+
+If you request matching references for a branch named feature but the branch feature doesn't exist, the response can still include other matching head refs that start with the word feature, such as featureA and featureB.
+
+Fine-grained access tokens for "List matching references"
+This endpoint works with the following fine-grained token types:
+
+GitHub App user access tokens
+GitHub App installation access tokens
+Fine-grained personal access tokens
+The fine-grained token must have the following permission set:
+
+"Contents" repository permissions (read)
+This endpoint can be used without authentication or the aforementioned permissions if only public resources are requested.
+
+Parameters for "List matching references"
+Headers
+Name, Type, Description
+accept string
+Setting to application/vnd.github+json is recommended.
+
+Path parameters
+Name, Type, Description
+owner string Required
+The account owner of the repository. The name is not case sensitive.
+
+repo string Required
+The name of the repository without the .git extension. The name is not case sensitive.
+
+ref string Required
+The Git reference. For more information, see "Git References" in the Git documentation.
+
+HTTP response status codes for "List matching references"
+Status code	Description
+200	
+OK
+
+409	
+Conflict
+
+Code samples for "List matching references"
+Request example
+get
+/repos/{owner}/{repo}/git/matching-refs/{ref}
+
+cURL
+
+JavaScript
+
+GitHub CLI
+curl -L \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR-TOKEN>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  https://api.github.com/repos/OWNER/REPO/git/matching-refs/REF
+Response
+
+
+Example response
+
+Response schema
+Status: 200
+[
+  {
+    "ref": "refs/heads/feature-a",
+    "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlLWE=",
+    "url": "https://api.github.com/repos/octocat/Hello-World/git/refs/heads/feature-a",
+    "object": {
+      "type": "commit",
+      "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+      "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+    }
+  },
+  {
+    "ref": "refs/heads/feature-b",
+    "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlLWI=",
+    "url": "https://api.github.com/repos/octocat/Hello-World/git/refs/heads/feature-b",
+    "object": {
+      "type": "commit",
+      "sha": "612077ae6dffb4d2fbd8ce0cccaa58893b07b5ac",
+      "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/612077ae6dffb4d2fbd8ce0cccaa58893b07b5ac"
+    }
+  }
+]
+Get a reference
+Returns a single reference from your Git database. The :ref in the URL must be formatted as heads/<branch name> for branches and tags/<tag name> for tags. If the :ref doesn't match an existing ref, a 404 is returned.
+
+Note
+
+You need to explicitly request a pull request to trigger a test merge commit, which checks the mergeability of pull requests. For more information, see "Checking mergeability of pull requests".
+
+Fine-grained access tokens for "Get a reference"
+This endpoint works with the following fine-grained token types:
+
+GitHub App user access tokens
+GitHub App installation access tokens
+Fine-grained personal access tokens
+The fine-grained token must have the following permission set:
+
+"Contents" repository permissions (read)
+This endpoint can be used without authentication or the aforementioned permissions if only public resources are requested.
+
+Parameters for "Get a reference"
+Headers
+Name, Type, Description
+accept string
+Setting to application/vnd.github+json is recommended.
+
+Path parameters
+Name, Type, Description
+owner string Required
+The account owner of the repository. The name is not case sensitive.
+
+repo string Required
+The name of the repository without the .git extension. The name is not case sensitive.
+
+ref string Required
+The Git reference. For more information, see "Git References" in the Git documentation.
+
+HTTP response status codes for "Get a reference"
+Status code	Description
+200	
+OK
+
+404	
+Resource not found
+
+409	
+Conflict
+
+Code samples for "Get a reference"
+Request example
+get
+/repos/{owner}/{repo}/git/ref/{ref}
+
+cURL
+
+JavaScript
+
+GitHub CLI
+curl -L \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR-TOKEN>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  https://api.github.com/repos/OWNER/REPO/git/ref/REF
+Response
+
+
+Example response
+
+Response schema
+Status: 200
+{
+  "ref": "refs/heads/featureA",
+  "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlQQ==",
+  "url": "https://api.github.com/repos/octocat/Hello-World/git/refs/heads/featureA",
+  "object": {
+    "type": "commit",
+    "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+    "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+  }
+}
+Create a reference
+Creates a reference for your repository. You are unable to create new references for empty repositories, even if the commit SHA-1 hash used exists. Empty repositories are repositories without branches.
+
+Fine-grained access tokens for "Create a reference"
+This endpoint works with the following fine-grained token types:
+
+GitHub App user access tokens
+GitHub App installation access tokens
+Fine-grained personal access tokens
+The fine-grained token must have at least one of the following permission sets:
+
+"Contents" repository permissions (write)
+"Contents" repository permissions (write) and "Workflows" repository permissions (write)
+Parameters for "Create a reference"
+Headers
+Name, Type, Description
+accept string
+Setting to application/vnd.github+json is recommended.
+
+Path parameters
+Name, Type, Description
+owner string Required
+The account owner of the repository. The name is not case sensitive.
+
+repo string Required
+The name of the repository without the .git extension. The name is not case sensitive.
+
+Body parameters
+Name, Type, Description
+ref string Required
+The name of the fully qualified reference (ie: refs/heads/master). If it doesn't start with 'refs' and have at least two slashes, it will be rejected.
+
+sha string Required
+The SHA1 value for this reference.
+
+HTTP response status codes for "Create a reference"
+Status code	Description
+201	
+Created
+
+409	
+Conflict
+
+422	
+Validation failed, or the endpoint has been spammed.
+
+Code samples for "Create a reference"
+Request example
+post
+/repos/{owner}/{repo}/git/refs
+
+cURL
+
+JavaScript
+
+GitHub CLI
+curl -L \
+  -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR-TOKEN>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  https://api.github.com/repos/OWNER/REPO/git/refs \
+  -d '{"ref":"refs/heads/featureA","sha":"aa218f56b14c9653891f9e74264a383fa43fefbd"}'
+Response
+
+
+Example response
+
+Response schema
+Status: 201
+{
+  "ref": "refs/heads/featureA",
+  "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlQQ==",
+  "url": "https://api.github.com/repos/octocat/Hello-World/git/refs/heads/featureA",
+  "object": {
+    "type": "commit",
+    "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+    "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+  }
+}
+Update a reference
+Updates the provided reference to point to a new SHA. For more information, see "Git References" in the Git documentation.
+
+Fine-grained access tokens for "Update a reference"
+This endpoint works with the following fine-grained token types:
+
+GitHub App user access tokens
+GitHub App installation access tokens
+Fine-grained personal access tokens
+The fine-grained token must have at least one of the following permission sets:
+
+"Contents" repository permissions (write)
+"Contents" repository permissions (write) and "Workflows" repository permissions (write)
+Parameters for "Update a reference"
+Headers
+Name, Type, Description
+accept string
+Setting to application/vnd.github+json is recommended.
+
+Path parameters
+Name, Type, Description
+owner string Required
+The account owner of the repository. The name is not case sensitive.
+
+repo string Required
+The name of the repository without the .git extension. The name is not case sensitive.
+
+ref string Required
+The Git reference. For more information, see "Git References" in the Git documentation.
+
+Body parameters
+Name, Type, Description
+sha string Required
+The SHA1 value to set this reference to
+
+force boolean
+Indicates whether to force the update or to make sure the update is a fast-forward update. Leaving this out or setting it to false will make sure you're not overwriting work.
+
+Default: false
+
+HTTP response status codes for "Update a reference"
+Status code	Description
+200	
+OK
+
+409	
+Conflict
+
+422	
+Validation failed, or the endpoint has been spammed.
+
+Code samples for "Update a reference"
+Request example
+patch
+/repos/{owner}/{repo}/git/refs/{ref}
+
+cURL
+
+JavaScript
+
+GitHub CLI
+curl -L \
+  -X PATCH \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR-TOKEN>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  https://api.github.com/repos/OWNER/REPO/git/refs/REF \
+  -d '{"sha":"aa218f56b14c9653891f9e74264a383fa43fefbd","force":true}'
+Response
+
+
+Example response
+
+Response schema
+Status: 200
+{
+  "ref": "refs/heads/featureA",
+  "node_id": "MDM6UmVmcmVmcy9oZWFkcy9mZWF0dXJlQQ==",
+  "url": "https://api.github.com/repos/octocat/Hello-World/git/refs/heads/featureA",
+  "object": {
+    "type": "commit",
+    "sha": "aa218f56b14c9653891f9e74264a383fa43fefbd",
+    "url": "https://api.github.com/repos/octocat/Hello-World/git/commits/aa218f56b14c9653891f9e74264a383fa43fefbd"
+  }
+}
+Delete a reference
+Deletes the provided reference.
+
+Fine-grained access tokens for "Delete a reference"
+This endpoint works with the following fine-grained token types:
+
+GitHub App user access tokens
+GitHub App installation access tokens
+Fine-grained personal access tokens
+The fine-grained token must have the following permission set:
+
+"Contents" repository permissions (write)
+Parameters for "Delete a reference"
+Headers
+Name, Type, Description
+accept string
+Setting to application/vnd.github+json is recommended.
+
+Path parameters
+Name, Type, Description
+owner string Required
+The account owner of the repository. The name is not case sensitive.
+
+repo string Required
+The name of the repository without the .git extension. The name is not case sensitive.
+
+ref string Required
+The Git reference. For more information, see "Git References" in the Git documentation.
+
+HTTP response status codes for "Delete a reference"
+Status code	Description
+204	
+No Content
+
+409	
+Conflict
+
+422	
+Validation failed, an attempt was made to delete the default branch, or the endpoint has been spammed.
+
+Code samples for "Delete a reference"
+Request example
+delete
+/repos/{owner}/{repo}/git/refs/{ref}
+
+cURL
+
+JavaScript
+
+GitHub CLI
+curl -L \
+  -X DELETE \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR-TOKEN>" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  https://api.github.com/repos/OWNER/REPO/git/refs/REF
+Response
+
+Status: 204
+Help and support
+Did you find what you needed?
+
+Privacy policy
+Help us make these docs great!
+All GitHub docs are open source. See something that's wrong or unclear? Submit a pull request.
+
+Learn how to contribute
+
+Still need help?
+Ask the GitHub community
+Contact support
+Legal
+© 2026 GitHub, Inc.
+Terms
+Privacy
+Status
+Pricing
+Expert services
+Blog
+REST API endpoints for Git references - GitHub Docs
