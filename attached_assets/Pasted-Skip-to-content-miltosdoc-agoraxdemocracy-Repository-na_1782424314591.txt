@@ -1,0 +1,148 @@
+Skip to content
+miltosdoc
+agoraxdemocracy
+Repository navigation
+Code
+Issues
+Pull requests
+Agents
+Actions
+Projects
+Security and quality
+Insights
+Settings
+Settings: miltosdoc/agoraxdemocracy
+Access
+Code and automation
+Security and quality
+Integrations
+General
+Repository name
+agoraxdemocracy
+Template repository Loading
+A repository with LFS content cannot be used as a template. Learn more about template repositories.
+
+Default branch
+The default branch is considered the “base” branch in your repository, against which all pull requests and code commits are automatically made, unless you specify a different branch.
+
+main
+Releases
+Enable release immutability Loading
+Disallow assets and tags from being modified once a release is published.
+
+Features
+Wikis Loading
+Wikis host documentation for your repository.
+
+wikis
+Upgrade or make this repository public to enable Wikis
+GitHub Wikis is a simple way to let others contribute content. Any GitHub user can create and edit pages to use for documentation, examples, support, or anything you wish.
+
+Learn more about wikis
+Issues Loading
+Issues integrate lightweight task tracking into your repository. Keep projects on track with issue labels and milestones, and reference them in commit messages.
+
+Get organized with issue templates
+Give contributors issue templates that help you cut through the noise and help them push your project forward.
+
+Sponsorships   Loading
+Sponsorships help your community know how to financially support this repository.
+
+Display a "Sponsor" button
+Add links to GitHub Sponsors or third-party methods your repository accepts for financial contributions to your project.
+
+Discussions Loading
+Discussions is the space for your community to have conversations, ask questions and post answers without opening issues.
+
+Get started with Discussions
+Engage your community by having discussions right in your repository, where your community already lives
+
+Projects Loading
+Projects on GitHub are created at the repository owner's level (organization or user) and can be linked to a repository's Projects tab. Projects are suitable for cross-repository development efforts such as feature work, complex product roadmaps or even Issue triage.
+
+Pull requests Loading
+Pull requests allow others to suggest changes to your repository.
+
+Pull request permissions
+Loading
+If restricted, pull requests will still be readable by everyone who can see this repository.
+
+Pull Requests
+When merging pull requests, you can allow any combination of merge commits, squashing, or rebasing. At least one option must be enabled. If you have linear history requirement enabled on any protected branch, you must enable squashing or rebasing.
+
+Allow merge commits Loading
+Add all commits from the head branch to the base branch with a merge commit.
+
+Default commit message
+Presented when merging a pull request with merge.
+
+Allow squash merging Loading
+Combine all commits from the head branch into a single commit in the base branch.
+
+Default commit message
+Presented when merging a pull request with squash.
+
+Allow rebase merging Loading
+Add all commits from the head branch onto the base branch individually.
+
+Control how and when users are prompted to update their branches if there are new changes available in the base branch.
+
+Always suggest updating pull request branches Loading
+Whenever there are new changes available in the base branch, present an “update branch” option in the pull request.
+
+You can allow setting pull requests to merge automatically once all required reviews and status checks have passed.
+
+Allow auto-merge Loading
+Waits for merge requirements to be met and then merges automatically. Why is this option disabled?
+
+After pull requests are merged, you can have head branches deleted automatically.
+
+Automatically delete head branches Loading
+Deleted branches will still be able to be restored.
+
+Commits
+Require contributors to sign off on web-based commits Loading
+Enabling this setting will require contributors to sign off on commits made through GitHub’s web interface. Signing off is a way for contributors to affirm that their commit complies with the repository's terms, commonly the Developer Certificate of Origin (DCO). Learn more about signing off on commits.
+
+Allow comments on individual commits Loading
+Enabling this setting will allow anyone who can view this repository to add commit comments. Existing commit comments are not affected by this setting and will remain viewable, editable, and deletable.
+
+Archives
+When creating source code archives, you can choose to include files stored using Git LFS in the archive.
+
+Include Git LFS objects in archives 
+Git LFS usage in archives is billed at the same rate as usage with the client.
+
+Issues
+After merging a pull request, linked issues can be closed automatically.
+
+Auto-close issues with merged linked pull requests Loading
+Whenever linked pull requests have merged, auto-close the issue.
+
+Danger Zone
+Change repository visibility
+This repository is currently private.
+Disable branch protection rules
+Disable branch protection rules enforcement and APIs
+
+Transfer ownership
+Transfer this repository to another user or to an organization where you have the ability to create repositories.
+
+Archive this repository
+Mark this repository as archived and read-only.
+
+Delete this repository
+Once you delete a repository, there is no going back. Please be certain.
+
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
