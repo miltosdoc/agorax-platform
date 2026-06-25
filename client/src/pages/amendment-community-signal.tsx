@@ -13,6 +13,7 @@ import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api } from '@/lib/api';
 import { ArrowLeft, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
@@ -40,6 +41,10 @@ interface CommunitySignal {
   threshold: number;
 }
 
+interface ProposalMeta {
+  phaseDeadline?: string | null;
+}
+
 export default function AmendmentCommunitySignal() {
   const params = useParams<{ id: string }>();
   const proposalId = parseInt(params.id || '0', 10);
@@ -47,6 +52,7 @@ export default function AmendmentCommunitySignal() {
   
   const [amendments, setAmendments] = useState<RejectedAmendment[]>([]);
   const [signals, setSignals] = useState<CommunitySignal[]>([]);
+  const [proposal, setProposal] = useState<ProposalMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState<Record<number, boolean>>({});
   const [userVotes, setUserVotes] = useState<Record<number, number>>({});
@@ -74,12 +80,14 @@ export default function AmendmentCommunitySignal() {
 
   async function loadData() {
     try {
-      const [amendmentsRes, signalsRes] = await Promise.all([
+      const [amendmentsRes, signalsRes, proposalRes] = await Promise.all([
         api.get<(RejectedAmendment & { authorDecision?: string })[]>(`/api/proposals/${proposalId}/amendments`),
         api.get<CommunitySignal[]>(`/api/proposals/${proposalId}/amendments/signals`),
+        api.get<ProposalMeta>(`/api/proposals/${proposalId}`).catch(() => ({ data: null })),
       ]);
       setAmendments(amendmentsRes.data.filter((a) => a.authorDecision === 'rejected'));
       setSignals(signalsRes.data);
+      if (proposalRes.data) setProposal(proposalRes.data);
     } catch (e) {
       setError(t('amendment.error.loadDataFailed'));
     } finally {
@@ -93,7 +101,7 @@ export default function AmendmentCommunitySignal() {
     try {
       await api.post(`/api/amendments/${amendmentId}/rejection-vote`, { vote });
       setUserVotes(prev => ({ ...prev, [amendmentId]: vote }));
-      await loadData(); // Refresh data
+      await loadData();
     } catch (e) {
       setError(t('amendment.error.voteFailed'));
     } finally {
@@ -125,6 +133,16 @@ export default function AmendmentCommunitySignal() {
         </Button>
         <h1 className="text-2xl font-bold">{t('amendment.communitySignal.title')}</h1>
       </div>
+
+      {proposal?.phaseDeadline && (
+        <div className="mb-4">
+          <PhaseCountdown
+            deadline={proposal.phaseDeadline}
+            label="Χρόνος φάσης κοινοτικού σήματος:"
+            onExpired={advanceToNextPhase}
+          />
+        </div>
+      )}
 
       <Card className="mb-6">
         <CardHeader>

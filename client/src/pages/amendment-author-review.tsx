@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api } from '@/lib/api';
 import { ArrowLeft, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
@@ -28,12 +29,17 @@ interface Amendment {
   createdAt: string;
 }
 
+interface ProposalMeta {
+  phaseDeadline?: string | null;
+}
+
 export default function AmendmentAuthorReview() {
   const params = useParams<{ id: string }>();
   const proposalId = parseInt(params.id || '0', 10);
   const { t } = useTranslation();
   
   const [amendments, setAmendments] = useState<Amendment[]>([]);
+  const [proposal, setProposal] = useState<ProposalMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState<Record<number, boolean>>({});
   const [reasons, setReasons] = useState<Record<number, string>>({});
@@ -54,13 +60,17 @@ export default function AmendmentAuthorReview() {
   }
 
   useEffect(() => {
-    loadAmendments();
+    loadData();
   }, [proposalId]);
 
-  async function loadAmendments() {
+  async function loadData() {
     try {
-      const res = await api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`);
-      setAmendments(res.data);
+      const [amendmentsRes, proposalRes] = await Promise.all([
+        api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`),
+        api.get<ProposalMeta>(`/api/proposals/${proposalId}`).catch(() => ({ data: null })),
+      ]);
+      setAmendments(amendmentsRes.data);
+      if (proposalRes.data) setProposal(proposalRes.data);
     } catch (e) {
       setError(t('amendment.error.loadFailed'));
     } finally {
@@ -70,7 +80,7 @@ export default function AmendmentAuthorReview() {
 
   async function reviewAmendment(amendmentId: number, decision: 'accepted' | 'rejected') {
     if (decision === 'rejected' && !reasons[amendmentId]?.trim()) {
-      return; // Require reason for rejection
+      return;
     }
     
     setReviewing(prev => ({ ...prev, [amendmentId]: true }));
@@ -121,6 +131,16 @@ export default function AmendmentAuthorReview() {
         </Button>
         <h1 className="text-2xl font-bold">{t('amendment.authorReview.title')}</h1>
       </div>
+
+      {proposal?.phaseDeadline && (
+        <div className="mb-4">
+          <PhaseCountdown
+            deadline={proposal.phaseDeadline}
+            label="Χρόνος φάσης αξιολόγησης:"
+            onExpired={advanceToCommunitySignal}
+          />
+        </div>
+      )}
 
       <Card className="mb-6">
         <CardHeader>

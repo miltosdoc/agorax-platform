@@ -40,6 +40,9 @@ interface CommunitySettingsForm {
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
   joinPolicy: CommunityJoinPolicy;
+  authorReviewHours: number;
+  communitySignalHours: number;
+  votingHours: number;
 }
 
 function toForm(community: Community): CommunitySettingsForm {
@@ -58,6 +61,9 @@ function toForm(community: Community): CommunitySettingsForm {
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
     requireGovgrVerification: community.requireGovgrVerification ?? false,
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
+    authorReviewHours: (community as any).authorReviewHours ?? 72,
+    communitySignalHours: (community as any).communitySignalHours ?? 48,
+    votingHours: (community as any).votingHours ?? 168,
   };
 }
 
@@ -291,6 +297,54 @@ export default function CommunitySettingsPage() {
                     <div className="space-y-2">
                       <Label htmlFor="sortitionResponseHours">{t('community.sortition_response_hours')}</Label>
                       <Input id="sortitionResponseHours" type="number" min="1" max="720" value={form.sortitionResponseHours} onChange={(e) => update('sortitionResponseHours', Number(e.target.value))} />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">Χρονικά όρια φάσεων</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Ορίστε πόσες ώρες διαρκεί κάθε φάση πριν από την αυτόματη μετάβαση στην επόμενη. Η τιμή 0 σημαίνει χωρίς χρονικό όριο.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="authorReviewHours">Αξιολόγηση συγγραφέα (ώρες)</Label>
+                      <Input
+                        id="authorReviewHours"
+                        type="number"
+                        min="0"
+                        max="8760"
+                        value={form.authorReviewHours}
+                        onChange={(e) => update('authorReviewHours', Number(e.target.value))}
+                      />
+                      <p className="text-xs text-muted-foreground">Προεπιλογή: 72 ώρες (3 ημέρες). 0 = χωρίς όριο.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="communitySignalHours">Κοινοτικό σήμα (ώρες)</Label>
+                      <Input
+                        id="communitySignalHours"
+                        type="number"
+                        min="0"
+                        max="8760"
+                        value={form.communitySignalHours}
+                        onChange={(e) => update('communitySignalHours', Number(e.target.value))}
+                      />
+                      <p className="text-xs text-muted-foreground">Προεπιλογή: 48 ώρες (2 ημέρες). 0 = χωρίς όριο.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="votingHours">Ψηφοφορία (ώρες)</Label>
+                      <Input
+                        id="votingHours"
+                        type="number"
+                        min="0"
+                        max="8760"
+                        value={form.votingHours}
+                        onChange={(e) => update('votingHours', Number(e.target.value))}
+                      />
+                      <p className="text-xs text-muted-foreground">Προεπιλογή: 168 ώρες (7 ημέρες). 0 = χωρίς όριο.</p>
                     </div>
                   </div>
                 </section>

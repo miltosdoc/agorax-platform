@@ -99,7 +99,25 @@ export async function transitionProposal(
     );
   }
 
-  const updated = await storage.updateProposal(proposal.id, { status: newState });
+  // Compute phase deadline when entering a time-limited phase.
+  const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'votingHours'> = {
+    author_review: 'authorReviewHours',
+    community_signal: 'communitySignalHours',
+    voting: 'votingHours',
+  };
+  let phaseDeadline: Date | null = null;
+  if (TIMED_PHASES[newState]) {
+    try {
+      const { communityRepo } = await import('../storage');
+      const community = await communityRepo.getCommunity(proposal.communityId);
+      const hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
+      phaseDeadline = hours > 0 ? new Date(Date.now() + hours * 3600 * 1000) : null;
+    } catch {
+      // Best-effort — missing deadline is non-fatal.
+    }
+  }
+
+  const updated = await storage.updateProposal(proposal.id, { status: newState, phaseDeadline });
 
   // Democracy Points: a proposal that passes quality validation — leaving
   // `review` for deliberation or straight to the vote — earns its author.

@@ -5,12 +5,12 @@
  * Import this module during server startup to wire up the job queue.
  */
 
-import { registerHandler, startWorker, type JobPayload } from './job-queue';
+import { registerHandler, startWorker, enqueueJob, type JobPayload } from './job-queue';
 import { handleSortitionCompletion, transitionToValidation } from './proposal-state-machine';
 import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembers } from './sortition-timeout';
 import { db } from '../db';
-import { sortitionBodies } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { sortitionBodies, proposals, proposalAmendments } from '@shared/schema';
+import { and, eq, lt, isNotNull, inArray } from 'drizzle-orm';
 
 // ─── Handler: structure_proposal ────────────────────────────────────────────
 
@@ -114,6 +114,76 @@ async function handleSortitionTimeout(payload: JobPayload): Promise<void> {
   
 }
 
+// ─── Handler: phase_auto_advance ─────────────────────────────────────────────
+
+/**
+ * Auto-advance proposals whose phase deadline has passed.
+ * Runs periodically. Handles author_review, community_signal, and voting.
+ */
+async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
+  const now = new Date();
+
+  // Find proposals in timed phases where deadline has passed.
+  const expired = await db
+    .select()
+    .from(proposals)
+    .where(
+      and(
+        inArray(proposals.status, ['author_review', 'community_signal', 'voting']),
+        isNotNull(proposals.phaseDeadline),
+        lt(proposals.phaseDeadline, now),
+      ),
+    );
+
+  for (const proposal of expired) {
+    try {
+      const { transitionProposal, triggerSideEffects } = await import('./proposal-state-machine');
+      const { storage } = await import('../storage');
+
+      if (proposal.status === 'author_review') {
+        const updated = await transitionProposal(proposal as any, 'community_signal', storage);
+        await triggerSideEffects('author_review', 'community_signal', updated);
+
+      } else if (proposal.status === 'community_signal') {
+        // Check if any rejected amendments were flagged by community
+        const community = await db.query.communities?.findFirst?.({ where: (c: any, { eq: e }: any) => e(c.id, proposal.communityId) }) as any;
+        const threshold = parseFloat(String(community?.amendmentThreshold ?? '0.5'));
+        const allAmendments = await db
+          .select()
+          .from(proposalAmendments)
+          .where(and(eq(proposalAmendments.proposalId, proposal.id), eq(proposalAmendments.authorDecision, 'rejected')));
+        
+        const anyFlagged = allAmendments.some(a => {
+          const total = (a.rejectionUpvotes ?? 0) + (a.rejectionDownvotes ?? 0);
+          if (total === 0) return false;
+          return ((a.rejectionUpvotes ?? 0) / total) >= threshold;
+        });
+
+        const nextState = anyFlagged ? 'sortition_synthesis' : 'voting';
+        const updated = await transitionProposal(proposal as any, nextState, storage);
+        await triggerSideEffects('community_signal', nextState, updated);
+
+      } else if (proposal.status === 'voting') {
+        // Auto-finalize the vote
+        const { getVotingBackend } = await import('../voting');
+        const backend = getVotingBackend();
+        await backend.closeAndTally({ proposalId: proposal.id });
+        const view = await backend.getVoterView({ proposalId: proposal.id });
+        const { computeVoteResults } = await import('../routers/proposals');
+        const results = await computeVoteResults(proposal as any, view);
+        const hasDecisive = (results.yes + results.no) > 0;
+        const nextState = results.meetsQuorum && hasDecisive ? 'decided' : 'archived';
+        const { storage: st } = await import('../storage');
+        const updated = await transitionProposal(proposal as any, nextState, st);
+        await triggerSideEffects('voting', nextState, updated);
+      }
+    } catch (err) {
+      // Log and continue — one failure shouldn't block others.
+      console.error(`[phase_auto_advance] failed for proposal ${proposal.id}:`, err);
+    }
+  }
+}
+
 // ─── Register all handlers ──────────────────────────────────────────────────
 
 export function registerAllHandlers(): void {
@@ -123,7 +193,7 @@ export function registerAllHandlers(): void {
   registerHandler('recalculate_score', handleRecalculateScore);
   registerHandler('cleanup_expired', handleCleanupExpired);
   registerHandler('sortition_timeout', handleSortitionTimeout);
-  
+  registerHandler('phase_auto_advance', handlePhaseAutoAdvance);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────
@@ -138,7 +208,14 @@ export function startJobQueue(): () => void {
   
   // Start the worker (polls every 5 seconds)
   const stopWorker = startWorker(5000);
-  
-  
-  return stopWorker;
+
+  // Phase auto-advance: check every minute for expired phase deadlines.
+  const autoAdvanceId = setInterval(() => {
+    enqueueJob({ type: 'phase_auto_advance', data: {} }).catch(() => {});
+  }, 60_000);
+
+  return () => {
+    stopWorker();
+    clearInterval(autoAdvanceId);
+  };
 }

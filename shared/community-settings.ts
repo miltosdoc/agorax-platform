@@ -25,6 +25,9 @@ export interface CommunitySettingsInput {
   maxAmendmentsPerProposal?: unknown;
   requireGovgrVerification?: unknown;
   joinPolicy?: unknown;
+  authorReviewHours?: unknown;
+  communitySignalHours?: unknown;
+  votingHours?: unknown;
 }
 
 // Sanitized community settings — narrow literal types instead of the wide
@@ -45,6 +48,9 @@ export interface CommunityCreateSettings {
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
   joinPolicy: CommunityJoinPolicy;
+  authorReviewHours: number;
+  communitySignalHours: number;
+  votingHours: number;
 }
 
 export type CommunityUpdateSettings = Partial<CommunityCreateSettings>;
@@ -62,6 +68,9 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
   joinPolicy: 'open',
+  authorReviewHours: 72,
+  communitySignalHours: 48,
+  votingHours: 168,
 } as const;
 
 function optionalString(value: unknown): string | undefined {
@@ -161,6 +170,9 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
     joinPolicy: enumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, DEFAULT_COMMUNITY_SETTINGS.joinPolicy, 'Invalid join policy'),
+    authorReviewHours: integerValue(input.authorReviewHours, DEFAULT_COMMUNITY_SETTINGS.authorReviewHours, 0, 8760, 'authorReviewHours must be 0–8760'),
+    communitySignalHours: integerValue(input.communitySignalHours, DEFAULT_COMMUNITY_SETTINGS.communitySignalHours, 0, 8760, 'communitySignalHours must be 0–8760'),
+    votingHours: integerValue(input.votingHours, DEFAULT_COMMUNITY_SETTINGS.votingHours, 0, 8760, 'votingHours must be 0–8760'),
   };
 }
 
@@ -206,6 +218,15 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const joinPolicy = optionalEnumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, 'Invalid join policy');
   if (joinPolicy !== undefined) updates.joinPolicy = joinPolicy;
+
+  const authorReviewHours = optionalIntegerValue(input.authorReviewHours, 0, 8760, 'authorReviewHours must be 0–8760');
+  if (authorReviewHours !== undefined) updates.authorReviewHours = authorReviewHours;
+
+  const communitySignalHours = optionalIntegerValue(input.communitySignalHours, 0, 8760, 'communitySignalHours must be 0–8760');
+  if (communitySignalHours !== undefined) updates.communitySignalHours = communitySignalHours;
+
+  const votingHours = optionalIntegerValue(input.votingHours, 0, 8760, 'votingHours must be 0–8760');
+  if (votingHours !== undefined) updates.votingHours = votingHours;
 
   return updates;
 }

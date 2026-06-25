@@ -444,6 +444,7 @@ export default function ProposalDetailPage() {
             proposalStatus={proposal.status}
             proposalAuthorId={proposal.authorId}
             votingMode={proposal.votingMode}
+            phaseDeadline={(proposal as any).phaseDeadline}
             onProposalAdvanced={handleProposalAdvanced}
           />
           {voteError && (

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import {
   ThumbsUp,
   ThumbsDown,
@@ -76,6 +77,7 @@ interface VotePanelProps {
   proposalStatus: string;
   proposalAuthorId?: number;
   votingMode?: string;
+  phaseDeadline?: string | null;
   onVoteResultsChange?: (results: VoteResults) => void;
   onProposalAdvanced?: (newStatus: string) => void;
 }
@@ -85,6 +87,7 @@ export default function VotePanel({
   proposalStatus,
   proposalAuthorId,
   votingMode = 'pseudonymous',
+  phaseDeadline,
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
@@ -283,6 +286,13 @@ export default function VotePanel({
               : (t('vote.pseudonymousModeHint') || 'Η ψήφος σας αποθηκεύεται μαζί με την ταυτότητά σας. Μπορείτε να την αλλάξετε όσο η ψηφοφορία είναι ανοιχτή.')}
           </span>
         </div>
+
+        {isVoting && phaseDeadline && (
+          <PhaseCountdown
+            deadline={phaseDeadline}
+            label="Χρόνος ψηφοφορίας:"
+          />
+        )}
 
         {isVoting && (
           <div className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-900">

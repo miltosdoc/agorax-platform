@@ -232,6 +232,11 @@ export const communities = pgTable("communities", {
   // Verification settings
   requireGovgrVerification: boolean("require_govgr_verification").default(false),
 
+  // Phase time limits (hours). 0 = unlimited (no auto-advance)
+  authorReviewHours: integer("author_review_hours").default(72),
+  communitySignalHours: integer("community_signal_hours").default(48),
+  votingHours: integer("voting_hours").default(168),
+
   // Democracy score (computed, shows how democratic the community governance is)
   democracyScore: numeric("democracy_score"),
 
@@ -316,6 +321,10 @@ export const proposals = pgTable("proposals", {
   category: text("category"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+
+  // Phase deadline — set when entering author_review, community_signal, or voting.
+  // null means no deadline configured (unlimited).
+  phaseDeadline: timestamp("phase_deadline"),
 });
 
 // ─── Demopolis: Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────

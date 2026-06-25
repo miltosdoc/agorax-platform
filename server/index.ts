@@ -1,12 +1,8 @@
-import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
-import cors from "cors";
 import { apiLimit, authLimit } from './utils/rate-limiter';
 import { logger } from './utils/logger';
 import { csrfBootstrap, csrfMiddleware } from './utils/csrf';
 import { initSentry } from './utils/sentry';
-
-import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateRuntimeConfig } from "./config";
@@ -17,74 +13,25 @@ initSentry();
 
 const app = express();
 
-// CSP. In dev we disable it (Vite HMR + cross-origin assets). In prod we
-// take helmet's default and widen `connect-src` to include any external
-// services the browser needs to reach directly. The only one today is
-// the LiveKit SFU (LIVEKIT_URL — wss + the matching https/http for the
-// SDK's /rtc/v1/validate fetch). Add Sentry's ingest URL the same way
-// when/if you wire it.
-function buildCspDirectives(): Record<string, string[]> | undefined {
-  if (process.env.NODE_ENV !== "production") return undefined;
-  const connectSrc = ["'self'"];
-  const lkUrl = process.env.LIVEKIT_URL;
-  if (lkUrl) {
-    // LIVEKIT_URL is wss:// — the SDK opens both that and the matching
-    // http(s):// for /rtc/v1/validate. Add both.
-    connectSrc.push(lkUrl);
-    connectSrc.push(
-      lkUrl
-        .replace(/^wss:\/\//, 'https://')
-        .replace(/^ws:\/\//, 'http://'),
-    );
-  }
-  return {
-    "default-src": ["'self'"],
-    "base-uri": ["'self'"],
-    "font-src": ["'self'", "https:", "data:"],
-    "form-action": ["'self'"],
-    "frame-ancestors": ["'self'"],
-    "img-src": ["'self'", "data:", "blob:"],
-    "object-src": ["'none'"],
-    "script-src": ["'self'"],
-    "script-src-attr": ["'none'"],
-    "style-src": ["'self'", "https:", "'unsafe-inline'"],
-    "media-src": ["'self'", "blob:"],
-    "connect-src": connectSrc,
-    "upgrade-insecure-requests": [],
-  };
-}
-
-const cspDirectives = buildCspDirectives();
-app.use(helmet({
-  contentSecurityPolicy: cspDirectives
-    ? { directives: cspDirectives, useDefaults: false }
-    : false,
-}));
-
-// CORS allowlist. In production, only origins explicitly enumerated in
-// CORS_ALLOWED_ORIGINS (comma-separated) may make cross-origin requests
-// with credentials. In dev, same-origin Vite proxy means CORS is
-// effectively unused — we still mount it so the policy is uniform.
+// Inline CORS middleware (replaces the 'cors' package for dev)
 const corsAllowlist = (process.env.CORS_ALLOWED_ORIGINS ?? '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-app.use(cors({
-  credentials: true,
-  origin(origin, callback) {
-    // Same-origin / curl-with-no-Origin: allow.
-    if (!origin) return callback(null, true);
-    // Explicit allowlist: production must enumerate origins.
-    if (corsAllowlist.includes(origin)) return callback(null, true);
-    // Dev convenience: localhost variants when not in production.
-    if (process.env.APP_ENV !== 'production') {
-      if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(origin)) {
-        return callback(null, true);
-      }
+  .split(',').map(s => s.trim()).filter(Boolean);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin as string | undefined;
+  let allowed = !origin;
+  if (!allowed && origin) {
+    if (corsAllowlist.includes(origin)) allowed = true;
+    if (!allowed && process.env.APP_ENV !== 'production') {
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/.test(origin)) allowed = true;
     }
-    callback(new Error(`CORS: origin ${origin} not allowed`));
-  },
-}));
+  }
+  if (allowed && origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-CSRF-Token');
+  if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+  next();
+});
 
 app.use(express.json({ limit: "100kb" }));
 
