@@ -3,7 +3,7 @@
   "appName": "AgoraX",
   "webDir": "www",
   "server": {
-    "url": "https://elude-willed-bunion.ngrok-free.dev/",
+    "url": "https://agoraxdemocracy.com",
     "androidScheme": "https",
     "cleartext": false
   }
