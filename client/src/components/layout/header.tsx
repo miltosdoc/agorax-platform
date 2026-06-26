@@ -16,7 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Home } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Home, Smartphone } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -372,6 +372,16 @@ export default function Header() {
                     {t('nav.adminAccounts')}
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  asChild
+                  className="cursor-pointer transition-smooth"
+                  data-testid="menu-android-download"
+                >
+                  <a href="/api/android/download" download="agorax.apk">
+                    <Smartphone className="mr-2 h-4 w-4" />
+                    {t('android.downloadMenuLabel')}
+                  </a>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}

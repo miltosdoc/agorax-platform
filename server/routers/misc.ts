@@ -236,6 +236,19 @@ export function registerMiscRoutes(app: Express): void {
     }
     next();
   };
+  // ── Android APK download (authenticated users only) ──────────────────
+  app.get("/api/android/download", requireAuth, async (req, res) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const apkPath = path.resolve(process.cwd(), 'downloads', 'agorax.apk');
+    if (!fs.existsSync(apkPath)) {
+      return res.status(404).json({ message: "APK not yet available" });
+    }
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="agorax.apk"');
+    res.sendFile(apkPath);
+  });
+
   app.get("/api/health", async (req, res) => {
     try {
       const { db } = await import('../db');

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
-import { ArrowLeft, BadgeCheck, Fingerprint, Shield, Trash2, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Download, Fingerprint, Shield, Smartphone, Trash2, User } from "lucide-react";
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 
@@ -156,6 +156,24 @@ export default function ProfilePage() {
                     </Button>
                   </>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  {t('android.downloadTitle')}
+                </CardTitle>
+                <CardDescription>{t('android.downloadDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="gap-2">
+                  <a href="/api/android/download" download="agorax.apk">
+                    <Download className="h-4 w-4" />
+                    {t('android.downloadButton')}
+                  </a>
+                </Button>
               </CardContent>
             </Card>
 

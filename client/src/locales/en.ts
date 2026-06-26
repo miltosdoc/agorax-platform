@@ -1277,6 +1277,12 @@ const en: TranslationDictionary = {
   'push.disable': 'Disable notifications',
   'push.deniedHint': "You've blocked notifications in your browser. Open the site permissions to re-enable.",
 
+  'android.downloadTitle': 'Android App',
+  'android.downloadDescription': 'Install the AgoraX Android app to participate on the go.',
+  'android.downloadButton': 'Download APK',
+  'android.downloadMenuLabel': 'Download Android App',
+  'android.notAvailable': 'The Android APK is not yet available. Check back soon.',
+
 };
 
 export default en;

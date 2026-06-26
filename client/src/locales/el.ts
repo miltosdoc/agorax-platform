@@ -1277,6 +1277,12 @@ const el: TranslationDictionary = {
   'push.disable': 'Απενεργοποίηση ειδοποιήσεων',
   'push.deniedHint': 'Έχετε αρνηθεί τις ειδοποιήσεις στον φυλλομετρητή. Αλλάξτε τη ρύθμιση από τα δικαιώματα της σελίδας για να τις ενεργοποιήσετε.',
 
+  'android.downloadTitle': 'Εφαρμογή Android',
+  'android.downloadDescription': 'Εγκαταστήστε την εφαρμογή AgoraX για Android για να συμμετέχετε εν κινήσει.',
+  'android.downloadButton': 'Λήψη APK',
+  'android.downloadMenuLabel': 'Λήψη εφαρμογής Android',
+  'android.notAvailable': 'Το APK για Android δεν είναι ακόμα διαθέσιμο. Ελέγξτε ξανά σύντομα.',
+
 };
 
 export default el;
