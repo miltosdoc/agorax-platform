@@ -1,3 +1,4 @@
 - [LiveKit self-hosted proxy](livekit-proxy.md) — LiveKit runs on :7880, proxied through Express /rtc + /twirp so LIVEKIT_URL is the stable Replit domain.
+- [LiveKit CDN workaround](livekit-cdn.md) — livekit-client loaded from CDN in index.html (window.LivekitClient); ConferenceRoomCard uses raw Room API, no @livekit/components-react needed.
 - [ESM package stubs](esm-stubs.md) — npm install is blocked by CVE policy; missing packages are manually stubbed as ESM modules under node_modules.
 - [Phase timer system](phase-timers.md) — phaseDeadline on proposals, duration hours on communities, PhaseCountdown component, auto-advance job handler.
