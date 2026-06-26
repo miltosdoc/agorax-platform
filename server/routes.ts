@@ -38,6 +38,7 @@ import { registerAnalyticsRoutes } from "./routers/analytics";
 import { registerEconomyRoutes } from "./routers/economy";
 import { registerMediaRoutes } from "./routers/media";
 import { registerLivekitRoutes } from "./routers/livekit";
+import { setupLiveKitProxy } from "./utils/livekit-proxy";
 import { registerPushRoutes } from "./routers/push";
 import { registerSurveysRoutes } from "./routers/surveys";
 import { registerMiscRoutes } from "./routers/misc";
@@ -71,6 +72,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create and return the server
   const server = createServer(app);
+
+  // Proxy /rtc (WebSocket) and /twirp (HTTP) to the local LiveKit SFU
+  setupLiveKitProxy(server, app);
+
   return server;
 }
 

@@ -107,9 +107,18 @@ export async function deleteRoom(roomName: string): Promise<void> {
 }
 
 /**
- * Public LiveKit URL the browser uses to connect. Safe to ship in API
- * responses — it's the wss endpoint, the secret lives only here.
+ * Public LiveKit URL the browser uses to connect. Derived from the
+ * request host so it always matches the environment (dev, prod, any
+ * Replit domain) without needing to update LIVEKIT_URL when the host
+ * changes. The Express proxy forwards /rtc and /twirp to the local SFU.
+ *
+ * Falls back to LIVEKIT_URL if no host is provided (e.g. config probe).
  */
-export function publicLivekitUrl(): string {
+export function publicLivekitUrl(reqHost?: string): string {
+  if (reqHost) {
+    // Use wss:// if the request came over HTTPS (Replit always does), ws:// for local dev
+    const scheme = reqHost.startsWith('localhost') || reqHost.startsWith('127.') ? 'ws' : 'wss';
+    return `${scheme}://${reqHost}`;
+  }
   return requireConfig().url;
 }

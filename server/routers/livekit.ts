@@ -91,7 +91,7 @@ export function registerLivekitRoutes(app: Express): void {
     if (!isLivekitConfigured()) {
       return res.json({ available: false });
     }
-    res.json({ available: true, url: publicLivekitUrl() });
+    res.json({ available: true, url: publicLivekitUrl(req.get('host')) });
   });
 
   // ── Community rooms ──────────────────────────────────────────────────
@@ -311,7 +311,7 @@ export function registerLivekitRoutes(app: Express): void {
       } catch (logErr: any) {
         logger.warn('participation record failed', { roomId: room.id, err: logErr?.message });
       }
-      res.json({ token, url: publicLivekitUrl(), roomName: room.roomName, isHost, participationId });
+      res.json({ token, url: publicLivekitUrl(req.get('host')), roomName: room.roomName, isHost, participationId });
     } catch (err: any) {
       if (err instanceof LivekitUnavailableError) return unavailable(res);
       logger.error('issue livekit token failed', { err: err?.message });

@@ -7,6 +7,7 @@ NODE_ENV = "development"
 VOTING_BACKEND = "hash-chain"
 LOG_LEVEL = "info"
 SIGNING_MASTER_KEY = "<redacted-signing-master-key>"
+LIVEKIT_URL = "ws://localhost:7880"
 
 [workflows]
 runButton = "Project"
@@ -20,6 +21,10 @@ author = "agent"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "LiveKit Server"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -32,9 +37,28 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "LiveKit Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./livekit-server --config livekit.yaml"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [nix]
 channel = "stable-25_05"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 7880
+externalPort = 3001
+
+[[ports]]
+localPort = 7881
+externalPort = 3000
