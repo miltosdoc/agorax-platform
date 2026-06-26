@@ -3,15 +3,16 @@
  * self-hosted SFU.
  *
  * Three env vars wire this up:
- *   LIVEKIT_URL         — wss://livekit.your-host:7880  (the SFU)
+ *   LIVEKIT_URL         — ws://localhost:7880  (the local SFU)
  *   LIVEKIT_API_KEY     — server-only key (NEVER ship to the client)
  *   LIVEKIT_API_SECRET  — server-only HMAC secret
  *
- * When the env is missing every function throws `LivekitUnavailableError`
- * so callers can surface "video disabled" without crashing the request.
+ * This module intentionally avoids `livekit-server-sdk` (which is
+ * stubbed in this environment) and implements the JWT + Twirp calls
+ * natively using Node's built-in `crypto` and `fetch`.
  */
 
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
+import { createHmac } from 'crypto';
 
 export class LivekitUnavailableError extends Error {
   constructor(message: string) {
@@ -21,10 +22,10 @@ export class LivekitUnavailableError extends Error {
 }
 
 export interface LivekitConfig {
-  url: string;          // wss:// — passed back to the client for connect
+  url: string;      // ws:// or wss:// — the SFU WebSocket URL
   apiKey: string;
   apiSecret: string;
-  httpUrl: string;      // http(s):// — used by the RoomService REST API
+  httpUrl: string;  // http:// or https:// — derived from url for REST/Twirp
 }
 
 export function readLivekitConfig(): LivekitConfig | null {
@@ -32,7 +33,6 @@ export function readLivekitConfig(): LivekitConfig | null {
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   if (!url || !apiKey || !apiSecret) return null;
-  // Server-side REST calls expect http(s) not wss; derive from the wss URL.
   const httpUrl = url
     .replace(/^wss:\/\//, 'https://')
     .replace(/^ws:\/\//, 'http://');
@@ -53,71 +53,110 @@ function requireConfig(): LivekitConfig {
   return cfg;
 }
 
+// ── Native HS256 JWT ────────────────────────────────────────────────────────
+
+function b64url(input: string | Buffer): string {
+  const buf = typeof input === 'string' ? Buffer.from(input) : input;
+  return buf.toString('base64url');
+}
+
+/**
+ * Mint a LiveKit-compatible HS256 JWT.
+ * Spec: https://docs.livekit.io/realtime/server/generating-tokens/
+ */
+function mintJwt(
+  apiKey: string,
+  apiSecret: string,
+  payload: Record<string, unknown>,
+  ttlSeconds = 4 * 3600,
+): string {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = {
+    iss: apiKey,
+    nbf: now,
+    exp: now + ttlSeconds,
+    ...payload,
+  };
+  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body   = b64url(JSON.stringify(claims));
+  const sig = b64url(
+    createHmac('sha256', apiSecret)
+      .update(`${header}.${body}`)
+      .digest(),
+  );
+  return `${header}.${body}.${sig}`;
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
 export interface IssueTokenOptions {
   roomName: string;
-  identity: string;            // typically `user-<id>`
-  name?: string;               // display name shown in the room
-  canPublish?: boolean;        // mic/cam producer (default true)
-  canSubscribe?: boolean;      // can hear/see others (default true)
-  canPublishData?: boolean;    // data channel (default true — chat, reactions)
-  isAdmin?: boolean;           // hostadmin: kick, mute others, end room
-  ttlSeconds?: number;         // default 4h, plenty for a sortition session
+  identity: string;
+  name?: string;
+  canPublish?: boolean;
+  canSubscribe?: boolean;
+  canPublishData?: boolean;
+  isAdmin?: boolean;
+  ttlSeconds?: number;
 }
 
-/**
- * Mint a JWT the browser will hand to LiveKit to join. The grants follow
- * the principle of least privilege — admins get room-admin rights, others
- * just publish + subscribe.
- */
+/** Mint a JWT the browser hands to LiveKit to join a room. */
 export async function issueJoinToken(opts: IssueTokenOptions): Promise<string> {
   const cfg = requireConfig();
-  const ttl = opts.ttlSeconds ?? 4 * 60 * 60;
-  const token = new AccessToken(cfg.apiKey, cfg.apiSecret, {
-    identity: opts.identity,
-    name: opts.name,
-    ttl,
-  });
-  token.addGrant({
-    room: opts.roomName,
-    roomJoin: true,
-    canPublish: opts.canPublish ?? true,
-    canSubscribe: opts.canSubscribe ?? true,
-    canPublishData: opts.canPublishData ?? true,
-    roomAdmin: !!opts.isAdmin,
-  });
-  return await token.toJwt();
+  return mintJwt(cfg.apiKey, cfg.apiSecret, {
+    sub: opts.identity,
+    name: opts.name ?? opts.identity,
+    video: {
+      room: opts.roomName,
+      roomJoin: true,
+      canPublish: opts.canPublish ?? true,
+      canSubscribe: opts.canSubscribe ?? true,
+      canPublishData: opts.canPublishData ?? true,
+      roomAdmin: !!opts.isAdmin,
+    },
+  }, opts.ttlSeconds ?? 4 * 3600);
 }
 
 /**
- * Force-close a room on the LiveKit side. Kicks all participants and
- * frees the room slot. We call this when the proposal author / community
- * admin closes their conference, or when a sortition body's status flips
- * to completed.
+ * Force-close a room via LiveKit's Twirp API.
+ * Uses a short-lived admin token (roomCreate + roomAdmin grants).
  */
 export async function deleteRoom(roomName: string): Promise<void> {
   const cfg = requireConfig();
-  const svc = new RoomServiceClient(cfg.httpUrl, cfg.apiKey, cfg.apiSecret);
+  const adminToken = mintJwt(cfg.apiKey, cfg.apiSecret, {
+    sub: 'server',
+    video: { roomCreate: true, roomList: true, roomAdmin: true },
+  }, 60);
+
   try {
-    await svc.deleteRoom(roomName);
+    const res = await fetch(`${cfg.httpUrl}/twirp/livekit.RoomService/DeleteRoom`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ room: roomName }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      if (/not.found|does not exist/i.test(text)) return; // no-op
+      if (res.status === 404) return;
+      throw new Error(`LiveKit DeleteRoom ${res.status}: ${text}`);
+    }
   } catch (err: any) {
-    // If the room never materialised on the SFU (no one joined yet),
-    // LiveKit returns 404 — treat as a no-op.
-    if (!/not.found|does not exist/i.test(err?.message ?? '')) throw err;
+    if (/not.found|does not exist/i.test(err?.message ?? '')) return;
+    throw err;
   }
 }
 
 /**
- * Public LiveKit URL the browser uses to connect. Derived from the
- * request host so it always matches the environment (dev, prod, any
- * Replit domain) without needing to update LIVEKIT_URL when the host
- * changes. The Express proxy forwards /rtc and /twirp to the local SFU.
- *
- * Falls back to LIVEKIT_URL if no host is provided (e.g. config probe).
+ * Public LiveKit URL the browser uses to connect.  Derived from the
+ * request host so it works in any environment without updating env vars.
+ * The Express proxy forwards /rtc (WS) and /twirp (HTTP) to port 7880.
  */
 export function publicLivekitUrl(reqHost?: string): string {
   if (reqHost) {
-    // Use wss:// if the request came over HTTPS (Replit always does), ws:// for local dev
-    const scheme = reqHost.startsWith('localhost') || reqHost.startsWith('127.') ? 'ws' : 'wss';
+    const scheme = (reqHost.startsWith('localhost') || reqHost.startsWith('127.')) ? 'ws' : 'wss';
     return `${scheme}://${reqHost}`;
   }
   return requireConfig().url;
