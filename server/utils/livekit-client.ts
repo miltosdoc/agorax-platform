@@ -1,15 +1,14 @@
 /**
- * LiveKit server wrapper — token issuance + room CRUD against the
- * self-hosted SFU.
+ * LiveKit wrapper — token issuance + room management.
  *
- * Three env vars wire this up:
- *   LIVEKIT_URL         — ws://localhost:7880  (the local SFU)
- *   LIVEKIT_API_KEY     — server-only key (NEVER ship to the client)
- *   LIVEKIT_API_SECRET  — server-only HMAC secret
+ * Env vars:
+ *   LIVEKIT_API_KEY     — API key (server-only, never sent to client)
+ *   LIVEKIT_SECRET      — API secret (HMAC key for JWTs)
+ *   LIVEKIT_WEBSOCKET   — wss:// URL clients connect to (LiveKit Cloud or proxy)
+ *   LIVEKIT_URL         — http(s):// URL for server-side Twirp calls (optional,
+ *                         derived from LIVEKIT_WEBSOCKET if absent)
  *
- * This module intentionally avoids `livekit-server-sdk` (which is
- * stubbed in this environment) and implements the JWT + Twirp calls
- * natively using Node's built-in `crypto` and `fetch`.
+ * Uses native Node crypto — no livekit-server-sdk needed.
  */
 
 import { createHmac } from 'crypto';
@@ -22,21 +21,26 @@ export class LivekitUnavailableError extends Error {
 }
 
 export interface LivekitConfig {
-  url: string;      // ws:// or wss:// — the SFU WebSocket URL
+  wsUrl: string;    // wss:// — given to clients for Room.connect()
+  httpUrl: string;  // https:// — used for Twirp REST calls (deleteRoom, etc.)
   apiKey: string;
   apiSecret: string;
-  httpUrl: string;  // http:// or https:// — derived from url for REST/Twirp
 }
 
 export function readLivekitConfig(): LivekitConfig | null {
-  const url = process.env.LIVEKIT_URL;
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
-  if (!url || !apiKey || !apiSecret) return null;
-  const httpUrl = url
+  const apiKey    = process.env.LIVEKIT_API_KEY;
+  // Accept LIVEKIT_SECRET (new) or LIVEKIT_API_SECRET (old fallback)
+  const apiSecret = process.env.LIVEKIT_SECRET ?? process.env.LIVEKIT_API_SECRET;
+  // LIVEKIT_WEBSOCKET is the cloud wss:// URL; fall back to LIVEKIT_URL
+  const wsUrl     = process.env.LIVEKIT_WEBSOCKET ?? process.env.LIVEKIT_URL;
+
+  if (!apiKey || !apiSecret || !wsUrl) return null;
+
+  const httpUrl = wsUrl
     .replace(/^wss:\/\//, 'https://')
     .replace(/^ws:\/\//, 'http://');
-  return { url, apiKey, apiSecret, httpUrl };
+
+  return { wsUrl, httpUrl, apiKey, apiSecret };
 }
 
 export function isLivekitConfigured(): boolean {
@@ -47,7 +51,7 @@ function requireConfig(): LivekitConfig {
   const cfg = readLivekitConfig();
   if (!cfg) {
     throw new LivekitUnavailableError(
-      'LiveKit env not configured (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)',
+      'LiveKit env not configured (LIVEKIT_API_KEY, LIVEKIT_SECRET, LIVEKIT_WEBSOCKET)',
     );
   }
   return cfg;
@@ -60,10 +64,6 @@ function b64url(input: string | Buffer): string {
   return buf.toString('base64url');
 }
 
-/**
- * Mint a LiveKit-compatible HS256 JWT.
- * Spec: https://docs.livekit.io/realtime/server/generating-tokens/
- */
 function mintJwt(
   apiKey: string,
   apiSecret: string,
@@ -71,18 +71,11 @@ function mintJwt(
   ttlSeconds = 4 * 3600,
 ): string {
   const now = Math.floor(Date.now() / 1000);
-  const claims = {
-    iss: apiKey,
-    nbf: now,
-    exp: now + ttlSeconds,
-    ...payload,
-  };
+  const claims = { iss: apiKey, nbf: now, exp: now + ttlSeconds, ...payload };
   const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body   = b64url(JSON.stringify(claims));
-  const sig = b64url(
-    createHmac('sha256', apiSecret)
-      .update(`${header}.${body}`)
-      .digest(),
+  const sig    = b64url(
+    createHmac('sha256', apiSecret).update(`${header}.${body}`).digest(),
   );
   return `${header}.${body}.${sig}`;
 }
@@ -100,7 +93,6 @@ export interface IssueTokenOptions {
   ttlSeconds?: number;
 }
 
-/** Mint a JWT the browser hands to LiveKit to join a room. */
 export async function issueJoinToken(opts: IssueTokenOptions): Promise<string> {
   const cfg = requireConfig();
   return mintJwt(cfg.apiKey, cfg.apiSecret, {
@@ -117,10 +109,6 @@ export async function issueJoinToken(opts: IssueTokenOptions): Promise<string> {
   }, opts.ttlSeconds ?? 4 * 3600);
 }
 
-/**
- * Force-close a room via LiveKit's Twirp API.
- * Uses a short-lived admin token (roomCreate + roomAdmin grants).
- */
 export async function deleteRoom(roomName: string): Promise<void> {
   const cfg = requireConfig();
   const adminToken = mintJwt(cfg.apiKey, cfg.apiSecret, {
@@ -139,8 +127,7 @@ export async function deleteRoom(roomName: string): Promise<void> {
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      if (/not.found|does not exist/i.test(text)) return; // no-op
-      if (res.status === 404) return;
+      if (/not.found|does not exist/i.test(text) || res.status === 404) return;
       throw new Error(`LiveKit DeleteRoom ${res.status}: ${text}`);
     }
   } catch (err: any) {
@@ -150,14 +137,9 @@ export async function deleteRoom(roomName: string): Promise<void> {
 }
 
 /**
- * Public LiveKit URL the browser uses to connect.  Derived from the
- * request host so it works in any environment without updating env vars.
- * The Express proxy forwards /rtc (WS) and /twirp (HTTP) to port 7880.
+ * The URL the browser uses to connect. For LiveKit Cloud this is
+ * LIVEKIT_WEBSOCKET directly — no need to derive from request host.
  */
-export function publicLivekitUrl(reqHost?: string): string {
-  if (reqHost) {
-    const scheme = (reqHost.startsWith('localhost') || reqHost.startsWith('127.')) ? 'ws' : 'wss';
-    return `${scheme}://${reqHost}`;
-  }
-  return requireConfig().url;
+export function publicLivekitUrl(_reqHost?: string): string {
+  return requireConfig().wsUrl;
 }

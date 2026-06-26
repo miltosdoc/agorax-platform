@@ -198,13 +198,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
         url = resp.data.url;
         setIsHost(!!resp.data.isHost);
 
-        // Build ICE server config — use the proxied TURN server when available
-        const rtcConfig: RTCConfiguration | undefined = resp.data.turnUrl ? {
-          iceServers: [{ urls: [`turn:${resp.data.turnUrl.replace(/^wss?:\/\//, '')}?transport=tcp`], username: 'livekit', credential: 'livekit' }],
-          iceTransportPolicy: 'relay',
-        } : undefined;
-
-        const room = new LK.Room({ adaptiveStream: true, dynacast: true, rtcConfig });
+        const room = new LK.Room({ adaptiveStream: true, dynacast: true });
         roomRef.current = room;
 
         const RE = LK.RoomEvent ?? {};
