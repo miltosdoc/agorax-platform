@@ -36,36 +36,31 @@ const MEDIA_ROOT = process.env.AGORAX_MEDIA_DIR
   || path.resolve(process.cwd(), 'uploads', 'media');
 
 /**
- * Given a list of media rows, return only those whose file exists on disk.
- * Rows with missing files that are still `published` get auto-hidden and
- * their uploader receives a one-time in-app notification.
- * Returns items tagged with `fileMissing: true` so the uploader's own view
- * can show a re-upload prompt.
+ * Read-only check: tag rows whose file is missing on disk with fileMissing=true.
+ * Never writes to the DB — callers decide what to show based on the flag.
  */
-async function filterMissingFiles<T extends { id: number; filePath: string; status: string; uploaderId: number; proposalId: number; kind: string }>(
+function filterMissingFiles<T extends { id: number; filePath: string }>(
   rows: T[],
-): Promise<(T & { fileMissing?: boolean })[]> {
-  const results: (T & { fileMissing?: boolean })[] = [];
-  for (const row of rows) {
+): (T & { fileMissing?: boolean })[] {
+  return rows.map((row) => {
     const fullPath = path.join(MEDIA_ROOT, row.filePath);
     const exists = existsSync(fullPath);
-    if (exists) {
-      results.push(row);
-    } else {
-      // Auto-hide published entries and notify the uploader (best-effort, once).
-      if (row.status === 'published') {
-        try {
-          await mediaRepo.setStatus(row.id, 'hidden');
-          await notifyFileLost(row.uploaderId, row.proposalId, row.kind as 'podcast' | 'video');
-        } catch (err: any) {
-          logger.warn('filterMissingFiles: auto-hide failed', { id: row.id, err: err?.message });
-        }
-      }
-      // Still include the row for the uploader's own view (tagged as missing).
-      results.push({ ...row, fileMissing: true });
-    }
+    return exists ? row : { ...row, fileMissing: true };
+  });
+}
+
+/**
+ * Best-effort: notify uploader their file is gone and hide the DB row.
+ * Called only from the DELETE handler or a dedicated admin action, never
+ * from a read path.
+ */
+async function handleFileLost(row: { id: number; uploaderId: number; proposalId: number; kind: string }): Promise<void> {
+  try {
+    await mediaRepo.setStatus(row.id, 'hidden');
+    await notifyFileLost(row.uploaderId, row.proposalId, row.kind as 'podcast' | 'video');
+  } catch (err: any) {
+    logger.warn('handleFileLost failed', { id: row.id, err: err?.message });
   }
-  return results;
 }
 
 // Per-kind caps. Size is the only enforced limit (same 120MB ceiling for
@@ -314,7 +309,7 @@ export function registerMediaRoutes(app: Express): void {
         includeHidden: isAuthor || isAdmin,
         userId,
       });
-      const withFlags = await filterMissingFiles(raw);
+      const withFlags = filterMissingFiles(raw);
       // Public viewers never see missing-file rows; uploaders/authors do so
       // they can re-upload.
       const isPrivileged = (isAuthor || isAdmin) || !!userId;
@@ -409,7 +404,7 @@ export function registerMediaRoutes(app: Express): void {
 
       if (kind) {
         const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
-        const filtered = (await filterMissingFiles(rows)).filter((r) => !r.fileMissing);
+        const filtered = filterMissingFiles(rows).filter((r) => !r.fileMissing);
         res.json({
           items: filtered.map((r) => ({ feedType: 'media' as const, ...r })),
           nextCursor: filtered.length === limit ? filtered[filtered.length - 1].id : null,
@@ -422,7 +417,7 @@ export function registerMediaRoutes(app: Express): void {
       const wantMedia = kindRaw === undefined || kindRaw === 'all';
 
       const [mediaRows, proposalRows, surveyRows] = await Promise.all([
-        wantMedia ? mediaRepo.feed({ limit: 20 }).then((rows) => filterMissingFiles(rows).then((r) => r.filter((x) => !x.fileMissing))) : Promise.resolve([]),
+        wantMedia ? mediaRepo.feed({ limit: 20 }).then((rows) => filterMissingFiles(rows).filter((x) => !x.fileMissing)) : Promise.resolve([]),
         wantProposals
           ? db.select({
               id: proposals.id,
