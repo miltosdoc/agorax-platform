@@ -1214,6 +1214,8 @@ const el: TranslationDictionary = {
   'media.galleryAllUploaded': 'Όλα τα ανεβασμένα αρχεία.',
   'media.loading': 'Φόρτωση…',
   'media.galleryEmpty': 'Δεν έχουν ανεβεί αρχεία ακόμη. Δημιουργήστε ένα σενάριο παραπάνω και ανεβάστε το πρώτο podcast ή βίντεο.',
+  'media.fileMissingTitle': 'Το αρχείο χάθηκε',
+  'media.fileMissingHint': 'Το αρχείο δεν βρέθηκε στον διακομιστή (πιθανώς λόγω επανεκκίνησης). Διαγράψτε αυτή την καταχώρηση και ανεβάστε ξανά το αρχείο.',
   'media.overviewHeading': 'Podcast & βίντεο',
 
   'feed.title': 'Ροή AgoraX',

@@ -30,9 +30,43 @@ import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
 import { generatePodcastScript, generateTeaserScript } from '../utils/media-scripts';
 import { logger } from '../utils/logger';
+import { notifyFileLost } from '../utils/notifications';
 
 const MEDIA_ROOT = process.env.AGORAX_MEDIA_DIR
   || path.resolve(process.cwd(), 'uploads', 'media');
+
+/**
+ * Given a list of media rows, return only those whose file exists on disk.
+ * Rows with missing files that are still `published` get auto-hidden and
+ * their uploader receives a one-time in-app notification.
+ * Returns items tagged with `fileMissing: true` so the uploader's own view
+ * can show a re-upload prompt.
+ */
+async function filterMissingFiles<T extends { id: number; filePath: string; status: string; uploaderId: number; proposalId: number; kind: string }>(
+  rows: T[],
+): Promise<(T & { fileMissing?: boolean })[]> {
+  const results: (T & { fileMissing?: boolean })[] = [];
+  for (const row of rows) {
+    const fullPath = path.join(MEDIA_ROOT, row.filePath);
+    const exists = existsSync(fullPath);
+    if (exists) {
+      results.push(row);
+    } else {
+      // Auto-hide published entries and notify the uploader (best-effort, once).
+      if (row.status === 'published') {
+        try {
+          await mediaRepo.setStatus(row.id, 'hidden');
+          await notifyFileLost(row.uploaderId, row.proposalId, row.kind as 'podcast' | 'video');
+        } catch (err: any) {
+          logger.warn('filterMissingFiles: auto-hide failed', { id: row.id, err: err?.message });
+        }
+      }
+      // Still include the row for the uploader's own view (tagged as missing).
+      results.push({ ...row, fileMissing: true });
+    }
+  }
+  return results;
+}
 
 // Per-kind caps. Size is the only enforced limit (same 120MB ceiling for
 // audio and video). Duration is still probed and stored so the UI can
@@ -276,10 +310,17 @@ export function registerMediaRoutes(app: Express): void {
       const userId: number | undefined = req.user?.id;
       const isAuthor = !!userId && proposal.authorId === userId;
       const isAdmin = !!userId && req.user.isAdmin;
-      const list = await mediaRepo.listForProposal(proposalId, {
+      const raw = await mediaRepo.listForProposal(proposalId, {
         includeHidden: isAuthor || isAdmin,
         userId,
       });
+      const withFlags = await filterMissingFiles(raw);
+      // Public viewers never see missing-file rows; uploaders/authors do so
+      // they can re-upload.
+      const isPrivileged = (isAuthor || isAdmin) || !!userId;
+      const list = isPrivileged
+        ? withFlags
+        : withFlags.filter((r) => !r.fileMissing);
       res.json(list);
     } catch (err: any) {
       logger.error('list media failed', { err: err?.message });
@@ -368,9 +409,10 @@ export function registerMediaRoutes(app: Express): void {
 
       if (kind) {
         const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
+        const filtered = (await filterMissingFiles(rows)).filter((r) => !r.fileMissing);
         res.json({
-          items: rows.map((r) => ({ feedType: 'media' as const, ...r })),
-          nextCursor: rows.length === limit ? rows[rows.length - 1].id : null,
+          items: filtered.map((r) => ({ feedType: 'media' as const, ...r })),
+          nextCursor: filtered.length === limit ? filtered[filtered.length - 1].id : null,
         });
         return;
       }
@@ -380,7 +422,7 @@ export function registerMediaRoutes(app: Express): void {
       const wantMedia = kindRaw === undefined || kindRaw === 'all';
 
       const [mediaRows, proposalRows, surveyRows] = await Promise.all([
-        wantMedia ? mediaRepo.feed({ limit: 20 }) : Promise.resolve([]),
+        wantMedia ? mediaRepo.feed({ limit: 20 }).then((rows) => filterMissingFiles(rows).then((r) => r.filter((x) => !x.fileMissing))) : Promise.resolve([]),
         wantProposals
           ? db.select({
               id: proposals.id,

@@ -29,7 +29,8 @@ export type NotificationType =
   | 'conference_starting'
   | 'sortition_room_opened'
   | 'new_proposal'
-  | 'new_media';
+  | 'new_media'
+  | 'file_lost';
 
 interface CreateNotificationParams {
   userId: number;
@@ -149,6 +150,24 @@ export async function notifyNewMedia(
     notified++;
   }
   return notified;
+}
+
+// ─── Personal: Notify uploader their file was lost ──────────────────────────
+
+export async function notifyFileLost(
+  uploaderId: number,
+  proposalId: number,
+  kind: 'podcast' | 'video',
+): Promise<void> {
+  const label = kind === 'podcast' ? 'podcast' : 'βίντεο';
+  await createNotification({
+    userId: uploaderId,
+    type: 'file_lost',
+    title: `Το αρχείο ${label} σας χάθηκε`,
+    message: 'Το αρχείο σας δεν βρέθηκε στον διακομιστή (πιθανώς λόγω επανεκκίνησης). Παρακαλώ ανεβάστε ξανά.',
+    proposalId,
+    actionUrl: `/proposals/${proposalId}`,
+  });
 }
 
 // ─── Batch: Notify Sortition Members ────────────────────────────────────────

@@ -1214,6 +1214,8 @@ const en: TranslationDictionary = {
   'media.galleryAllUploaded': 'All uploaded files.',
   'media.loading': 'Loading…',
   'media.galleryEmpty': 'Nothing uploaded yet. Generate a script above and upload your first podcast or video.',
+  'media.fileMissingTitle': 'File lost',
+  'media.fileMissingHint': 'The file could not be found on the server (likely lost after a server restart). Delete this entry and re-upload the file.',
   'media.overviewHeading': 'Podcast & video',
 
   'feed.title': 'AgoraX Feed',

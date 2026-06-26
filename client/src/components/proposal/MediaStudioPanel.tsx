@@ -26,7 +26,7 @@ import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { api, ApiError } from '@/lib/api';
-import { Mic, Video, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2 } from 'lucide-react';
+import { Mic, Video, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2, AlertTriangle } from 'lucide-react';
 
 interface MediaRow {
   id: number;
@@ -41,6 +41,7 @@ interface MediaRow {
   status: 'published' | 'hidden';
   isFeatured: boolean;
   createdAt: string;
+  fileMissing?: boolean;
 }
 
 interface ScriptResponse {
@@ -344,6 +345,42 @@ function MediaGalleryItem(props: {
   const Icon = media.kind === 'podcast' ? Mic : Video;
   const mediaUrl = `/media/${media.filePath}`;
   const thumbUrl = media.thumbPath ? `/media/${media.thumbPath}` : undefined;
+
+  if (media.fileMissing) {
+    return (
+      <div
+        className="border border-destructive/40 rounded-lg p-3 bg-destructive/5"
+        data-testid={`media-item-${media.id}`}
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-destructive">
+              {media.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideo')} — {t('media.fileMissingTitle')}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t('media.fileMissingHint')}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          {canCurate && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              disabled={acting}
+              data-testid={`media-delete-${media.id}`}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              {t('media.delete')}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
