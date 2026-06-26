@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/hooks/use-translation';
+import { apiRequest } from '@/lib/queryClient';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
@@ -79,12 +80,7 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/communities/${targetCommunityId}/proposals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
+      const res = await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, formData);
 
       if (!res.ok) {
         const data = await res.json();
