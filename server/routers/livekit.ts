@@ -311,7 +311,10 @@ export function registerLivekitRoutes(app: Express): void {
       } catch (logErr: any) {
         logger.warn('participation record failed', { roomId: room.id, err: logErr?.message });
       }
-      res.json({ token, url: publicLivekitUrl(req.get('host')), roomName: room.roomName, isHost, participationId });
+      const host = req.get('host') ?? '';
+      const scheme = (host.startsWith('localhost') || host.startsWith('127.')) ? 'ws' : 'wss';
+      const turnUrl = `${scheme}://${host}/turn`;
+      res.json({ token, url: publicLivekitUrl(host), roomName: room.roomName, isHost, participationId, turnUrl });
     } catch (err: any) {
       if (err instanceof LivekitUnavailableError) return unavailable(res);
       logger.error('issue livekit token failed', { err: err?.message });
