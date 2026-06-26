@@ -158,8 +158,18 @@ export default function Header() {
             <div className="flex-1 max-w-md min-w-0">
               <SearchBar />
             </div>
-            {/* Single primary CTA; every destination lives once in the
-                user dropdown (mobile additionally gets the bottom nav). */}
+            {/* Communities — integral nav destination, always one click away on desktop */}
+            <button
+              type="button"
+              onClick={() => navigate("/communities")}
+              className="hidden sm:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted border border-border hover:border-primary rounded-md px-3 py-2 cursor-pointer"
+              data-testid="button-communities"
+            >
+              <Users className="h-4 w-4" />
+              <span>{t('nav.communities')}</span>
+            </button>
+
+            {/* Primary CTA */}
             <button
               type="button"
               onClick={() => navigate("/proposals/new")}
