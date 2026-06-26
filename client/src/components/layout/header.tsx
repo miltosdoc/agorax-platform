@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,31 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const { toast } = useToast();
+
+  async function handleApkDownload() {
+    setIsMenuOpen(false);
+    try {
+      const res = await fetch("/api/android/download");
+      if (res.status === 404) {
+        toast({ title: t('android.notAvailable'), variant: "destructive" });
+        return;
+      }
+      if (!res.ok) {
+        toast({ title: "Download failed", variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "agorax.apk";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
+  }
 
   const handleLogout = () => {
     navigate("/");
@@ -383,14 +409,12 @@ export default function Header() {
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
-                  asChild
+                  onClick={handleApkDownload}
                   className="cursor-pointer transition-smooth"
                   data-testid="menu-android-download"
                 >
-                  <a href="/api/android/download" download="agorax.apk">
-                    <Smartphone className="mr-2 h-4 w-4" />
-                    {t('android.downloadMenuLabel')}
-                  </a>
+                  <Smartphone className="mr-2 h-4 w-4" />
+                  {t('android.downloadMenuLabel')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

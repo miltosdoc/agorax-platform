@@ -7,15 +7,44 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
-import { ArrowLeft, BadgeCheck, Download, Fingerprint, Shield, Smartphone, Trash2, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Download, Fingerprint, Loader2, Shield, Smartphone, Trash2, User } from "lucide-react";
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
   const { t } = useTranslation();
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [apkDownloading, setApkDownloading] = useState(false);
+  const { toast } = useToast();
+
+  async function handleApkDownload() {
+    setApkDownloading(true);
+    try {
+      const res = await fetch("/api/android/download");
+      if (res.status === 404) {
+        toast({ title: t('android.notAvailable'), variant: "destructive" });
+        return;
+      }
+      if (!res.ok) {
+        toast({ title: "Download failed", variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "agorax.apk";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    } finally {
+      setApkDownloading(false);
+    }
+  }
 
   const effectiveUser = user ?? {
     id: 0,
@@ -168,11 +197,9 @@ export default function ProfilePage() {
                 <CardDescription>{t('android.downloadDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button asChild className="gap-2">
-                  <a href="/api/android/download" download="agorax.apk">
-                    <Download className="h-4 w-4" />
-                    {t('android.downloadButton')}
-                  </a>
+                <Button onClick={handleApkDownload} disabled={apkDownloading} className="gap-2">
+                  {apkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {t('android.downloadButton')}
                 </Button>
               </CardContent>
             </Card>
