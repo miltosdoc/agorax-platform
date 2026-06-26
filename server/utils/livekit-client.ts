@@ -36,11 +36,14 @@ export function readLivekitConfig(): LivekitConfig | null {
 
   if (!apiKey || !apiSecret || !wsUrl) return null;
 
-  const httpUrl = wsUrl
+  // Guard against the user pasting "wss://host KEY=val SECRET=val" into one field
+  const cleanWsUrl = wsUrl.split(/\s+/)[0];
+
+  const httpUrl = cleanWsUrl
     .replace(/^wss:\/\//, 'https://')
     .replace(/^ws:\/\//, 'http://');
 
-  return { wsUrl, httpUrl, apiKey, apiSecret };
+  return { wsUrl: cleanWsUrl, httpUrl, apiKey, apiSecret };
 }
 
 export function isLivekitConfigured(): boolean {
