@@ -183,21 +183,29 @@ export function registerMediaRoutes(app: Express): void {
 
   app.post('/api/proposals/:id/media',
     requireAuth,
-    upload.single('file'),
+    express.raw({ type: '*/*', limit: '120mb' }),
     async (req: any, res) => {
       const proposalId = parseInt(req.params.id, 10);
       if (!Number.isFinite(proposalId)) {
         return res.status(400).json({ message: 'invalid proposal id' });
       }
-      // Accept kind from either the multipart body field OR the query string
-      // (the frontend includes it in both places for robustness).
-      const kindRaw = req.body?.kind ?? req.query?.kind;
+      const kindRaw = req.query?.kind;
       if (!isKind(kindRaw)) {
         return res.status(400).json({ message: "kind must be 'podcast' or 'video'" });
       }
       const kind: Kind = kindRaw;
-      const file = req.file as Express.Multer.File | undefined;
-      if (!file) return res.status(400).json({ message: 'file is required' });
+
+      const buffer = req.body as Buffer;
+      if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
+        return res.status(400).json({ message: 'file is required' });
+      }
+
+      // Metadata from headers / query params sent by the client.
+      const mimeType = (req.headers['content-type'] || '').split(';')[0].trim()
+        || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4');
+      const rawName = req.headers['x-file-name']
+        ? decodeURIComponent(req.headers['x-file-name'] as string)
+        : `upload${kind === 'podcast' ? '.mp3' : '.mp4'}`;
 
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: 'proposal not found' });
@@ -210,31 +218,29 @@ export function registerMediaRoutes(app: Express): void {
       }
 
       const limits = LIMITS[kind];
-      if (file.size > limits.maxBytes) {
+      if (buffer.length > limits.maxBytes) {
         return res.status(413).json({
           message: `file too large; ${kind} max is ${Math.round(limits.maxBytes / 1024 / 1024)}MB`,
         });
       }
-      const ext = path.extname(file.originalname).toLowerCase();
+      const ext = path.extname(rawName).toLowerCase();
       if (!limits.exts.has(ext)) {
         return res.status(415).json({
           message: `unsupported extension ${ext || '(none)'}; expected one of ${[...limits.exts].join(', ')}`,
         });
       }
-      if (file.mimetype && !limits.mimes.has(file.mimetype)) {
-        // Browsers occasionally send 'application/octet-stream' — don't hard-fail
-        // on a permissive mime, but reject obviously-wrong content types.
-        if (!file.mimetype.startsWith('audio/') && !file.mimetype.startsWith('video/')
-            && file.mimetype !== 'application/octet-stream') {
-          return res.status(415).json({ message: `mime ${file.mimetype} not allowed` });
+      if (mimeType && !limits.mimes.has(mimeType)) {
+        if (!mimeType.startsWith('audio/') && !mimeType.startsWith('video/')
+            && mimeType !== 'application/octet-stream') {
+          return res.status(415).json({ message: `mime ${mimeType} not allowed` });
         }
       }
 
       const dir = await ensureProposalDir(proposalId);
-      const id = hashId(file.buffer) + '-' + randomBytes(4).toString('hex');
+      const id = hashId(buffer) + '-' + randomBytes(4).toString('hex');
       const filename = `${kind}-${id}${ext}`;
       const filePath = path.join(dir, filename);
-      await writeFile(filePath, file.buffer);
+      await writeFile(filePath, buffer);
 
       // Probe — if probe fails or the file is the wrong shape, clean up.
       let durationS = 0;
@@ -274,8 +280,8 @@ export function registerMediaRoutes(app: Express): void {
         kind,
         filePath: relPath,
         thumbPath: thumbRel,
-        mimeType: file.mimetype || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4'),
-        sizeBytes: file.size,
+        mimeType: mimeType || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4'),
+        sizeBytes: buffer.length,
         durationS: durationS > 0 ? String(durationS) : null,
         status: 'published',
         isFeatured: false,

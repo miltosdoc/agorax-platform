@@ -89,13 +89,22 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1024)} KB`;
 }
 
-async function uploadMultipart(url: string, formData: FormData): Promise<MediaRow> {
+async function uploadFile(file: File, uploadUrl: string): Promise<MediaRow> {
+  // Ensure CSRF cookie exists before sending.
+  if (!readCsrfCookie()) {
+    await fetch('/api/csrf', { credentials: 'include' }).catch(() => {});
+  }
   const csrf = readCsrfCookie();
-  const res = await fetch(url, {
+  const headers: Record<string, string> = {
+    'Content-Type': file.type || 'application/octet-stream',
+    'X-File-Name': encodeURIComponent(file.name),
+  };
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  const res = await fetch(uploadUrl, {
     method: 'POST',
     credentials: 'include',
-    headers: csrf ? { 'X-CSRF-Token': csrf } : {},
-    body: formData,
+    headers,
+    body: file,
   });
   if (!res.ok) {
     let msg = res.statusText;
@@ -170,12 +179,7 @@ function MediaKindCard(props: {
     if (!file) return;
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('kind', kind);
-      fd.append('file', file);
-      // Include kind in the query string too — body field can be lost if
-      // multer has trouble with multipart field ordering.
-      await uploadMultipart(`/api/proposals/${proposalId}/media?kind=${kind}`, fd);
+      await uploadFile(file, `/api/proposals/${proposalId}/media?kind=${kind}`);
       toast({ title: t('media.uploadSuccess'), description: file.name });
       onUploaded();
     } catch (err: any) {
