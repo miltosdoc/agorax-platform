@@ -137,7 +137,7 @@ function AppRouter() {
         <Route path="/proposals" component={ProposalsPage} />
         <ProtectedRoute path="/proposals/new" component={ProposalFormPage} />
         <ProtectedRoute path="/proposals/:id" component={ProposalDetailPage} />
-        <Route path="/feed" component={FeedPage} />
+        <ProtectedRoute path="/feed" component={FeedPage} />
         <ProtectedRoute path="/sortition" component={SortitionDashboardPage} />
         <ProtectedRoute path="/sortition/body/:bodyId" component={SortitionBodyDetailPage} />
         <ProtectedRoute path="/sortition/:bodyId/ceremony" component={SortitionCeremonyPage} />
