@@ -63,7 +63,7 @@ const KIND_CONFIG = {
     titleKey: 'media.podcastTitle',
     descriptionKey: 'media.podcastDescription',
     scriptHintKey: 'media.podcastScriptHint',
-    accept: 'audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,.mp3,.m4a',
+    accept: 'audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/m4a,.mp3,.m4a',
   },
   video: {
     icon: Video,
@@ -173,7 +173,9 @@ function MediaKindCard(props: {
       const fd = new FormData();
       fd.append('kind', kind);
       fd.append('file', file);
-      await uploadMultipart(`/api/proposals/${proposalId}/media`, fd);
+      // Include kind in the query string too — body field can be lost if
+      // multer has trouble with multipart field ordering.
+      await uploadMultipart(`/api/proposals/${proposalId}/media?kind=${kind}`, fd);
       toast({ title: t('media.uploadSuccess'), description: file.name });
       onUploaded();
     } catch (err: any) {
@@ -265,7 +267,7 @@ function MediaKindCard(props: {
             data-testid={`media-upload-${kind}`}
           >
             {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-            {kind === 'podcast' ? t('media.uploadMp3') : t('media.uploadMp4')}
+            {kind === 'podcast' ? t('media.uploadAudio') : t('media.uploadVideo')}
           </Button>
           <span className="text-xs text-muted-foreground">{t('media.sizeLimit')}</span>
         </div>

@@ -189,7 +189,9 @@ export function registerMediaRoutes(app: Express): void {
       if (!Number.isFinite(proposalId)) {
         return res.status(400).json({ message: 'invalid proposal id' });
       }
-      const kindRaw = req.body?.kind;
+      // Accept kind from either the multipart body field OR the query string
+      // (the frontend includes it in both places for robustness).
+      const kindRaw = req.body?.kind ?? req.query?.kind;
       if (!isKind(kindRaw)) {
         return res.status(400).json({ message: "kind must be 'podcast' or 'video'" });
       }

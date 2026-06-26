@@ -1179,6 +1179,8 @@ const el: TranslationDictionary = {
   'media.copyFailed': 'Η αντιγραφή απέτυχε',
   'media.uploadMp3': 'Ανέβασμα MP3',
   'media.uploadMp4': 'Ανέβασμα MP4',
+  'media.uploadAudio': 'Ανέβασμα ήχου',
+  'media.uploadVideo': 'Ανέβασμα βίντεο',
   'media.sizeLimit': 'Έως 120 MB.',
   'media.uploadSuccess': 'Επιτυχής μεταφόρτωση',
   'media.uploadFailed': 'Η μεταφόρτωση απέτυχε',

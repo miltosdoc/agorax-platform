@@ -1179,6 +1179,8 @@ const en: TranslationDictionary = {
   'media.copyFailed': 'Copy failed',
   'media.uploadMp3': 'Upload MP3',
   'media.uploadMp4': 'Upload MP4',
+  'media.uploadAudio': 'Upload audio',
+  'media.uploadVideo': 'Upload video',
   'media.sizeLimit': 'Up to 120 MB.',
   'media.uploadSuccess': 'Upload complete',
   'media.uploadFailed': 'Upload failed',
