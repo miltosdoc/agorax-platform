@@ -1,0 +1,180 @@
+19:08:29.25
+0592f61e
+User
+{"level":"info","timestamp":"2026-06-30T17:08:29.251Z","message":"Server started on port 5000","port":5000,"env":"production"}
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+To prepare for this change:
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+2026-06-30 19:08:41.79
+0592f61e
+User
+(node:30) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+
+2026-06-30 19:44:55.93
+0592f61e
+System
+system: received signal terminated
+
+2026-06-30 19:44:55.96
+0592f61e
+System
+command finished with error [npm run start]: signal: terminated
+
+2026-06-30 19:44:55.96
+0592f61e
+System
+main done, exiting
+
+2026-06-30 20:16:59.03
+0592f61e
+System
+starting up user application
+
+2026-06-30 20:16:59.03
+0592f61e
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+
+2026-06-30 20:16:59.03
+0592f61e
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+
+2026-06-30 20:16:59.03
+0592f61e
+System
+healthcheck failed error=healthcheck /: Get "http://127.0.0.1:1104/": dial tcp 127.0.0.1:1104: connect: connection refused
+
+2026-06-30 20:16:59.04
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.06
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.07
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.09
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.19
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.49
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:16:59.98
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:17:00.37
+0592f61e
+User
+> agorax-democracy-platform@1.0.0 start
+
+2026-06-30 20:17:00.37
+0592f61e
+User
+> NODE_ENV=production node dist/index.js
+
+2026-06-30 20:17:00.74
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:17:02.56
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:17:03.06
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:17:03.46
+0592f61e
+System
+healthcheck failed error=healthcheck / returned status 500
+
+2026-06-30 20:17:03.73
+0592f61e
+User
+{"level":"info","timestamp":"2026-06-30T18:17:03.733Z","message":"Server started on port 5000","port":5000,"env":"production"}
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+(node:30) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+To prepare for this change:
+
+2026-06-30 20:17:04.83
+0592f61e
+User
+See https://www.postgresql.org/docs/curren
