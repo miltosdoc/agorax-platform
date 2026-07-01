@@ -2,3 +2,4 @@
 - [LiveKit CDN workaround](livekit-cdn.md) — livekit-client loaded from CDN in index.html (window.LivekitClient); ConferenceRoomCard uses raw Room API, no @livekit/components-react needed.
 - [ESM package stubs](esm-stubs.md) — npm install is blocked by CVE policy; missing packages are manually stubbed as ESM modules under node_modules.
 - [Phase timer system](phase-timers.md) — phaseDeadline on proposals, duration hours on communities, PhaseCountdown component, auto-advance job handler.
+- [Security scan connection-lost](deploy-security-scan-connection-lost.md) — publish fails at "Security scan skipped: connection lost" ~14s in; infra-side, not fixable via code/lockfile.
