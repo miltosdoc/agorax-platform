@@ -29,3 +29,5 @@ declaration*.png
 # OS
 .DS_Store
 Thumbs.db
+# Early-user feedback submissions (reviewed on the server)
+feedback/

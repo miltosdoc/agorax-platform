@@ -5,6 +5,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
+import multer from 'multer';
 import { votingRepo, proposalRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { db } from '../db';
@@ -276,6 +277,54 @@ export function registerMiscRoutes(app: Express): void {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', `attachment; filename="${newest.file}"`);
     res.sendFile(path.join(dir, newest.file));
+  });
+
+  // ── Early-user feedback ────────────────────────────────────────────────
+  // Stores each submission as a JSON file (+ optional screenshot) under
+  // feedback/ on the server, for periodic developer review. Deliberately
+  // filesystem-based: no admin UI needed, reviewed over SSH.
+  const feedbackUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB screenshot cap
+  });
+  app.post("/api/feedback", requireAuth, feedbackUpload.single('screenshot'), async (req: any, res) => {
+    try {
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      if (message.length < 3 || message.length > 5000) {
+        return res.status(400).json({ message: "message must be 3–5000 characters" });
+      }
+      const page = typeof req.body?.page === 'string' ? req.body.page.slice(0, 300) : '';
+
+      const fs = await import('fs');
+      const path = await import('path');
+      const dir = path.resolve(process.cwd(), 'feedback');
+      fs.mkdirSync(dir, { recursive: true });
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const base = `feedback-${stamp}-u${req.user.id}`;
+
+      let screenshotFile: string | null = null;
+      if (req.file && /^image\//.test(req.file.mimetype)) {
+        const ext = req.file.mimetype === 'image/png' ? 'png'
+          : req.file.mimetype === 'image/webp' ? 'webp' : 'jpg';
+        screenshotFile = `${base}.${ext}`;
+        fs.writeFileSync(path.join(dir, screenshotFile), req.file.buffer);
+      }
+
+      fs.writeFileSync(path.join(dir, `${base}.json`), JSON.stringify({
+        userId: req.user.id,
+        username: req.user.username,
+        message,
+        page,
+        userAgent: req.get('user-agent') ?? null,
+        screenshot: screenshotFile,
+        createdAt: new Date().toISOString(),
+      }, null, 2));
+
+      res.status(201).json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to store feedback" });
+    }
   });
 
   app.get("/api/health", async (req, res) => {

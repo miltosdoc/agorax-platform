@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
-import { ArrowLeft, BadgeCheck, Download, Fingerprint, Loader2, Shield, Smartphone, Trash2, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Download, Fingerprint, Loader2, MessageSquarePlus, Shield, Smartphone, Trash2, User } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +22,7 @@ export default function ProfilePage() {
   const [, setLocation] = useLocation();
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [apkDownloading, setApkDownloading] = useState(false);
+  const [feedbackOn, setFeedbackOn] = useState(isFeedbackWidgetEnabled);
   const { toast } = useToast();
 
   async function handleApkDownload() {
@@ -187,6 +191,29 @@ export default function ProfilePage() {
                   {apkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   {t('android.downloadButton')}
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-5 w-5" />
+                  {t('feedback.settingTitle')}
+                </CardTitle>
+                <CardDescription>{t('feedback.settingDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between">
+                <Label htmlFor="feedback-widget-toggle" className="text-sm">
+                  {t('feedback.toggleLabel')}
+                </Label>
+                <Switch
+                  id="feedback-widget-toggle"
+                  checked={feedbackOn}
+                  onCheckedChange={(on) => {
+                    setFeedbackWidgetEnabled(on);
+                    setFeedbackOn(on);
+                  }}
+                />
               </CardContent>
             </Card>
 
