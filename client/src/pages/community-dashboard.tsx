@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
 import { ImpactMetricsDashboard } from '@/components/community/ImpactMetricsDashboard';
+import ShareButton from '@/components/ShareButton';
 import {
   getCommunityDashboardMetrics,
   getGovernanceTranslationKey,
@@ -51,7 +52,11 @@ export default function CommunityDashboardPage() {
 
   const [summary, setSummary] = useState<CommunitySummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>('proposals');
+  // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return ['proposals', 'sortition', 'members', 'conferences', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
+  });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -224,6 +229,13 @@ export default function CommunityDashboardPage() {
                     : t('community.settings_title')}
                 </Button>
               )}
+              <ShareButton
+                url={`/communities/${communityId}`}
+                title={community.name}
+                text={community.description ?? undefined}
+                size="sm"
+                variant="outline"
+              />
             </div>
           </div>
         </CardHeader>

@@ -12,6 +12,7 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Loader2, CalendarPlus, XCircle,
 import { api, ApiError } from '@/lib/api';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
+import ShareButton from '@/components/ShareButton';
 
 interface JoinTokenResponse {
   token: string;
@@ -136,9 +137,11 @@ interface Props {
   badge?: string;
   viewerIsAdmin?: boolean;
   onEnded?: () => void;
+  /** When set, a share button offers this link (e.g. the community's conferences tab). */
+  shareUrl?: string;
 }
 
-export function ConferenceRoomCard({ roomId, title, description, badge, viewerIsAdmin, onEnded }: Props) {
+export function ConferenceRoomCard({ roomId, title, description, badge, viewerIsAdmin, onEnded, shareUrl }: Props) {
   const { t } = useTranslation();
   const errorToast = useErrorToast();
 
@@ -406,6 +409,9 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
             {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
             {t('livekit.join')}
           </Button>
+          {shareUrl && (
+            <ShareButton url={shareUrl} title={title} text={description} size="sm" variant="outline" />
+          )}
           <a
             href={`/api/livekit/rooms/${roomId}/ics`}
             download={`agorax-room-${roomId}.ics`}

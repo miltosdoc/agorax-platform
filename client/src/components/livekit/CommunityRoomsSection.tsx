@@ -159,6 +159,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
               badge={room.status === 'active' ? t('livekit.live') : t('livekit.scheduled')}
               viewerIsAdmin={viewerIsAdmin}
               onEnded={refresh}
+              shareUrl={`/communities/${communityId}?tab=conferences`}
             />
           ))}
         </div>

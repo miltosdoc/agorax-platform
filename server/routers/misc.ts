@@ -102,6 +102,25 @@ export function registerMiscRoutes(app: Express): void {
     }
   });
 
+  app.get('/communities/:id', async (req, res, next) => {
+    if (!SOCIAL_BOT_RE.test(req.get('User-Agent') || '')) return next();
+    try {
+      const id = parseInt(req.params.id, 10);
+      const [community] = await db.select().from(communities).where(eq(communities.id, id)).limit(1);
+      if (!community) return next();
+      const base = `${req.protocol}://${req.get('host')}`;
+      const description = `${(community.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)} — Κοινότητα στο AgoraX. Συμμετοχή στη διαβούλευση, τις προτάσεις και τις τηλεδιασκέψεις.`.trim();
+      res.send(renderOgPage({
+        url: `${base}/communities/${id}`,
+        title: community.name,
+        description,
+        image: `${base}/logo-share.png`,
+      }));
+    } catch {
+      next();
+    }
+  });
+
   app.get("/polls/:id", async (req, res, next) => {
     const userAgent = req.get('User-Agent') || '';
     // Detect social media crawlers and preview bots
