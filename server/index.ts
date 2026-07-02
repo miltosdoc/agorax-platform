@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { apiLimit, authLimit } from './utils/rate-limiter';
 import { logger } from './utils/logger';

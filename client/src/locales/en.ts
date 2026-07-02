@@ -179,6 +179,12 @@ const en: TranslationDictionary = {
   'amendment.communitySignal.flaggedForSortition': 'Flagged for sortition body',
   'amendment.communitySignal.disagree': '⬆️ Disagree',
   'amendment.communitySignal.agree': '⬇️ Agree',
+  'amendment.tree': 'Amendment Tree',
+  'amendment.treeView': 'Tree view',
+  'amendment.listView': 'List view',
+  'amendment.originalProposal': 'Original Proposal',
+  'amendment.noAmendments': 'No amendments yet',
+  'amendment.communityOverride': 'Community can override with 30% threshold',
 
   // Sortition
 
@@ -743,6 +749,26 @@ const en: TranslationDictionary = {
   'dashboard.activeSortitions': 'Active Sortitions',
   'dashboard.recentActivity': 'Recent Activity',
   'dashboard.viewAllProposals': 'Browse all proposals',
+  'dashboard.impactMetrics': 'Impact Metrics',
+  'general.viewAll': 'View All',
+
+  // Impact metrics
+  'metrics.totalProposals': 'Total Proposals',
+  'metrics.implemented': 'Implemented',
+  'metrics.participants': 'Participants',
+  'metrics.totalVotes': 'Total Votes',
+  'metrics.proposalPipeline': 'Proposal Pipeline',
+  'metrics.inDeliberation': 'in deliberation',
+  'metrics.inVoting': 'in voting',
+  'metrics.budgetAllocated': 'allocated from citizen decisions',
+
+  // AI validation badge
+  'proposal.aiValidation': 'AI Validation',
+  'proposal.routing': 'Routing',
+  'proposal.validationDimensions': 'Validation Dimensions',
+  'proposal.viewReasoning': 'View AI Reasoning',
+  'proposal.disagreeWithAI': 'Disagree with AI assessment?',
+  'proposal.flagExplanation': 'Flag AI errors to improve the system',
 
   // Vote panel
   'vote.panelTitle': 'Final Ratification Vote',
@@ -809,6 +835,18 @@ const en: TranslationDictionary = {
   'sortition.attendance.status.declined': 'Declined',
   'sortition.attendance.status.no-show': 'No-show',
   'sortition.attendance.status.completed': 'Completed',
+
+  // Sortition role card
+  'sortition.roleCard': 'Sortition Role Card',
+  'sortition.selectedJuror': 'Selected Juror',
+  'sortition.selected': 'Selected',
+  'sortition.due': 'Due',
+  'sortition.selectionCriteria': 'Selection Criteria',
+  'sortition.verificationHash': 'Verification Hash',
+  'sortition.responsibilities': 'Your Responsibilities',
+  'sortition.responsibilityScore': 'Score the proposal on a 1-100 scale',
+  'sortition.responsibilityDeliberate': 'Read the proposal and amendments carefully',
+  'sortition.responsibilityDeadline': 'Submit your score before the deadline',
 
   // Global search
   'search.placeholder': 'Search proposals, members, communities…',

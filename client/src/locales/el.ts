@@ -179,6 +179,12 @@ const el: TranslationDictionary = {
   'amendment.communitySignal.flaggedForSortition': 'Σημειώθηκε για κληρωτό σώμα',
   'amendment.communitySignal.disagree': '⬆️ Διαφωνώ',
   'amendment.communitySignal.agree': '⬇️ Συμφωνώ',
+  'amendment.tree': 'Δέντρο Τροπολογιών',
+  'amendment.treeView': 'Προβολή δέντρου',
+  'amendment.listView': 'Προβολή λίστας',
+  'amendment.originalProposal': 'Αρχική Πρόταση',
+  'amendment.noAmendments': 'Δεν υπάρχουν τροπολογίες ακόμη',
+  'amendment.communityOverride': 'Η κοινότητα μπορεί να ανατρέψει με όριο 30%',
 
   // Sortition
 
@@ -743,6 +749,26 @@ const el: TranslationDictionary = {
   'dashboard.activeSortitions': 'Ενεργές Κληρώσεις',
   'dashboard.recentActivity': 'Πρόσφατη Δραστηριότητα',
   'dashboard.viewAllProposals': 'Όλες οι προτάσεις',
+  'dashboard.impactMetrics': 'Μετρήσεις Αντίκτυπου',
+  'general.viewAll': 'Προβολή όλων',
+
+  // Impact metrics
+  'metrics.totalProposals': 'Συνολικές Προτάσεις',
+  'metrics.implemented': 'Υλοποιήθηκαν',
+  'metrics.participants': 'Συμμετέχοντες',
+  'metrics.totalVotes': 'Συνολικές Ψήφοι',
+  'metrics.proposalPipeline': 'Πορεία Προτάσεων',
+  'metrics.inDeliberation': 'σε διαβούλευση',
+  'metrics.inVoting': 'σε ψηφοφορία',
+  'metrics.budgetAllocated': 'κατανεμήθηκαν από αποφάσεις πολιτών',
+
+  // AI validation badge
+  'proposal.aiValidation': 'Επικύρωση AI',
+  'proposal.routing': 'Δρομολόγηση',
+  'proposal.validationDimensions': 'Διαστάσεις Επικύρωσης',
+  'proposal.viewReasoning': 'Προβολή σκεπτικού AI',
+  'proposal.disagreeWithAI': 'Διαφωνείτε με την αξιολόγηση του AI;',
+  'proposal.flagExplanation': 'Επισημάνετε σφάλματα του AI για τη βελτίωση του συστήματος',
 
   // Dashboard — active assignments
 
@@ -809,6 +835,18 @@ const el: TranslationDictionary = {
   'sortition.attendance.status.declined': 'Απορρίφθηκε',
   'sortition.attendance.status.no-show': 'Δεν εμφανίστηκε',
   'sortition.attendance.status.completed': 'Ολοκληρώθηκε',
+
+  // Sortition role card
+  'sortition.roleCard': 'Κάρτα Ρόλου Κλήρωσης',
+  'sortition.selectedJuror': 'Επιλεγμένος Ένορκος',
+  'sortition.selected': 'Επιλέχθηκε',
+  'sortition.due': 'Προθεσμία',
+  'sortition.selectionCriteria': 'Κριτήρια Επιλογής',
+  'sortition.verificationHash': 'Hash Επαλήθευσης',
+  'sortition.responsibilities': 'Οι Υποχρεώσεις σας',
+  'sortition.responsibilityScore': 'Βαθμολογήστε την πρόταση σε κλίμακα 1-100',
+  'sortition.responsibilityDeliberate': 'Διαβάστε προσεκτικά την πρόταση και τις τροπολογίες',
+  'sortition.responsibilityDeadline': 'Υποβάλετε τη βαθμολογία σας πριν από την προθεσμία',
 
   // Global search
   'search.placeholder': 'Αναζήτηση προτάσεων, μελών, κοινοτήτων…',
