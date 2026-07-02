@@ -12,7 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, Vote, Users, FileText, Eye, Trash2, Mic } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, Trash2, Mic } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
@@ -49,21 +50,6 @@ interface Proposal {
 }
 
 type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
-
-function defaultTabForStatus(status: string): string {
-  switch (status) {
-    case 'author_review':
-    case 'community_signal':
-      return 'amendments';
-    case 'sortition_synthesis':
-      return 'sortition';
-    case 'voting':
-    case 'decided':
-      return 'votes';
-    default:
-      return 'overview';
-  }
-}
 
 function categoryFromScore(score: number | null): ValidationCategory | null {
   if (score === null) return null;
@@ -201,15 +187,6 @@ export default function ProposalDetailPage() {
         {t('general.back')}
       </Button>
 
-      {/* Next Action Panel */}
-      <div className="mb-4">
-        <NextActionPanel
-          status={proposal.status}
-          proposalId={proposal.id}
-          userIsAuthor={userIsAuthor}
-        />
-      </div>
-
       {/* While the LLM is scoring (status='review'), tell the user what's
           happening — the page polls every 3s and updates itself. */}
       {proposal.status === 'review' && (
@@ -219,64 +196,63 @@ export default function ProposalDetailPage() {
         </div>
       )}
 
-      {/* Lifecycle Stepper */}
-      <Card className="mb-4">
-        <CardContent className="py-4">
-          <LifecycleStepper status={proposal.status} />
-        </CardContent>
-      </Card>
+      {/* Slim lifecycle strip — the one piece of process chrome above the fold */}
+      <div className="mb-6 rounded-lg border bg-background px-4 py-3">
+        <LifecycleStepper status={proposal.status} />
+      </div>
 
-      {/* Proposal Content */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-xl mb-2">{proposal.question}</CardTitle>
-              <CardDescription>
-                {t('proposal.by')} {proposal.authorName || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2 self-start">
-              <ShareButton
-                url={`/proposals/${proposal.id}`}
-                title={proposal.question}
-                text={proposal.solution ?? undefined}
-                iconOnly
-              />
-              <StatusBadge status={proposal.status} />
-              {userIsAuthor && proposal.status === 'draft' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 hover:bg-red-50"
-                  onClick={async () => {
-                    if (!window.confirm(t('proposal.deleteConfirm') || 'Delete this draft proposal?')) return;
-                    try {
-                      const res = await fetch(`/api/proposals/${proposal.id}`, {
-                        method: 'DELETE',
-                        credentials: 'include',
-                      });
-                      if (!res.ok && res.status !== 204) {
-                        const data = await res.json().catch(() => ({}));
-                        throw new Error(data.message || `HTTP ${res.status}`);
+      {/* Two-column deliberation layout: the proposal text and the people
+          (debate + amendments) own the main column; process widgets (next
+          action, votes, sortition, AI score) live in a sticky sidebar. */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-8 lg:items-start">
+        <div className="lg:col-span-2 min-w-0">
+          {/* Proposal header — no card chrome, generous type */}
+          <header className="mb-6">
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-2xl md:text-3xl font-semibold leading-snug flex-1 min-w-0">
+                {proposal.question}
+              </h1>
+              <div className="flex items-center gap-2 shrink-0 pt-1">
+                <ShareButton
+                  url={`/proposals/${proposal.id}`}
+                  title={proposal.question}
+                  text={proposal.solution ?? undefined}
+                  iconOnly
+                />
+                {userIsAuthor && proposal.status === 'draft' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 hover:bg-red-50"
+                    onClick={async () => {
+                      if (!window.confirm(t('proposal.deleteConfirm') || 'Delete this draft proposal?')) return;
+                      try {
+                        await apiRequest('DELETE', `/api/proposals/${proposal.id}`);
+                        setLocation('/home');
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : String(err));
                       }
-                      setLocation('/home');
-                    } catch (err) {
-                      alert(err instanceof Error ? err.message : String(err));
-                    }
-                  }}
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  {t('proposal.delete') || 'Delete'}
-                </Button>
-              )}
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    {t('proposal.delete') || 'Delete'}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="prose max-w-none">
-            <h4 className="text-sm font-medium text-muted-foreground">{t('proposal.proposedSolution')}</h4>
-            <p className="whitespace-pre-wrap">{proposal.solution}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>
+                {t('proposal.by')} {proposal.authorName || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
+              </span>
+              <StatusBadge status={proposal.status} />
+              {proposal.category && <Badge variant="secondary">{proposal.category}</Badge>}
+            </div>
+          </header>
+
+          {/* Proposal text — the star of the page */}
+          <section className="mb-8">
+            <h2 className="text-sm font-medium text-muted-foreground mb-2">{t('proposal.proposedSolution')}</h2>
+            <p className="whitespace-pre-wrap text-base leading-relaxed">{proposal.solution}</p>
 
             {sortitionRevisions.length > 0 && (
               <div className="mt-4 p-4 border rounded space-y-3">
@@ -305,8 +281,8 @@ export default function ProposalDetailPage() {
                       variant="outline"
                       onClick={async () => {
                         try {
-                          const resp = await fetch(`/api/proposals/${proposal.id}/merge`, { method: 'POST', credentials: 'include' });
-                          if (resp.ok) window.location.reload();
+                          await apiRequest('POST', `/api/proposals/${proposal.id}/merge`);
+                          window.location.reload();
                         } catch {}
                       }}
                     >
@@ -318,12 +294,86 @@ export default function ProposalDetailPage() {
               </div>
             )}
 
+            <div className="mt-4">
+              <ProposalMediaPreview proposalId={proposal.id} />
+            </div>
+          </section>
+
+          {/* Participation — the people's surface, always visible */}
+          <section>
+            <Tabs defaultValue={['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
+              <TabsList className="grid w-full grid-cols-3 h-auto gap-1">
+                <TabsTrigger value="debate" className="gap-1 py-2">
+                  <MessageSquare className="w-4 h-4 sm:mr-1" />
+                  <span className="text-xs sm:text-sm">{t('workspace.tabs.debate')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="amendments" className="gap-1 py-2">
+                  <FileText className="w-4 h-4 sm:mr-1" />
+                  <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="media" className="gap-1 py-2">
+                  <Mic className="w-4 h-4 sm:mr-1" />
+                  <span className="text-xs sm:text-sm">{t('media.tabLabel')}</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="debate">
+                <DebatePanel proposalId={proposal.id} />
+              </TabsContent>
+
+              <TabsContent value="amendments">
+                <AmendmentsPanel
+                  proposalId={proposal.id}
+                  proposalStatus={proposal.status}
+                  userIsAuthor={userIsAuthor}
+                />
+              </TabsContent>
+
+              <TabsContent value="media">
+                <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} />
+              </TabsContent>
+            </Tabs>
+          </section>
+        </div>
+
+        {/* Sidebar — process widgets, sticky on desktop */}
+        <aside className="mt-8 lg:mt-0 lg:col-span-1">
+          <div className="lg:sticky lg:top-20 space-y-4">
+            <NextActionPanel
+              status={proposal.status}
+              proposalId={proposal.id}
+              userIsAuthor={userIsAuthor}
+            />
+
+            {['voting', 'decided', 'archived'].includes(proposal.status) && (
+              <div>
+                <VotePanel
+                  proposalId={proposal.id}
+                  proposalStatus={proposal.status}
+                  proposalAuthorId={proposal.authorId}
+                  votingMode={proposal.votingMode}
+                  phaseDeadline={(proposal as any).phaseDeadline}
+                  onProposalAdvanced={handleProposalAdvanced}
+                />
+                {voteError && (
+                  <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
+                )}
+              </div>
+            )}
+
+            {['sortition_synthesis', 'voting', 'decided', 'archived'].includes(proposal.status) && (
+              <SortitionPanel
+                proposalId={proposal.id}
+                proposalStatus={proposal.status}
+              />
+            )}
+
             {(() => {
               const numericScore = proposal.llmScore != null ? Number(proposal.llmScore) : null;
               const score = Number.isFinite(numericScore) ? (numericScore as number) : null;
               if (score === null) {
                 return userIsAuthor ? (
-                  <div className="mt-4 p-4 border rounded">
+                  <div className="p-4 border rounded-lg">
                     <h4 className="text-sm font-medium mb-2">{t('proposal.llmValidation')}</h4>
                     <p className="text-sm text-muted-foreground mb-3">{t('proposal.llmNotYetValidated')}</p>
                     <Button size="sm" onClick={handleRevalidate} disabled={revalidating} data-testid="proposal-revalidate-empty">
@@ -336,7 +386,7 @@ export default function ProposalDetailPage() {
                 ) : null;
               }
               return (
-                <div className="mt-4" data-testid="proposal-llm-validation">
+                <div data-testid="proposal-llm-validation">
                   <AIValidationBadge
                     score={score}
                     feedback={proposal.llmFeedback || undefined}
@@ -349,113 +399,8 @@ export default function ProposalDetailPage() {
               );
             })()}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs: Overview, Debate, Amendments, Sortition, Votes.
-          Default tab follows the lifecycle phase so users land on the
-          relevant work surface for the proposal's current state. */}
-      <Tabs defaultValue={defaultTabForStatus(proposal.status)}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-3 md:grid-cols-6 h-auto gap-1">
-          <TabsTrigger value="overview" className="flex-col sm:flex-row gap-1 py-2">
-            <Eye className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('workspace.tabs.overview')}</span>
-          </TabsTrigger>
-          <TabsTrigger value="debate" className="flex-col sm:flex-row gap-1 py-2">
-            <MessageSquare className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('workspace.tabs.debate')}</span>
-          </TabsTrigger>
-          <TabsTrigger value="amendments" className="flex-col sm:flex-row gap-1 py-2">
-            <FileText className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
-          </TabsTrigger>
-          <TabsTrigger value="sortition" className="flex-col sm:flex-row gap-1 py-2">
-            <Users className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('workspace.tabs.sortition')}</span>
-          </TabsTrigger>
-          <TabsTrigger value="votes" className="flex-col sm:flex-row gap-1 py-2">
-            <Vote className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('workspace.tabs.votes')}</span>
-          </TabsTrigger>
-          <TabsTrigger value="media" className="flex-col sm:flex-row gap-1 py-2">
-            <Mic className="w-4 h-4 sm:mr-1" />
-            <span className="text-xs sm:text-sm">{t('media.tabLabel')}</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('workspace.tabs.overview')}</CardTitle>
-              <CardDescription>
-                {t('proposal.proposedSolution')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('proposal.questionLabel') || 'Ερώτημα'}</h4>
-                  <p className="whitespace-pre-wrap">{proposal.question}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('proposal.proposedSolution')}</h4>
-                  <p className="whitespace-pre-wrap">{proposal.solution}</p>
-                </div>
-                {proposal.finalText && (
-                  <div className="p-4 bg-muted rounded">
-                    <h4 className="text-sm font-medium mb-2">{t('proposal.finalTextSortition')}</h4>
-                    <p className="whitespace-pre-wrap">{proposal.finalText}</p>
-                  </div>
-                )}
-                {proposal.category && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-1">{t('proposal.category') || 'Κατηγορία'}</h4>
-                    <Badge variant="secondary">{proposal.category}</Badge>
-                  </div>
-                )}
-                <ProposalMediaPreview proposalId={proposal.id} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="debate">
-          <DebatePanel proposalId={proposal.id} />
-        </TabsContent>
-
-        <TabsContent value="amendments">
-          <AmendmentsPanel
-            proposalId={proposal.id}
-            proposalStatus={proposal.status}
-            userIsAuthor={userIsAuthor}
-          />
-        </TabsContent>
-
-        <TabsContent value="sortition">
-          <SortitionPanel
-            proposalId={proposal.id}
-            proposalStatus={proposal.status}
-          />
-        </TabsContent>
-
-        <TabsContent value="votes">
-          <VotePanel
-            proposalId={proposal.id}
-            proposalStatus={proposal.status}
-            proposalAuthorId={proposal.authorId}
-            votingMode={proposal.votingMode}
-            phaseDeadline={(proposal as any).phaseDeadline}
-            onProposalAdvanced={handleProposalAdvanced}
-          />
-          {voteError && (
-            <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="media">
-          <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} />
-        </TabsContent>
-      </Tabs>
+        </aside>
+      </div>
     </AppShell>
   );
 }
