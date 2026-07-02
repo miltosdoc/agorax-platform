@@ -86,6 +86,31 @@ async function buildHeaders(body: unknown, includeCsrf: boolean): Promise<Record
   return headers;
 }
 
+// State-changing request with automatic CSRF recovery: if the server rejects
+// the token (e.g. the cookie was cleared or went stale in a long-lived tab or
+// the Android webview), fetch a fresh token once and retry transparently
+// instead of surfacing "CSRF token missing or invalid" to the user.
+async function mutate<T>(method: string, url: string, body?: unknown): Promise<ApiResponse<T>> {
+  const doFetch = async () => fetch(url, {
+    method,
+    headers: await buildHeaders(body, true),
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: "include",
+  });
+  let res = await doFetch();
+  if (res.status === 403) {
+    let code: string | undefined;
+    try { code = (await res.clone().json())?.code; } catch { /* not JSON */ }
+    if (code === 'csrf_token_invalid') {
+      await fetch('/api/csrf', { credentials: 'include' }).catch(() => undefined);
+      res = await doFetch();
+    }
+  }
+  await throwIfResNotOk(res);
+  const data = await res.json();
+  return { data, status: res.status, headers: res.headers };
+}
+
 export const api = {
   async get<T>(url: string): Promise<ApiResponse<T>> {
     const res = await fetch(url, {
@@ -96,54 +121,19 @@ export const api = {
     return { data, status: res.status, headers: res.headers };
   },
 
-  async post<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
-    const headers = await buildHeaders(body, true);
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    return { data, status: res.status, headers: res.headers };
+  post<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    return mutate<T>("POST", url, body);
   },
 
-  async patch<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
-    const headers = await buildHeaders(body, true);
-    const res = await fetch(url, {
-      method: "PATCH",
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    return { data, status: res.status, headers: res.headers };
+  patch<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    return mutate<T>("PATCH", url, body);
   },
 
-  async put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
-    const headers = await buildHeaders(body, true);
-    const res = await fetch(url, {
-      method: "PUT",
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    return { data, status: res.status, headers: res.headers };
+  put<T>(url: string, body?: unknown): Promise<ApiResponse<T>> {
+    return mutate<T>("PUT", url, body);
   },
 
-  async delete<T>(url: string): Promise<ApiResponse<T>> {
-    const headers = await buildHeaders(undefined, true);
-    const res = await fetch(url, {
-      method: "DELETE",
-      headers,
-      credentials: "include",
-    });
-    await throwIfResNotOk(res);
-    const data = await res.json();
-    return { data, status: res.status, headers: res.headers };
+  delete<T>(url: string): Promise<ApiResponse<T>> {
+    return mutate<T>("DELETE", url);
   },
 };

@@ -77,18 +77,33 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  if (!SAFE_METHODS.has(method.toUpperCase())) {
-    await ensureCsrfCookie();
+  const doFetch = async (): Promise<Response> => {
+    if (!SAFE_METHODS.has(method.toUpperCase())) {
+      await ensureCsrfCookie();
+    }
+    const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+    const csrf = readCookie(CSRF_COOKIE);
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+    return fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
+  };
+
+  let res = await doFetch();
+  // Automatic CSRF recovery: refresh the token once and retry instead of
+  // surfacing "CSRF token missing or invalid" (stale cookie in a long-lived
+  // tab or the Android webview).
+  if (res.status === 403) {
+    let code: string | undefined;
+    try { code = (await res.clone().json())?.code; } catch { /* not JSON */ }
+    if (code === 'csrf_token_invalid') {
+      await fetch('/api/csrf', { credentials: 'include' }).catch(() => undefined);
+      res = await doFetch();
+    }
   }
-  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  const csrf = readCookie(CSRF_COOKIE);
-  if (csrf) headers["X-CSRF-Token"] = csrf;
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
 
   await throwIfResNotOk(res);
   return res;

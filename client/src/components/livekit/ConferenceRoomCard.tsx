@@ -148,7 +148,11 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
   // Pre-join state
   const [connecting, setConnecting] = useState(false);
   const [ending, setEnding] = useState(false);
-  const [joined, setJoined] = useState(false);
+  // Survive page refreshes: if this tab was in the call, rejoin automatically.
+  const rejoinKey = `livekit-rejoin-${roomId}`;
+  const [joined, setJoined] = useState(() => {
+    try { return sessionStorage.getItem(rejoinKey) === '1'; } catch { return false; }
+  });
   const [isHost, setIsHost] = useState(false);
 
   // Room state
@@ -172,6 +176,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
       try { roomRef.current.disconnect(); } catch { /* noop */ }
       roomRef.current = null;
     }
+    try { sessionStorage.removeItem(rejoinKey); } catch { /* noop */ }
     setJoined(false);
     setLocalParticipant(null);
     setRemoteParticipants([]);
@@ -240,6 +245,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
         else if (status === 403) errorToast(t('livekit.joinFailed'), `403: ${err?.message}`);
         else if (status === 410) errorToast(t('livekit.joinFailed'), 'Room is closed.');
         else errorToast(t('livekit.joinFailed'), err?.message ?? String(err));
+        try { sessionStorage.removeItem(rejoinKey); } catch { /* noop */ }
         setJoined(false);
       });
 
@@ -294,6 +300,7 @@ export function ConferenceRoomCard({ roomId, title, description, badge, viewerIs
     // Defer to avoid flicker; the useEffect above handles actual connection
     setTimeout(() => {
       setConnecting(false);
+      try { sessionStorage.setItem(rejoinKey, '1'); } catch { /* noop */ }
       setJoined(true);
     }, 100);
   };
