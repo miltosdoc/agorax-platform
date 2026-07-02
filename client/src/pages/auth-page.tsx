@@ -25,6 +25,14 @@ import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import logoImage from "../assets/logo.png";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
+// Inside the Capacitor Android wrapper, Google OAuth cannot complete: the
+// external accounts.google.com navigation opens the system browser, and the
+// resulting session cookie lands there instead of in the app's webview. Hide
+// the Google buttons in the app until a deep-link token handoff exists.
+function isNativeApp(): boolean {
+  return !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
 async function getFingerprint(): Promise<string | undefined> {
   try {
     const fp = await FingerprintJS.load();
@@ -259,6 +267,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           {loginMutation.isPending ? t('general.loading') + "..." : t('auth.login')}
         </Button>
 
+        {!isNativeApp() && (<>
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <Separator className="w-full" />
@@ -284,6 +293,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           <FcGoogle className="h-5 w-5" />
           {t('auth.signInWithGoogle')}
         </Button>
+        </>)}
       </form>
     </Form>
   );
@@ -411,6 +421,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             : t('auth.register')}
         </Button>
 
+        {!isNativeApp() && (<>
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <Separator className="w-full" />
@@ -436,6 +447,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
           <FcGoogle className="h-5 w-5" />
           {t('auth.signUpWithGoogle')}
         </Button>
+        </>)}
       </form>
     </Form>
   );
