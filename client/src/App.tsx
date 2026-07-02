@@ -41,6 +41,7 @@ import { CommunityForm } from "@/components/community/community-form";
 import { CommunityList } from "@/components/community/community-list";
 import { ProposalForm } from "@/components/proposal/proposal-form";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { useMobileAuthDeepLink } from "./hooks/use-mobile-auth";
 import { I18nProvider } from "./hooks/use-translation";
 import { ProtectedRoute } from "./lib/protected-route";
 import BottomNav from "@/components/layout/bottom-nav";
@@ -86,6 +87,7 @@ function CommunityFormPage() {
 
 function AppRouter() {
   const { user } = useAuth();
+  useMobileAuthDeepLink();
 
   return (
     <Router>

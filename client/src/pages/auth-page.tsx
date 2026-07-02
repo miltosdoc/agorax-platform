@@ -25,12 +25,20 @@ import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import logoImage from "../assets/logo.png";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
-// Inside the Capacitor Android wrapper, Google OAuth cannot complete: the
-// external accounts.google.com navigation opens the system browser, and the
-// resulting session cookie lands there instead of in the app's webview. Hide
-// the Google buttons in the app until a deep-link token handoff exists.
+// Inside the Capacitor Android wrapper, Google blocks OAuth in the webview,
+// so the flow runs in the system browser with mobile=1: the callback then
+// deep-links back into the app (agorax://auth?code=…) and the app exchanges
+// the one-time code for a webview session (see use-mobile-auth.ts).
 function isNativeApp(): boolean {
   return !!(window as any).Capacitor?.isNativePlatform?.();
+}
+
+function startGoogleAuth() {
+  const currentUrl = new URL(window.location.href);
+  const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
+  const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
+  const mobile = isNativeApp() ? '&mobile=1' : '';
+  window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}${mobile}`;
 }
 
 async function getFingerprint(): Promise<string | undefined> {
@@ -267,7 +275,6 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           {loginMutation.isPending ? t('general.loading') + "..." : t('auth.login')}
         </Button>
 
-        {!isNativeApp() && (<>
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <Separator className="w-full" />
@@ -283,17 +290,11 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           type="button"
           variant="outline"
           className="w-full flex items-center justify-center gap-2"
-          onClick={() => {
-            const currentUrl = new URL(window.location.href);
-            const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
-            const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
-            window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}`;
-          }}
+          onClick={startGoogleAuth}
         >
           <FcGoogle className="h-5 w-5" />
           {t('auth.signInWithGoogle')}
         </Button>
-        </>)}
       </form>
     </Form>
   );
@@ -421,7 +422,6 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             : t('auth.register')}
         </Button>
 
-        {!isNativeApp() && (<>
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <Separator className="w-full" />
@@ -437,17 +437,11 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
           type="button"
           variant="outline"
           className="w-full flex items-center justify-center gap-2"
-          onClick={() => {
-            const currentUrl = new URL(window.location.href);
-            const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
-            const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
-            window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}`;
-          }}
+          onClick={startGoogleAuth}
         >
           <FcGoogle className="h-5 w-5" />
           {t('auth.signUpWithGoogle')}
         </Button>
-        </>)}
       </form>
     </Form>
   );

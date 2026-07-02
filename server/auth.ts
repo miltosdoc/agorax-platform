@@ -25,7 +25,35 @@ import { consentTextHash } from "./utils/consent-hash";
 declare module "express-session" {
   interface SessionData {
     returnTo?: string;
+    mobileAuth?: boolean;
   }
+}
+
+// ─── Mobile OAuth handoff ────────────────────────────────────────────────────
+// Google blocks OAuth inside webviews, so the Android app completes the flow
+// in the system browser. The callback then redirects to agorax://auth?code=…
+// which reopens the app; the app exchanges the one-time code for a session
+// via POST /api/auth/mobile-exchange. Codes are single-use and short-lived.
+const MOBILE_CODE_TTL_MS = 2 * 60 * 1000;
+const mobileAuthCodes = new Map<string, { userId: number; returnTo: string; expires: number }>();
+
+function issueMobileAuthCode(userId: number, returnTo: string): string {
+  // Opportunistic sweep so the map can't grow unbounded
+  const now = Date.now();
+  for (const [k, v] of mobileAuthCodes) {
+    if (v.expires < now) mobileAuthCodes.delete(k);
+  }
+  const code = randomBytes(32).toString("hex");
+  mobileAuthCodes.set(code, { userId, returnTo, expires: now + MOBILE_CODE_TTL_MS });
+  return code;
+}
+
+function consumeMobileAuthCode(code: string): { userId: number; returnTo: string } | null {
+  const entry = mobileAuthCodes.get(code);
+  if (!entry) return null;
+  mobileAuthCodes.delete(code);
+  if (entry.expires < Date.now()) return null;
+  return { userId: entry.userId, returnTo: entry.returnTo };
 }
 
 declare global {
@@ -504,6 +532,9 @@ export function setupAuth(app: Express) {
     if (req.query.returnTo) {
       req.session.returnTo = req.query.returnTo as string;
     }
+    // The Android app appends mobile=1: the flow runs in the system browser
+    // and must hand the session back to the app via deep link (see callback).
+    req.session.mobileAuth = req.query.mobile === '1';
 
     passport.authenticate('google', {
       scope: ['profile', 'email']
@@ -529,9 +560,38 @@ export function setupAuth(app: Express) {
         const returnTo = req.session.returnTo || '/feed';
         delete req.session.returnTo;
 
+        // Mobile flow: this response renders in the system browser, but the
+        // session must reach the app's webview. Hand over a one-time code via
+        // the agorax:// deep link, which Android routes back into the app.
+        if (req.session.mobileAuth) {
+          delete req.session.mobileAuth;
+          const code = issueMobileAuthCode(user.id, returnTo);
+          return res.redirect(`agorax://auth?code=${code}`);
+        }
+
         // Redirect to the original URL or homepage after successful authentication
         return res.redirect(returnTo);
       });
     })(req, res, next);
+  });
+
+  // Exchange a deep-link one-time code for a webview session (mobile app).
+  app.post('/api/auth/mobile-exchange', authLimiter, async (req, res) => {
+    const code = typeof req.body?.code === 'string' ? req.body.code : '';
+    const entry = code ? consumeMobileAuthCode(code) : null;
+    if (!entry) {
+      return res.status(401).json({ message: 'Invalid or expired code' });
+    }
+    const user = await storage.getUser(entry.userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid or expired code' });
+    }
+    req.login(user, (err) => {
+      if (err) {
+        return res.status(500).json({ message: 'Login failed' });
+      }
+      const { password: _pw, ...safeUser } = user as any;
+      res.json({ ...safeUser, returnTo: entry.returnTo });
+    });
   });
 }
