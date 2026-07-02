@@ -778,6 +778,9 @@ const en: TranslationDictionary = {
 
   // Vote panel
   'vote.panelTitle': 'Final Ratification Vote',
+  'vote.ballotPendingTitle': 'Your ballot is sealed — casting soon',
+  'vote.ballotPendingBody': 'For your vote to stay unlinkable to your identity, a privacy delay separates ballot issuance from casting. Your vote is cast automatically when the timer ends — you can keep this page open or come back later; the ballot is saved in this browser.',
+  'vote.ballotCasting': 'Casting your ballot…',
   'vote.castYourVote': 'Cast your vote on this proposal:',
   'vote.changeYourVote': 'Update your vote:',
   'vote.changeVote': 'Change vote',
@@ -1184,7 +1187,7 @@ const en: TranslationDictionary = {
   'workspace.action.draft': 'This proposal is still a draft. Submit it to start AI validation.',
   'workspace.action.review': 'Awaiting AI validation. The proposal will be routed automatically based on its score.',
   'workspace.action.author_review': 'The author is reviewing community amendments.',
-  'workspace.action.community_signal': 'The community is voting on rejected amendments.',
+  'workspace.action.community_signal': 'Community signal: members vote ⬆/⬇ on the amendments the author rejected. Amendments with enough support go to the citizen jury (sortition); when the timer ends the proposal advances automatically.',
   'workspace.action.sortition_synthesis': 'A citizen jury is composing the final text.',
   'workspace.action.voting': 'The community is voting on the final text. Cast your vote in the Votes tab.',
   'workspace.action.decided': 'A decision has been reached.',

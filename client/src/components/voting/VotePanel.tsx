@@ -19,10 +19,14 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import {
-  castAnonymousVote,
+  requestAnonymousBallot,
+  castPendingBallot,
+  getPendingBallot,
+  clearPendingBallot,
   getReceipt,
   type AnonymousReceipt,
   type AnonymousChoice,
+  type PendingBallot,
 } from '@/lib/anonymous-vote';
 import {
   AlertDialog,
@@ -102,6 +106,11 @@ export default function VotePanel({
   // Anonymous mode: a local receipt + a confirm modal before the one-shot vote.
   const [localReceipt, setLocalReceipt] = useState<AnonymousReceipt | undefined>(() => getReceipt(proposalId));
   const [pendingAnon, setPendingAnon] = useState<AnonymousChoice | null>(null);
+  // A blind-signed ballot waiting out the anonymity delay (see
+  // anonymous-vote.ts). Survives reloads via localStorage; cast
+  // automatically the moment it matures while this panel is mounted.
+  const [pendingBallot, setPendingBallot] = useState<PendingBallot | undefined>(() => getPendingBallot(proposalId));
+  const [ballotSecondsLeft, setBallotSecondsLeft] = useState<number | null>(null);
 
   const isAnonymous = votingMode === 'anonymous';
   const isVoting = proposalStatus === 'voting';
@@ -175,9 +184,10 @@ export default function VotePanel({
     setVoting(true);
     setError(null);
     try {
-      const receipt = await castAnonymousVote(proposalId, choice);
-      setLocalReceipt(receipt);
-      await refresh();
+      // Phase 1: obtain the blind-signed ballot. It matures after the
+      // anonymity delay and is cast automatically by the effect below.
+      const ballot = await requestAnonymousBallot(proposalId, choice);
+      setPendingBallot(ballot);
     } catch (e) {
       const message = e instanceof Error ? e.message : t('proposal.voteFailed');
       setError(message);
@@ -185,6 +195,45 @@ export default function VotePanel({
       setVoting(false);
     }
   };
+
+  // Countdown + auto-cast for a pending anonymous ballot. Ticks every
+  // second; when the ballot matures it is cast without user action.
+  useEffect(() => {
+    if (!pendingBallot) {
+      setBallotSecondsLeft(null);
+      return;
+    }
+    let casting = false;
+    const tick = async () => {
+      const msLeft = pendingBallot.minCastTime - Date.now();
+      setBallotSecondsLeft(Math.max(0, Math.ceil(msLeft / 1000)));
+      if (msLeft <= 0 && !casting) {
+        casting = true;
+        try {
+          const receipt = await castPendingBallot(pendingBallot);
+          setLocalReceipt(receipt);
+          setPendingBallot(undefined);
+          await refresh();
+        } catch (e) {
+          casting = false; // server may still say "not yet" — retry next tick
+          const message = e instanceof Error ? e.message : t('proposal.voteFailed');
+          // A double-spend rejection means the ballot was already counted
+          // (e.g. cast from another tab) — drop it quietly.
+          if (/already|duplicate/i.test(message)) {
+            clearPendingBallot(proposalId);
+            setPendingBallot(undefined);
+            await refresh();
+          } else {
+            setError(message);
+          }
+        }
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingBallot, proposalId]);
 
   const handleFinalize = async () => {
     if (finalizing) return;
@@ -305,7 +354,26 @@ export default function VotePanel({
           </div>
         )}
 
-        {showVoteButtons && user && (
+        {/* Pending anonymous ballot: the anonymity delay is counting down.
+            The vote is cast automatically when the ballot matures. */}
+        {pendingBallot && !localReceipt && (
+          <div className="rounded-md border border-blue-200 bg-blue-50/70 px-4 py-3 space-y-1" data-testid="pending-ballot">
+            <div className="text-sm font-medium text-blue-900">
+              {t('vote.ballotPendingTitle')}
+            </div>
+            <p className="text-xs text-blue-900/80">{t('vote.ballotPendingBody')}</p>
+            {ballotSecondsLeft !== null && ballotSecondsLeft > 0 && (
+              <div className="text-lg font-semibold tabular-nums text-blue-900">
+                {Math.floor(ballotSecondsLeft / 60)}:{String(ballotSecondsLeft % 60).padStart(2, '0')}
+              </div>
+            )}
+            {ballotSecondsLeft === 0 && (
+              <div className="text-sm text-blue-900">{t('vote.ballotCasting')}</div>
+            )}
+          </div>
+        )}
+
+        {showVoteButtons && user && !pendingBallot && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
               {userVoted ? t('vote.changeYourVote') : t('vote.castYourVote')}
