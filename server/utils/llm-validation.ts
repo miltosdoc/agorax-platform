@@ -96,8 +96,11 @@ function fallbackResult(): LLMValidationResult {
   };
 }
 
+// Gate: proposals scoring below 60 go back to the author for revision;
+// 60 and above advance into the lifecycle (author review → community
+// signal → sortition/voting). >90 is flagged auto_approve quality.
 function categorize(score: number): LLMValidationResult['category'] {
-  if (score < 20) return 'return';
+  if (score < 60) return 'return';
   if (score > 90) return 'auto_approve';
   return 'sortition';
 }

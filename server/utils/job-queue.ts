@@ -19,13 +19,14 @@ import { sql } from 'drizzle-orm';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type JobType = 
+export type JobType =
   | 'structure_proposal'    // LLM proposal structuring
   | 'send_notification'     // Notification delivery
   | 'create_sortition'      // Sortition body creation
   | 'recalculate_score'     // Democracy score recalculation
   | 'cleanup_expired'       // Cleanup expired sessions/votes
-  | 'sortition_timeout';    // Sortition deadline sweep & completion
+  | 'sortition_timeout'     // Sortition deadline sweep & completion
+  | 'phase_auto_advance';   // Advance proposals past expired phase deadlines
 
 export interface JobPayload {
   type: JobType;

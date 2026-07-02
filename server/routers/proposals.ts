@@ -32,7 +32,7 @@ import { createServer, type Server } from 'http';
  * private backends seal the tally (yes/no/abstain are 0 and `sealed` is true)
  * until the election closes.
  */
-async function computeVoteResults(
+export async function computeVoteResults(
   proposal: { communityId: number },
   view: VoterView,
 ) {
