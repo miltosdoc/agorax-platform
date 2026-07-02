@@ -40,6 +40,10 @@ const EXEMPT_PATH_PATTERNS: RegExp[] = [
   /^\/api\/panel\/register$/,
   /^\/api\/panel\/profile$/,
   /^\/api\/surveys\/\d+\/respond$/,
+  // Leave beacon: fired via navigator.sendBeacon / keepalive fetch on
+  // pagehide, which cannot carry custom headers. It only records a
+  // participation timestamp for the session user — nothing to forge.
+  /^\/api\/livekit\/rooms\/\d+\/leave$/,
 ];
 
 function newToken(): string {

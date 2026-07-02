@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight, AlertCircle, CheckCircle2, Clock, Zap, Loader2 } from 'lucide-react';
 import { getStatusForProposal, STATUS_MAP } from '@/lib/proposal-status';
 import { useTranslation } from '@/hooks/use-translation';
+import { apiRequest } from '@/lib/queryClient';
 import type { ProposalState } from '@shared/proposal-lifecycle';
 
 interface NextActionPanelProps {
@@ -39,14 +40,7 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await fetch(`/api/proposals/${proposalId}/submit`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || `HTTP ${res.status}`);
-      }
+      await apiRequest('POST', `/api/proposals/${proposalId}/submit`);
       window.location.reload();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : String(err));

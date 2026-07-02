@@ -149,7 +149,6 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
           <div className="flex items-center gap-3 flex-wrap">
             <Button
               type="button"
-              variant="secondary"
               size="sm"
               onClick={handleAiDraft}
               disabled={aiLoading || aiIntent.trim().length < 10}
