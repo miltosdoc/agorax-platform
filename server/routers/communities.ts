@@ -352,6 +352,12 @@ export function registerCommunitiesRoutes(app: Express): void {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.user!.id;
+      // Founders can't leave — the community would be orphaned. They must
+      // transfer or delete the community instead.
+      const role = await communityRepo.getCommunityMemberRole(communityId, userId);
+      if (role === 'founder') {
+        return res.status(409).json({ message: "Founders cannot leave their community" });
+      }
       await communityRepo.removeCommunityMember(communityId, userId);
       res.json({ success: true });
     } catch (error) {

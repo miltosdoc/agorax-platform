@@ -1159,6 +1159,8 @@ const el: TranslationDictionary = {
   'community.role.admin': 'Διαχειριστής',
   'community.role.member': 'Μέλος',
   'community.join': 'Εγγραφή',
+  'community.leave': 'Αποχώρηση',
+  'community.leave_confirm': 'Να αποχωρήσετε από αυτή την κοινότητα; Μπορείτε να επανεγγραφείτε αργότερα, ανάλογα με την πολιτική εγγραφής της.',
   'community.apply_to_join': 'Αίτηση εγγραφής',
   'community.request_pending': 'Αίτηση σε εκκρεμότητα',
   'community.invite_only': 'Μόνο με πρόσκληση',

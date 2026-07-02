@@ -1159,6 +1159,8 @@ const en: TranslationDictionary = {
   'community.role.admin': 'Admin',
   'community.role.member': 'Member',
   'community.join': 'Join',
+  'community.leave': 'Leave community',
+  'community.leave_confirm': 'Leave this community? You can rejoin later depending on its join policy.',
   'community.apply_to_join': 'Apply to join',
   'community.request_pending': 'Request pending',
   'community.invite_only': 'Invite only',

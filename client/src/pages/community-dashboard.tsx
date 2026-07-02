@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic, LogOut } from 'lucide-react';
 import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
 import { ActiveCallBanner } from '@/components/livekit/ActiveCallBanner';
 import { api } from '@/lib/api';
@@ -172,7 +172,18 @@ export default function CommunityDashboardPage() {
     );
   }
 
-  const { community, proposals, memberCount, canManageSettings } = summary;
+  const { community, proposals, memberCount, canManageSettings, currentUserRole } = summary;
+
+  async function handleLeave() {
+    if (!communityId) return;
+    if (!window.confirm(t('community.leave_confirm') || 'Να αποχωρήσετε από αυτή την κοινότητα;')) return;
+    try {
+      await api.delete(`/api/communities/${communityId}/members`);
+      window.location.reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to leave community');
+    }
+  }
   const metrics = getCommunityDashboardMetrics({ memberCount, proposals });
   const democracyScoreAvailable = hasDemocracyScore(community.democracyScore);
   const democracyScore = democracyScoreAvailable ? Number(community.democracyScore) : null;
@@ -236,6 +247,19 @@ export default function CommunityDashboardPage() {
                 size="sm"
                 variant="outline"
               />
+              {/* Founders can't leave — they'd orphan the community. */}
+              {user && isMember && currentUserRole !== 'founder' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:bg-red-50"
+                  onClick={handleLeave}
+                  data-testid="community-leave"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  {t('community.leave') || 'Αποχώρηση'}
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
