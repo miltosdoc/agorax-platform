@@ -357,6 +357,12 @@ const en: TranslationDictionary = {
   // Proposal Form
   'proposal.submit_title': 'Submit Proposal',
   'proposal.submit_description': 'Submit a proposal for your community. Each proposal must include a question (the problem) and a solution.',
+  'proposal.ai_intent_label': 'Describe your idea in plain words',
+  'proposal.ai_intent_placeholder': 'e.g. My neighborhood has no bike lanes and children are at risk…',
+  'proposal.ai_generate': 'Fill in with AI',
+  'proposal.ai_generating': 'Generating…',
+  'proposal.ai_hint': 'The AI fills the fields below — review and edit before submitting.',
+  'proposal.ai_failed': 'AI drafting failed, please try again.',
   'proposal.question_label': 'Question',
   'proposal.question_placeholder': 'What problem do you want to solve?',
   'proposal.question_hint': 'Describe the problem or issue you want to investigate.',

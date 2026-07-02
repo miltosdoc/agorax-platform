@@ -21,6 +21,8 @@ import {
   castProposalVoteSchema,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState } from '@shared/proposal-lifecycle';
+import { compileProposal } from '../utils/proposal-compiler';
+import { isLlmConfigured } from '../utils/llm-client';
 import type { VoterView } from '../voting';
 import { createServer, type Server } from 'http';
 
@@ -154,6 +156,25 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update proposal" });
     }
   });
+  // AI-assisted drafting: natural-language intent → editable form fields.
+  // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
+  // author edits before submitting — the validation gate still runs on submit.
+  app.post("/api/proposals/compile", requireAuth, async (req: any, res) => {
+    const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
+    if (intent.length < 10 || intent.length > 2000) {
+      return res.status(400).json({ message: 'intent must be 10–2000 characters' });
+    }
+    if (!isLlmConfigured()) {
+      return res.status(503).json({ message: 'AI drafting is not available' });
+    }
+    try {
+      const draft = await compileProposal(intent);
+      res.json(draft);
+    } catch (err: any) {
+      res.status(502).json({ message: 'AI drafting failed, please try again' });
+    }
+  });
+
   app.post("/api/proposals/:id/submit", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);

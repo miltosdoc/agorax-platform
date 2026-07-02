@@ -357,6 +357,12 @@ const el: TranslationDictionary = {
   // Proposal Form
   'proposal.submit_title': 'Υπόβαλε Πρόταση',
   'proposal.submit_description': 'Υποβάλετε μια πρόταση για την κοινότητά σας. Κάθε πρόταση πρέπει να περιλαμβάνει ένα ερώτημα (το πρόβλημα) και μια λύση.',
+  'proposal.ai_intent_label': 'Περιγράψτε την ιδέα σας με απλά λόγια',
+  'proposal.ai_intent_placeholder': 'π.χ. Στη γειτονιά μου δεν υπάρχουν ποδηλατόδρομοι και τα παιδιά κινδυνεύουν…',
+  'proposal.ai_generate': 'Συμπλήρωση με AI',
+  'proposal.ai_generating': 'Δημιουργία…',
+  'proposal.ai_hint': 'Το AI συμπληρώνει τα πεδία — ελέγξτε και διορθώστε πριν την υποβολή.',
+  'proposal.ai_failed': 'Η δημιουργία με AI απέτυχε, δοκιμάστε ξανά.',
   'proposal.question_label': 'Ερώτημα',
   'proposal.question_placeholder': 'Ποιο πρόβλημα θέλετε να λύσετε;',
   'proposal.question_hint': 'Περιγράψτε το πρόβλημα ή το ζήτημα που θέλετε να διερευνήσετε.',

@@ -94,11 +94,15 @@ export async function chatCompletion(opts: ChatCompletionOptions): Promise<strin
       body: JSON.stringify({
         model: cfg.model,
         messages: opts.messages,
-        max_tokens: opts.maxTokens ?? 4000,
+        // Reasoning models (mandatory on this endpoint for e.g. gemini) spend
+        // hidden thinking tokens inside the same budget: small caps come back
+        // as empty content. Keep a floor so every call has room to think.
+        max_tokens: Math.max(opts.maxTokens ?? 4000, 4000),
         temperature: opts.temperature ?? 0.7,
-        // OpenRouter / xsilico-style reasoning control. Older / non-
-        // reasoning models simply ignore unknown keys.
-        ...(opts.enableThinking === false ? { reasoning: { enabled: false } } : {}),
+        // Note: no reasoning-disable flag here. The xsilico endpoint rejects
+        // `reasoning: {enabled: false}` outright for models where reasoning
+        // is mandatory (e.g. gemini-3.5-flash), so callers' enableThinking
+        // hint is accepted but not forwarded.
         ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
       }),
     });

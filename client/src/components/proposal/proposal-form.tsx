@@ -12,10 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest } from '@/lib/queryClient';
+import { api, ApiError } from '@/lib/api';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
@@ -59,6 +60,33 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
     solution: '',
     category: '',
   });
+
+  // AI-assisted drafting (same UX as the poll compiler): describe the idea
+  // in plain language, the LLM fills the fields below, the author edits.
+  const [aiIntent, setAiIntent] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function handleAiDraft() {
+    if (aiIntent.trim().length < 10) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const resp = await api.post<{ question: string; solution: string; category: string }>(
+        '/api/proposals/compile',
+        { intent: aiIntent.trim() },
+      );
+      setFormData({
+        question: resp.data.question,
+        solution: resp.data.solution,
+        category: resp.data.category,
+      });
+    } catch (e) {
+      setAiError(e instanceof ApiError ? e.message : (t('proposal.ai_failed') || 'AI drafting failed'));
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   const CATEGORIES = [
     { value: 'education', label: t('proposal.category_education') },
@@ -105,6 +133,45 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-6 rounded-lg border bg-muted/40 p-4 space-y-3">
+          <Label htmlFor="ai-intent" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            {t('proposal.ai_intent_label') || 'Περιγράψτε την ιδέα σας με απλά λόγια'}
+          </Label>
+          <Textarea
+            id="ai-intent"
+            placeholder={t('proposal.ai_intent_placeholder') || 'π.χ. Στη γειτονιά μου δεν υπάρχουν ποδηλατόδρομοι και τα παιδιά κινδυνεύουν…'}
+            value={aiIntent}
+            onChange={(e) => setAiIntent(e.target.value)}
+            rows={3}
+            maxLength={2000}
+          />
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleAiDraft}
+              disabled={aiLoading || aiIntent.trim().length < 10}
+              data-testid="proposal-ai-draft"
+            >
+              {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+              {aiLoading
+                ? (t('proposal.ai_generating') || 'Δημιουργία…')
+                : (t('proposal.ai_generate') || 'Συμπλήρωση με AI')}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              {t('proposal.ai_hint') || 'Το AI συμπληρώνει τα πεδία — ελέγξτε και διορθώστε πριν την υποβολή.'}
+            </p>
+          </div>
+          {aiError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{aiError}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <Alert variant="destructive">
