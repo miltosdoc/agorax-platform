@@ -566,7 +566,36 @@ export function setupAuth(app: Express) {
         if (req.session.mobileAuth) {
           delete req.session.mobileAuth;
           const code = issueMobileAuthCode(user.id, returnTo);
-          return res.redirect(`agorax://auth?code=${code}`);
+          // Chrome blocks plain 302 redirects to custom schemes without a
+          // user gesture, so serve a tiny interstitial: JS tries the deep
+          // link immediately and a visible button guarantees a tappable
+          // fallback. intent:// is the Chrome-native form of the same link.
+          const deepLink = `agorax://auth?code=${code}`;
+          const intentLink = `intent://auth?code=${code}#Intent;scheme=agorax;package=gr.agorax.app;end`;
+          res.setHeader('Cache-Control', 'no-store');
+          return res.send(`<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgoraX</title>
+  <style>
+    body { font-family: -apple-system, Roboto, sans-serif; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; min-height: 90vh; gap: 1.5rem; margin: 0; padding: 1rem; text-align: center; }
+    a.btn { background: #1d4ed8; color: #fff; padding: 1rem 2.5rem; border-radius: 0.75rem;
+            text-decoration: none; font-size: 1.15rem; font-weight: 600; }
+    p { color: #555; max-width: 30rem; }
+  </style>
+</head>
+<body>
+  <h1>Επιτυχής σύνδεση ✓</h1>
+  <p>Επιστρέψτε στην εφαρμογή AgoraX για να συνεχίσετε. / Return to the AgoraX app to continue.</p>
+  <a class="btn" href="${deepLink}">Άνοιγμα εφαρμογής / Open app</a>
+  <script>
+    setTimeout(function () { window.location.href = ${JSON.stringify(intentLink)}; }, 150);
+  </script>
+</body>
+</html>`);
         }
 
         // Redirect to the original URL or homepage after successful authentication
