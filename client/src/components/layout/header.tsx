@@ -31,6 +31,7 @@ import { useUnreadCount, useNotifications, useMarkAsRead } from "@/hooks/use-not
 import type { SortitionNotification } from "@/types/notifications";
 import { notificationTypeConfig } from "@/types/notifications";
 import SearchBar from "@/components/SearchBar";
+import { downloadApk } from "@/lib/download-apk";
 
 export default function Header() {
   const { user, logoutMutation } = useAuth();
@@ -44,24 +45,10 @@ export default function Header() {
 
   async function handleApkDownload() {
     setIsMenuOpen(false);
-    try {
-      const res = await fetch("/api/android/download");
-      if (res.status === 404) {
-        toast({ title: t('android.notAvailable'), variant: "destructive" });
-        return;
-      }
-      if (!res.ok) {
-        toast({ title: "Download failed", variant: "destructive" });
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "agorax.apk";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
+    const result = await downloadApk();
+    if (result === "unavailable") {
+      toast({ title: t('android.notAvailable'), variant: "destructive" });
+    } else if (result === "failed") {
       toast({ title: "Download failed", variant: "destructive" });
     }
   }

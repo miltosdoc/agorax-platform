@@ -11,6 +11,7 @@ import { ArrowLeft, BadgeCheck, Download, Fingerprint, Loader2, Shield, Smartpho
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 import { useToast } from "@/hooks/use-toast";
+import { downloadApk } from "@/lib/download-apk";
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -22,30 +23,13 @@ export default function ProfilePage() {
 
   async function handleApkDownload() {
     setApkDownloading(true);
-    try {
-      const res = await fetch("/api/android/download");
-      if (res.status === 404) {
-        toast({ title: t('android.notAvailable'), variant: "destructive" });
-        return;
-      }
-      if (!res.ok) {
-        toast({ title: "Download failed", variant: "destructive" });
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      // Use the server-provided (versioned) filename so users can tell builds apart
-      const disposition = res.headers.get("content-disposition") ?? "";
-      a.download = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "agorax.apk";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
+    const result = await downloadApk();
+    if (result === "unavailable") {
+      toast({ title: t('android.notAvailable'), variant: "destructive" });
+    } else if (result === "failed") {
       toast({ title: "Download failed", variant: "destructive" });
-    } finally {
-      setApkDownloading(false);
     }
+    setApkDownloading(false);
   }
 
   const effectiveUser = user ?? {
