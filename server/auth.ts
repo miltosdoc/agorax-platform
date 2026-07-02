@@ -25,7 +25,6 @@ import { consentTextHash } from "./utils/consent-hash";
 declare module "express-session" {
   interface SessionData {
     returnTo?: string;
-    mobileAuth?: boolean;
   }
 }
 
@@ -532,13 +531,18 @@ export function setupAuth(app: Express) {
     if (req.query.returnTo) {
       req.session.returnTo = req.query.returnTo as string;
     }
-    // The Android app appends mobile=1: the flow runs in the system browser
-    // and must hand the session back to the app via deep link (see callback).
-    req.session.mobileAuth = req.query.mobile === '1';
+    // The Android app appends mobile=1. The flow starts in the app's webview
+    // but Google's callback lands in the system browser — a different cookie
+    // jar — so the flag must ride the OAuth state parameter, not the session.
+    const state = Buffer.from(JSON.stringify({
+      m: req.query.mobile === '1' ? 1 : 0,
+      r: typeof req.query.returnTo === 'string' ? req.query.returnTo : '/feed',
+    })).toString('base64url');
 
     passport.authenticate('google', {
-      scope: ['profile', 'email']
-    })(req, res, next);
+      scope: ['profile', 'email'],
+      state,
+    } as any)(req, res, next);
   });
 
   app.get('/auth/google/callback', (req, res, next) => {
@@ -556,15 +560,23 @@ export function setupAuth(app: Express) {
           return res.redirect('/?error=login_failed');
         }
 
-        // Get the returnTo URL from the session and clear it
-        const returnTo = req.session.returnTo || '/feed';
+        // The state parameter round-trips through Google and is the only
+        // context that survives the webview → system-browser cookie switch.
+        let mobileAuth = false;
+        let stateReturnTo: string | undefined;
+        try {
+          const parsed = JSON.parse(Buffer.from(String(req.query.state ?? ''), 'base64url').toString());
+          mobileAuth = parsed?.m === 1;
+          if (typeof parsed?.r === 'string' && parsed.r.startsWith('/')) stateReturnTo = parsed.r;
+        } catch { /* absent or malformed state → normal web flow */ }
+
+        const returnTo = stateReturnTo || req.session.returnTo || '/feed';
         delete req.session.returnTo;
 
         // Mobile flow: this response renders in the system browser, but the
         // session must reach the app's webview. Hand over a one-time code via
         // the agorax:// deep link, which Android routes back into the app.
-        if (req.session.mobileAuth) {
-          delete req.session.mobileAuth;
+        if (mobileAuth) {
           const code = issueMobileAuthCode(user.id, returnTo);
           // Chrome blocks plain 302 redirects to custom schemes without a
           // user gesture, so serve a tiny interstitial: JS tries the deep

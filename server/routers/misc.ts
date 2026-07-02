@@ -237,16 +237,26 @@ export function registerMiscRoutes(app: Express): void {
     next();
   };
   // ── Android APK download (authenticated users only) ──────────────────
+  // Serves the newest downloads/agorax*.apk under its real (versioned)
+  // filename, so users can verify which build they received.
   app.get("/api/android/download", requireAuth, async (req, res) => {
     const fs = await import('fs');
     const path = await import('path');
-    const apkPath = path.resolve(process.cwd(), 'downloads', 'agorax.apk');
-    if (!fs.existsSync(apkPath)) {
+    const dir = path.resolve(process.cwd(), 'downloads');
+    let newest: { file: string; mtime: number } | null = null;
+    try {
+      for (const file of fs.readdirSync(dir)) {
+        if (!/^agorax.*\.apk$/i.test(file)) continue;
+        const mtime = fs.statSync(path.join(dir, file)).mtimeMs;
+        if (!newest || mtime > newest.mtime) newest = { file, mtime };
+      }
+    } catch { /* downloads dir missing → 404 below */ }
+    if (!newest) {
       return res.status(404).json({ message: "APK not yet available" });
     }
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', 'attachment; filename="agorax.apk"');
-    res.sendFile(apkPath);
+    res.setHeader('Content-Disposition', `attachment; filename="${newest.file}"`);
+    res.sendFile(path.join(dir, newest.file));
   });
 
   app.get("/api/health", async (req, res) => {

@@ -36,7 +36,9 @@ export default function ProfilePage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "agorax.apk";
+      // Use the server-provided (versioned) filename so users can tell builds apart
+      const disposition = res.headers.get("content-disposition") ?? "";
+      a.download = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "agorax.apk";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
