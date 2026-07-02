@@ -158,13 +158,13 @@ export function AIValidationBadge({
           </div>
         )}
 
-        {/* Disagree Button */}
+        {/* Disagree Button — stacked so it fits narrow sidebar columns */}
         {onDisagree && (
-          <div className="flex items-center gap-2 pt-2 border-t">
+          <div className="flex flex-col gap-1.5 pt-2 border-t">
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 text-red-600 hover:bg-red-50"
+              className="gap-2 text-red-600 hover:bg-red-50 w-full"
               onClick={onDisagree}
             >
               <ThumbsDown className="w-4 h-4" />

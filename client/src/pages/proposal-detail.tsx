@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, MessageSquare, FileText, Trash2, Mic } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
@@ -339,6 +340,10 @@ export default function ProposalDetailPage() {
         {/* Sidebar — process widgets, sticky on desktop */}
         <aside className="mt-8 lg:mt-0 lg:col-span-1">
           <div className="lg:sticky lg:top-20 space-y-4">
+            {/* Phase timer — voting shows its own countdown inside VotePanel */}
+            {['author_review', 'community_signal'].includes(proposal.status) && (proposal as any).phaseDeadline && (
+              <PhaseCountdown deadline={(proposal as any).phaseDeadline} />
+            )}
             <NextActionPanel
               status={proposal.status}
               proposalId={proposal.id}

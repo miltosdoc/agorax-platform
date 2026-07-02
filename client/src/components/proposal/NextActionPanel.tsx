@@ -53,20 +53,20 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
 
   return (
     <Card className="border-l-4 border-l-primary/30">
-      <CardContent className="py-4 px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Icon className="w-5 h-5 text-primary" />
+      <CardContent className="py-4 px-4">
+        {/* Sidebar-friendly vertical layout: label, text, then a full-width
+            action button — nothing competes for horizontal space. */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10 shrink-0">
+              <Icon className="w-4 h-4 text-primary" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{t('workspace.nextAction')}</p>
-              <p className="text-base font-medium">{t(actionKey) || entry.nextAction}</p>
-            </div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('workspace.nextAction')}</p>
           </div>
+          <p className="text-sm leading-relaxed">{t(actionKey) || entry.nextAction}</p>
           {status === 'draft' && userIsAuthor && (
-            <div className="flex flex-col items-end gap-1">
-              <Button size="sm" onClick={handleSubmitDraft} disabled={submitting}>
+            <div className="flex flex-col gap-1">
+              <Button size="sm" className="w-full" onClick={handleSubmitDraft} disabled={submitting}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -80,21 +80,21 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
             </div>
           )}
           {status === 'author_review' && userIsAuthor && (
-            <Button size="sm" asChild>
+            <Button size="sm" className="w-full" asChild>
               <a href={`/proposals/${proposalId}/amendments/review`}>
                 {t('workspace.action.authorReviewButton')}
               </a>
             </Button>
           )}
           {status === 'community_signal' && (
-            <Button size="sm" asChild>
+            <Button size="sm" className="w-full" asChild>
               <a href={`/proposals/${proposalId}/amendments/signals`}>
                 {t('workspace.action.communitySignalButton')}
               </a>
             </Button>
           )}
           {status === 'sortition_synthesis' && (
-            <Button size="sm" variant="outline" asChild>
+            <Button size="sm" variant="outline" className="w-full" asChild>
               <a href={`/proposals/${proposalId}/sortition`}>
                 {t('workspace.action.sortitionSynthesisButton')}
               </a>
