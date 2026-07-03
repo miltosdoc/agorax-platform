@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -15,8 +14,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { loginUserSchema, registerUserSchema } from "@shared/schema";
 import { CURRENT_CONSENT_VERSION } from "@shared/consent";
 import { FcGoogle } from "react-icons/fc";
@@ -52,6 +49,19 @@ async function getFingerprint(): Promise<string | undefined> {
   }
 }
 
+// ————— Institutional idiom (tokens only, 120ms color transitions) —————
+const EYEBROW = "text-xs uppercase tracking-[0.14em] font-semibold text-ink-faint";
+const BUTTON_BASE =
+  "inline-flex w-full items-center justify-center gap-2 rounded-sm px-6 py-2.5 text-sm font-medium transition-colors duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON_PRIMARY = `${BUTTON_BASE} bg-ink text-paper hover:bg-kyanos-deep`;
+const BUTTON_SECONDARY = `${BUTTON_BASE} border border-ink bg-surface text-ink hover:bg-sunken`;
+const LINK_CLASS =
+  "text-sm text-kyanos transition-colors duration-[120ms] hover:underline underline-offset-2";
+const INPUT_CLASS =
+  "h-10 rounded-sm border-line bg-paper text-sm text-ink placeholder:text-ink-faint transition-colors duration-[120ms] focus-visible:ring-1 focus-visible:ring-kyanos focus-visible:border-line-strong";
+const CHECKBOX_CLASS =
+  "mt-0.5 h-4 w-4 rounded-[2px] border border-ink bg-paper data-[state=checked]:bg-ink data-[state=checked]:text-paper";
+
 export default function AuthPage() {
   const { t } = useTranslation();
   const [location, navigate] = useLocation();
@@ -74,137 +84,134 @@ export default function AuthPage() {
     }
   }, [user, navigate, returnTo]);
 
+  const handleAuthenticated = () => {
+    const path = returnTo.startsWith('http') ? new URL(returnTo).pathname : returnTo;
+    navigate(path);
+  };
+
+  const features = [
+    { title: t('auth.heroFeature1Title'), desc: t('auth.heroFeature1Desc') },
+    { title: t('auth.heroFeature2Title'), desc: t('auth.heroFeature2Desc') },
+    { title: t('auth.heroFeature3Title'), desc: t('auth.heroFeature3Desc') },
+    { title: t('auth.heroFeature4Title'), desc: t('auth.heroFeature4Desc') },
+    { title: t('auth.heroFeature5Title'), desc: t('auth.heroFeature5Desc') },
+  ];
+
+  const tabClass = (active: boolean) =>
+    `-mb-px border-b-2 pb-3 text-sm transition-colors duration-[120ms] ${
+      active
+        ? "border-ink font-semibold text-ink"
+        : "border-transparent font-medium text-ink-faint hover:text-ink-soft"
+    }`;
+
   return (
-    <div className="min-h-screen flex relative">
-      {/* Top-right language toggle — visible on both halves.
-          Wrapped in a translucent-white pill so it stays readable over
-          the dark primary-colored hero column. */}
-      <div className="absolute top-4 right-4 z-20 rounded-lg bg-white/90 text-gray-800 shadow-sm backdrop-blur-sm">
-        <LanguageSwitcher />
-      </div>
+    <div className="flex min-h-screen flex-col bg-paper text-ink">
+      {/* ————— Slim masthead strip: wordmark + language toggle ————— */}
+      <header className="border-b border-line bg-paper">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+          <a href="/" className="flex items-center gap-3">
+            <img src={logoImage} alt="AgoraX Logo" className="h-9 w-auto" />
+            <span className="font-serif text-xl font-normal leading-none text-ink">
+              AgoraX
+            </span>
+          </a>
+          <LanguageSwitcher />
+        </div>
+      </header>
 
-      {/* Left side - Auth forms */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="flex flex-col items-center">
-              <img
-                src={logoImage}
-                alt="AgoraX Logo"
-                className="h-20 w-auto mb-3"
-              />
-              <h1 className="text-3xl font-bold text-primary">AgoraX</h1>
-              <p className="text-muted-foreground mt-2">
-                {t('header.digitalDemocracy')}
-              </p>
+      <main className="flex flex-1 flex-col lg:grid lg:grid-cols-2">
+        {/* ————— Ink panel: statement band on mobile, full column on desktop ————— */}
+        <aside className="border-b border-line-strong bg-ink text-paper lg:order-2 lg:border-b-0 lg:border-l lg:border-l-line-strong">
+          <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center px-4 py-8 sm:px-6 lg:px-12 lg:py-16">
+            <p className="text-xs uppercase tracking-[0.14em] font-semibold text-bc-ink-soft">
+              AgoraX
+            </p>
+            <h1 className="mt-3 max-w-[22ch] text-balance font-serif text-2xl font-normal leading-tight text-paper sm:text-3xl lg:mt-5 lg:text-4xl">
+              {t('auth.heroTitle')}
+            </h1>
+            <p className="mt-5 hidden max-w-prose text-base leading-relaxed text-bc-ink-soft lg:block">
+              {t('auth.heroSubtitle')}
+            </p>
+
+            <div className="mt-10 hidden divide-y divide-bc-line border-y border-bc-line lg:block">
+              {features.map((feature, index) => (
+                <div key={index} className="flex gap-5 py-5">
+                  <span
+                    className="font-mono text-xs leading-6 tabular-nums text-bc-ink-soft"
+                    aria-hidden="true"
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <h3 className="font-serif text-lg font-normal leading-6 text-paper">
+                      {feature.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-bc-ink-soft">
+                      {feature.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        </aside>
 
-          <Tabs value={tab} onValueChange={setTab} className="w-full">
-            <TabsList className="grid grid-cols-2 w-full mb-6">
-              <TabsTrigger value="login">{t('auth.login')}</TabsTrigger>
-              <TabsTrigger value="register">{t('auth.register')}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="login">
-              <LoginForm
-                onSubmit={() => {
-                  const path = returnTo.startsWith('http') ? new URL(returnTo).pathname : returnTo;
-                  navigate(path);
-                }}
-                onSwitchToRegister={() => setTab("register")}
-              />
-            </TabsContent>
-            <TabsContent value="register">
-              <RegisterForm
-                onSubmit={() => {
-                  const path = returnTo.startsWith('http') ? new URL(returnTo).pathname : returnTo;
-                  navigate(path);
-                }}
-                onSwitchToLogin={() => setTab("login")}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+        {/* ————— Form column ————— */}
+        <div className="flex flex-1 items-start justify-center px-4 py-10 sm:px-6 lg:order-1 lg:items-center lg:py-16">
+          <div className="w-full max-w-md rounded-sm border border-line bg-surface p-6 sm:p-8">
+            <p className={EYEBROW}>{t('header.digitalDemocracy')}</p>
 
-      {/* Right side - Hero content */}
-      <div className="hidden lg:w-1/2 lg:flex flex-col bg-primary text-white p-10 items-center justify-center">
-        <div className="max-w-lg">
-          <h2 className="text-4xl font-bold mb-6">
-            {t('auth.heroTitle')}
-          </h2>
-          <p className="text-lg mb-8">
-            {t('auth.heroSubtitle')}
-          </p>
-          <div className="space-y-4">
-            <div className="flex items-start">
-              <div className="bg-white/20 p-2 rounded-full mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-                  <path d="M15 2v6h6" />
-                  <path d="M10 12l4 0" />
-                  <path d="M10 16l4 0" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl">{t('auth.heroFeature1Title')}</h3>
-                <p>{t('auth.heroFeature1Desc')}</p>
-              </div>
+            {/* Underline tab rail */}
+            <div className="mt-5 flex gap-6 border-b border-line" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "login"}
+                onClick={() => setTab("login")}
+                className={tabClass(tab === "login")}
+              >
+                {t('auth.login')}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "register"}
+                onClick={() => setTab("register")}
+                className={tabClass(tab === "register")}
+              >
+                {t('auth.register')}
+              </button>
             </div>
-            <div className="flex items-start">
-              <div className="bg-white/20 p-2 rounded-full mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl">{t('auth.heroFeature2Title')}</h3>
-                <p>{t('auth.heroFeature2Desc')}</p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <div className="bg-white/20 p-2 rounded-full mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M16 21v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a2 2 0 0 0-2-2h-2.21" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl">{t('auth.heroFeature3Title')}</h3>
-                <p>{t('auth.heroFeature3Desc')}</p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <div className="bg-white/20 p-2 rounded-full mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-                  <path d="m9 12 2 2 4-4" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl">{t('auth.heroFeature4Title')}</h3>
-                <p>{t('auth.heroFeature4Desc')}</p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <div className="bg-white/20 p-2 rounded-full mr-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M3 3v16a2 2 0 0 0 2 2h16" />
-                  <path d="M7 16h8" />
-                  <path d="M7 11h12" />
-                  <path d="M7 6h3" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-xl">{t('auth.heroFeature5Title')}</h3>
-                <p>{t('auth.heroFeature5Desc')}</p>
-              </div>
+
+            <div className="pt-6" role="tabpanel">
+              {tab === "login" ? (
+                <LoginForm
+                  onSubmit={handleAuthenticated}
+                  onSwitchToRegister={() => setTab("register")}
+                />
+              ) : (
+                <RegisterForm
+                  onSubmit={handleAuthenticated}
+                  onSwitchToLogin={() => setTab("login")}
+                />
+              )}
             </div>
           </div>
         </div>
-      </div>
+      </main>
+    </div>
+  );
+}
+
+function OrDivider() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <span className="h-px flex-1 bg-line" aria-hidden="true" />
+      <span className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">
+        {t('auth.orContinueWith')}
+      </span>
+      <span className="h-px flex-1 bg-line" aria-hidden="true" />
     </div>
   );
 }
@@ -243,7 +250,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.username')}</FormLabel>
               <FormControl>
-                <Input placeholder={t('auth.usernamePlaceholder') as string} {...field} />
+                <Input className={INPUT_CLASS} placeholder={t('auth.usernamePlaceholder') as string} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -256,45 +263,35 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input className={INPUT_CLASS} type="password" placeholder="••••••••" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <div className="flex justify-end">
-          <Button variant="link" className="px-0 text-sm" onClick={onSwitchToRegister}>
+          <button type="button" className={LINK_CLASS} onClick={onSwitchToRegister}>
             {t('auth.noAccount')}
-          </Button>
+          </button>
         </div>
-        <Button
+        <button
           type="submit"
-          className="w-full"
+          className={BUTTON_PRIMARY}
           disabled={loginMutation.isPending}
         >
           {loginMutation.isPending ? t('general.loading') + "..." : t('auth.login')}
-        </Button>
+        </button>
 
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <Separator className="w-full" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-background px-2 text-sm text-muted-foreground">
-              {t('auth.orContinueWith')}
-            </span>
-          </div>
-        </div>
+        <OrDivider />
 
-        <Button
+        <button
           type="button"
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2"
+          className={BUTTON_SECONDARY}
           onClick={startGoogleAuth}
         >
           <FcGoogle className="h-5 w-5" />
           {t('auth.signInWithGoogle')}
-        </Button>
+        </button>
       </form>
     </Form>
   );
@@ -340,7 +337,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.fullName')}</FormLabel>
               <FormControl>
-                <Input placeholder={t('auth.fullNamePlaceholder') as string} {...field} />
+                <Input className={INPUT_CLASS} placeholder={t('auth.fullNamePlaceholder') as string} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -353,7 +350,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.email')}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder={t('auth.emailPlaceholder') as string} {...field} />
+                <Input className={INPUT_CLASS} type="email" placeholder={t('auth.emailPlaceholder') as string} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -366,7 +363,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.username')}</FormLabel>
               <FormControl>
-                <Input placeholder={t('auth.usernamePlaceholder') as string} {...field} />
+                <Input className={INPUT_CLASS} placeholder={t('auth.usernamePlaceholder') as string} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -379,7 +376,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="••••••••" {...field} />
+                <Input className={INPUT_CLASS} type="password" placeholder="••••••••" {...field} />
               </FormControl>
               <FormMessage className="text-xs">
                 {t('auth.passwordMinLength')}
@@ -387,61 +384,57 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             </FormItem>
           )}
         />
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="terms"
-            checked={acceptTerms}
-            onCheckedChange={(checked) => setAcceptTerms(!!checked)}
-          />
-          <label
-            htmlFor="terms"
-            className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-          >
-            {t('auth.acceptTerms')}{" "}
-            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              {t('auth.termsOfService')}
-            </a>{" "}
-            {t('auth.and')}{" "}
-            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              {t('auth.privacyPolicy')}
-            </a>
-          </label>
+
+        {/* GDPR consent — legal micro-copy on a sunken panel */}
+        <div className="rounded-sm border border-line bg-sunken p-3">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="terms"
+              checked={acceptTerms}
+              onCheckedChange={(checked) => setAcceptTerms(!!checked)}
+              className={CHECKBOX_CLASS}
+            />
+            <label
+              htmlFor="terms"
+              className="font-mono text-xs leading-relaxed text-ink-soft peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              {t('auth.acceptTerms')}{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-kyanos transition-colors duration-[120ms] hover:underline underline-offset-2">
+                {t('auth.termsOfService')}
+              </a>{" "}
+              {t('auth.and')}{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-kyanos transition-colors duration-[120ms] hover:underline underline-offset-2">
+                {t('auth.privacyPolicy')}
+              </a>
+            </label>
+          </div>
         </div>
+
         <div className="flex justify-end">
-          <Button variant="link" className="px-0 text-sm" onClick={onSwitchToLogin}>
+          <button type="button" className={LINK_CLASS} onClick={onSwitchToLogin}>
             {t('auth.haveAccount')}
-          </Button>
+          </button>
         </div>
-        <Button
+        <button
           type="submit"
-          className="w-full"
+          className={BUTTON_PRIMARY}
           disabled={registerMutation.isPending || !acceptTerms}
         >
           {registerMutation.isPending
             ? t('general.loading') + "..."
             : t('auth.register')}
-        </Button>
+        </button>
 
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <Separator className="w-full" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-background px-2 text-sm text-muted-foreground">
-              {t('auth.orContinueWith')}
-            </span>
-          </div>
-        </div>
+        <OrDivider />
 
-        <Button
+        <button
           type="button"
-          variant="outline"
-          className="w-full flex items-center justify-center gap-2"
+          className={BUTTON_SECONDARY}
           onClick={startGoogleAuth}
         >
           <FcGoogle className="h-5 w-5" />
           {t('auth.signUpWithGoogle')}
-        </Button>
+        </button>
       </form>
     </Form>
   );
