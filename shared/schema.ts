@@ -699,6 +699,7 @@ export const proposalMedia = pgTable("proposal_media", {
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
   uploaderId: integer("uploader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(),                          // 'podcast' | 'video'
+  title: text("title"),                                   // user-provided post name
   filePath: text("file_path").notNull(),                 // relative to AGORAX_MEDIA_DIR
   thumbPath: text("thumb_path"),                          // null for podcasts; jpg poster for videos
   mimeType: text("mime_type").notNull(),

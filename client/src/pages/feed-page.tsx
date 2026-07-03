@@ -29,6 +29,7 @@ interface MediaFeedItem {
   proposalId: number;
   uploaderId: number;
   kind: 'podcast' | 'video';
+  title: string | null;
   filePath: string;
   thumbPath: string | null;
   mimeType: string;
@@ -186,8 +187,11 @@ function FeedItemCard({ item, onShare }: { item: MediaFeedItem; onShare: (item: 
           className="block"
         >
           <h3 className="text-lg font-semibold hover:underline">
-            {item.proposalQuestion}
+            {item.title || item.proposalQuestion}
           </h3>
+          {item.title && (
+            <p className="text-sm text-muted-foreground">{item.proposalQuestion}</p>
+          )}
         </Link>
 
         {item.kind === 'podcast' ? (

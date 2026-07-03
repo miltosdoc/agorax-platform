@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useLocation } from "wouter";
@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, Menu, Coins, Home, Smartphone } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -32,6 +32,7 @@ import type { SortitionNotification } from "@/types/notifications";
 import { notificationTypeConfig } from "@/types/notifications";
 import SearchBar from "@/components/SearchBar";
 import { downloadApk } from "@/lib/download-apk";
+import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
 
 export default function Header() {
   const { user, logoutMutation } = useAuth();
@@ -41,6 +42,12 @@ export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [feedbackOn, setFeedbackOn] = useState(isFeedbackWidgetEnabled);
+  useEffect(() => {
+    const sync = () => setFeedbackOn(isFeedbackWidgetEnabled());
+    window.addEventListener('agorax-feedback-toggle', sync);
+    return () => window.removeEventListener('agorax-feedback-toggle', sync);
+  }, []);
   const { toast } = useToast();
 
   async function handleApkDownload() {
@@ -402,6 +409,21 @@ export default function Header() {
                 >
                   <Smartphone className="mr-2 h-4 w-4" />
                   {t('android.downloadMenuLabel')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    // Keep the menu open so the check state is visible.
+                    e.preventDefault();
+                    const next = !feedbackOn;
+                    setFeedbackWidgetEnabled(next);
+                    setFeedbackOn(next);
+                  }}
+                  className="cursor-pointer transition-smooth"
+                  data-testid="menu-feedback-toggle"
+                >
+                  <MessageSquarePlus className="mr-2 h-4 w-4" />
+                  <span className="flex-1">{t('feedback.toggleLabel')}</span>
+                  {feedbackOn && <Check className="ml-2 h-4 w-4 text-green-600" />}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

@@ -206,6 +206,11 @@ export function registerMediaRoutes(app: Express): void {
       const rawName = req.headers['x-file-name']
         ? decodeURIComponent(req.headers['x-file-name'] as string)
         : `upload${kind === 'podcast' ? '.mp3' : '.mp4'}`;
+      // User-provided post name (required by the UI; tolerated absent for
+      // older clients — display falls back to the proposal question).
+      const title = req.headers['x-media-title']
+        ? decodeURIComponent(req.headers['x-media-title'] as string).trim().slice(0, 200)
+        : null;
 
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: 'proposal not found' });
@@ -278,6 +283,7 @@ export function registerMediaRoutes(app: Express): void {
         proposalId,
         uploaderId: userId,
         kind,
+        title: title || null,
         filePath: relPath,
         thumbPath: thumbRel,
         mimeType: mimeType || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4'),

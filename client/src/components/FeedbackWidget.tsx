@@ -14,8 +14,6 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { MessageSquarePlus, ImagePlus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
@@ -127,20 +125,9 @@ export function FeedbackWidget() {
             )}
           </div>
 
-          <div className="flex items-center justify-between border-t pt-3">
-            <Label htmlFor="feedback-toggle" className="text-xs text-muted-foreground">
-              {t('feedback.toggleLabel')}
-            </Label>
-            <Switch
-              id="feedback-toggle"
-              checked={enabled}
-              onCheckedChange={(on) => {
-                setFeedbackWidgetEnabled(on);
-                setEnabled(on);
-                if (!on) setOpen(false);
-              }}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground border-t pt-3">
+            {t('feedback.hideHint')}
+          </p>
 
           <DialogFooter>
             <Button

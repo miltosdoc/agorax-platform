@@ -150,6 +150,7 @@ export class MediaRepository {
         proposalId: proposalMedia.proposalId,
         uploaderId: proposalMedia.uploaderId,
         kind: proposalMedia.kind,
+        title: proposalMedia.title,
         filePath: proposalMedia.filePath,
         thumbPath: proposalMedia.thumbPath,
         mimeType: proposalMedia.mimeType,

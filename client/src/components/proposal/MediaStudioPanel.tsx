@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,6 +34,7 @@ interface MediaRow {
   proposalId: number;
   uploaderId: number;
   kind: 'podcast' | 'video';
+  title: string | null;
   filePath: string;
   thumbPath: string | null;
   mimeType: string;
@@ -89,7 +91,7 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1024)} KB`;
 }
 
-async function uploadFile(file: File, uploadUrl: string): Promise<MediaRow> {
+async function uploadFile(file: File, uploadUrl: string, title: string): Promise<MediaRow> {
   // Ensure CSRF cookie exists before sending.
   if (!readCsrfCookie()) {
     await fetch('/api/csrf', { credentials: 'include' }).catch(() => {});
@@ -98,6 +100,7 @@ async function uploadFile(file: File, uploadUrl: string): Promise<MediaRow> {
   const headers: Record<string, string> = {
     'Content-Type': file.type || 'application/octet-stream',
     'X-File-Name': encodeURIComponent(file.name),
+    'X-Media-Title': encodeURIComponent(title),
   };
   if (csrf) headers['X-CSRF-Token'] = csrf;
   const res = await fetch(uploadUrl, {
@@ -141,6 +144,7 @@ function MediaKindCard(props: {
   const [source, setSource] = useState<'llm' | 'template' | null>(null);
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [postTitle, setPostTitle] = useState('');
   const [includeAmendments, setIncludeAmendments] = useState(false);
   const [includeThreads, setIncludeThreads] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -172,15 +176,22 @@ function MediaKindCard(props: {
     }
   };
 
-  const handleUploadClick = () => fileRef.current?.click();
+  const handleUploadClick = () => {
+    if (postTitle.trim().length < 3) {
+      errorToast(t('media.titleRequired'), t('media.titleRequiredHint'));
+      return;
+    }
+    fileRef.current?.click();
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      await uploadFile(file, `/api/proposals/${proposalId}/media?kind=${kind}`);
-      toast({ title: t('media.uploadSuccess'), description: file.name });
+      await uploadFile(file, `/api/proposals/${proposalId}/media?kind=${kind}`, postTitle.trim());
+      toast({ title: t('media.uploadSuccess'), description: postTitle.trim() });
+      setPostTitle('');
       onUploaded();
     } catch (err: any) {
       errorToast(t('media.uploadFailed'), err?.message || t('media.tryAgain'));
@@ -254,26 +265,35 @@ function MediaKindCard(props: {
             )}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
-          <input
-            ref={fileRef}
-            type="file"
-            accept={cfg.accept}
-            className="hidden"
-            onChange={handleFileChange}
-            data-testid={`media-file-${kind}`}
+        <div className="space-y-2 pt-2 border-t">
+          <Input
+            value={postTitle}
+            onChange={(e) => setPostTitle(e.target.value)}
+            placeholder={t('media.titlePlaceholder')}
+            maxLength={200}
+            data-testid={`media-title-${kind}`}
           />
-          <Button
-            type="button"
-            variant="default"
-            onClick={handleUploadClick}
-            disabled={uploading}
-            data-testid={`media-upload-${kind}`}
-          >
-            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
-            {kind === 'podcast' ? t('media.uploadAudio') : t('media.uploadVideo')}
-          </Button>
-          <span className="text-xs text-muted-foreground">{t('media.sizeLimit')}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={cfg.accept}
+              className="hidden"
+              onChange={handleFileChange}
+              data-testid={`media-file-${kind}`}
+            />
+            <Button
+              type="button"
+              variant="default"
+              onClick={handleUploadClick}
+              disabled={uploading}
+              data-testid={`media-upload-${kind}`}
+            >
+              {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              {kind === 'podcast' ? t('media.uploadAudio') : t('media.uploadVideo')}
+            </Button>
+            <span className="text-xs text-muted-foreground">{t('media.sizeLimit')}</span>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -413,6 +433,10 @@ function MediaGalleryItem(props: {
           </span>
         </div>
       </div>
+
+      {media.title && (
+        <h4 className="font-semibold mb-2">{media.title}</h4>
+      )}
 
       {media.kind === 'podcast' ? (
         <audio controls preload="metadata" src={mediaUrl} className="w-full" />

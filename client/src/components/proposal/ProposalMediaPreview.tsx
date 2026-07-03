@@ -25,6 +25,7 @@ interface MediaRow {
   proposalId: number;
   uploaderId: number;
   kind: 'podcast' | 'video';
+  title: string | null;
   filePath: string;
   thumbPath: string | null;
   mimeType: string;
@@ -108,6 +109,10 @@ function MediaTile({ media }: { media: MediaRow }) {
           {t('media.share')}
         </Button>
       </div>
+
+      {media.title && (
+        <h4 className="font-semibold">{media.title}</h4>
+      )}
 
       {media.kind === 'podcast' ? (
         <audio controls preload="metadata" src={mediaUrl} className="w-full" />
