@@ -202,7 +202,7 @@ export default function CommunityDashboardPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-2xl">{community.name}</CardTitle>
+                <CardTitle className="text-2xl font-serif font-normal">{community.name}</CardTitle>
                 <Badge variant="secondary">{governanceLabel}</Badge>
               </div>
               <CardDescription>
@@ -264,35 +264,18 @@ export default function CommunityDashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg border bg-background/70 p-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="w-4 h-4" />
-                {t('community.members')}
+          <div className="grid grid-cols-2 lg:grid-cols-4 lg:divide-x divide-line border-y border-line">
+            {[
+              { label: t('community.members'), value: metrics.memberCount },
+              { label: t('community.proposals'), value: metrics.proposalCount },
+              { label: t('community.active_proposals'), value: metrics.activeProposalCount },
+              { label: t('community.decided_proposals'), value: metrics.decidedProposalCount },
+            ].map((s, i) => (
+              <div key={i} className="flex flex-col gap-1 px-4 py-3 lg:first:pl-0">
+                <span className="font-serif text-3xl leading-none text-ink tabular-nums">{s.value}</span>
+                <span className="text-xs uppercase tracking-wider text-ink-faint font-semibold">{s.label}</span>
               </div>
-              <div className="mt-1 text-2xl font-semibold">{metrics.memberCount}</div>
-            </div>
-            <div className="rounded-lg border bg-background/70 p-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <FileText className="w-4 h-4" />
-                {t('community.proposals')}
-              </div>
-              <div className="mt-1 text-2xl font-semibold">{metrics.proposalCount}</div>
-            </div>
-            <div className="rounded-lg border bg-background/70 p-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Vote className="w-4 h-4" />
-                {t('community.active_proposals')}
-              </div>
-              <div className="mt-1 text-2xl font-semibold">{metrics.activeProposalCount}</div>
-            </div>
-            <div className="rounded-lg border bg-background/70 p-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4" />
-                {t('community.decided_proposals')}
-              </div>
-              <div className="mt-1 text-2xl font-semibold">{metrics.decidedProposalCount}</div>
-            </div>
+            ))}
           </div>
 
           {/* Impact Metrics Dashboard — Civic Tech Best Practice */}
@@ -310,15 +293,21 @@ export default function CommunityDashboardPage() {
             onViewAll={() => setLocation('/analytics')}
           />
 
-          <div className="rounded-lg border bg-background/70 p-4">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <div className="flex items-center gap-2 font-medium">
-                <Shield className="w-4 h-4 text-muted-foreground" />
+          <div className="border border-line rounded px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs uppercase tracking-wider font-semibold text-ink-faint flex items-center gap-2">
+                <Shield className="w-3.5 h-3.5" />
                 {t('community.democracy_score')}
-              </div>
-              <span>{democracyScoreAvailable ? `${democracyScore}/100` : t('community.score_not_available')}</span>
+              </span>
+              <span className="text-sm tabular-nums">
+                {democracyScoreAvailable
+                  ? <><span className="font-serif text-lg text-ink">{democracyScore}</span><span className="text-ink-faint">/100</span></>
+                  : <span className="text-ink-faint">{t('community.score_not_available')}</span>}
+              </span>
             </div>
-            <Progress value={democracyScore ?? 0} />
+            <div className="h-1.5 bg-sunken rounded-full overflow-hidden">
+              <div className="h-full bg-kyanos rounded-full transition-[width] duration-500" style={{ width: `${democracyScore ?? 0}%` }} />
+            </div>
           </div>
         </CardContent>
       </Card>
