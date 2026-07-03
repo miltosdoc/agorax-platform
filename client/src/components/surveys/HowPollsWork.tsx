@@ -27,7 +27,7 @@ export const POLL_HOW_SECTIONS: Section[] = [
   },
   {
     title: { el: "Γιατί η ταυτότητα πάνελ «ζει» στη συσκευή μου;", en: "Why does my panel identity “live” on my device?" },
-    body: { el: "Ακριβώς επειδή δεν ξέρουμε ποια ταυτότητα πάνελ είναι δική σου, δεν μπορούμε και να σου τη «στείλουμε» σε άλλη συσκευή. Αποθηκεύεται στον browser/εφαρμογή όπου έκανες την εγγραφή. Αν καθαρίσεις τα δεδομένα του browser, η ταυτότητα χάνεται — αυτό είναι το κόστος της πραγματικής ανωνυμίας.", en: "Precisely because we do not know which panel identity is yours, we cannot “send” it to another device either. It is stored in the browser/app where you enrolled — you can transfer it manually from the /panel page. If you clear browser data the identity is lost; that is the cost of real anonymity." },
+    body: { el: "Ακριβώς επειδή δεν ξέρουμε ποια ταυτότητα πάνελ είναι δική σου, δεν μπορούμε και να σου τη «στείλουμε» σε άλλη συσκευή. Αποθηκεύεται στον browser/εφαρμογή όπου έκανες την εγγραφή — μπορείς να τη μεταφέρεις χειροκίνητα με κωδικό μεταφοράς από τη σελίδα Προφίλ. Αν καθαρίσεις τα δεδομένα του browser, η ταυτότητα χάνεται — αυτό είναι το κόστος της πραγματικής ανωνυμίας.", en: "Precisely because we do not know which panel identity is yours, we cannot “send” it to another device either. It is stored in the browser/app where you enrolled — you can transfer it manually with a transfer code from your Profile page. If you clear browser data the identity is lost; that is the cost of real anonymity." },
   },
   {
     title: { el: "Τι είναι οι «πάγιες» ερωτήσεις;", en: "What are the “standing” questions?" },

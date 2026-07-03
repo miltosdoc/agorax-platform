@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
-import { ArrowLeft, BadgeCheck, Download, Fingerprint, Loader2, Shield, Smartphone, Trash2, User } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Download, Fingerprint, KeyRound, Loader2, Shield, Smartphone, Trash2, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { anonInventory, exportAnonData, importAnonData } from "@/lib/anon-transfer";
 import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +21,35 @@ export default function ProfilePage() {
   const [, setLocation] = useLocation();
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [apkDownloading, setApkDownloading] = useState(false);
+  const [inventory, setInventory] = useState(anonInventory);
+  const [exportCode, setExportCode] = useState<string | null>(null);
+  const [importCode, setImportCode] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  async function handleAnonImport() {
+    setImporting(true);
+    try {
+      const result = await importAnonData(importCode);
+      if (!result.ok) {
+        toast({
+          title: result.error === 'panel_invalid' ? t('anon.importPanelInvalid') : t('anon.importInvalid'),
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: t('anon.importOk', {
+          panel: result.panelImported ? 1 : 0,
+          receipts: result.receiptsAdded,
+          pending: result.pendingAdded,
+        }),
+      });
+      setImportCode('');
+      setInventory(anonInventory());
+    } finally {
+      setImporting(false);
+    }
+  }
   const { toast } = useToast();
 
   async function handleApkDownload() {
@@ -187,6 +218,84 @@ export default function ProfilePage() {
                   {apkDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   {t('android.downloadButton')}
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-primary" />
+                  {t('anon.transferTitle')}
+                </CardTitle>
+                <CardDescription>{t('anon.transferDescription')}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t('anon.inventory', {
+                    panel: inventory.hasPanel ? t('anon.panelYes') : t('anon.panelNo'),
+                    receipts: inventory.receipts,
+                    pending: inventory.pending,
+                  })}
+                </p>
+
+                {!exportCode ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const code = exportAnonData();
+                      if (code) setExportCode(code);
+                      else toast({ title: t('anon.nothingToExport'), variant: "destructive" });
+                    }}
+                    data-testid="anon-export"
+                  >
+                    {t('anon.exportButton')}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input readOnly value={exportCode} className="font-mono text-xs" />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(exportCode);
+                            toast({ title: t('media.linkCopied') });
+                          } catch {
+                            toast({ title: t('media.copyFailed'), variant: "destructive" });
+                          }
+                        }}
+                      >
+                        {t('panel.copy')}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-amber-700">{t('anon.exportWarning')}</p>
+                  </div>
+                )}
+
+                <div className="border-t pt-4 space-y-2">
+                  <p className="text-sm font-medium">{t('anon.importTitle')}</p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={importCode}
+                      onChange={(e) => setImportCode(e.target.value)}
+                      placeholder={t('anon.importPlaceholder')}
+                      className="font-mono text-xs"
+                      data-testid="anon-import-input"
+                    />
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      disabled={!importCode.trim() || importing}
+                      onClick={handleAnonImport}
+                      data-testid="anon-import"
+                    >
+                      {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : t('anon.importButton')}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
