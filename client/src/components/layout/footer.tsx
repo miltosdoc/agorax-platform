@@ -9,47 +9,87 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-slate-900 text-slate-300 py-12">
+    <footer className="border-t border-line-strong bg-ink text-paper">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Logo & Tagline */}
-          <div>
+        {/* ── Colophon grid ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-y-12 py-16 md:grid-cols-12 md:gap-x-8">
+          {/* Wordmark & tagline */}
+          <div className="md:col-span-6">
             <div
-              className="flex items-center gap-2 mb-4 cursor-pointer"
+              className="inline-flex cursor-pointer items-center gap-3"
               role="button"
               tabIndex={0}
               aria-label="Go to home page"
               onClick={() => navigate("/")}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate("/"); }}
             >
-              <img src={logoImage} alt="AgoraX logo" className="h-8 w-auto" />
-              <span className="text-white text-xl font-bold">AgoraX</span>
+              <img src={logoImage} alt="AgoraX logo" className="h-9 w-auto" />
+              <span className="font-serif text-4xl font-normal leading-none text-paper">
+                AgoraX
+              </span>
             </div>
-            <p className="text-sm text-slate-400">
+            <p className="mt-5 max-w-[40ch] text-sm leading-relaxed text-bc-ink-soft">
               {t('footer.tagline')}
             </p>
           </div>
 
-          {/* Useful Links */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">{t('footer.usefulLinks')}</h3>
-            <ul className="space-y-2 text-sm">
-              <li><button className="hover:text-white transition-colors text-left text-sm" onClick={() => navigate("/how-it-works")}>{t('footer.howItWorks')}</button></li>
-              <li><button className="hover:text-white transition-colors text-left text-sm" onClick={() => navigate("/faq")}>{t('footer.faq')}</button></li>
-              <li><button className="hover:text-white transition-colors text-left text-sm" onClick={() => navigate("/terms")}>{t('footer.terms')}</button></li>
-              <li><button className="hover:text-white transition-colors text-left text-sm" onClick={() => navigate("/privacy")}>{t('footer.privacy')}</button></li>
+          {/* Useful links */}
+          <div className="md:col-span-3">
+            <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-bc-ink-soft">
+              {t('footer.usefulLinks')}
+            </h3>
+            <ul className="mt-4 divide-y divide-bc-line border-t border-bc-line">
+              <li>
+                <button
+                  className="block w-full py-2.5 text-left text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+                  onClick={() => navigate("/how-it-works")}
+                >
+                  {t('footer.howItWorks')}
+                </button>
+              </li>
+              <li>
+                <button
+                  className="block w-full py-2.5 text-left text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+                  onClick={() => navigate("/faq")}
+                >
+                  {t('footer.faq')}
+                </button>
+              </li>
+              <li>
+                <button
+                  className="block w-full py-2.5 text-left text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+                  onClick={() => navigate("/terms")}
+                >
+                  {t('footer.terms')}
+                </button>
+              </li>
+              <li>
+                <button
+                  className="block w-full py-2.5 text-left text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+                  onClick={() => navigate("/privacy")}
+                >
+                  {t('footer.privacy')}
+                </button>
+              </li>
             </ul>
           </div>
 
           {/* Contact */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">{t('footer.contact')}</h3>
-            <p className="text-sm text-slate-400">info@agorax.gr</p>
+          <div className="md:col-span-3">
+            <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-bc-ink-soft">
+              {t('footer.contact')}
+            </h3>
+            <p className="mt-4 border-t border-bc-line pt-3 font-mono text-sm text-paper">
+              info@agorax.gr
+            </p>
           </div>
         </div>
 
-        <div className="border-t border-slate-700 mt-8 pt-8 text-center text-sm text-slate-500">
-          © {new Date().getFullYear()} AgoraX — {t('general.digitalDemocracy')}
+        {/* ── Legal row ─────────────────────────────────────────────── */}
+        <div className="border-t border-bc-line py-6">
+          <p className="font-mono text-xs tabular-nums text-bc-ink-soft">
+            © {new Date().getFullYear()} AgoraX — {t('general.digitalDemocracy')}
+          </p>
         </div>
       </div>
     </footer>

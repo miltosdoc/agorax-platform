@@ -6,13 +6,15 @@
  * question + solution. Sorting is client-side (the API only exposes a
  * `limit` parameter today). Pagination uses a simple "load more" cursor
  * over an in-memory list.
+ *
+ * Composition: a legislative docket — one hairline-bounded toolbar
+ * (search line, filter grid, mono result-count strip) over a single
+ * bordered register of divided rows.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -53,6 +55,10 @@ interface Community {
 const PAGE_SIZE = 12;
 const STATUS_ALL = '__all__';
 const COMMUNITY_ALL = '__all__';
+
+/* Toolbar vocabulary: tracked eyebrow labels, flat token-bound controls. */
+const FIELD_LABEL = 'text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint';
+const FIELD_CONTROL = 'h-9 rounded border-line bg-surface text-sm text-ink';
 
 function parseScore(value: Proposal['llmScore']): number | null {
   if (value === null || value === undefined) return null;
@@ -149,108 +155,118 @@ export default function ProposalsPage() {
       title={t('proposals.title')}
       breadcrumb={[{ label: t('nav.home'), href: '/' }, { label: t('proposals.title') }]}
       actions={
-        <Button onClick={() => navigate('/proposals/new')} data-testid="proposals-new-button">
-          <Plus className="w-4 h-4 mr-2" />
+        <button
+          type="button"
+          onClick={() => navigate('/proposals/new')}
+          data-testid="proposals-new-button"
+          className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
           {t('home.submitProposal')}
-        </Button>
+        </button>
       }
     >
-      <Card className="mb-6">
-        <CardContent className="p-4 sm:p-6 space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      {/* ── Toolbar: search line / filter grid / result strip ── */}
+      <section className="mb-8 rounded border border-line bg-surface">
+        <div className="flex items-center gap-2.5 border-b border-line px-4">
+          <Search className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
+          <Input
+            type="search"
+            placeholder={t('proposals.searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-12 rounded-none border-0 bg-transparent px-0 text-sm text-ink placeholder:text-ink-faint focus-visible:ring-0 focus-visible:ring-offset-0"
+            data-testid="proposals-search"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-4 gap-y-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-5">
+          <div className="space-y-1.5">
+            <Label className={FIELD_LABEL}>{t('proposals.filterStatus')}</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger data-testid="proposals-filter-status" className={FIELD_CONTROL}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STATUS_ALL}>{t('proposals.filterStatusAll')}</SelectItem>
+                {ORDERED_STATES.map((state) => (
+                  <SelectItem key={state} value={state}>
+                    {getStatusLabel(state, t)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className={FIELD_LABEL}>{t('proposals.filterCommunity')}</Label>
+            <Select value={communityFilter} onValueChange={setCommunityFilter}>
+              <SelectTrigger data-testid="proposals-filter-community" className={FIELD_CONTROL}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={COMMUNITY_ALL}>{t('proposals.filterCommunityAll')}</SelectItem>
+                {communities.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className={FIELD_LABEL}>{t('proposals.dateFrom')}</Label>
             <Input
-              type="search"
-              placeholder={t('proposals.searchPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-              data-testid="proposals-search"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={`${FIELD_CONTROL} font-mono tabular-nums`}
+              data-testid="proposals-date-from"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('proposals.filterStatus')}</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="proposals-filter-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={STATUS_ALL}>{t('proposals.filterStatusAll')}</SelectItem>
-                  {ORDERED_STATES.map((state) => (
-                    <SelectItem key={state} value={state}>
-                      {getStatusLabel(state, t)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('proposals.filterCommunity')}</Label>
-              <Select value={communityFilter} onValueChange={setCommunityFilter}>
-                <SelectTrigger data-testid="proposals-filter-community">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={COMMUNITY_ALL}>{t('proposals.filterCommunityAll')}</SelectItem>
-                  {communities.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('proposals.dateFrom')}</Label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                data-testid="proposals-date-from"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('proposals.dateTo')}</Label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                data-testid="proposals-date-to"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label className={FIELD_LABEL}>{t('proposals.dateTo')}</Label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={`${FIELD_CONTROL} font-mono tabular-nums`}
+              data-testid="proposals-date-to"
+            />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="space-y-1 sm:w-64">
-              <Label className="text-xs text-muted-foreground">{t('proposals.sort')}</Label>
-              <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-                <SelectTrigger data-testid="proposals-sort">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="created_desc">{t('proposals.sortNewest')}</SelectItem>
-                  <SelectItem value="created_asc">{t('proposals.sortOldest')}</SelectItem>
-                  <SelectItem value="score_desc">{t('proposals.sortScoreHigh')}</SelectItem>
-                  <SelectItem value="score_asc">{t('proposals.sortScoreLow')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground" data-testid="proposals-result-count">
-                {t('proposals.resultCount', { count: filtered.length })}
-              </span>
-              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="proposals-clear-filters">
-                {t('proposals.clearFilters')}
-              </Button>
-            </div>
+          <div className="space-y-1.5">
+            <Label className={FIELD_LABEL}>{t('proposals.sort')}</Label>
+            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+              <SelectTrigger data-testid="proposals-sort" className={FIELD_CONTROL}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">{t('proposals.sortNewest')}</SelectItem>
+                <SelectItem value="created_asc">{t('proposals.sortOldest')}</SelectItem>
+                <SelectItem value="score_desc">{t('proposals.sortScoreHigh')}</SelectItem>
+                <SelectItem value="score_asc">{t('proposals.sortScoreLow')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b border-t border-line bg-sunken px-4 py-2.5">
+          <span className="font-mono text-xs tabular-nums text-ink-soft" data-testid="proposals-result-count">
+            {t('proposals.resultCount', { count: filtered.length })}
+          </span>
+          <button
+            type="button"
+            onClick={clearFilters}
+            data-testid="proposals-clear-filters"
+            className="text-xs font-medium text-kyanos underline-offset-2 hover:underline"
+          >
+            {t('proposals.clearFilters')}
+          </button>
+        </div>
+      </section>
 
       {loading ? (
         <LoadingState label={t('general.loading')} />
@@ -260,65 +276,78 @@ export default function ProposalsPage() {
           title={t('proposals.empty')}
           action={
             /* Clear-filters already lives in the filter bar above. */
-            <Button onClick={() => navigate('/proposals/new')} data-testid="proposals-empty-cta">
-              <Plus className="w-4 h-4 mr-2" />
+            <button
+              type="button"
+              onClick={() => navigate('/proposals/new')}
+              data-testid="proposals-empty-cta"
+              className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
               {t('home.submitProposal')}
-            </Button>
+            </button>
           }
         />
       ) : (
-        <div className="space-y-3" data-testid="proposals-list">
-          {visible.map((proposal) => {
-            const score = parseScore(proposal.llmScore);
-            return (
-              <Link
-                key={proposal.id}
-                href={`/proposals/${proposal.id}`}
-                className="block"
-                data-testid={`proposals-card-${proposal.id}`}
-              >
-                <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardContent className="p-4 sm:p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base sm:text-lg mb-1 line-clamp-2">{proposal.question}</h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                          {proposal.solution}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <FileText className="w-3.5 h-3.5" />
-                            {communityName(proposal.communityId, proposal.communityName)}
-                          </span>
-                          <span>
-                            {t('proposal.by')}{' '}
-                            {proposal.authorName ?? t('proposal.userWithId', { id: proposal.authorId })}
-                          </span>
-                          <span>{new Date(proposal.createdAt).toLocaleDateString()}</span>
-                          {score !== null && (
-                            <span data-testid={`proposals-score-${proposal.id}`}>
-                              {t('proposals.score')}: {Math.round(score)}/100
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <StatusBadge status={proposal.status} className="self-start" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+        <div className="space-y-6" data-testid="proposals-list">
+          {/* ── The register ── */}
+          <div className="divide-y divide-line overflow-hidden rounded border border-line bg-surface">
+            {visible.map((proposal) => {
+              const score = parseScore(proposal.llmScore);
+              return (
+                <Link
+                  key={proposal.id}
+                  href={`/proposals/${proposal.id}`}
+                  className="group block p-5 transition-colors duration-[120ms] hover:bg-sunken sm:p-6"
+                  data-testid={`proposals-card-${proposal.id}`}
+                >
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-faint">
+                    <span className="inline-flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      {communityName(proposal.communityId, proposal.communityName)}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <time dateTime={proposal.createdAt} className="font-mono tabular-nums">
+                      {new Date(proposal.createdAt).toLocaleDateString()}
+                    </time>
+                    <span className="ml-auto">
+                      <StatusBadge status={proposal.status} />
+                    </span>
+                  </div>
+
+                  <h3 className="mt-2.5 line-clamp-2 font-serif text-lg leading-snug decoration-1 underline-offset-2 group-hover:underline sm:text-xl">
+                    {proposal.question}
+                  </h3>
+
+                  <p className="mb-0 mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">
+                    {proposal.solution}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-faint">
+                    <span>
+                      {t('proposal.by')}{' '}
+                      {proposal.authorName ?? t('proposal.userWithId', { id: proposal.authorId })}
+                    </span>
+                    {score !== null && (
+                      <span className="font-mono tabular-nums" data-testid={`proposals-score-${proposal.id}`}>
+                        {t('proposals.score')}: {Math.round(score)}/100
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
 
           {hasMore && (
-            <div className="flex justify-center pt-2">
-              <Button
-                variant="outline"
+            <div className="flex justify-center">
+              <button
+                type="button"
                 onClick={() => setPageLimit((n) => n + PAGE_SIZE)}
                 data-testid="proposals-load-more"
+                className="rounded border border-ink px-4 py-2 text-sm font-medium text-ink transition-colors duration-[120ms] hover:bg-sunken"
               >
                 {t('proposals.loadMore')}
-              </Button>
+              </button>
             </div>
           )}
         </div>
@@ -326,4 +355,3 @@ export default function ProposalsPage() {
     </AppShell>
   );
 }
-

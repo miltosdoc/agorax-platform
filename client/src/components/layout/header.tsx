@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,10 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Badge } from "@/components/ui/badge";
 import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { el as dateFnsEl, enUS as dateFnsEn } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
@@ -29,7 +25,6 @@ import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 import { useUnreadCount, useNotifications, useMarkAsRead } from "@/hooks/use-notifications";
 import type { SortitionNotification } from "@/types/notifications";
-import { notificationTypeConfig } from "@/types/notifications";
 import SearchBar from "@/components/SearchBar";
 import { downloadApk } from "@/lib/download-apk";
 import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
@@ -37,7 +32,7 @@ import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/
 export default function Header() {
   const { user, logoutMutation } = useAuth();
   const { t, locale } = useTranslation();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const dateFnsLocale = locale === 'el' ? dateFnsEl : dateFnsEn;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -93,39 +88,52 @@ export default function Header() {
   const unreadCount = unreadCountData?.count || 0;
   const notifications = notificationsData?.notifications || [];
 
+  // Current-page detection for the tier-2 nav
+  const isCommunitiesActive = location === "/communities" || location.startsWith("/communities/");
+  const isWalkthroughActive = location === "/walkthrough";
+
+  const navLinkClass = (active: boolean) =>
+    `inline-flex items-center border-b-2 px-0.5 text-sm font-medium transition-colors duration-[120ms] ${
+      active
+        ? "border-ink text-ink"
+        : "border-transparent text-ink-soft hover:text-ink"
+    }`;
+
   return (
-    <header className="bg-background/95 backdrop-blur-sm border-b border-border shadow-md sticky top-0 z-50 transition-smooth">
-      <div className="container mx-auto px-4 py-2 sm:py-3 flex justify-between items-center gap-3 sm:gap-4">
-        <div className="flex items-center min-w-0">
-          <Link
-            href={user ? "/feed" : "/"}
-            className="flex items-center gap-2 sm:gap-3 transition-smooth hover:opacity-80"
-            data-testid="logo-link"
-          >
-            <img
-              src={logoImage}
-              alt=""
-              className="h-8 sm:h-10 w-auto flex-shrink-0"
-            />
-            <div className="min-w-0">
-              <span className="text-primary text-xl sm:text-2xl font-bold font-sans block leading-tight">
-                AgoraX
-              </span>
-              <span className="text-muted-foreground text-xs sm:text-sm hidden sm:block leading-tight mt-0.5">
-                {t('general.digitalDemocracy')}
-              </span>
-            </div>
-          </Link>
-        </div>
+    <header className="sticky top-0 z-50 border-b border-line bg-paper">
+      {/* Institutional signature: solid ink rule across the very top */}
+      <div className="h-1 bg-ink" aria-hidden="true" />
+
+      {/* ── Tier 1: masthead ── */}
+      <div className="container mx-auto flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2.5 sm:gap-x-3 sm:py-3">
+        <Link
+          href={user ? "/feed" : "/"}
+          className="mr-auto flex min-w-0 items-center gap-2.5 sm:gap-3"
+          data-testid="logo-link"
+        >
+          <img
+            src={logoImage}
+            alt=""
+            className="h-8 w-auto flex-shrink-0 sm:h-9"
+          />
+          <span className="min-w-0">
+            <span className="block font-serif text-xl leading-none text-ink sm:text-2xl">
+              AgoraX
+            </span>
+            <span className="mt-1 hidden font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-ink-faint sm:block">
+              {t('general.digitalDemocracy')}
+            </span>
+          </span>
+        </Link>
 
         {!user ? (
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <LanguageSwitcher />
             {/* Desktop buttons */}
             <button
               type="button"
               onClick={() => navigate("/auth")}
-              className="hidden sm:inline-flex items-center justify-center whitespace-nowrap h-11 px-4 text-sm font-medium transition-smooth border border-border hover:bg-muted hover:border-primary rounded-md cursor-pointer"
+              className="hidden h-9 items-center justify-center whitespace-nowrap rounded-sm border border-ink px-3.5 text-sm font-medium text-ink transition-colors duration-[120ms] hover:bg-sunken sm:inline-flex"
               data-testid="button-login"
             >
               {t('auth.login')}
@@ -133,28 +141,22 @@ export default function Header() {
             <button
               type="button"
               onClick={() => navigate("/auth?tab=register")}
-              className="hidden sm:inline-flex items-center justify-center whitespace-nowrap h-11 px-4 text-sm font-medium transition-smooth shadow-sm hover:shadow-md bg-primary hover:bg-primary/90 text-white rounded-md cursor-pointer"
+              className="hidden h-9 items-center justify-center whitespace-nowrap rounded-sm bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep sm:inline-flex"
               data-testid="button-register"
             >
               {t('auth.register')}
             </button>
-            <button
-              type="button"
-              onClick={() => navigate("/walkthrough")}
-              className="hidden sm:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted rounded-md px-3 py-2 cursor-pointer"
-              data-testid="button-walkthrough"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>{t('nav.process')}</span>
-            </button>
             {/* Mobile hamburger */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="sm:hidden min-h-[44px] min-w-[44px] p-2">
+                <button
+                  type="button"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-ink transition-colors duration-[120ms] hover:bg-sunken sm:hidden"
+                >
                   <Menu className="h-5 w-5" />
-                </Button>
+                </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 mt-2">
+              <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
                 <DropdownMenuItem onClick={() => navigate("/auth")} className="cursor-pointer">
                   {t('auth.login')}
                 </DropdownMenuItem>
@@ -174,82 +176,63 @@ export default function Header() {
             </DropdownMenu>
           </div>
         ) : (
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 justify-end">
-            <div className="flex-1 max-w-md min-w-0">
+          <>
+            {/* Search: inline on desktop, wraps to its own full-width line on mobile */}
+            <div className="order-last w-full sm:order-none sm:w-56 md:w-72 lg:w-80">
               <SearchBar />
             </div>
-            {/* Communities — integral nav destination, always one click away on desktop */}
-            <button
-              type="button"
-              onClick={() => navigate("/communities")}
-              className="hidden sm:flex items-center gap-2 min-h-[44px] transition-smooth hover:bg-muted border border-border hover:border-primary rounded-md px-3 py-2 cursor-pointer"
-              data-testid="button-communities"
-            >
-              <Users className="h-4 w-4" />
-              <span>{t('nav.communities')}</span>
-            </button>
 
-            {/* Primary CTA */}
-            <button
-              type="button"
-              onClick={() => navigate("/proposals/new")}
-              className="hidden sm:flex items-center gap-2 min-h-[44px] bg-primary hover:bg-primary/90 text-white transition-smooth shadow-sm hover:shadow-md rounded-md px-3 py-2 cursor-pointer"
-              data-testid="button-new-proposal"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>{t('nav.newProposal')}</span>
-            </button>
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <LanguageSwitcher />
 
-            {/* Notification Bell */}
-            <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="relative min-h-[44px] min-w-[44px] transition-smooth hover:bg-muted hover:border-primary"
-                  data-testid="button-notifications"
-                >
-                  <Bell className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
-                      data-testid="badge-notification-count"
-                    >
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-80 p-0 mt-2" data-testid="popover-notifications">
-                <div className="border-b p-4">
-                  <h3 className="font-semibold text-sm">{t('notification.title')}</h3>
-                </div>
-                <div className="max-h-[400px] overflow-y-auto">
-                  {notificationsLoading ? (
-                    <div className="p-4 text-center text-sm text-muted-foreground" data-testid="text-loading-notifications">
-                      {t('notification.loading')}
-                    </div>
-                  ) : notifications.length > 0 ? (
-                    <div className="divide-y" data-testid="list-notifications">
-                      {notifications.map((notification) => {
-                        const config = notificationTypeConfig[notification.type] || { icon: '📋', color: 'bg-gray-50 border-gray-200' };
-                        return (
+              {/* Notification Bell */}
+              <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken hover:text-ink"
+                    data-testid="button-notifications"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {unreadCount > 0 && (
+                      <span
+                        className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-sm bg-kyanos px-1 font-mono text-[10px] leading-none tabular-nums text-paper"
+                        data-testid="badge-notification-count"
+                      >
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="mt-2 w-80 rounded-sm border-line p-0" data-testid="popover-notifications">
+                  <div className="border-b border-line px-4 py-3">
+                    <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                      {t('notification.title')}
+                    </h3>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notificationsLoading ? (
+                      <div className="p-4 text-center text-sm text-ink-faint" data-testid="text-loading-notifications">
+                        {t('notification.loading')}
+                      </div>
+                    ) : notifications.length > 0 ? (
+                      <div className="divide-y divide-line" data-testid="list-notifications">
+                        {notifications.map((notification) => (
                           <div
                             key={notification.id}
                             onClick={() => handleNotificationClick(notification)}
-                            className={`p-3 cursor-pointer transition-smooth hover:bg-muted ${!notification.read ? "bg-muted/30" : ""}`}
+                            className={`cursor-pointer p-3 transition-colors duration-[120ms] hover:bg-sunken ${!notification.read ? "bg-kyanos-wash" : ""}`}
                             data-testid={`notification-item-${notification.id}`}
                           >
-                            <div className="flex items-start gap-2">
-                              <span className="text-lg flex-shrink-0 mt-0.5">{config.icon}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm ${!notification.read ? "font-semibold" : ""}`}>
+                            <div className="flex items-start gap-2.5">
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-sm text-ink ${!notification.read ? "font-semibold" : ""}`}>
                                   {notification.title}
                                 </p>
                                 {notification.message && (
-                                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{notification.message}</p>
+                                  <p className="mt-0.5 line-clamp-1 text-xs text-ink-soft">{notification.message}</p>
                                 )}
-                                <p className="text-xs text-muted-foreground mt-1" data-testid={`text-time-ago-${notification.id}`}>
+                                <p className="mt-1 font-mono text-[11px] tabular-nums text-ink-faint" data-testid={`text-time-ago-${notification.id}`}>
                                   {formatDistanceToNow(new Date(notification.createdAt), {
                                     addSuffix: true,
                                     locale: dateFnsLocale
@@ -257,188 +240,230 @@ export default function Header() {
                                 </p>
                               </div>
                               {!notification.read && (
-                                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" data-testid="indicator-unread" />
+                                <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-kyanos" data-testid="indicator-unread" />
                               )}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-sm text-muted-foreground" data-testid="text-no-notifications">
-                      {t('notification.empty')}
-                    </div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-sm text-ink-faint" data-testid="text-no-notifications">
+                        {t('notification.empty')}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
-            <LanguageSwitcher />
-
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={`flex items-center gap-1 sm:gap-2 transition-smooth hover:bg-muted hover:border-primary min-h-[44px] min-w-[44px] ${user.govgrVerified ? "border-green-500 bg-green-50/50" : ""}`}
-                  data-testid="button-user-menu"
-                >
-                  {user.govgrVerified ? (
-                    <Shield className="h-4 w-4 text-green-600 flex-shrink-0" />
-                  ) : (
-                    <UserCircle className="h-5 w-5 flex-shrink-0" />
-                  )}
-                  <span className="hidden sm:inline truncate max-w-[120px] md:max-w-[150px]">{user.name}</span>
-                  <ChevronDown className="h-4 w-4 flex-shrink-0" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 mt-2">
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                  {user.govgrVerified ? (
-                    <div className="flex items-center text-green-600 font-medium">
-                      <Shield className="mr-1 h-3 w-3" />
-                      {t('ballot.verified')}
-                    </div>
-                  ) : (
-                    <span className="text-amber-600">{t('ballot.unverified')}</span>
-                  )}
-                </div>
-                <DropdownMenuSeparator />
-
-                {!user.govgrVerified && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setIsVerifyModalOpen(true);
-                      setIsMenuOpen(false);
-                    }}
-                    className="cursor-pointer transition-smooth bg-blue-50 text-blue-700 focus:bg-blue-100 focus:text-blue-800"
-                    data-testid="menu-verify"
+              <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border px-2 text-sm text-ink transition-colors duration-[120ms] sm:px-3 ${
+                      user.govgrVerified
+                        ? "border-yper bg-yper-wash"
+                        : "border-line hover:border-line-strong hover:bg-sunken"
+                    }`}
+                    data-testid="button-user-menu"
                   >
-                    <Shield className="mr-2 h-4 w-4" />
-                    {t('ballot.verify')}
-                  </DropdownMenuItem>
-                )}
+                    {user.govgrVerified ? (
+                      <Shield className="h-4 w-4 flex-shrink-0 text-yper" />
+                    ) : (
+                      <UserCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
+                    )}
+                    <span className="hidden max-w-[120px] truncate sm:inline md:max-w-[150px]">{user.name}</span>
+                    <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-ink-faint" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
+                  <div className="px-2 py-1.5 text-xs">
+                    {user.govgrVerified ? (
+                      <div className="flex items-center font-medium text-yper">
+                        <Shield className="mr-1 h-3 w-3" />
+                        {t('ballot.verified')}
+                      </div>
+                    ) : (
+                      <span className="text-warn">{t('ballot.unverified')}</span>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
 
-                <DropdownMenuItem
-                  onClick={() => navigate("/home")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-dashboard"
-                >
-                  <Home className="mr-2 h-4 w-4" />
-                  {t('dashboard.title')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/profile")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-profile"
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  {t('nav.profile')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/proposals")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-proposals"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  {t('nav.proposals')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/communities")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-communities"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  {t('nav.communities')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/sortition")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-sortition"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  {t('nav.sortition')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/surveys")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-surveys"
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  {t('nav.surveys')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/points")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-points"
-                >
-                  <Coins className="mr-2 h-4 w-4" />
-                  {t('nav.points')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate("/walkthrough")}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-walkthrough"
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  {t('nav.walkthrough')}
-                </DropdownMenuItem>
-                {user.isAdmin && (
+                  {!user.govgrVerified && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setIsVerifyModalOpen(true);
+                        setIsMenuOpen(false);
+                      }}
+                      className="cursor-pointer bg-kyanos-wash text-kyanos-deep focus:bg-kyanos-wash focus:text-kyanos-deep"
+                      data-testid="menu-verify"
+                    >
+                      <Shield className="mr-2 h-4 w-4" />
+                      {t('ballot.verify')}
+                    </DropdownMenuItem>
+                  )}
+
                   <DropdownMenuItem
-                    onClick={() => navigate("/analytics")}
-                    className="cursor-pointer transition-smooth"
-                    data-testid="menu-analytics"
+                    onClick={() => navigate("/home")}
+                    className="cursor-pointer"
+                    data-testid="menu-dashboard"
                   >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    {t('nav.analytics')}
+                    <Home className="mr-2 h-4 w-4" />
+                    {t('dashboard.title')}
                   </DropdownMenuItem>
-                )}
-                {user.isAdmin && (
                   <DropdownMenuItem
-                    onClick={() => navigate("/admin/accounts")}
-                    className="cursor-pointer transition-smooth"
-                    data-testid="menu-admin-accounts"
+                    onClick={() => navigate("/profile")}
+                    className="cursor-pointer"
+                    data-testid="menu-profile"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    {t('nav.profile')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/proposals")}
+                    className="cursor-pointer"
+                    data-testid="menu-proposals"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    {t('nav.proposals')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/communities")}
+                    className="cursor-pointer"
+                    data-testid="menu-communities"
                   >
                     <Users className="mr-2 h-4 w-4" />
-                    {t('nav.adminAccounts')}
+                    {t('nav.communities')}
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={handleApkDownload}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-android-download"
-                >
-                  <Smartphone className="mr-2 h-4 w-4" />
-                  {t('android.downloadMenuLabel')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    // Keep the menu open so the check state is visible.
-                    e.preventDefault();
-                    const next = !feedbackOn;
-                    setFeedbackWidgetEnabled(next);
-                    setFeedbackOn(next);
-                  }}
-                  className="cursor-pointer transition-smooth"
-                  data-testid="menu-feedback-toggle"
-                >
-                  <MessageSquarePlus className="mr-2 h-4 w-4" />
-                  <span className="flex-1">{t('feedback.toggleLabel')}</span>
-                  {feedbackOn && <Check className="ml-2 h-4 w-4 text-green-600" />}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer transition-smooth text-red-600 focus:text-red-600"
-                  data-testid="menu-logout"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t('auth.logout')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/sortition")}
+                    className="cursor-pointer"
+                    data-testid="menu-sortition"
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    {t('nav.sortition')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/surveys")}
+                    className="cursor-pointer"
+                    data-testid="menu-surveys"
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    {t('nav.surveys')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/points")}
+                    className="cursor-pointer"
+                    data-testid="menu-points"
+                  >
+                    <Coins className="mr-2 h-4 w-4" />
+                    {t('nav.points')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate("/walkthrough")}
+                    className="cursor-pointer"
+                    data-testid="menu-walkthrough"
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    {t('nav.walkthrough')}
+                  </DropdownMenuItem>
+                  {user.isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/analytics")}
+                      className="cursor-pointer"
+                      data-testid="menu-analytics"
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      {t('nav.analytics')}
+                    </DropdownMenuItem>
+                  )}
+                  {user.isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/accounts")}
+                      className="cursor-pointer"
+                      data-testid="menu-admin-accounts"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      {t('nav.adminAccounts')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={handleApkDownload}
+                    className="cursor-pointer"
+                    data-testid="menu-android-download"
+                  >
+                    <Smartphone className="mr-2 h-4 w-4" />
+                    {t('android.downloadMenuLabel')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      // Keep the menu open so the check state is visible.
+                      e.preventDefault();
+                      const next = !feedbackOn;
+                      setFeedbackWidgetEnabled(next);
+                      setFeedbackOn(next);
+                    }}
+                    className="cursor-pointer"
+                    data-testid="menu-feedback-toggle"
+                  >
+                    <MessageSquarePlus className="mr-2 h-4 w-4" />
+                    <span className="flex-1">{t('feedback.toggleLabel')}</span>
+                    {feedbackOn && <Check className="ml-2 h-4 w-4 text-yper" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-kata focus:text-kata"
+                    data-testid="menu-logout"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {t('auth.logout')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </>
         )}
       </div>
+
+      {/* ── Tier 2: nav row (desktop) ── */}
+      {!user ? (
+        <nav className="hidden border-t border-line sm:block">
+          <div className="container mx-auto flex h-11 items-stretch px-4">
+            <button
+              type="button"
+              onClick={() => navigate("/walkthrough")}
+              className={navLinkClass(isWalkthroughActive)}
+              data-testid="button-walkthrough"
+            >
+              {t('nav.process')}
+            </button>
+          </div>
+        </nav>
+      ) : (
+        <nav className="hidden border-t border-line sm:block">
+          <div className="container mx-auto flex h-11 items-stretch gap-6 px-4">
+            <button
+              type="button"
+              onClick={() => navigate("/communities")}
+              className={navLinkClass(isCommunitiesActive)}
+              data-testid="button-communities"
+            >
+              {t('nav.communities')}
+            </button>
+
+            {/* Primary CTA */}
+            <button
+              type="button"
+              onClick={() => navigate("/proposals/new")}
+              className="ml-auto inline-flex items-center gap-2 self-center rounded-sm bg-ink px-3.5 py-1.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+              data-testid="button-new-proposal"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>{t('nav.newProposal')}</span>
+            </button>
+          </div>
+        </nav>
+      )}
 
       <VerifyGovgrModal
         isOpen={isVerifyModalOpen}
