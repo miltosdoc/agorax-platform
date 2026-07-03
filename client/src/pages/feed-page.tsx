@@ -174,8 +174,8 @@ function FeedItemCard({ item, onShare }: { item: MediaFeedItem; onShare: (item: 
             <span>·</span>
             <span>{created}</span>
             {item.isFeatured && (
-              <Badge variant="default" className="bg-amber-500">
-                <Star className="w-3 h-3 mr-1" />
+              <Badge variant="outline" className="border-bronze text-bronze bg-bronze-wash gap-1">
+                <Star className="w-3 h-3" />
                 {t('media.featured')}
               </Badge>
             )}
@@ -300,8 +300,8 @@ export default function FeedPage() {
     <AppShell>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         <div>
-          <h1 className="text-2xl font-bold mb-1">{t('feed.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('feed.subtitle')}</p>
+          <h1 className="mb-1">{t('feed.title')}</h1>
+          <p className="text-sm text-ink-soft max-w-[65ch]">{t('feed.subtitle')}</p>
         </div>
 
         <div className="flex gap-2" data-testid="feed-filter">
