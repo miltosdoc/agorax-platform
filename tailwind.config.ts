@@ -5,12 +5,35 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        serif: ["GFS Didot", "Georgia", "Times New Roman", "serif"],
+        display: ["GFS Didot", "Georgia", "Times New Roman", "serif"],
+        mono: ["IBM Plex Mono", "Menlo", "Consolas", "monospace"],
+      },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 1px)",
+        sm: "max(2px, calc(var(--radius) - 2px))",
       },
       colors: {
+        /* ── AgoraX named palette (design-system tokens) ── */
+        paper: "var(--paper)",
+        surface: "var(--surface)",
+        sunken: "var(--sunken)",
+        line: { DEFAULT: "var(--line)", strong: "var(--line-strong)" },
+        ink: { DEFAULT: "var(--ink)", soft: "var(--ink-soft)", faint: "var(--ink-faint)" },
+        kyanos: { DEFAULT: "var(--kyanos)", deep: "var(--kyanos-deep)", wash: "var(--kyanos-wash)" },
+        yper: { DEFAULT: "var(--yper)", wash: "var(--yper-wash)" },
+        kata: { DEFAULT: "var(--kata)", wash: "var(--kata-wash)" },
+        apochi: { DEFAULT: "var(--apochi)", wash: "var(--apochi-wash)" },
+        warn: { DEFAULT: "var(--warn)", wash: "var(--warn-wash)" },
+        bronze: { DEFAULT: "var(--bronze)", deep: "var(--bronze-deep)", wash: "var(--bronze-wash)" },
+        bc: {
+          ground: "var(--bc-ground)", panel: "var(--bc-panel)", line: "var(--bc-line)",
+          "ink": "var(--bc-ink)", "ink-soft": "var(--bc-ink-soft)",
+          yper: "var(--bc-yper)", kata: "var(--bc-kata)", apochi: "var(--bc-apochi)", live: "var(--bc-live)",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

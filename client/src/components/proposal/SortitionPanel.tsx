@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
 import { Users, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
+import { SortitionDraw } from '@/components/ceremony/SortitionDraw';
 
 interface SortitionBodySnapshot {
   body: {
@@ -167,34 +168,18 @@ export function SortitionPanel({ proposalId, proposalStatus }: SortitionPanelPro
           <Progress value={responseRate} />
         </div>
 
-        {/* Member avatars */}
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">
-            {t('workspace.sortition.selected_members') || 'Επιλεγμένα μέλη'}
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {snap.members.map((m) => (
-              <div
-                key={m.memberId}
-                className={`flex items-center gap-2 p-2 rounded border ${
-                  m.responded ? 'border-green-200 bg-green-50' : 'border-muted bg-background'
-                }`}
-              >
-                {m.profilePicture ? (
-                  <img src={m.profilePicture} alt="" className="w-7 h-7 rounded-full object-cover" />
-                ) : (
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                    {(m.name || m.username).slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{m.name || m.username}</p>
-                </div>
-                {m.responded && <CheckCircle2 className="w-3 h-3 text-green-600 flex-shrink-0" />}
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Ceremony III — the sortition draw. */}
+        <SortitionDraw
+          seed={snap.baseline}
+          size={total}
+          members={snap.members.map((m) => ({
+            memberId: m.memberId,
+            name: m.name,
+            username: m.username,
+            responded: m.responded,
+          }))}
+          settled={!!body.selectedAt}
+        />
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 pt-2 border-t">

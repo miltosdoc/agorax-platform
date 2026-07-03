@@ -781,6 +781,11 @@ const en: TranslationDictionary = {
   'proposal.flagExplanation': 'Flag AI errors to improve the system',
 
   // Vote panel
+  'vote.receiptHash': 'Chain fingerprint · SHA-256',
+  'vote.receiptVerifyNote': 'The fingerprint is stored only on this device. Verify that it was counted at any time — no one, not even an administrator, knows it is yours.',
+  'vote.live': 'In progress',
+  'vote.participationShort': 'Turnout',
+  'vote.quorumShort': 'Quorum',
   'vote.panelTitle': 'Final Ratification Vote',
   'vote.ballotPendingTitle': 'Your ballot is sealed — casting soon',
   'vote.ballotPendingBody': 'For your vote to stay unlinkable to your identity, a privacy delay separates ballot issuance from casting. Your vote is cast automatically when the timer ends — you can keep this page open or come back later; the ballot is saved in this browser.',
@@ -847,6 +852,11 @@ const en: TranslationDictionary = {
   'sortition.attendance.status.accepted': 'Confirmed',
   'sortition.attendance.status.declined': 'Declined',
   'sortition.attendance.status.no-show': 'No-show',
+  'sortition.drawTitle': 'The draw',
+  'sortition.drawRule': 'Cryptographically secure, unbiased random selection. The seed is recorded for audit.',
+  'sortition.drawSeed': 'Recorded seed',
+  'sortition.drawChosen': 'Chosen {n} of {size}',
+  'sortition.drawSelected': 'Drawn',
   'sortition.attendance.status.completed': 'Completed',
 
   // Sortition role card

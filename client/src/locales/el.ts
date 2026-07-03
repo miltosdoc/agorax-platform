@@ -783,6 +783,11 @@ const el: TranslationDictionary = {
   // Dashboard — active assignments
 
   // Vote panel
+  'vote.receiptHash': 'Αποτύπωμα αλυσίδας · SHA-256',
+  'vote.receiptVerifyNote': 'Το αποτύπωμα αποθηκεύεται μόνο σε αυτή τη συσκευή. Επαληθεύστε την καταμέτρησή του ανά πάσα στιγμή — κανείς, ούτε ο διαχειριστής, δεν γνωρίζει ότι είναι δικό σας.',
+  'vote.live': 'Σε εξέλιξη',
+  'vote.participationShort': 'Συμμετοχή',
+  'vote.quorumShort': 'Απαρτία',
   'vote.panelTitle': 'Τελική Ψηφοφορία Εγκρίσεως',
   'vote.ballotPendingTitle': 'Το ψηφοδέλτιό σας σφραγίστηκε — καταχωρείται σύντομα',
   'vote.ballotPendingBody': 'Για να μη συνδέεται η ψήφος σας με την ταυτότητά σας, μεσολαβεί μια καθυστέρηση ιδιωτικότητας ανάμεσα στην έκδοση και την καταχώρηση του ψηφοδελτίου. Η ψήφος καταχωρείται αυτόματα όταν λήξει ο χρόνος — μπορείτε να αφήσετε τη σελίδα ανοιχτή ή να επιστρέψετε αργότερα· το ψηφοδέλτιο είναι αποθηκευμένο σε αυτόν τον browser.',
@@ -847,6 +852,11 @@ const el: TranslationDictionary = {
   'sortition.attendance.status.accepted': 'Επιβεβαιώθηκε',
   'sortition.attendance.status.declined': 'Απορρίφθηκε',
   'sortition.attendance.status.no-show': 'Δεν εμφανίστηκε',
+  'sortition.drawTitle': 'Η κλήρωση',
+  'sortition.drawRule': 'Κρυπτογραφικά ασφαλής, αμερόληπτη τυχαία επιλογή. Ο σπόρος καταγράφεται για έλεγχο.',
+  'sortition.drawSeed': 'Καταγεγραμμένος σπόρος',
+  'sortition.drawChosen': 'Εκλέχθηκαν {n} από {size}',
+  'sortition.drawSelected': 'Εκλέγεται',
   'sortition.attendance.status.completed': 'Ολοκληρώθηκε',
 
   // Sortition role card

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
+import { BallotReceipt } from '@/components/ceremony/BallotReceipt';
+import { BroadcastResults } from '@/components/ceremony/BroadcastResults';
 import {
   ThumbsUp,
   ThumbsDown,
@@ -319,7 +321,7 @@ export default function VotePanel({
         {/* Mode badge — always visible so the voter sees the privacy property */}
         <div className="flex items-center gap-2 text-xs">
           {isAnonymous ? (
-            <Badge variant="default" className="gap-1 bg-emerald-700 hover:bg-emerald-700">
+            <Badge variant="default" className="gap-1 bg-yper hover:bg-yper text-white border-transparent">
               <ShieldCheck className="w-3 h-3" />
               {t('vote.anonymousMode') || 'Ανώνυμη / Anonymous'}
             </Badge>
@@ -344,7 +346,7 @@ export default function VotePanel({
         )}
 
         {isVoting && (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-900">
+          <div className="rounded-md border border-yper/30 bg-yper-wash px-3 py-2 text-xs text-yper">
             {t('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
           </div>
         )}
@@ -383,8 +385,8 @@ export default function VotePanel({
                 variant={results.userVote === 'yes' ? 'default' : 'outline'}
                 className={
                   results.userVote === 'yes'
-                    ? 'gap-2 bg-green-600 hover:bg-green-700'
-                    : 'gap-2 border-green-500 text-green-700 hover:bg-green-50'
+                    ? 'gap-2 bg-yper hover:bg-yper text-white border-transparent'
+                    : 'gap-2 border-yper text-yper hover:bg-yper-wash'
                 }
                 onClick={() => handleCastVote('yes')}
                 disabled={voting}
@@ -397,8 +399,8 @@ export default function VotePanel({
                 variant={results.userVote === 'no' ? 'default' : 'outline'}
                 className={
                   results.userVote === 'no'
-                    ? 'gap-2 bg-red-600 hover:bg-red-700'
-                    : 'gap-2 border-red-500 text-red-700 hover:bg-red-50'
+                    ? 'gap-2 bg-kata hover:bg-kata text-white border-transparent'
+                    : 'gap-2 border-kata text-kata hover:bg-kata-wash'
                 }
                 onClick={() => handleCastVote('no')}
                 disabled={voting}
@@ -426,24 +428,22 @@ export default function VotePanel({
           </div>
         )}
 
-        {userVoted && !showVoteButtons && (
+        {/* Ceremony I — the ballot receipt (anonymous voter, one-shot). */}
+        {userVoted && !showVoteButtons && isAnonymous && localReceipt && (
+          <BallotReceipt
+            choice={localReceipt.choice}
+            rowHash={localReceipt.rowHash}
+            castAt={localReceipt.castAt}
+          />
+        )}
+
+        {/* Pseudonymous confirmation — quiet line, re-cast allowed while voting. */}
+        {userVoted && !showVoteButtons && !(isAnonymous && localReceipt) && (
           <div className="flex items-center justify-between p-3 rounded border bg-muted/30">
             <div className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <CheckCircle2 className="w-4 h-4 text-yper" />
               <span>
-                {isAnonymous && localReceipt ? (
-                  <>
-                    {t('vote.youVoted')}{' '}
-                    <span className="font-medium">
-                      {localReceipt.choice === 'yes' && t('proposal.support')}
-                      {localReceipt.choice === 'no' && t('proposal.oppose')}
-                      {localReceipt.choice === 'abstain' && t('proposal.abstain')}
-                    </span>{' '}
-                    <span className="text-muted-foreground">
-                      ({t('vote.receiptStoredLocally') || 'απόδειξη αποθηκευμένη μόνο τοπικά'})
-                    </span>
-                  </>
-                ) : results.userVote ? (
+                {results.userVote ? (
                   <>
                     {t('vote.youVoted')}{' '}
                     <span className="font-medium">
@@ -457,7 +457,6 @@ export default function VotePanel({
                 )}
               </span>
             </div>
-            {/* Anonymous = one-shot: no re-cast button. */}
             {isVoting && !isAnonymous && (
               <Button variant="outline" size="sm" onClick={() => setChanging(true)} data-testid="vote-change">
                 {t('vote.changeVote')}
@@ -467,7 +466,7 @@ export default function VotePanel({
         )}
 
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="flex items-center gap-2 p-3 bg-kata-wash border border-kata/30 rounded text-sm text-kata">
             <XCircle className="w-4 h-4" />
             <span>{error}</span>
           </div>
@@ -483,75 +482,17 @@ export default function VotePanel({
             </div>
           </div>
         ) : (
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="flex items-center gap-1">
-                <ThumbsUp className="w-4 h-4 text-green-600" />
-                {t('proposal.support')}
-              </span>
-              <span className="font-medium">
-                {results.yes} ({yesShare}%)
-              </span>
-            </div>
-            <Progress value={yesShare} className="h-2" />
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="flex items-center gap-1">
-                <ThumbsDown className="w-4 h-4 text-red-600" />
-                {t('proposal.oppose')}
-              </span>
-              <span className="font-medium">
-                {results.no} ({noShare}%)
-              </span>
-            </div>
-            <Progress value={noShare} className="h-2" />
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="flex items-center gap-1">
-                <MinusCircle className="w-4 h-4 text-muted-foreground" />
-                {t('proposal.abstain')}
-              </span>
-              <span className="font-medium">
-                {results.abstain} ({abstainShare}%)
-              </span>
-            </div>
-            <Progress value={abstainShare} className="h-2" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 pt-2 text-xs text-muted-foreground">
-            <div>
-              <div>{t('vote.decisiveSplit')}</div>
-              <div className="text-foreground font-medium">
-                {yesPercent}% / {noPercent}%
-              </div>
-            </div>
-            <div>
-              {quorumPercent === 0 ? (
-                <>
-                  <div>{t('proposal.participation_no_quorum', { pct: participationPercent }) || `Συμμετοχή: ${participationPercent}%`}</div>
-                  <div className="text-muted-foreground">
-                    {t('vote.noQuorumRequired') || 'Δεν απαιτείται απαρτία'}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    {t('proposal.participation', { pct: participationPercent, quorum: quorumPercent })}
-                  </div>
-                  <div className={results.meetsQuorum ? 'text-green-700 font-medium' : 'text-amber-700 font-medium'}>
-                    {results.meetsQuorum ? t('vote.quorumMet') : t('vote.quorumNotMet')}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="text-xs text-center text-muted-foreground">
-            {t('proposal.totalVotes', { count: results.total })}
-          </div>
-        </div>
+          /* Ceremony II — election-night broadcast results. */
+          <BroadcastResults
+            yes={results.yes}
+            no={results.no}
+            abstain={results.abstain}
+            total={results.total}
+            participationPct={results.participationPct}
+            quorumPct={results.minParticipationPct}
+            meetsQuorum={results.meetsQuorum}
+            live={isVoting}
+          />
         )}
 
         {isVoting && userIsAuthor && (
