@@ -12,7 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, CheckCircle, Edit3, TrendingUp, Users, Vote,
   Shield, ArrowRight, Zap, Globe, Lock, Award,
-  Mic, Rss, Bell, Video
+  Mic, Rss, Bell, Video, Smartphone
 } from "lucide-react";
 
 export default function HowItWorksPage() {
@@ -245,6 +245,34 @@ export default function HowItWorksPage() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+
+          {/* Android app — download & install (sideload) guide */}
+          <div className="mt-16 mb-16" id="android-app">
+            <h2 className="text-2xl font-bold text-center mb-2">{t('hiw.app_title')}</h2>
+            <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+              {t('hiw.app_subtitle')}
+            </p>
+            <Card className="max-w-3xl mx-auto">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 shrink-0">
+                    <Smartphone className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="text-sm text-muted-foreground">{t('hiw.app_note')}</div>
+                </div>
+                <ol className="space-y-4">
+                  {[t('hiw.app_step1'), t('hiw.app_step2'), t('hiw.app_step3'), t('hiw.app_step4')].map((step, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm text-muted-foreground leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Polls & anonymous panel */}
