@@ -20,6 +20,7 @@ import { api, ApiError } from '@/lib/api';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
+  editProposalId?: number;  // When set, edit an existing draft instead of creating
 }
 
 interface MemberCommunity {
@@ -28,7 +29,7 @@ interface MemberCommunity {
   isGeneral?: boolean;
 }
 
-export function ProposalForm({ communityId }: ProposalFormProps) {
+export function ProposalForm({ communityId, editProposalId }: ProposalFormProps) {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -60,6 +61,21 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
     solution: '',
     category: '',
   });
+
+  // Edit mode: load the existing draft into the form.
+  useEffect(() => {
+    if (!editProposalId) return;
+    api.get<{ question: string; solution: string; category: string | null; communityId: number; status: string }>(
+      `/api/proposals/${editProposalId}`,
+    ).then((resp) => {
+      setFormData({
+        question: resp.data.question ?? '',
+        solution: resp.data.solution ?? '',
+        category: resp.data.category ?? '',
+      });
+      setSelectedCommunityId(resp.data.communityId);
+    }).catch(() => setError(t('proposal.create_error')));
+  }, [editProposalId, t]);
 
   // AI-assisted drafting (same UX as the poll compiler): describe the idea
   // in plain language, the LLM fills the fields below, the author edits.
@@ -108,7 +124,9 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
     setError(null);
 
     try {
-      const res = await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, formData);
+      const res = editProposalId
+        ? await apiRequest('PATCH', `/api/proposals/${editProposalId}`, formData)
+        : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, formData);
 
       if (!res.ok) {
         const data = await res.json();
@@ -116,7 +134,7 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
       }
 
       const proposal = await res.json();
-      setLocation(`/proposals/${proposal.id}`);
+      setLocation(`/proposals/${editProposalId ?? proposal.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.unknown_error'));
     } finally {
@@ -127,9 +145,9 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('proposal.submit_title')}</CardTitle>
+        <CardTitle>{editProposalId ? t('proposal.edit_title') : t('proposal.submit_title')}</CardTitle>
         <CardDescription>
-          {t('proposal.submit_description')}
+          {editProposalId ? t('proposal.edit_description') : t('proposal.submit_description')}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -280,7 +298,7 @@ export function ProposalForm({ communityId }: ProposalFormProps) {
                   {t('proposal.submitting')}
                 </>
               ) : (
-                t('proposal.submit_button')
+                editProposalId ? t('proposal.edit_button') : t('proposal.submit_button')
               )}
             </Button>
           </div>

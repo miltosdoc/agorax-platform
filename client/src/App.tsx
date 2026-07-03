@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect, Router } from "wouter";
+import { Switch, Route, Redirect, Router, useParams } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -59,7 +59,13 @@ function CommunitiesPage() {
   );
 }
 
-function ProposalFormPage() {
+function EditProposalFormPage() {
+  const params = useParams();
+  const editId = params.id && /^\d+$/.test(params.id) ? parseInt(params.id, 10) : undefined;
+  return <ProposalFormPage editId={editId} />;
+}
+
+function ProposalFormPage({ editId }: { editId?: number }) {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('community');
   const communityId = raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : undefined;
@@ -67,7 +73,7 @@ function ProposalFormPage() {
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <ProposalForm communityId={communityId} />
+        <ProposalForm communityId={communityId} editProposalId={editId} />
       </div>
       <Footer />
     </div>
@@ -139,6 +145,7 @@ function AppRouter() {
         <ProtectedRoute path="/communities/:id" component={CommunityDashboardPage} />
         <Route path="/proposals" component={ProposalsPage} />
         <ProtectedRoute path="/proposals/new" component={ProposalFormPage} />
+        <ProtectedRoute path="/proposals/:id/edit" component={EditProposalFormPage} />
         <ProtectedRoute path="/proposals/:id" component={ProposalDetailPage} />
         <ProtectedRoute path="/feed" component={FeedPage} />
         <ProtectedRoute path="/sortition" component={SortitionDashboardPage} />

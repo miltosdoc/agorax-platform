@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, FileText, Trash2, Mic } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, Trash2, Mic, Pencil } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api, ApiError } from '@/lib/api';
@@ -220,6 +220,17 @@ export default function ProposalDetailPage() {
                   text={proposal.solution ?? undefined}
                   iconOnly
                 />
+                {userIsAuthor && proposal.status === 'draft' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setLocation(`/proposals/${proposal.id}/edit`)}
+                    data-testid="proposal-edit"
+                  >
+                    <Pencil className="w-4 h-4 mr-1" />
+                    {t('proposal.edit') || 'Edit'}
+                  </Button>
+                )}
                 {userIsAuthor && proposal.status === 'draft' && (
                   <Button
                     size="sm"

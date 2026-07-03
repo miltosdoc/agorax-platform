@@ -356,7 +356,11 @@ const en: TranslationDictionary = {
 
   // Proposal Form
   'proposal.submit_title': 'Submit Proposal',
-  'proposal.submit_description': 'Submit a proposal for your community. Each proposal must include a question (the problem) and a solution.',
+  'proposal.edit_title': 'Edit draft',
+  'proposal.edit_description': 'Update your draft. Changes are saved without submitting — submit for AI review from the proposal page when ready.',
+  'proposal.edit_button': 'Save changes',
+  'proposal.edit': 'Edit',
+  'proposal.submit_description': 'Fill in your proposal. It is saved as a draft you can come back to — you submit it for AI review as a separate step, from the proposal page.',
   'proposal.ai_intent_label': 'Describe your idea in plain words',
   'proposal.ai_intent_placeholder': 'e.g. My neighborhood has no bike lanes and children are at risk…',
   'proposal.ai_generate': 'Fill in with AI',
@@ -380,8 +384,8 @@ const en: TranslationDictionary = {
   'proposal.category_governance': 'Governance',
   'proposal.category_other': 'Other',
   'proposal.create_error': 'Failed to create proposal',
-  'proposal.submit_button': 'Submit Proposal',
-  'proposal.submitting': 'Submitting...',
+  'proposal.submit_button': 'Save as draft',
+  'proposal.submitting': 'Saving…',
 
   // Verify Gov.gr Modal
   'verify.title': 'Gov.gr Identity Verification',

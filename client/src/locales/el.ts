@@ -356,7 +356,11 @@ const el: TranslationDictionary = {
 
   // Proposal Form
   'proposal.submit_title': 'Υπόβαλε Πρόταση',
-  'proposal.submit_description': 'Υποβάλετε μια πρόταση για την κοινότητά σας. Κάθε πρόταση πρέπει να περιλαμβάνει ένα ερώτημα (το πρόβλημα) και μια λύση.',
+  'proposal.edit_title': 'Επεξεργασία προσχεδίου',
+  'proposal.edit_description': 'Ενημερώστε το προσχέδιό σας. Οι αλλαγές αποθηκεύονται χωρίς υποβολή — υποβάλετε για έλεγχο από ΤΝ από τη σελίδα της πρότασης όταν είστε έτοιμοι.',
+  'proposal.edit_button': 'Αποθήκευση αλλαγών',
+  'proposal.edit': 'Επεξεργασία',
+  'proposal.submit_description': 'Συμπληρώστε την πρότασή σας. Αποθηκεύεται ως προσχέδιο που μπορείτε να επεξεργαστείτε αργότερα — η υποβολή για έλεγχο από ΤΝ γίνεται ξεχωριστά, από τη σελίδα της πρότασης.',
   'proposal.ai_intent_label': 'Περιγράψτε την ιδέα σας με απλά λόγια',
   'proposal.ai_intent_placeholder': 'π.χ. Στη γειτονιά μου δεν υπάρχουν ποδηλατόδρομοι και τα παιδιά κινδυνεύουν…',
   'proposal.ai_generate': 'Συμπλήρωση με AI',
@@ -380,8 +384,8 @@ const el: TranslationDictionary = {
   'proposal.category_governance': 'Διακυβέρνηση',
   'proposal.category_other': 'Άλλο',
   'proposal.create_error': 'Αποτυχία δημιουργίας πρότασης',
-  'proposal.submit_button': 'Υποβολή Πρότασης',
-  'proposal.submitting': 'Υποβολή...',
+  'proposal.submit_button': 'Αποθήκευση προσχεδίου',
+  'proposal.submitting': 'Αποθήκευση…',
 
   // Verify Gov.gr Modal
   'verify.title': 'Επαλήθευση Ταυτότητας Gov.gr',
