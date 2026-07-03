@@ -30,24 +30,23 @@ export default function AppShell({ title, breadcrumb, actions, children }: AppSh
 
       {breadcrumb && breadcrumb.length > 0 && (
         <nav
-          className="border-b bg-muted/30"
           aria-label="Breadcrumb"
           data-testid="appshell-breadcrumb"
         >
-          <div className="container mx-auto px-4 py-2 max-w-6xl">
-            <ol className="flex items-center flex-wrap gap-1 text-sm text-muted-foreground">
+          <div className="container mx-auto px-4 pt-4 pb-1 max-w-6xl">
+            <ol className="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm text-ink-faint">
               {breadcrumb.map((item, idx) => {
                 const isLast = idx === breadcrumb.length - 1;
                 return (
-                  <li key={`${item.label}-${idx}`} className="flex items-center gap-1">
+                  <li key={`${item.label}-${idx}`} className="flex items-center gap-2">
                     {item.href && !isLast ? (
-                      <Link href={item.href} className="hover:text-foreground transition-colors">
+                      <Link href={item.href} className="text-kyanos hover:underline underline-offset-2">
                         {item.label}
                       </Link>
                     ) : (
-                      <span className={isLast ? "text-foreground font-medium" : ""}>{item.label}</span>
+                      <span aria-current="page" className="text-ink-soft">{item.label}</span>
                     )}
-                    {!isLast && <ChevronRight className="w-3 h-3" />}
+                    {!isLast && <ChevronRight className="w-3 h-3 text-line-strong" aria-hidden="true" />}
                   </li>
                 );
               })}
