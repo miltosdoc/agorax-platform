@@ -85,7 +85,7 @@ Per `GDPR_FORMALIZATION_BRIEF.md` §1B, the DPIA must record the following verba
 > - Audit log of admin actions (verify schema and write paths).
 > - Append-only ledger gives tamper-evidence for after-the-fact rewrites of *which* vote a member cast.
 >
-> **Risk acceptance:** the controller (AMKE "Restart Democracy") accepts this residual risk for non-binding, consultative voting in the closed-member instance, on the basis of explicit Article 9(2)(a) consent at onboarding plus Article 9(2)(d) association-processing carve-out. **Binding ratification votes do not run on this stack** until Option A is delivered and reviewed.
+> **Risk acceptance:** the controller (the platform operator) accepts this residual risk for non-binding, consultative voting in the closed-member instance, on the basis of explicit Article 9(2)(a) consent at onboarding plus Article 9(2)(d) association-processing carve-out. **Binding ratification votes do not run on this stack** until Option A is delivered and reviewed.
 
 ---
 

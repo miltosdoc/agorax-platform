@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document consolidates all research and architectural decisions for implementing Phase 2 of the AgoraX platform: extending the storage interface and API routes to support Demopolis deliberation features (communities, proposals, sortition, amendments, debate) while establishing the identity, coercion-resistance, and cryptographic-tallying foundations required for a legitimate direct-democracy platform operating at Greek national scale.
+This document consolidates all research and architectural decisions for implementing Phase 2 of the AgoraX platform: extending the storage interface and API routes to support deliberation features (communities, proposals, sortition, amendments, debate) while establishing the identity, coercion-resistance, and cryptographic-tallying foundations required for a legitimate direct-democracy platform operating at Greek national scale.
 
 This revision incorporates critical architectural decisions made during review:
 
@@ -925,7 +925,7 @@ Before Phase 2 implementation begins, the project must formally decide:
 ## 15.5 Phase 2.0 Implementation Status (2026-04-23)
 
 **COMPLETED:**
-- ✅ Storage layer: ~30 Demopolis methods (communities, proposals, amendments, sortition, debate, support)
+- ✅ Storage layer: ~30 deliberation methods (communities, proposals, amendments, sortition, debate, support)
 - ✅ API routes: 16 endpoints for community/proposal/debate management
 - ✅ State machine: 5-state proposal lifecycle (draft → review → deliberation → voting → decided)
 - ✅ Sortition algorithm: Cryptographically secure random selection with verifiable seed
@@ -952,7 +952,7 @@ Before Phase 2 implementation begins, the project must formally decide:
 
 ## 16. References
 
-- **MERGE_PLAN.md** — Full Demopolis→AgorX merge strategy (schema, storage, routes, LLM, frontend)
+- **MERGE_PLAN.md** — Full deliberation-module merge strategy (schema, storage, routes, LLM, frontend)
 - **Helios Voting System** — https://github.com/benadida/helios-server
 - **Benaloh, J. (2006)** "Simple Verifiable Elections" — USENIX EVT
 - **Decidim** — https://github.com/decidim/decidim
@@ -963,5 +963,4 @@ Before Phase 2 implementation begins, the project must formally decide:
 - **NIST Randomness Beacon** — https://beacon.nist.gov/
 - **IRMA / Idemix** — Anonymous credential systems
 - **OSCE/ODIHR** — International election observation standards
-- **Demopolis design documents** — `~/.hermes/demopolis/Draft/docs/`
 - **AgoraX codebase** — `~/.hermes/agorax-build/`

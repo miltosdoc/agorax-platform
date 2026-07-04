@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * - PostgreSQL + Redis running (docker-compose up)
  * - DEMO_MODE=true (demo users available)
  * 
- * Demo users: miltos, elena, giorgos, maria, kostas (all password: 'password')
+ * Demo users: dimitris, elena, giorgos, maria, kostas (all password: 'password')
  */
 
 test.describe('Proposal Full Lifecycle', () => {
@@ -20,7 +20,7 @@ test.describe('Proposal Full Lifecycle', () => {
   test.beforeEach(async ({ page }) => {
     // Login as demo user
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -145,7 +145,7 @@ test.describe('Proposal Full Lifecycle', () => {
 test.describe('Proposal Creation Edge Cases', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -206,7 +206,7 @@ test.describe('Proposal Creation Edge Cases', () => {
 test.describe('Proposal Results Display', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');

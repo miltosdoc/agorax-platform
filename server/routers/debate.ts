@@ -56,7 +56,7 @@ export function registerDebateRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to oppose argument" });
     }
   });
-  // ─── Demopolis: Debate Threads (Διάλογος σε νήματα) ───────────────────────
+  // ─── Debate Threads (Διάλογος σε νήματα) ───────────────────────
   app.get("/api/proposals/:id/debate", async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -127,5 +127,5 @@ export function registerDebateRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to vote on debate thread" });
     }
   });
-  // ─── Demopolis: Proposal Support Routes ────────────────────────────────────
+  // ─── Proposal Support Routes ────────────────────────────────────
 }

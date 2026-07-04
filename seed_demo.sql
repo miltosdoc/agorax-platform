@@ -5,7 +5,7 @@
 
 -- Demo Users
 INSERT INTO users (id, username, name, email, password) VALUES
-  (1, 'miltos', 'Μιλτιάδης Τριανταφύλλου', 'miltos@agorax.gr', '$2b$10$demo'),
+  (1, 'dimitris', 'Δημήτρης Παπαδόπουλος', 'dimitris@agorax.gr', '$2b$10$demo'),
   (2, 'elena', 'Ελένα Παπαδοπούλου', 'elena@agorax.gr', '$2b$10$demo'),
   (3, 'giorgos', 'Γιώργος Νικολάου', 'giorgos@agorax.gr', '$2b$10$demo'),
   (4, 'maria', 'Μαρία Κωνσταντίνου', 'maria@agorax.gr', '$2b$10$demo'),

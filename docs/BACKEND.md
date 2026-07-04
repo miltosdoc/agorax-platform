@@ -107,7 +107,7 @@ shared/
 - `id` (PK), `pollId` → polls.id, `questionId` → poll_questions.id
 - `userId` → users.id, `answerId` → poll_answers.id, `answerValue` (JSONB)
 
-### Demopolis Tables (Deliberation Democracy)
+### Deliberation Democracy Tables
 
 **communities** — Governance communities
 - `id` (PK), `name`, `description`
@@ -303,7 +303,7 @@ archived → (none — terminal)
 | GET | `/api/ballot/stats/:pollId` | — | Get ballot voting stats |
 | GET | `/api/ballot/health` | — | Ballot system health check |
 
-### Communities (Demopolis)
+### Communities
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -317,7 +317,7 @@ archived → (none — terminal)
 | DELETE | `/api/communities/:id/members` | ✓ | Remove member |
 | GET | `/api/communities/:id/democracy-score` | — | Get democracy score |
 
-### Proposals (Demopolis)
+### Proposals
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -708,7 +708,7 @@ Environment variables (from `server/config.ts`):
 ### Demo Mode
 
 When `DEMO_MODE=true`, the system creates dummy users with bcrypt hashes that accept any password:
-- `miltos`, `elena`, `giorgos`, `maria`, `kostas`
+- `dimitris`, `elena`, `giorgos`, `maria`, `kostas`
 
 ---
 

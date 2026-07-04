@@ -232,7 +232,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to submit proposal" });
     }
   });
-  // ─── Demopolis: Amendment Routes ───────────────────────────────────────────
+  // ─── Amendment Routes ───────────────────────────────────────────
   app.post("/api/proposals/:id/support", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -255,7 +255,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch support" });
     }
   });
-  // ─── Demopolis: Proposal Final Ratification Vote Routes ────────────────────
+  // ─── Proposal Final Ratification Vote Routes ────────────────────
   // Cast a final ratification vote. Routed through the configured
   // VotingBackend (see server/voting/) — today's hash-chain backend records
   // an append-only SHA-256 chain; a future Helios backend would encrypt the
@@ -617,7 +617,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to finalize proposal" });
     }
   });
-  // ─── Demopolis: State Machine Routes ───────────────────────────────────────
+  // ─── State Machine Routes ───────────────────────────────────────
   app.post("/api/proposals/:id/transition", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -673,7 +673,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to transition proposal" });
     }
   });
-  // ─── Demopolis: Sortition Routes ──────────────────────────────────────────
+  // ─── Sortition Routes ──────────────────────────────────────────
   app.get("/api/proposals/:id/attendance", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);

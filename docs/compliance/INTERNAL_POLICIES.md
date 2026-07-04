@@ -1,6 +1,6 @@
 # Internal Policies — Access, Retention, Breach, Erasure
 
-**Audience:** AMKE staff with access to the AgoraX systems.
+**Audience:** platform staff with access to the AgoraX systems.
 **Version:** 2026-05-25
 **Status:** Draft for controller review and sign-off.
 **Inputs:** [DPIA.md](DPIA.md), [ROPA.md](ROPA.md), audits [01](01_VOTE_LINKAGE_AUDIT.md), [02](02_DATA_MINIMIZATION_AUDIT.md), [03](03_OPERATIONAL_AUDITS.md).
@@ -15,7 +15,7 @@
 
 | Role | Holders | Database read | Database write | Server SSH | Vote↔identity join |
 |---|---|---|---|---|---|
-| Controller representative | Miltos Triantafyllou | ✅ | ✅ | ✅ | ✅ (with audit log) |
+| Controller representative | (internal record) | ✅ | ✅ | ✅ | ✅ (with audit log) |
 | Technical admin | TBD (named, ≤2 people) | ✅ | ✅ | ✅ | ✅ (with audit log) |
 | Application service (Node) | service user | ✅ (scoped) | ✅ (scoped) | ❌ | implicit via app code |
 | Application service (Python ballot) | service user | ✅ (own tables) | ✅ (own tables) | ❌ | ❌ |
@@ -119,7 +119,7 @@ A near-miss (e.g., port-scan probe with no successful intrusion) is not a breach
 
 ### 3.2 The 72-hour clock
 
-Starts when **any AMKE staff member becomes aware** of the breach (not when it's confirmed). Notification to the HDPA is mandatory unless the breach is unlikely to result in risk to data subjects.
+Starts when **any platform staff member becomes aware** of the breach (not when it's confirmed). Notification to the HDPA is mandatory unless the breach is unlikely to result in risk to data subjects.
 
 ### 3.3 Decision tree
 
@@ -158,7 +158,7 @@ breach detected
 | Decision | Who |
 |---|---|
 | Containment (immediate) | Whichever admin is online — act first, ask later |
-| HDPA notification | Controller representative (Miltos) — within the 72-hour window |
+| HDPA notification | Controller representative — within the 72-hour window |
 | Member notification | Controller representative + technical admin agreement |
 | Public statement | Controller representative |
 
@@ -203,5 +203,5 @@ This policy must be re-issued (and a new version logged in [README.md](README.md
 
 | Role | Name | Date | Signature |
 |---|---|---|---|
-| Controller representative | Miltos Triantafyllou | TBD | |
+| Controller representative | (internal record) | TBD | |
 | Technical admin | TBD | TBD | |

@@ -31,3 +31,4 @@ declaration*.png
 Thumbs.db
 # Early-user feedback submissions (reviewed on the server)
 feedback/
+downloads/*.apk

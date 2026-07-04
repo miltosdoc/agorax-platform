@@ -196,7 +196,7 @@ export const pollUserResponses = pgTable("poll_user_responses", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ─── Demopolis: Communities (Κοινότητες) ──────────────────────────────────────
+// ─── Communities (Κοινότητες) ──────────────────────────────────────
 
 export const communities = pgTable("communities", {
   id: serial("id").primaryKey(),
@@ -283,7 +283,7 @@ export const communitySettingVotes = pgTable("community_setting_votes", {
   communitySettingVoteUnique: uniqueIndex('community_setting_votes_unique_idx').on(table.communityId, table.settingKey, table.userId),
 }));
 
-// ─── Demopolis: Proposals (Προβουλεύματα) ────────────────────────────────────
+// ─── Proposals (Προβουλεύματα) ────────────────────────────────────
 
 export const proposals = pgTable("proposals", {
   id: serial("id").primaryKey(),
@@ -327,7 +327,7 @@ export const proposals = pgTable("proposals", {
   phaseDeadline: timestamp("phase_deadline"),
 });
 
-// ─── Demopolis: Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────
+// ─── Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────
 
 export const proposalAmendments = pgTable("proposal_amendments", {
   id: serial("id").primaryKey(),
@@ -357,7 +357,7 @@ export const proposalAmendments = pgTable("proposal_amendments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ─── Demopolis: Amendment Rejection Votes (Κρίση κοινότητας) ─────────────────
+// ─── Amendment Rejection Votes (Κρίση κοινότητας) ─────────────────
 
 export const amendmentRejectionVotes = pgTable("amendment_rejection_votes", {
   id: serial("id").primaryKey(),
@@ -369,7 +369,7 @@ export const amendmentRejectionVotes = pgTable("amendment_rejection_votes", {
   amendmentVoteUnique: uniqueIndex('amendment_vote_unique').on(table.amendmentId, table.userId),
 }));
 
-// ─── Demopolis: LLM Validation Results (Αξιολογήσεις LLM) ────────────────────
+// ─── LLM Validation Results (Αξιολογήσεις LLM) ────────────────────
 // Persists the structured output of `validateProposal` so the score, the
 // freeform feedback, the per-criterion breakdown, and the routing category
 // (return / sortition / auto_approve) survive across requests. The
@@ -387,7 +387,7 @@ export const validationResults = pgTable("validation_results", {
   validatedAt: timestamp("validated_at").notNull().defaultNow(),
 });
 
-// ─── Demopolis: Sortition Notifications ──────────────────────────────────────
+// ─── Sortition Notifications ──────────────────────────────────────
 
 export const sortitionNotifications = pgTable("sortition_notifications", {
   id: serial("id").primaryKey(),
@@ -404,7 +404,7 @@ export const sortitionNotifications = pgTable("sortition_notifications", {
   readAt: timestamp("read_at"),
 });
 
-// ─── Demopolis: Sortition Bodies (Κληρωτά Σώματα) ────────────────────────────
+// ─── Sortition Bodies (Κληρωτά Σώματα) ────────────────────────────
 
 export const sortitionBodies = pgTable("sortition_bodies", {
   id: serial("id").primaryKey(),
@@ -435,7 +435,7 @@ export const sortitionMembers = pgTable("sortition_members", {
   sortitionMemberUnique: uniqueIndex('sortition_member_unique').on(table.bodyId, table.userId),
 }));
 
-// ─── Demopolis: Debate Threads (Διάλογος σε νήματα) ──────────────────────────
+// ─── Debate Threads (Διάλογος σε νήματα) ──────────────────────────
 // Real-time threaded discussion attached to a proposal during deliberation.
 // `parentId` is null for top-level threads and points at another row for
 // replies. Active only while the proposal is in a deliberation state — the
@@ -464,7 +464,7 @@ export const debateVotes = pgTable("debate_votes", {
   debateVoteUnique: uniqueIndex('debate_vote_unique').on(table.threadId, table.userId),
 }));
 
-// ─── Demopolis: Debate Arguments (Διάλογος) ──────────────────────────────────
+// ─── Debate Arguments (Διάλογος) ──────────────────────────────────
 
 export const debateArguments = pgTable("debate_arguments", {
   id: serial("id").primaryKey(),
@@ -481,7 +481,7 @@ export const debateArguments = pgTable("debate_arguments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ─── Demopolis: Proposal Support (Συγκέντρωση Υποστήριξης) ───────────────────
+// ─── Proposal Support (Συγκέντρωση Υποστήριξης) ───────────────────
 
 export const proposalSupport = pgTable("proposal_support", {
   id: serial("id").primaryKey(),
@@ -493,7 +493,7 @@ export const proposalSupport = pgTable("proposal_support", {
   proposalSupportUnique: uniqueIndex('proposal_support_unique').on(table.proposalId, table.userId, table.type),
 }));
 
-// ─── Demopolis: Proposal Final Ratification Votes (Επικυρωτική Ψηφοφορία) ────
+// ─── Proposal Final Ratification Votes (Επικυρωτική Ψηφοφορία) ────
 // Append-only ledger of ratification votes cast during the `voting` phase.
 // Each row links to its predecessor via prev_hash, forming a per-proposal
 // SHA-256 hash chain. A user changing their vote inserts a NEW row and the
@@ -937,7 +937,7 @@ export const pollUserResponsesRelations = relations(pollUserResponses, ({ one })
   }),
 }));
 
-// ─── Demopolis Relations ─────────────────────────────────────────────────────
+// ─── Deliberation Relations ─────────────────────────────────────────────────────
 
 export const communitiesRelations = relations(communities, ({ one, many }) => ({
   creator: one(users, {
@@ -1159,7 +1159,7 @@ export const rankingVoteSchema = z.object({
 export const insertPollQuestionSchema = createInsertSchema(pollQuestions).omit({ id: true });
 export const insertPollAnswerSchema = createInsertSchema(pollAnswers).omit({ id: true });
 export const insertPollUserResponseSchema = createInsertSchema(pollUserResponses).omit({ id: true, createdAt: true });
-// Demopolis Insert Schemas
+// Deliberation Insert Schemas
 export const insertCommunitySchema = createInsertSchema(communities).omit({ id: true, createdAt: true });
 export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, lastChangedAt: true });
 export const insertCommunityMemberSchema = createInsertSchema(communityMembers).omit({ id: true, joinedAt: true });
@@ -1286,7 +1286,7 @@ export type PollAnswer = typeof pollAnswers.$inferSelect;
 export type PollUserResponse = typeof pollUserResponses.$inferSelect;
 export type BallotVote = typeof ballotVotes.$inferSelect;
 
-// Demopolis Types
+// Deliberation Types
 export type Community = typeof communities.$inferSelect;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type CommunityMember = typeof communityMembers.$inferSelect;
@@ -1313,7 +1313,7 @@ export type LivekitParticipation = typeof livekitParticipations.$inferSelect;
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
 
-// Demopolis Insert Types
+// Deliberation Insert Types
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type InsertCommunityMember = z.infer<typeof insertCommunityMemberSchema>;
@@ -1374,7 +1374,7 @@ export type PollWithQuestions = Poll & {
   userVoted?: boolean;
 };
 
-// Demopolis extended types
+// Deliberation extended types
 export type CommunityWithMembers = Community & {
   members: (CommunityMember & { user: SafeUser })[];
   creator: SafeUser;

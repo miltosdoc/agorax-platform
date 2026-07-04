@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-31
 **Decision:** Option B — Single service with hard internal separation
-**Decision maker:** Hermes Agent (automated analysis per Miltos' work order)
-**Review required:** Miltos approval before production deployment
+**Decision maker:** Hermes Agent (automated analysis per maintainer work order)
+**Review required:** Maintainer approval before production deployment
 
 ---
 

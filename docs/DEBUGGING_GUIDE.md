@@ -47,7 +47,7 @@ npx playwright test            # E2E tests (requires dev server running)
 
 | Username | Password | Role |
 |----------|----------|------|
-| miltos   | password | Admin |
+| dimitris  | password | Admin |
 | elena    | password | Member |
 | giorgos  | password | Member |
 | maria    | password | Member |
@@ -217,7 +217,7 @@ curl -X POST http://localhost:3001/api/proposals \
 ```bash
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"miltos","password":"password"}'
+  -d '{"username":"dimitris","password":"password"}'
 ```
 
 ---

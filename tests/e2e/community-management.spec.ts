@@ -12,7 +12,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Community Creation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -68,7 +68,7 @@ test.describe('Community Creation', () => {
 test.describe('Community Settings', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -131,7 +131,7 @@ test.describe('Community Settings', () => {
 test.describe('Community Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');

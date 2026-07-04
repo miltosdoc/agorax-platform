@@ -1,4 +1,4 @@
-# Open Questions — AgoraX / Demopolis
+# Open Questions — AgoraX
 
 Compiled: 2026-04-23
 
@@ -167,7 +167,7 @@ Compiled: 2026-04-23
 
 ### P12. Platform Governance
 **Source:** Implicit
-**Question:** Who governs the platform itself? The Demopolis working group? A foundation? The code is open-source but deployment and domain ownership are centralized.
+**Question:** Who governs the platform itself? The platform working group? A foundation? The code is open-source but deployment and domain ownership are centralized.
 **Status:** Unresolved.
 
 ---

@@ -1,7 +1,7 @@
 # Identity & Vote-Anonymity Audit
 
 **Date:** 2026-05-31
-**Auditor:** Hermes (per design brief from Miltos, 2026-05-31)
+**Auditor:** Hermes (per maintainer design brief, 2026-05-31)
 **Scope:** Complete trace of identity↔vote linkage across all storage, logging, and in-memory structures. Gap analysis against target architecture (§2-§6 of design brief).
 **Status:** AUDIT COMPLETE — implementation pending review.
 

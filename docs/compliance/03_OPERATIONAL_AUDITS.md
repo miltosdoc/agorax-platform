@@ -104,24 +104,24 @@ Append-only, preserves consent history, supports withdrawal (Art. 7(3) right to 
 
 ## 4. LICENSE inconsistency — controller decision required
 
-**Brief §4.4:** *"LICENSE inconsistency (MIT vs CC-BY-NC-4.0 in package.json) — not GDPR, but flag it; legal coherence of the entity matters for the AMKE."*
+**Brief §4.4:** *"LICENSE inconsistency (MIT vs CC-BY-NC-4.0 in package.json) — not GDPR, but flag it; legal coherence of the entity matters for the operator."*
 
 ### Findings
 
 | Source | Declared license |
 |---|---|
-| `LICENSE` (root file, the legally canonical artifact) | **MIT** (Copyright 2024-2026 Demopolis Working Group & Miltos Triantafyllou) |
+| `LICENSE` (root file, the legally canonical artifact) | **MIT** (Copyright 2024-2026 The AgoraX Project contributors) |
 | `package.json:8` | **CC-BY-NC-4.0** |
 
 The repo currently grants two contradictory rights regimes. MIT is a permissive software license; CC-BY-NC-4.0 is a Creative Commons license intended for creative works, with a **non-commercial** restriction. A downstream consumer reading either can claim they relied on the more permissive interpretation.
 
 ### Options (pick one — not auto-resolved)
 
-1. **MIT everywhere** — align `package.json` to match the LICENSE file. Maximum adoption; AMKE keeps copyright but anyone can fork commercially.
+1. **MIT everywhere** — align `package.json` to match the LICENSE file. Maximum adoption; the operator keeps copyright but anyone can fork commercially.
 2. **CC-BY-NC-4.0 everywhere** — replace the LICENSE file. Prevents commercial appropriation of the AgoraX platform. Note: CC-BY-NC-4.0 is **not OSI-approved** and is generally a poor fit for software (license-compatibility friction with most open-source ecosystems).
 3. **Dual: AGPL-3.0 for software + CC-BY-NC-4.0 for docs** — common civic-tech pattern. AGPL prevents commercial forks from going closed-source while staying OSI-approved.
 
-**Recommendation:** Option 3 if the AMKE wants to prevent commercial enclosure; Option 1 if the AMKE wants maximum adoption. The status quo is the worst of all worlds.
+**Recommendation:** Option 3 if the operator wants to prevent commercial enclosure; Option 1 if the operator wants maximum adoption. The status quo is the worst of all worlds.
 
 ---
 

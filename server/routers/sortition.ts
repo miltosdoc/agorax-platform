@@ -172,7 +172,7 @@ export function registerSortitionRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to complete sortition body" });
     }
   });
-  // ─── Demopolis: Sortition Assignment Routes ────────────────────────────────
+  // ─── Sortition Assignment Routes ────────────────────────────────
   app.get("/api/sortition/assignments/:id", requireAuth, async (req: any, res) => {
     try {
       const memberId = parseInt(req.params.id);
@@ -279,5 +279,5 @@ export function registerSortitionRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to synthesize scores" });
     }
   });
-  // ─── Demopolis: Democracy Score Routes ────────────────────────────────────
+  // ─── Democracy Score Routes ────────────────────────────────────
 }

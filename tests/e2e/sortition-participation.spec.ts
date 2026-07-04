@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Sortition Ceremony', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -65,7 +65,7 @@ test.describe('Sortition Ceremony', () => {
 test.describe('Sortition Body Detail', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -102,7 +102,7 @@ test.describe('Sortition Body Detail', () => {
 test.describe('Sortition Scoring Flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');
@@ -149,7 +149,7 @@ test.describe('Sortition Scoring Flow', () => {
 test.describe('Sortition Synthesis', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    await page.getByPlaceholder('Username or email').fill('miltos');
+    await page.getByPlaceholder('Username or email').fill('dimitris');
     await page.getByPlaceholder('Password').fill('password');
     await page.getByRole('button', { name: 'Login' }).click();
     await expect(page).toHaveURL('/dashboard');

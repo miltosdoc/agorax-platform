@@ -1,7 +1,7 @@
 # B3 Verification — DB-Grant Enforcement
 
 **Date:** 2026-05-31
-**Committer:** Hermes agent (on behalf of Miltos)
+**Committer:** Hermes agent (on behalf of the maintainer)
 
 ## What was done
 

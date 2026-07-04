@@ -18,7 +18,7 @@ We follow the [Contributor Covenant](https://www.contributor-covenant.org/versio
 
 ```bash
 # Clone the repository
-git clone https://github.com/miltosdoc/agoraxdemo.git
+git clone https://github.com/miltosdoc/agoraxdemocracy.git
 cd agoraxdemo
 
 # Install dependencies
@@ -68,7 +68,7 @@ agoraxdemo/
 ```bash
 git clone https://github.com/YOUR_USERNAME/agoraxdemo.git
 cd agoraxdemo
-git remote add upstream https://github.com/miltosdoc/agoraxdemo.git
+git remote add upstream https://github.com/miltosdoc/agoraxdemocracy.git
 ```
 
 ### 2. Create a Branch

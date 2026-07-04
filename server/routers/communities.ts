@@ -397,7 +397,7 @@ export function registerCommunitiesRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update member role" });
     }
   });
-  // ─── Demopolis: Proposal Routes ────────────────────────────────────────────
+  // ─── Proposal Routes ────────────────────────────────────────────
   app.post("/api/communities/:id/merge", requireAuth, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);

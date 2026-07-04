@@ -7,7 +7,7 @@
 **A deliberative-democracy platform — structured deliberation, sortition, and
 verifiable voting for civic decision-making.**
 
-AgoraX implements the *Demopolis* framework: instead of a comment section and a
+AgoraX implements a structured deliberation framework: instead of a comment section and a
 poll, a proposal moves through a defined eight-state lifecycle — community
 amendments, a randomly selected citizen jury, and a ratification vote whose
 count anyone can re-verify. It is built for Greek civic communities, bilingual

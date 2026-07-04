@@ -8,7 +8,7 @@
 
 ### 1. Υπεύθυνος επεξεργασίας
 
-**ΑΜΚΕ «Επανεκκίνηση Δημοκρατίας»** (Ελλάδα). Εκπρόσωπος: Μίλτος Τριανταφύλλου.
+**Η πλατφόρμα AgoraX** (Ελλάδα).
 
 Εποπτική αρχή: **Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (ΑΠΔΠΧ)**.
 Δικαίωμα καταγγελίας: https://www.dpa.gr.
@@ -44,7 +44,7 @@
 
 - **Πάροχος φιλοξενίας** (VPS) — αυστηρά ως εκτελών την επεξεργασία, με σύμβαση Άρθρου 28.
 - **Google** — εάν επιλέξετε σύνδεση μέσω Google OAuth, μοιράζεστε email + όνομα + provider id. Δείτε τους όρους Google.
-- **Καμία μεταφορά εκτός ΕΟΧ** — εφόσον ο πάροχος VPS βρίσκεται εντός Ε.Ε. (επιβεβαιώνεται από την ΑΜΚΕ).
+- **Καμία μεταφορά εκτός ΕΟΧ** — εφόσον ο πάροχος VPS βρίσκεται εντός Ε.Ε. (επιβεβαιώνεται από τον διαχειριστή).
 - **Καμία αποστολή σε εξωτερική υπηρεσία τεχνητής νοημοσύνης** — το προηγούμενο σύστημα ποιοτικού ελέγχου που στέλνε προτάσεις στο OpenRouter αφαιρέθηκε.
 
 ### 6. Πόσο καιρό κρατάμε τα δεδομένα σας
@@ -63,7 +63,7 @@
 
 - **Πρόσβαση** στα δεδομένα σας — `GET /api/user/data-export` (Άρθρο 15).
 - **Διόρθωση** ανακριβών δεδομένων (Άρθρο 16).
-- **Διαγραφή** — `POST /api/user/erasure-request` (Άρθρο 17). Η αίτησή σας επεξεργάζεται χειροκίνητα από διαχειριστή της ΑΜΚΕ. Λόγω της φύσης της αλυσίδας hash των ψήφων, η διαγραφή πολιτικών απόψεων από κλειστή ψηφοφορία γίνεται με κρυπτογραφικό σβήσιμο (αφαίρεση της αντιστοίχισης ψήφος↔ταυτότητα).
+- **Διαγραφή** — `POST /api/user/erasure-request` (Άρθρο 17). Η αίτησή σας επεξεργάζεται χειροκίνητα από διαχειριστή της πλατφόρμας. Λόγω της φύσης της αλυσίδας hash των ψήφων, η διαγραφή πολιτικών απόψεων από κλειστή ψηφοφορία γίνεται με κρυπτογραφικό σβήσιμο (αφαίρεση της αντιστοίχισης ψήφος↔ταυτότητα).
 - **Φορητότητα** των δεδομένων (Άρθρο 20) — το `data-export` παρέχει αναγνώσιμη μηχανικά μορφή.
 - **Ανάκληση συγκατάθεσης** — `POST /api/user/consent/withdraw` (Άρθρο 7(3)).
 - **Καταγγελία** στην ΑΠΔΠΧ.
@@ -78,7 +78,7 @@
 
 ### 9. Επικοινωνία
 
-Για ερωτήματα προστασίας δεδομένων ή για άσκηση δικαιωμάτων που δεν καλύπτονται από τα παραπάνω endpoints, στείλτε email στον υπεύθυνο της ΑΜΚΕ (στοιχεία στο CONTRIBUTING.md).
+Για ερωτήματα προστασίας δεδομένων ή για άσκηση δικαιωμάτων που δεν καλύπτονται από τα παραπάνω endpoints, επικοινωνήστε με τη διαχείριση μέσω της πλατφόρμας.
 
 ---
 
@@ -86,7 +86,7 @@
 
 ### 1. Controller
 
-**AMKE "Restart Democracy"** (Greece). Representative: Miltos Triantafyllou.
+**The AgoraX platform** (Greece).
 
 Supervisory authority: **Hellenic Data Protection Authority (HDPA)**.
 Right to complain: https://www.dpa.gr.
@@ -122,7 +122,7 @@ You may withdraw consent at any time (Art. 7(3)). Withdrawal does not affect the
 
 - **Hosting provider** (VPS) — strictly as a processor under an Art. 28 contract.
 - **Google** — if you sign up via Google OAuth, you share email + name + provider id. See Google's terms.
-- **No transfers outside the EEA** — provided the VPS host is in the EU (confirmed by the AMKE).
+- **No transfers outside the EEA** — provided the VPS host is in the EU (confirmed by the operator).
 - **No external AI processing** — the previous OpenRouter quality-gate that forwarded proposal text has been removed.
 
 ### 6. How long we keep your data
@@ -141,7 +141,7 @@ You have the right to:
 
 - **Access** your data — `GET /api/user/data-export` (Art. 15).
 - **Rectify** inaccurate data (Art. 16).
-- **Erasure** — `POST /api/user/erasure-request` (Art. 17). Your request is processed manually by an AMKE administrator. Because of the vote hash chain, erasing political-opinion data from a closed vote is done via crypto-shredding (removing the vote↔identity binding).
+- **Erasure** — `POST /api/user/erasure-request` (Art. 17). Your request is processed manually by an platform administrator. Because of the vote hash chain, erasing political-opinion data from a closed vote is done via crypto-shredding (removing the vote↔identity binding).
 - **Portability** (Art. 20) — `data-export` provides a machine-readable format.
 - **Withdraw consent** — `POST /api/user/consent/withdraw` (Art. 7(3)).
 - **Complain** to the HDPA.
@@ -156,4 +156,4 @@ You have the right to:
 
 ### 9. Contact
 
-For data-protection questions or to exercise rights not covered by the endpoints above, contact the AMKE representative (details in CONTRIBUTING.md).
+For data-protection questions or to exercise rights not covered by the endpoints above, contact the administrators through the platform.

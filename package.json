@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A comprehensive digital democracy platform built for Greek citizens to participate in transparent and reliable voting processes.",
   "private": true,
-  "author": "Miltiadis Triantafyllou",
+  "author": "The AgoraX Project contributors",
   "type": "module",
   "license": "CC-BY-NC-4.0",
   "workspaces": [

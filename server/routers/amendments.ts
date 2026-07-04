@@ -309,5 +309,5 @@ export function registerAmendmentsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to save final text" });
     }
   });
-  // ─── Demopolis: Debate Routes ──────────────────────────────────────────────
+  // ─── Debate Routes ──────────────────────────────────────────────
 }

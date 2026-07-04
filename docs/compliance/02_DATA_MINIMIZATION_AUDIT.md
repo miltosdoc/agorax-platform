@@ -55,7 +55,7 @@ These columns survive because they are load-bearing for a real, code-verifiable 
 
 **Required follow-ups for these fields:**
 - DPIA must document the retention period for each (currently unbounded — propose 12 months for IP rows after the related activity).
-- Internal Policies must record who in the AMKE can read the admin-accounts view (RBAC: `isAdmin` flag — verify the admin set is small and named).
+- Internal Policies must record who in the operating team can read the admin-accounts view (RBAC: `isAdmin` flag — verify the admin set is small and named).
 - Consent / Privacy Notice must disclose these to members at sign-up.
 
 ---

@@ -2,7 +2,7 @@
 --
 -- Closes the consent-logging gap identified in
 -- docs/compliance/03_OPERATIONAL_AUDITS.md §3. Without an audit trail,
--- the AMKE cannot evidence its Art. 9(2)(a) lawful basis for processing
+-- the operator cannot evidence its Art. 9(2)(a) lawful basis for processing
 -- members' political opinions (votes, deliberation contributions).
 --
 -- Design — append-only:

@@ -1,4 +1,4 @@
-# Demopolis → AgoraX Merge Plan
+# Deliberation Module → AgoraX Merge Plan
 
 ## Current State
 
@@ -10,8 +10,8 @@
 - **Frontend pages:** Home, Auth, Poll Details, My Polls, Poll Create/Extend, Survey Create, Profile, Groups, How It Works, FAQ, Terms, Privacy, Analytics, Admin Accounts
 - **Routing:** Wouter-based SPA (`client/src/App.tsx`), TanStack Query for data fetching, i18n via `t()` helper
 
-### Demopolis (What We Need)
-Source docs: `~/.hermes/demopolis/Draft/docs/` — 30+ files covering the full deliberation workflow.
+### Deliberation Module (What We Need)
+Source docs: internal design archive — 30+ files covering the full deliberation workflow.
 
 Key concepts from specs:
 - **Κοινότητες (Communities):** Autonomous vs. managed, with governance parameters per community
@@ -311,7 +311,7 @@ Prompt design (Greek language, evaluates):
 - Defines a specific action/solution
 
 Implementation options:
-1. **Ollama local** (PHI-safe, uses existing Miltos infrastructure)
+1. **Ollama local** (PHI-safe, uses existing maintainer infrastructure)
 2. **External API** (OpenRouter, Anthropic — configurable per community)
 3. **Configurable** via `communities.llm_provider` field
 
@@ -432,7 +432,7 @@ Functions:
 
 ---
 
-## Open Questions (from Demopolis specs)
+## Open Questions (from the deliberation specs)
 
 1. **Similar proposal merging:** AI vs. author communication? — Start with AI detection, author confirms
 2. **Should scorers know about similar proposals?** — Yes, via smart search in sortition UI

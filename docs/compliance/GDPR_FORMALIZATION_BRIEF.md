@@ -1,7 +1,7 @@
 # GDPR Formalization Brief — AgoraX (Closed Movement Instance)
 
 **Audience:** Hermes Agent
-**Owner:** Miltos (controller representative, AMKE "Restart Democracy")
+**Owner:** Controller representative (platform operator)
 **Scope:** The closed direct-democracy instance, 100–1000 verified members.
 **Goal:** Produce the *evidence* that GDPR controls exist — and, where the evidence reveals a gap, fix or formally accept the gap. This is an audit disguised as documentation. Do not generate compliance theater.
 
@@ -39,11 +39,11 @@ Do not describe the system as providing vote anonymity unless option A is verifi
 
 ## 2. Controller, jurisdiction, supervisory authority
 
-- **Controller:** AMKE "Restart Democracy" (Greece) — confirm this is the legal entity processing member data, not a Swedish entity.
+- **Controller:** the platform operator (Greece) — confirm the legal entity processing member data.
 - **Supervisory authority:** Greek HDPA (Hellenic Data Protection Authority). Note that members resident in Sweden do not change the lead authority but should be acknowledged.
 - **Lawful basis for Art. 9 data:** explicit consent (Art. 9(2)(a)) and the not-for-profit political/association carve-out (Art. 9(2)(d)) — the latter covers members only, only for internal purposes, and only if data is not disclosed externally without consent. State both; rely primarily on 9(2)(d) for membership processing and 9(2)(a) as backstop.
 
-Flag for Miltos if the controlling entity is ambiguous — it determines every downstream document.
+Flag for the maintainer if the controlling entity is ambiguous — it determines every downstream document.
 
 ---
 
@@ -93,7 +93,7 @@ Short stubs, each a few paragraphs:
 
 3. **LLM quality gate as a data flow.** If proposals (which may contain personal data / political opinion) leave the instance to a third-party model, that is the highest-volume external disclosure in the system. Confirm whether inference is local.
 
-4. **LICENSE inconsistency** (MIT vs CC-BY-NC-4.0 in package.json) — not GDPR, but flag it; legal coherence of the entity matters for the AMKE.
+4. **LICENSE inconsistency** (MIT vs CC-BY-NC-4.0 in package.json) — not GDPR, but flag it; legal coherence of the entity matters for the operator.
 
 ---
 

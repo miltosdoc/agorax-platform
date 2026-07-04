@@ -915,7 +915,7 @@ const en: TranslationDictionary = {
   'faq.q12_title': 'Is using AgoraX free?',
   'faq.q12_answer': 'Yes, basic use of the platform is free. You can register, submit proposals, participate in communities, and vote without any financial cost. The platform is funded by the communities that use it to organize their own deliberation.',
   'faq.q13_title': 'How do I contact the support team?',
-  'faq.q13_answer': 'For technical issues, questions, or suggestions about the platform, you can email agoraxdemocracy@gmail.com. If you want to access the demo or discuss collaboration, we are open.',
+  'faq.q13_answer': 'For technical issues, questions, or suggestions about the platform, you can open an issue on the project repository on GitHub. If you want to access the demo or discuss collaboration, we are open.',
   'faq.q14_title': 'What are Democracy Points?',
   'faq.q14_answer': 'Democracy Points record your civic contribution to AgoraX — authoring a validated proposal, serving on a sortition jury, casting a ratification vote, and so on. They are the modern form of ο μισθός εκκλησιαστικός, the pay Athenian citizens received for taking part in the assembly. They are not a token or cryptocurrency and cannot be bought or traded. Points carry no monetary value until the platform has real revenue to back redemption; until then they are a transparent, permanent record of participation. Your balance and the full earning schedule are on the Points page.',
   'faq.q15_title': 'How do I know the ratification vote was counted honestly?',

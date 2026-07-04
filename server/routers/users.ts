@@ -278,5 +278,5 @@ export function registerUsersRoutes(app: Express): void {
       res.status(500).json({ message: "Σφάλμα κατά την επαλήθευση ταυτότητας" });
     }
   });
-  // ─── Demopolis: Community Routes ────────────────────────────────────────────
+  // ─── Community Routes ────────────────────────────────────────────
 }
