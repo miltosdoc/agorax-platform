@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Controller | Platform operator (Greece) |
+| Controller | Platform operator (Sweden) |
 | Contact | Controller representative (internal record) |
 | Joint controllers | None |
 | Representative in EU | N/A (controller is in EU) |

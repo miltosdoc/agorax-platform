@@ -2,7 +2,7 @@
 
 **Purpose:** GDPR compliance evidence for the closed direct-democracy instance (≤1000 verified members).
 
-**Controller:** Platform operator (Greece)
+**Controller:** Platform operator (Sweden)
 **Supervisory Authority:** Greek HDPA (Hellenic Data Protection Authority)
 **Lawful Basis:** Art. 9(2)(d) — not-for-profit political/association processing; Art. 9(2)(a) — explicit consent as backstop.
 

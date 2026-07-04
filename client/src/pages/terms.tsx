@@ -58,7 +58,7 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Περιγραφή υπηρεσίας</h2>
         <p>
-          Η AgoraX είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας (Ελλάδα). Επιτρέπει σε
+          Η AgoraX είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας (Σουηδία). Επιτρέπει σε
           επαληθευμένα μέλη να υποβάλλουν προτάσεις, να καταθέτουν
           τροπολογίες, να συμμετέχουν σε διαβούλευση, σε κληρωτά σώματα κρίσης, και να ψηφίζουν
           συμβουλευτικά για το τελικό κείμενο μιας πρότασης.
@@ -195,7 +195,7 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Service description</h2>
         <p>
-          AgoraX is a closed deliberative-democracy platform (Greece). It allows verified members to submit proposals, file amendments, participate in
+          AgoraX is a closed deliberative-democracy platform (Sweden). It allows verified members to submit proposals, file amendments, participate in
           deliberation, serve on sortition (randomly selected) review bodies, and vote consultatively on
           a proposal's final text.
         </p>

@@ -8,7 +8,7 @@
 
 ### 1. Υπεύθυνος επεξεργασίας
 
-**Η πλατφόρμα AgoraX** (Ελλάδα).
+**Η πλατφόρμα AgoraX** (Σουηδία).
 
 Εποπτική αρχή: **Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (ΑΠΔΠΧ)**.
 Δικαίωμα καταγγελίας: https://www.dpa.gr.
@@ -86,7 +86,7 @@
 
 ### 1. Controller
 
-**The AgoraX platform** (Greece).
+**The AgoraX platform** (Sweden).
 
 Supervisory authority: **Hellenic Data Protection Authority (HDPA)**.
 Right to complain: https://www.dpa.gr.

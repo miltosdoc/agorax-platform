@@ -39,7 +39,7 @@ Do not describe the system as providing vote anonymity unless option A is verifi
 
 ## 2. Controller, jurisdiction, supervisory authority
 
-- **Controller:** the platform operator (Greece) — confirm the legal entity processing member data.
+- **Controller:** the platform operator (Sweden) — confirm the legal entity processing member data.
 - **Supervisory authority:** Greek HDPA (Hellenic Data Protection Authority). Note that members resident in Sweden do not change the lead authority but should be acknowledged.
 - **Lawful basis for Art. 9 data:** explicit consent (Art. 9(2)(a)) and the not-for-profit political/association carve-out (Art. 9(2)(d)) — the latter covers members only, only for internal purposes, and only if data is not disclosed externally without consent. State both; rely primarily on 9(2)(d) for membership processing and 9(2)(a) as backstop.
 
