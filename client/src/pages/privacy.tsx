@@ -59,8 +59,8 @@ function GreekContent() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Υπεύθυνος επεξεργασίας</h2>
         <p className="mb-3">
-          <strong className="text-foreground">ΑΜΚΕ «Επανεκκίνηση Δημοκρατίας»</strong> (Ελλάδα). Εκπρόσωπος:
-          Μίλτος Τριανταφύλλου. Εποπτική αρχή: <strong className="text-foreground">Αρχή Προστασίας
+          <strong className="text-foreground">Η πλατφόρμα AgoraX</strong> (Ελλάδα).
+          Εποπτική αρχή: <strong className="text-foreground">Αρχή Προστασίας
           Δεδομένων Προσωπικού Χαρακτήρα (ΑΠΔΠΧ)</strong> —{" "}
           <a href="https://www.dpa.gr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
             dpa.gr
@@ -264,8 +264,7 @@ function GreekContent() {
         <h2 className="text-xl font-semibold text-foreground mb-3">10. Επικοινωνία</h2>
         <p>
           Για κάθε ερώτημα προστασίας δεδομένων ή για άσκηση δικαιώματος που δεν καλύπτεται από τα
-          endpoints στην ενότητα 7, στείλτε email στο{" "}
-          <a href="mailto:info@agorax.gr" className="text-primary hover:underline">info@agorax.gr</a>.
+          endpoints στην ενότητα 7, επικοινωνήστε με τη διαχείριση μέσω της πλατφόρμας.
         </p>
       </section>
     </>
@@ -278,8 +277,8 @@ function EnglishContent() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Controller</h2>
         <p className="mb-3">
-          <strong className="text-foreground">AMKE "Restart Democracy"</strong> (Greece). Representative:
-          Miltos Triantafyllou. Supervisory authority:{" "}
+          <strong className="text-foreground">The AgoraX platform</strong> (Greece).
+          Supervisory authority:{" "}
           <strong className="text-foreground">Hellenic Data Protection Authority (HDPA)</strong> —{" "}
           <a href="https://www.dpa.gr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
             dpa.gr
@@ -483,8 +482,7 @@ function EnglishContent() {
         <h2 className="text-xl font-semibold text-foreground mb-3">10. Contact</h2>
         <p>
           For any data-protection question or to exercise a right not covered by the endpoints in
-          section 7, email{" "}
-          <a href="mailto:info@agorax.gr" className="text-primary hover:underline">info@agorax.gr</a>.
+          section 7, contact the administrators through the platform.
         </p>
       </section>
     </>

@@ -74,15 +74,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
-          <div className="md:col-span-3">
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-bc-ink-soft">
-              {t('footer.contact')}
-            </h3>
-            <p className="mt-4 border-t border-bc-line pt-3 font-mono text-sm text-paper">
-              info@agorax.gr
-            </p>
-          </div>
         </div>
 
         {/* ── Legal row ─────────────────────────────────────────────── */}

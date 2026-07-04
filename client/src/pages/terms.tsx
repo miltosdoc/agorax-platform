@@ -58,8 +58,8 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Περιγραφή υπηρεσίας</h2>
         <p>
-          Η AgoraX είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας της ΑΜΚΕ «Επανεκκίνηση
-          Δημοκρατίας» (Ελλάδα). Επιτρέπει σε επαληθευμένα μέλη να υποβάλλουν προτάσεις, να καταθέτουν
+          Η AgoraX είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας (Ελλάδα). Επιτρέπει σε
+          επαληθευμένα μέλη να υποβάλλουν προτάσεις, να καταθέτουν
           τροπολογίες, να συμμετέχουν σε διαβούλευση, σε κληρωτά σώματα κρίσης, και να ψηφίζουν
           συμβουλευτικά για το τελικό κείμενο μιας πρότασης.
         </p>
@@ -136,8 +136,8 @@ function GreekTerms() {
         <h2 className="text-xl font-semibold text-foreground mb-3">7. Νομική ισχύς αποτελεσμάτων</h2>
         <p>
           <strong className="text-foreground">Οι ψηφοφορίες είναι συμβουλευτικές</strong> — δεν παράγουν
-          δεσμευτικές νομικές πράξεις. Αποτελούν έκφραση της συλλογικής βούλησης των μελών της ΑΜΚΕ και
-          τροφοδοτούν τη συζήτηση των οργάνων της.
+          δεσμευτικές νομικές πράξεις. Αποτελούν έκφραση της συλλογικής βούλησης των μελών της
+          πλατφόρμας και τροφοδοτούν τη συλλογική συζήτηση.
         </p>
       </section>
 
@@ -162,7 +162,7 @@ function GreekTerms() {
           <strong className="text-foreground">CC-BY-NC-4.0</strong> (Creative Commons Attribution-NonCommercial)
           — δείτε το αρχείο LICENSE στο αποθετήριο. Επιτρέπεται η μη εμπορική επαναχρησιμοποίηση με
           αναφορά. Οι προτάσεις και τα σχόλια των μελών παραμένουν διανοητική ιδιοκτησία των μελών αλλά
-          παραχωρούνται στην ΑΜΚΕ άδεια προβολής και αρχειοθέτησης για τους σκοπούς της πλατφόρμας.
+          παραχωρείται στην πλατφόρμα άδεια προβολής και αρχειοθέτησης για τους σκοπούς της.
         </p>
       </section>
 
@@ -181,8 +181,8 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">11. Επικοινωνία</h2>
         <p>
-          Για ερωτήσεις σχετικά με τους όρους χρήσης, στείλτε email στο{" "}
-          <a href="mailto:info@agorax.gr" className="text-primary hover:underline">info@agorax.gr</a>.
+          Για ερωτήσεις σχετικά με τους όρους χρήσης, επικοινωνήστε με τη διαχείριση μέσω της
+          πλατφόρμας.
         </p>
       </section>
     </>
@@ -195,8 +195,7 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Service description</h2>
         <p>
-          AgoraX is a closed deliberative-democracy platform operated by AMKE "Restart Democracy"
-          (Greece). It allows verified members to submit proposals, file amendments, participate in
+          AgoraX is a closed deliberative-democracy platform (Greece). It allows verified members to submit proposals, file amendments, participate in
           deliberation, serve on sortition (randomly selected) review bodies, and vote consultatively on
           a proposal's final text.
         </p>
@@ -273,8 +272,8 @@ function EnglishTerms() {
         <h2 className="text-xl font-semibold text-foreground mb-3">7. Legal status of outcomes</h2>
         <p>
           <strong className="text-foreground">Votes are consultative</strong> — they do not produce
-          binding legal acts. They express the collective will of the AMKE's members and feed into the
-          deliberation of its bodies.
+          binding legal acts. They express the collective will of the platform's members and feed into
+          the community's deliberation.
         </p>
       </section>
 
@@ -298,8 +297,8 @@ function EnglishTerms() {
           <strong className="text-foreground">CC-BY-NC-4.0</strong> (Creative Commons
           Attribution-NonCommercial) — see the LICENSE file in the repository. Non-commercial reuse is
           permitted with attribution. Member proposals and comments remain the members' intellectual
-          property; by submitting, you grant the AMKE a license to display and archive them for the
-          purposes of the platform.
+          property; by submitting, you grant the platform a license to display and archive them for
+          its purposes.
         </p>
       </section>
 
@@ -318,8 +317,7 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">11. Contact</h2>
         <p>
-          For questions about these terms, email{" "}
-          <a href="mailto:info@agorax.gr" className="text-primary hover:underline">info@agorax.gr</a>.
+          For questions about these terms, contact the administrators through the platform.
         </p>
       </section>
     </>

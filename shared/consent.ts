@@ -14,7 +14,7 @@
  *      (UI gate — see PR that lands the interstitial).
  */
 
-export const CURRENT_CONSENT_VERSION = '2026-05-25';
+export const CURRENT_CONSENT_VERSION = '2026-07-04';
 
 export type ConsentLocale = 'el' | 'en';
 
@@ -26,7 +26,7 @@ export type ConsentLocale = 'el' | 'en';
 export const CONSENT_TEXT: Record<ConsentLocale, string> = {
   el: `Συγκατάθεση για επεξεργασία δεδομένων ειδικής κατηγορίας — έκδοση ${CURRENT_CONSENT_VERSION}
 
-Με την εγγραφή μου στην πλατφόρμα AgoraX της ΑΜΚΕ «Επανεκκίνηση Δημοκρατίας» συναινώ ρητά:
+Με την εγγραφή μου στην πλατφόρμα AgoraX συναινώ ρητά:
 
 1. Στην επεξεργασία των πολιτικών μου απόψεων (ψήφοι, σχόλια, προτάσεις), που αποτελούν δεδομένα ειδικής κατηγορίας κατά το Άρθρο 9 του ΓΚΠΔ.
 2. Στην ταυτοποίησή μου μέσω Gov.gr (αποθηκεύεται μόνο το hash του ΑΦΜ και τα ονομαστικά στοιχεία της Υπεύθυνης Δήλωσης — όχι το ίδιο το PDF).
@@ -38,7 +38,7 @@ export const CONSENT_TEXT: Record<ConsentLocale, string> = {
 
   en: `Consent to processing of special-category data — version ${CURRENT_CONSENT_VERSION}
 
-By registering on the AgoraX platform of AMKE "Restart Democracy" I explicitly consent to:
+By registering on the AgoraX platform I explicitly consent to:
 
 1. Processing of my political opinions (votes, comments, proposals), which constitute special-category data under GDPR Article 9.
 2. Identity verification via Gov.gr (only the salted hash of my AFM and the named demographics from the Solemn Declaration are retained — never the PDF itself).
