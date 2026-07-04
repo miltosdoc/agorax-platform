@@ -104,7 +104,7 @@
 - **Critical decision:** §1 vote-linkage — default `VOTING_BACKEND=hash-chain` stores cleartext votes linked to verified identity. Must resolve to Option A (architectural fix — unlinkable ballots) or Option B (pseudonymity honestly labelled with residual risk acceptance). Binding votes cannot run on cleartext without honest documentation.
 - **Other tensions:** Right to erasure vs append-only hash-chain, AFM salted hash re-identifiability, LLM quality gate external data flow, LICENSE inconsistency (MIT vs CC-BY-NC-4.0)
 - **Deliverables:** `docs/compliance/` directory with DPIA.md, ROPA.md, PRIVACY_NOTICE.md, CONSENT.md, INTERNAL_POLICIES.md, README.md
-- **Why:** Processing political opinions = Article 9 special-category data. DPIA is legally required. Without it, the operator has no defensible position with HDPA.
+- **Why:** Processing political opinions = Article 9 special-category data. DPIA is legally required. Without it, the operator has no defensible position with the supervisory authority (IMY).
 
 ### 9. Polish & Launch Prep
 - **Status:** Future

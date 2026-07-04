@@ -60,12 +60,12 @@ function GreekContent() {
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Υπεύθυνος επεξεργασίας</h2>
         <p className="mb-3">
           <strong className="text-foreground">Η πλατφόρμα AgoraX</strong> (Σουηδία).
-          Εποπτική αρχή: <strong className="text-foreground">Αρχή Προστασίας
-          Δεδομένων Προσωπικού Χαρακτήρα (ΑΠΔΠΧ)</strong> —{" "}
-          <a href="https://www.dpa.gr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
-            dpa.gr
+          Εποπτική αρχή: <strong className="text-foreground">Σουηδική Αρχή Προστασίας
+          Δεδομένων (IMY)</strong> —{" "}
+          <a href="https://www.imy.se" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+            imy.se
           </a>
-          . Έχετε δικαίωμα καταγγελίας απευθείας στην ΑΠΔΠΧ.
+          . Έχετε δικαίωμα καταγγελίας απευθείας στην IMY.
         </p>
       </section>
 
@@ -226,7 +226,7 @@ function GreekContent() {
             <code className="bg-muted px-1.5 py-0.5 rounded text-xs">POST /api/user/consent/withdraw</code>.
           </li>
           <li>
-            <strong className="text-foreground">Καταγγελία:</strong> ΑΠΔΠΧ — dpa.gr.
+            <strong className="text-foreground">Καταγγελία:</strong> IMY — imy.se.
           </li>
         </ul>
       </section>
@@ -279,11 +279,11 @@ function EnglishContent() {
         <p className="mb-3">
           <strong className="text-foreground">The AgoraX platform</strong> (Sweden).
           Supervisory authority:{" "}
-          <strong className="text-foreground">Hellenic Data Protection Authority (HDPA)</strong> —{" "}
-          <a href="https://www.dpa.gr" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
-            dpa.gr
+          <strong className="text-foreground">Swedish Authority for Privacy Protection (IMY)</strong> —{" "}
+          <a href="https://www.imy.se" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+            imy.se
           </a>
-          . You have the right to lodge a complaint directly with the HDPA.
+          . You have the right to lodge a complaint directly with IMY.
         </p>
       </section>
 
@@ -444,7 +444,7 @@ function EnglishContent() {
             <code className="bg-muted px-1.5 py-0.5 rounded text-xs">POST /api/user/consent/withdraw</code>.
           </li>
           <li>
-            <strong className="text-foreground">Complain:</strong> HDPA — dpa.gr.
+            <strong className="text-foreground">Complain:</strong> IMY — imy.se.
           </li>
         </ul>
       </section>

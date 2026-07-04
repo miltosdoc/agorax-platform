@@ -14,7 +14,7 @@
  *      (UI gate — see PR that lands the interstitial).
  */
 
-export const CURRENT_CONSENT_VERSION = '2026-07-04';
+export const CURRENT_CONSENT_VERSION = '2026-07-04.1';
 
 export type ConsentLocale = 'el' | 'en';
 
@@ -34,7 +34,7 @@ export const CONSENT_TEXT: Record<ConsentLocale, string> = {
 
 Οι ψήφοι δεν είναι ανώνυμοι. Η σύνδεση ψήφος↔ταυτότητα είναι ανακτήσιμη από διαχειριστές της βάσης δεδομένων. Δείτε το Privacy Notice για όλες τις λεπτομέρειες.
 
-Έχω το δικαίωμα να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή (Άρθρο 7(3) ΓΚΠΔ), να ζητήσω πρόσβαση/διαγραφή των δεδομένων μου (Άρθρα 15–17), και να υποβάλω καταγγελία στην ΑΠΔΠΧ.`,
+Έχω το δικαίωμα να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή (Άρθρο 7(3) ΓΚΠΔ), να ζητήσω πρόσβαση/διαγραφή των δεδομένων μου (Άρθρα 15–17), και να υποβάλω καταγγελία στη Σουηδική Αρχή Προστασίας Δεδομένων (IMY).`,
 
   en: `Consent to processing of special-category data — version ${CURRENT_CONSENT_VERSION}
 
@@ -46,7 +46,7 @@ By registering on the AgoraX platform I explicitly consent to:
 
 Votes are not anonymous. The vote↔identity linkage is reconstructable by database administrators. See the Privacy Notice for full details.
 
-I have the right to withdraw consent at any time (Art. 7(3) GDPR), to request access to or erasure of my data (Art. 15–17), and to lodge a complaint with the Hellenic Data Protection Authority.`,
+I have the right to withdraw consent at any time (Art. 7(3) GDPR), to request access to or erasure of my data (Art. 15–17), and to lodge a complaint with the Swedish Authority for Privacy Protection (IMY).`,
 };
 
 /** What a client sends back to acknowledge consent. */

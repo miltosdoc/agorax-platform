@@ -10,8 +10,8 @@
 
 **Η πλατφόρμα AgoraX** (Σουηδία).
 
-Εποπτική αρχή: **Αρχή Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (ΑΠΔΠΧ)**.
-Δικαίωμα καταγγελίας: https://www.dpa.gr.
+Εποπτική αρχή: **Σουηδική Αρχή Προστασίας Δεδομένων (IMY)**.
+Δικαίωμα καταγγελίας: https://www.imy.se.
 
 ### 2. Τι δεδομένα συλλέγουμε
 
@@ -66,7 +66,7 @@
 - **Διαγραφή** — `POST /api/user/erasure-request` (Άρθρο 17). Η αίτησή σας επεξεργάζεται χειροκίνητα από διαχειριστή της πλατφόρμας. Λόγω της φύσης της αλυσίδας hash των ψήφων, η διαγραφή πολιτικών απόψεων από κλειστή ψηφοφορία γίνεται με κρυπτογραφικό σβήσιμο (αφαίρεση της αντιστοίχισης ψήφος↔ταυτότητα).
 - **Φορητότητα** των δεδομένων (Άρθρο 20) — το `data-export` παρέχει αναγνώσιμη μηχανικά μορφή.
 - **Ανάκληση συγκατάθεσης** — `POST /api/user/consent/withdraw` (Άρθρο 7(3)).
-- **Καταγγελία** στην ΑΠΔΠΧ.
+- **Καταγγελία** στην IMY.
 
 ### 8. Ασφάλεια
 
@@ -88,8 +88,8 @@
 
 **The AgoraX platform** (Sweden).
 
-Supervisory authority: **Hellenic Data Protection Authority (HDPA)**.
-Right to complain: https://www.dpa.gr.
+Supervisory authority: **Swedish Authority for Privacy Protection (IMY)**.
+Right to complain: https://www.imy.se.
 
 ### 2. What data we collect
 
@@ -144,7 +144,7 @@ You have the right to:
 - **Erasure** — `POST /api/user/erasure-request` (Art. 17). Your request is processed manually by an platform administrator. Because of the vote hash chain, erasing political-opinion data from a closed vote is done via crypto-shredding (removing the vote↔identity binding).
 - **Portability** (Art. 20) — `data-export` provides a machine-readable format.
 - **Withdraw consent** — `POST /api/user/consent/withdraw` (Art. 7(3)).
-- **Complain** to the HDPA.
+- **Complain** to IMY.
 
 ### 8. Security
 

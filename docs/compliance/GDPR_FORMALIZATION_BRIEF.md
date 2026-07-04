@@ -40,7 +40,7 @@ Do not describe the system as providing vote anonymity unless option A is verifi
 ## 2. Controller, jurisdiction, supervisory authority
 
 - **Controller:** the platform operator (Sweden) — confirm the legal entity processing member data.
-- **Supervisory authority:** Greek HDPA (Hellenic Data Protection Authority). Note that members resident in Sweden do not change the lead authority but should be acknowledged.
+- **Supervisory authority:** Swedish Authority for Privacy Protection (IMY) — lead authority for the Sweden-established controller. Members resident elsewhere in the EU may also complain to their local DPA.
 - **Lawful basis for Art. 9 data:** explicit consent (Art. 9(2)(a)) and the not-for-profit political/association carve-out (Art. 9(2)(d)) — the latter covers members only, only for internal purposes, and only if data is not disclosed externally without consent. State both; rely primarily on 9(2)(d) for membership processing and 9(2)(a) as backstop.
 
 Flag for the maintainer if the controlling entity is ambiguous — it determines every downstream document.
@@ -71,7 +71,7 @@ List processors: VPS/host provider, any email provider, any LLM provider used by
 
 ### 3.3 PRIVACY_NOTICE.md + CONSENT.md (Art. 13 + Art. 9(2)(a))
 
-- **Privacy notice:** identity of controller, purposes, lawful bases, retention, rights, complaint route (HDPA).
+- **Privacy notice:** identity of controller, purposes, lawful bases, retention, rights, complaint route (IMY).
 - **Consent artifact:** the exact text a member agrees to at onboarding for processing of political opinions. Must be explicit, specific, freely given, and the consent event must be logged (timestamp + version). Verify the onboarding flow stores this; if not, open a task.
 - **Bilingual** (el/en) to match the platform. Check i18n parity.
 
@@ -81,7 +81,7 @@ Short stubs, each a few paragraphs:
 
 - **Access control policy** — who can read identity↔vote linkage; cite the RBAC implementation if it exists.
 - **Retention & deletion policy** — per data category; include member-initiated deletion (Art. 17) and how it interacts with the append-only Democracy Points ledger and the hash-chain (deletion vs. tamper-evidence is a genuine tension — address it, don't ignore it).
-- **Breach response runbook** — the 72-hour Art. 33 clock. Who decides, who notifies HDPA, how members are informed. Write this before it is needed.
+- **Breach response runbook** — the 72-hour Art. 33 clock. Who decides, who notifies IMY, how members are informed. Write this before it is needed.
 
 ---
 

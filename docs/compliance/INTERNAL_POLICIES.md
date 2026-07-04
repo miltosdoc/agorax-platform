@@ -119,7 +119,7 @@ A near-miss (e.g., port-scan probe with no successful intrusion) is not a breach
 
 ### 3.2 The 72-hour clock
 
-Starts when **any platform staff member becomes aware** of the breach (not when it's confirmed). Notification to the HDPA is mandatory unless the breach is unlikely to result in risk to data subjects.
+Starts when **any platform staff member becomes aware** of the breach (not when it's confirmed). Notification to IMY is mandatory unless the breach is unlikely to result in risk to data subjects.
 
 ### 3.3 Decision tree
 
@@ -136,8 +136,8 @@ breach detected
   │     • how many subjects?
   │     • likely consequences?
   │
-  ├── notify HDPA (within 72 hours of awareness)
-  │     • via https://www.dpa.gr — breach notification form
+  ├── notify IMY (within 72 hours of awareness)
+  │     • via https://www.imy.se — breach notification form
   │     • include: nature, categories + approx number of subjects,
   │       categories + approx number of records, likely consequences,
   │       measures taken / proposed
@@ -146,7 +146,7 @@ breach detected
   │     • via email, in-app banner, public statement
   │     • plain language, what happened + what they should do
   │
-  └── document (regardless of HDPA notification)
+  └── document (regardless of IMY notification)
         • write up in docs/compliance/incidents/YYYY-MM-DD-slug.md
         • root-cause analysis
         • policy / code change to prevent recurrence
@@ -158,11 +158,11 @@ breach detected
 | Decision | Who |
 |---|---|
 | Containment (immediate) | Whichever admin is online — act first, ask later |
-| HDPA notification | Controller representative — within the 72-hour window |
+| IMY notification | Controller representative — within the 72-hour window |
 | Member notification | Controller representative + technical admin agreement |
 | Public statement | Controller representative |
 
-If the controller representative is unreachable within 24 hours of detection, the named technical admin (TBD) is delegated authority to notify HDPA.
+If the controller representative is unreachable within 24 hours of detection, the named technical admin (TBD) is delegated authority to notify IMY.
 
 ### 3.5 Tabletop exercise
 
