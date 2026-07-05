@@ -152,7 +152,34 @@ export function registerProposalsRoutes(app: Express): void {
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
       if (proposal.authorId !== req.user.id) return res.status(403).json({ message: "Not the author" });
       if (proposal.status !== 'draft') return res.status(409).json({ message: "Can only edit drafts" });
-      const updated = await proposalRepo.updateProposal(proposalId, req.body);
+      // Only content fields are author-editable; same limits as create.
+      const { question, solution, category } = req.body ?? {};
+      const updates: Record<string, string> = {};
+      if (question !== undefined) {
+        if (typeof question !== "string" || question.length === 0) {
+          return res.status(400).json({ message: "Question must be a non-empty string" });
+        }
+        updates.question = question;
+      }
+      if (solution !== undefined) {
+        if (typeof solution !== "string" || solution.length === 0) {
+          return res.status(400).json({ message: "Solution must be a non-empty string" });
+        }
+        updates.solution = solution;
+      }
+      if ((updates.question ?? '').length > 2000 || (updates.solution ?? '').length > 12000) {
+        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
+      }
+      if (category !== undefined) {
+        if (typeof category !== "string") {
+          return res.status(400).json({ message: "Category must be a string" });
+        }
+        updates.category = category;
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "Nothing to update" });
+      }
+      const updated = await proposalRepo.updateProposal(proposalId, updates);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to update proposal" });
