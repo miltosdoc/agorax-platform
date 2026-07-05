@@ -110,8 +110,10 @@ export function registerProposalsRoutes(app: Express): void {
       if (typeof question !== "string" || typeof solution !== "string") {
         return res.status(400).json({ message: "Question and solution must be strings" });
       }
-      if (question.length > 2000 || solution.length > 4000) {
-        return res.status(400).json({ message: "Question max 2000 chars, solution max 4000 chars" });
+      // Solution ceiling matches the AI-drafting paste limit (12k) so a
+      // verbatim pass-through draft can always be submitted.
+      if (question.length > 2000 || solution.length > 12000) {
+        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
       }
       const proposal = await proposalRepo.createProposal({
         communityId,
