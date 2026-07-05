@@ -27,6 +27,7 @@ import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { api, ApiError } from '@/lib/api';
+import { uploadProposalFile, DOCUMENT_ACCEPT } from '@/lib/upload-media';
 import { Mic, Video, FileText, Download, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2, AlertTriangle } from 'lucide-react';
 
 interface MediaRow {
@@ -91,43 +92,8 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / 1024)} KB`;
 }
 
-async function uploadFile(file: File, uploadUrl: string, title: string): Promise<MediaRow> {
-  // Ensure CSRF cookie exists before sending.
-  if (!readCsrfCookie()) {
-    await fetch('/api/csrf', { credentials: 'include' }).catch(() => {});
-  }
-  const csrf = readCsrfCookie();
-  const headers: Record<string, string> = {
-    'Content-Type': file.type || 'application/octet-stream',
-    'X-File-Name': encodeURIComponent(file.name),
-    'X-Media-Title': encodeURIComponent(title),
-  };
-  if (csrf) headers['X-CSRF-Token'] = csrf;
-  const res = await fetch(uploadUrl, {
-    method: 'POST',
-    credentials: 'include',
-    headers,
-    body: file,
-  });
-  if (!res.ok) {
-    let msg = res.statusText;
-    try {
-      const json = await res.json();
-      msg = json.message || msg;
-    } catch { /* ignore */ }
-    throw new Error(msg);
-  }
-  return await res.json();
-}
-
-function readCsrfCookie(): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  for (const part of document.cookie.split(';')) {
-    const [k, ...v] = part.trim().split('=');
-    if (k === 'agorax_csrf') return decodeURIComponent(v.join('='));
-  }
-  return undefined;
-}
+const uploadFile = (file: File, uploadUrl: string, title: string) =>
+  uploadProposalFile<MediaRow>(file, uploadUrl, title);
 
 function MediaKindCard(props: {
   proposalId: number;
@@ -299,8 +265,6 @@ function MediaKindCard(props: {
     </Card>
   );
 }
-
-const DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,.pdf,.doc,.docx,.odt,.txt';
 
 /**
  * Document attachments card — no script workflow, just name + upload.

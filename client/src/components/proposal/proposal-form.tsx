@@ -5,18 +5,19 @@
  * Collects: question (problem), solution, category, and optional description.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
+import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
+import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/upload-media';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
@@ -61,6 +62,29 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
     solution: '',
     category: '',
   });
+
+  // Document attachments — picked now, uploaded right after the proposal
+  // is created (the upload endpoint needs a proposal id).
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const attachRef = useRef<HTMLInputElement>(null);
+
+  function handleAttachPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    if (picked.length === 0) return;
+    const tooBig = picked.filter((f) => f.size > DOCUMENT_MAX_BYTES);
+    if (tooBig.length > 0) {
+      setError(`${t('proposal.attachment_too_large')}: ${tooBig.map((f) => f.name).join(', ')}`);
+    } else {
+      setError(null);
+    }
+    const ok = picked.filter((f) => f.size <= DOCUMENT_MAX_BYTES);
+    setAttachments((prev) => [...prev, ...ok].slice(0, 10));
+    if (attachRef.current) attachRef.current.value = '';
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }
 
   // Edit mode: load the existing draft into the form.
   useEffect(() => {
@@ -134,7 +158,21 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
       }
 
       const proposal = await res.json();
-      setLocation(`/proposals/${editProposalId ?? proposal.id}`);
+      const proposalId = editProposalId ?? proposal.id;
+
+      // Upload attachments now that a proposal id exists. Failures are
+      // non-fatal: the proposal is already saved and documents can be
+      // re-added from its Media tab.
+      for (const file of attachments) {
+        const title = file.name.replace(/\.[^.]+$/, '').slice(0, 200) || file.name;
+        try {
+          await uploadProposalFile(file, `/api/proposals/${proposalId}/media?kind=document`, title);
+        } catch {
+          /* best-effort — see comment above */
+        }
+      }
+
+      setLocation(`/proposals/${proposalId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.unknown_error'));
     } finally {
@@ -266,6 +304,64 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
             <p className="text-sm text-muted-foreground">
               {t('proposal.solution_hint')}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              <span className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4" />
+                {t('proposal.attachments_label')}
+              </span>
+            </Label>
+            <input
+              ref={attachRef}
+              type="file"
+              accept={DOCUMENT_ACCEPT}
+              multiple
+              className="hidden"
+              onChange={handleAttachPick}
+              data-testid="proposal-attach-input"
+            />
+            {attachments.length > 0 && (
+              <ul className="space-y-1">
+                {attachments.map((file, i) => (
+                  <li
+                    key={`${file.name}-${i}`}
+                    className="flex items-center gap-2 text-sm border rounded-md px-3 py-1.5"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate">{file.name}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {file.size > 1024 * 1024
+                        ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+                        : `${Math.round(file.size / 1024)} KB`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(i)}
+                      className="text-muted-foreground hover:text-destructive"
+                      aria-label={t('common.remove') || 'Remove'}
+                      data-testid={`proposal-attach-remove-${i}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => attachRef.current?.click()}
+                data-testid="proposal-attach-button"
+              >
+                <Paperclip className="h-4 w-4 mr-2" />
+                {t('proposal.attach_document')}
+              </Button>
+              <p className="text-xs text-muted-foreground">{t('media.docSizeLimit')}</p>
+            </div>
           </div>
 
           <div className="space-y-2">
