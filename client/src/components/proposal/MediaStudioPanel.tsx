@@ -27,13 +27,13 @@ import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { api, ApiError } from '@/lib/api';
-import { Mic, Video, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2, AlertTriangle } from 'lucide-react';
+import { Mic, Video, FileText, Download, Copy, Upload, Star, EyeOff, Trash2, Loader2, Share2, AlertTriangle } from 'lucide-react';
 
 interface MediaRow {
   id: number;
   proposalId: number;
   uploaderId: number;
-  kind: 'podcast' | 'video';
+  kind: 'podcast' | 'video' | 'document';
   title: string | null;
   filePath: string;
   thumbPath: string | null;
@@ -300,6 +300,89 @@ function MediaKindCard(props: {
   );
 }
 
+const DOCUMENT_ACCEPT = 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,.pdf,.doc,.docx,.odt,.txt';
+
+/**
+ * Document attachments card — no script workflow, just name + upload.
+ * PDF / Word / ODT / plain text, forced download via the dedicated route.
+ */
+function DocumentUploadCard(props: { proposalId: number; onUploaded: () => void }) {
+  const { proposalId, onUploaded } = props;
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const errorToast = useErrorToast();
+  const [uploading, setUploading] = useState(false);
+  const [postTitle, setPostTitle] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = () => {
+    if (postTitle.trim().length < 3) {
+      errorToast(t('media.titleRequired'), t('media.docTitleRequiredHint'));
+      return;
+    }
+    fileRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      await uploadFile(file, `/api/proposals/${proposalId}/media?kind=document`, postTitle.trim());
+      toast({ title: t('media.uploadSuccess'), description: postTitle.trim() });
+      setPostTitle('');
+      onUploaded();
+    } catch (err: any) {
+      errorToast(t('media.uploadFailed'), err?.message || t('media.tryAgain'));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  return (
+    <Card data-testid="media-card-document">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          {t('media.documentTitle')}
+        </CardTitle>
+        <CardDescription>{t('media.documentDescription')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <Input
+          value={postTitle}
+          onChange={(e) => setPostTitle(e.target.value)}
+          placeholder={t('media.docTitlePlaceholder')}
+          maxLength={200}
+          data-testid="media-title-document"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept={DOCUMENT_ACCEPT}
+            className="hidden"
+            onChange={handleFileChange}
+            data-testid="media-file-document"
+          />
+          <Button
+            type="button"
+            variant="default"
+            onClick={handleUploadClick}
+            disabled={uploading}
+            data-testid="media-upload-document"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            {t('media.uploadDocument')}
+          </Button>
+          <span className="text-xs text-muted-foreground">{t('media.docSizeLimit')}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MediaGalleryItem(props: {
   media: MediaRow;
   userIsAuthor: boolean;
@@ -359,7 +442,10 @@ function MediaGalleryItem(props: {
   };
 
   const handleCopyShare = async () => {
-    const url = `${window.location.origin}/p/${media.proposalId}/${media.kind}/${media.id}`;
+    // Documents have no share page — the download URL is the link.
+    const url = media.kind === 'document'
+      ? `${window.location.origin}/api/proposals/${media.proposalId}/media/${media.id}/download`
+      : `${window.location.origin}/p/${media.proposalId}/${media.kind}/${media.id}`;
     try {
       await navigator.clipboard.writeText(url);
       toast({ title: t('media.linkCopied') });
@@ -368,8 +454,12 @@ function MediaGalleryItem(props: {
     }
   };
 
-  const Icon = media.kind === 'podcast' ? Mic : Video;
+  const Icon = media.kind === 'podcast' ? Mic : media.kind === 'video' ? Video : FileText;
+  const kindLabel = media.kind === 'podcast'
+    ? t('media.kindPodcast')
+    : media.kind === 'video' ? t('media.kindVideo') : t('media.kindDocument');
   const mediaUrl = `/media/${media.filePath}`;
+  const downloadUrl = `/api/proposals/${media.proposalId}/media/${media.id}/download`;
   const thumbUrl = media.thumbPath ? `/media/${media.thumbPath}` : undefined;
 
   if (media.fileMissing) {
@@ -382,7 +472,7 @@ function MediaGalleryItem(props: {
           <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-destructive">
-              {media.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideo')} — {t('media.fileMissingTitle')}
+              {kindLabel} — {t('media.fileMissingTitle')}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {t('media.fileMissingHint')}
@@ -416,9 +506,7 @@ function MediaGalleryItem(props: {
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 text-sm">
           <Icon className="w-4 h-4" />
-          <span className="font-medium">
-            {media.kind === 'podcast' ? t('media.kindPodcast') : t('media.kindVideo')}
-          </span>
+          <span className="font-medium">{kindLabel}</span>
           {media.isFeatured && (
             <Badge variant="default" className="bg-amber-500">
               <Star className="w-3 h-3 mr-1" />
@@ -429,7 +517,9 @@ function MediaGalleryItem(props: {
             <Badge variant="outline">{t('media.hidden')}</Badge>
           )}
           <span className="text-xs text-muted-foreground">
-            {formatDuration(media.durationS)} · {formatSize(media.sizeBytes)}
+            {media.kind === 'document'
+              ? formatSize(media.sizeBytes)
+              : `${formatDuration(media.durationS)} · ${formatSize(media.sizeBytes)}`}
           </span>
         </div>
       </div>
@@ -440,7 +530,7 @@ function MediaGalleryItem(props: {
 
       {media.kind === 'podcast' ? (
         <audio controls preload="metadata" src={mediaUrl} className="w-full" />
-      ) : (
+      ) : media.kind === 'video' ? (
         <video
           controls
           preload="metadata"
@@ -448,6 +538,13 @@ function MediaGalleryItem(props: {
           poster={thumbUrl}
           className="w-full max-h-96 bg-black rounded"
         />
+      ) : (
+        <Button asChild variant="secondary" size="sm" data-testid={`media-download-${media.id}`}>
+          <a href={downloadUrl} download>
+            <Download className="w-4 h-4 mr-2" />
+            {t('media.download')}
+          </a>
+        </Button>
       )}
 
       <div className="flex flex-wrap gap-2 mt-2">
@@ -540,6 +637,8 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
         <MediaKindCard proposalId={proposalId} kind="podcast" onUploaded={refresh} />
         <MediaKindCard proposalId={proposalId} kind="video" onUploaded={refresh} />
       </div>
+
+      <DocumentUploadCard proposalId={proposalId} onUploaded={refresh} />
 
       <Card>
         <CardHeader>

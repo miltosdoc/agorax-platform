@@ -160,9 +160,11 @@ export function registerProposalsRoutes(app: Express): void {
   // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
   // author edits before submitting — the validation gate still runs on submit.
   app.post("/api/proposals/compile", requireAuth, async (req: any, res) => {
+    // Generous ceiling so users can paste a full pre-written document —
+    // the compiler is instructed to keep pasted text verbatim.
     const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
-    if (intent.length < 10 || intent.length > 2000) {
-      return res.status(400).json({ message: 'intent must be 10–2000 characters' });
+    if (intent.length < 10 || intent.length > 12000) {
+      return res.status(400).json({ message: 'intent must be 10–12000 characters' });
     }
     if (!isLlmConfigured()) {
       return res.status(503).json({ message: 'AI drafting is not available' });

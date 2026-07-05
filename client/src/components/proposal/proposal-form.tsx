@@ -162,7 +162,7 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
             value={aiIntent}
             onChange={(e) => setAiIntent(e.target.value)}
             rows={3}
-            maxLength={2000}
+            maxLength={12000}
           />
           <div className="flex items-center gap-3 flex-wrap">
             <Button

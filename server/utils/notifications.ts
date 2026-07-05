@@ -123,7 +123,7 @@ export async function notifyNewProposal(
 export async function notifyNewMedia(
   proposalId: number,
   communityId: number,
-  kind: 'podcast' | 'video',
+  kind: 'podcast' | 'video' | 'document',
   uploaderUserId: number,
   proposalQuestion: string,
 ): Promise<number> {
@@ -132,7 +132,7 @@ export async function notifyNewMedia(
     WHERE cm.community_id = ${communityId} AND cm.user_id <> ${uploaderUserId}
   `);
   let notified = 0;
-  const label = kind === 'podcast' ? 'podcast' : 'βίντεο';
+  const label = kind === 'podcast' ? 'podcast' : kind === 'video' ? 'βίντεο' : 'έγγραφο';
   const short = proposalQuestion.length > 100
     ? proposalQuestion.slice(0, 97) + '…'
     : proposalQuestion;
@@ -157,9 +157,9 @@ export async function notifyNewMedia(
 export async function notifyFileLost(
   uploaderId: number,
   proposalId: number,
-  kind: 'podcast' | 'video',
+  kind: 'podcast' | 'video' | 'document',
 ): Promise<void> {
-  const label = kind === 'podcast' ? 'podcast' : 'βίντεο';
+  const label = kind === 'podcast' ? 'podcast' : kind === 'video' ? 'βίντεο' : 'έγγραφο';
   await createNotification({
     userId: uploaderId,
     type: 'file_lost',

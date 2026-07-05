@@ -18,13 +18,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { api } from '@/lib/api';
-import { Mic, Video, Share2, Star } from 'lucide-react';
+import { Mic, Video, Share2, Star, FileText, Download } from 'lucide-react';
 
 interface MediaRow {
   id: number;
   proposalId: number;
   uploaderId: number;
-  kind: 'podcast' | 'video';
+  kind: 'podcast' | 'video' | 'document';
   title: string | null;
   filePath: string;
   thumbPath: string | null;
@@ -149,17 +149,43 @@ export function ProposalMediaPreview({ proposalId }: Props) {
 
   const podcast = pickHero(items, 'podcast');
   const video = pickHero(items, 'video');
+  const documents = items.filter(m => m.kind === 'document' && m.status === 'published');
 
   if (!loaded) return null;
-  if (!podcast && !video) return null;
+  if (!podcast && !video && documents.length === 0) return null;
 
   return (
     <div className="space-y-3" data-testid="overview-media-preview">
       <h4 className="text-sm font-medium text-muted-foreground">{t('media.overviewHeading')}</h4>
-      <div className="grid gap-3 md:grid-cols-2">
-        {podcast && <MediaTile media={podcast} />}
-        {video && <MediaTile media={video} />}
-      </div>
+      {(podcast || video) && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {podcast && <MediaTile media={podcast} />}
+          {video && <MediaTile media={video} />}
+        </div>
+      )}
+      {documents.length > 0 && (
+        <div className="border rounded-lg p-3 space-y-2" data-testid="overview-media-documents">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <FileText className="w-4 h-4" />
+            {t('media.attachments')}
+          </div>
+          <ul className="space-y-1">
+            {documents.map((doc) => (
+              <li key={doc.id}>
+                <a
+                  href={`/api/proposals/${doc.proposalId}/media/${doc.id}/download`}
+                  download
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid={`overview-doc-${doc.id}`}
+                >
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  {doc.title || t('media.kindDocument')}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

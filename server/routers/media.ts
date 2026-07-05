@@ -1,5 +1,5 @@
 /**
- * Media Router — proposal podcasts + video teasers.
+ * Media Router — proposal podcasts, video teasers, and document attachments.
  *
  * Workflow:
  *   1. AgoraX generates Greek scripts (podcast + 45-second teaser) from the
@@ -8,6 +8,11 @@
  *   2. The user uploads the resulting MP3 / MP4 here.
  *   3. The proposal author curates the gallery: feature, hide, delete.
  *   4. Public share routes + the global /feed surface what's been featured.
+ *
+ * Documents (kind='document') are supporting files for a proposal — PDF,
+ * Word, ODT, plain text. They skip the ffprobe/thumbnail path, never appear
+ * in the global feed, and are served through a dedicated download route
+ * that forces Content-Disposition: attachment.
  *
  * Files live under AGORAX_MEDIA_DIR (default ./uploads/media) on local disk,
  * one subdirectory per proposal. The Express static handler below serves
@@ -57,7 +62,7 @@ function filterMissingFiles<T extends { id: number; filePath: string }>(
 async function handleFileLost(row: { id: number; uploaderId: number; proposalId: number; kind: string }): Promise<void> {
   try {
     await mediaRepo.setStatus(row.id, 'hidden');
-    await notifyFileLost(row.uploaderId, row.proposalId, row.kind as 'podcast' | 'video');
+    await notifyFileLost(row.uploaderId, row.proposalId, row.kind as Kind);
   } catch (err: any) {
     logger.warn('handleFileLost failed', { id: row.id, err: err?.message });
   }
@@ -78,12 +83,23 @@ const LIMITS = {
     mimes: new Set(['video/mp4', 'video/quicktime']),
     exts: new Set(['.mp4', '.mov']),
   },
+  document: {
+    maxBytes: 25 * 1024 * 1024,
+    mimes: new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.oasis.opendocument.text',
+      'text/plain',
+    ]),
+    exts: new Set(['.pdf', '.doc', '.docx', '.odt', '.txt']),
+  },
 } as const;
 
 type Kind = keyof typeof LIMITS;
 
 function isKind(v: unknown): v is Kind {
-  return v === 'podcast' || v === 'video';
+  return v === 'podcast' || v === 'video' || v === 'document';
 }
 
 async function ensureProposalDir(proposalId: number): Promise<string> {
@@ -191,7 +207,7 @@ export function registerMediaRoutes(app: Express): void {
       }
       const kindRaw = req.query?.kind;
       if (!isKind(kindRaw)) {
-        return res.status(400).json({ message: "kind must be 'podcast' or 'video'" });
+        return res.status(400).json({ message: "kind must be 'podcast', 'video' or 'document'" });
       }
       const kind: Kind = kindRaw;
 
@@ -201,11 +217,12 @@ export function registerMediaRoutes(app: Express): void {
       }
 
       // Metadata from headers / query params sent by the client.
-      const mimeType = (req.headers['content-type'] || '').split(';')[0].trim()
-        || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4');
+      const defaultMime = kind === 'podcast' ? 'audio/mpeg' : kind === 'video' ? 'video/mp4' : 'application/pdf';
+      const defaultExt = kind === 'podcast' ? '.mp3' : kind === 'video' ? '.mp4' : '.pdf';
+      const mimeType = (req.headers['content-type'] || '').split(';')[0].trim() || defaultMime;
       const rawName = req.headers['x-file-name']
         ? decodeURIComponent(req.headers['x-file-name'] as string)
-        : `upload${kind === 'podcast' ? '.mp3' : '.mp4'}`;
+        : `upload${defaultExt}`;
       // User-provided post name (required by the UI; tolerated absent for
       // older clients — display falls back to the proposal question).
       const title = req.headers['x-media-title']
@@ -234,9 +251,12 @@ export function registerMediaRoutes(app: Express): void {
           message: `unsupported extension ${ext || '(none)'}; expected one of ${[...limits.exts].join(', ')}`,
         });
       }
-      if (mimeType && !limits.mimes.has(mimeType)) {
-        if (!mimeType.startsWith('audio/') && !mimeType.startsWith('video/')
-            && mimeType !== 'application/octet-stream') {
+      if (mimeType && !limits.mimes.has(mimeType) && mimeType !== 'application/octet-stream') {
+        // Podcast/video tolerate any audio/video mime (browsers report many
+        // variants); documents must match the allow-list exactly.
+        const prefixOk = kind !== 'document'
+          && (mimeType.startsWith('audio/') || mimeType.startsWith('video/'));
+        if (!prefixOk) {
           return res.status(415).json({ message: `mime ${mimeType} not allowed` });
         }
       }
@@ -248,9 +268,10 @@ export function registerMediaRoutes(app: Express): void {
       await writeFile(filePath, buffer);
 
       // Probe — if probe fails or the file is the wrong shape, clean up.
+      // Documents skip the probe entirely: there is no stream to inspect.
       let durationS = 0;
       let thumbRel: string | null = null;
-      try {
+      if (kind !== 'document') try {
         const probed = await probeMedia(filePath);
         durationS = probed.durationS;
         if (kind === 'podcast' && !probed.hasAudio) {
@@ -286,7 +307,7 @@ export function registerMediaRoutes(app: Express): void {
         title: title || null,
         filePath: relPath,
         thumbPath: thumbRel,
-        mimeType: mimeType || (kind === 'podcast' ? 'audio/mpeg' : 'video/mp4'),
+        mimeType: mimeType || defaultMime,
         sizeBytes: buffer.length,
         durationS: durationS > 0 ? String(durationS) : null,
         status: 'published',
@@ -334,6 +355,53 @@ export function registerMediaRoutes(app: Express): void {
     } catch (err: any) {
       logger.error('list media failed', { err: err?.message });
       res.status(500).json({ message: 'failed to list media' });
+    }
+  });
+
+  // ── Download ─────────────────────────────────────────────────────────
+  // Forces Content-Disposition: attachment with a human filename derived
+  // from the title (the on-disk name is a content hash). Used primarily
+  // for document attachments, but works for any kind.
+
+  app.get('/api/proposals/:id/media/:mid/download', async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const row = await loadMediaOr404(req, res);
+      if (!row) return;
+      if (row.proposalId !== proposalId) {
+        return res.status(404).json({ message: 'not found' });
+      }
+      // Hidden rows are only downloadable by the uploader/author/admin.
+      if (row.status !== 'published') {
+        const userId: number | undefined = req.user?.id;
+        if (!userId) return res.status(404).json({ message: 'not found' });
+        const { allowed } = await canCurate(userId, !!req.user.isAdmin, row);
+        if (!allowed) return res.status(404).json({ message: 'not found' });
+      }
+      const fullPath = path.join(MEDIA_ROOT, row.filePath);
+      if (!existsSync(fullPath)) {
+        return res.status(404).json({ message: 'file missing' });
+      }
+      const ext = path.extname(row.filePath).toLowerCase();
+      // Keep letters (any script), digits, spaces and safe punctuation.
+      const base = (row.title ?? '')
+        .replace(/[^\p{L}\p{N} ._()-]/gu, '')
+        .trim()
+        .slice(0, 120) || `${row.kind}-${row.id}`;
+      const filename = base.toLowerCase().endsWith(ext) ? base : `${base}${ext}`;
+      const asciiFallback = filename.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '');
+      res.setHeader('Content-Type', row.mimeType || 'application/octet-stream');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      );
+      const size = (await stat(fullPath)).size;
+      res.setHeader('Content-Length', String(size));
+      createReadStream(fullPath).pipe(res);
+    } catch (err: any) {
+      logger.error('media download failed', { err: err?.message });
+      if (!res.headersSent) res.status(500).json({ message: 'download failed' });
     }
   });
 

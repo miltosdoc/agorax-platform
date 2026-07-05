@@ -139,7 +139,11 @@ export class MediaRepository {
   } = {}): Promise<MediaWithContext[]> {
     const limit = Math.min(opts.limit ?? 20, 50);
     const conditions = [eq(proposalMedia.status, 'published')];
-    if (opts.kind) conditions.push(eq(proposalMedia.kind, opts.kind));
+    // Documents are proposal attachments, not feed content — the global
+    // feed only ever surfaces podcasts and videos.
+    conditions.push(opts.kind
+      ? eq(proposalMedia.kind, opts.kind)
+      : inArray(proposalMedia.kind, ['podcast', 'video']));
     if (opts.cursor && Number.isFinite(opts.cursor)) {
       conditions.push(sql`${proposalMedia.id} < ${opts.cursor}`);
     }
