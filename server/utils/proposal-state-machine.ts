@@ -213,7 +213,19 @@ export async function triggerSideEffects(
   proposal: Proposal,
 ): Promise<void> {
   const transition = `${fromState}->${toState}`;
-  
+
+  // Every entry into `voting`, whatever the path (auto-approve, community
+  // signal, sortition synthesis), announces the vote to all members.
+  // Best-effort: a notification failure must never block the transition.
+  if (toState === 'voting' && fromState !== 'voting') {
+    try {
+      const { notifyVoteStarted } = await import('./notifications');
+      await notifyVoteStarted(proposal.id, proposal.communityId, proposal.question);
+    } catch (err: any) {
+      console.warn(`[notify] vote_started fan-out failed for proposal ${proposal.id}: ${err?.message}`);
+    }
+  }
+
   switch (transition) {
     case 'draft->review':
       // Queue LLM validation job
@@ -233,6 +245,13 @@ export async function triggerSideEffects(
     case 'author_review->community_signal':
       // Open community voting on rejected amendments
       await enqueueNotification(proposal.authorId, 'community_signal_open', 'Community is now voting on your rejected amendments');
+      // The members are the voters in this phase — tell them it opened.
+      try {
+        const { notifyProposalAdvanced } = await import('./notifications');
+        await notifyProposalAdvanced(proposal.id, proposal.communityId, 'community_signal', proposal.question);
+      } catch (err: any) {
+        console.warn(`[notify] community_signal fan-out failed for proposal ${proposal.id}: ${err?.message}`);
+      }
       break;
     
     case 'community_signal->sortition_synthesis':
@@ -287,6 +306,16 @@ export async function triggerSideEffects(
       // so the badge on the community dashboard reflects new outcomes.
       if (toState === 'decided' || toState === 'archived') {
         await enqueueRecalculateScore(proposal.communityId);
+
+        // A concluded vote is an outcome members should hear about.
+        if (toState === 'decided') {
+          try {
+            const { notifyProposalAdvanced } = await import('./notifications');
+            await notifyProposalAdvanced(proposal.id, proposal.communityId, 'decided', proposal.question);
+          } catch (err: any) {
+            console.warn(`[notify] decided fan-out failed for proposal ${proposal.id}: ${err?.message}`);
+          }
+        }
 
         // GDPR Art. 17 deferred-erasure hook: now that this proposal is
         // terminal, crypto-shred any votes on it that belong to members
@@ -493,6 +522,13 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
         `Η πρόταση εγκρίθηκε αυτόματα (βαθμός ${Math.round(result.score)}/100) και πέρασε σε ψηφοφορία.`,
         { proposalId, score: result.score },
       );
+      // This path skips triggerSideEffects, so announce the vote here.
+      try {
+        const { notifyVoteStarted } = await import('./notifications');
+        await notifyVoteStarted(proposalId, proposal.communityId, proposal.question);
+      } catch (err: any) {
+        console.warn(`[notify] vote_started fan-out failed for proposal ${proposalId}: ${err?.message}`);
+      }
       break;
   }
 

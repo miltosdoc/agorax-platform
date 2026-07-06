@@ -100,6 +100,13 @@ export function registerAmendmentsRoutes(app: Express): void {
         text,
         status: 'pending',
       });
+      // Best-effort fan-out to community members; failures must not block the response.
+      try {
+        const { notifyNewAmendment } = await import('../utils/notifications');
+        await notifyNewAmendment(proposalId, proposal.communityId, req.user.id, proposal.question);
+      } catch (notifyErr) {
+        console.error('notifyNewAmendment failed:', notifyErr);
+      }
       const { findDuplicateAmendments } = await import('../utils/amendment-merger');
       const groups = await findDuplicateAmendments(proposalId);
       const duplicateGroup = groups.find(g => g.amendmentIds.includes(amendment.id));

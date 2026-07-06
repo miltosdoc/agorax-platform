@@ -219,14 +219,32 @@ export async function notifyProposalAdvanced(
     WHERE cm.community_id = ${communityId}
   `);
 
+  const short = proposalTitle.length > 100 ? proposalTitle.slice(0, 97) + '…' : proposalTitle;
+  // Member-facing stage announcements — only stages where members act or
+  // learn an outcome get a tailored message.
+  const stageMessage: Record<string, { title: string; message: string }> = {
+    community_signal: {
+      title: 'Σήμα κοινότητας — ψηφίστε τροπολογίες',
+      message: `Ψηφίστε ⬆/⬇ στις τροπολογίες της πρότασης «${short}».`,
+    },
+    decided: {
+      title: 'Η πρόταση ολοκληρώθηκε',
+      message: `Η ψηφοφορία για την πρόταση «${short}» ολοκληρώθηκε — δείτε το αποτέλεσμα.`,
+    },
+  };
+  const text = stageMessage[newStatus] ?? {
+    title: 'Η πρόταση προχώρησε',
+    message: `Η πρόταση «${short}» πέρασε σε νέο στάδιο.`,
+  };
+
   let notified = 0;
   for (const member of members.rows) {
     const userId = member.user_id as number;
     await createNotification({
       userId,
       type: 'proposal_advanced',
-      title: 'Proposal Advanced',
-      message: `"${proposalTitle}" has moved to ${newStatus} stage.`,
+      title: text.title,
+      message: text.message,
       proposalId,
       communityId,
       actionUrl: `/proposals/${proposalId}`,
@@ -234,6 +252,38 @@ export async function notifyProposalAdvanced(
     notified++;
   }
 
+  return notified;
+}
+
+// ─── Batch: Notify Community of New Amendment ───────────────────────────────
+
+export async function notifyNewAmendment(
+  proposalId: number,
+  communityId: number,
+  amendmentAuthorId: number,
+  proposalQuestion: string,
+): Promise<number> {
+  const members = await db.execute(sql`
+    SELECT cm.user_id FROM community_members cm
+    WHERE cm.community_id = ${communityId} AND cm.user_id <> ${amendmentAuthorId}
+  `);
+  let notified = 0;
+  const short = proposalQuestion.length > 100
+    ? proposalQuestion.slice(0, 97) + '…'
+    : proposalQuestion;
+  for (const member of members.rows) {
+    const userId = member.user_id as number;
+    await createNotification({
+      userId,
+      type: 'amendment_ready',
+      title: 'Νέα τροπολογία σε πρόταση',
+      message: short,
+      proposalId,
+      communityId,
+      actionUrl: `/proposals/${proposalId}`,
+    });
+    notified++;
+  }
   return notified;
 }
 
@@ -255,8 +305,8 @@ export async function notifyVoteStarted(
     await createNotification({
       userId,
       type: 'vote_started',
-      title: 'Voting Open',
-      message: `Voting has started on "${proposalTitle}". Cast your vote!`,
+      title: 'Ξεκίνησε ψηφοφορία',
+      message: `Η ψηφοφορία για την πρόταση «${proposalTitle.length > 100 ? proposalTitle.slice(0, 97) + '…' : proposalTitle}» είναι ανοιχτή — δώστε την ψήφο σας!`,
       proposalId,
       communityId,
       actionUrl: `/proposals/${proposalId}`,
