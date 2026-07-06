@@ -68,6 +68,12 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
   const [attachments, setAttachments] = useState<File[]>([]);
   const attachRef = useRef<HTMLInputElement>(null);
 
+  // Which button triggered the form submit: 'save' keeps the proposal as a
+  // draft, 'submit' also sends it into review right away. Both buttons are
+  // type="submit" so native required-field validation runs for either path;
+  // the ref is set in each button's onClick, which fires before onSubmit.
+  const submitModeRef = useRef<'save' | 'submit'>('save');
+
   function handleAttachPick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     if (picked.length === 0) return;
@@ -144,6 +150,7 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
       setError(t('proposal.create_error'));
       return;
     }
+    const mode = submitModeRef.current;
     setLoading(true);
     setError(null);
 
@@ -169,6 +176,18 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
           await uploadProposalFile(file, `/api/proposals/${proposalId}/media?kind=document`, title);
         } catch {
           /* best-effort — see comment above */
+        }
+      }
+
+      // "Submit for review" chains the lifecycle transition right after the
+      // save. If it fails the draft is already stored, so navigate anyway —
+      // the detail page shows a draft banner where submission can be retried
+      // (staying on the form would risk creating a duplicate proposal).
+      if (mode === 'submit') {
+        try {
+          await apiRequest('POST', `/api/proposals/${proposalId}/submit`);
+        } catch {
+          /* draft saved — retry from the proposal page */
         }
       }
 
@@ -383,20 +402,46 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
             </Select>
           </div>
 
-          <div className="flex items-center justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => window.history.back()}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('proposal.submitting')}
-                </>
-              ) : (
-                editProposalId ? t('proposal.edit_button') : t('proposal.submit_button')
-              )}
-            </Button>
+          <div className="space-y-2">
+            <div className="flex items-center justify-end gap-2 flex-wrap">
+              <Button type="button" variant="ghost" onClick={() => window.history.back()}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={loading}
+                onClick={() => { submitModeRef.current = 'save'; }}
+                data-testid="proposal-save-draft"
+              >
+                {loading && submitModeRef.current === 'save' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('proposal.submitting')}
+                  </>
+                ) : (
+                  editProposalId ? t('proposal.edit_button') : t('proposal.submit_button')
+                )}
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                onClick={() => { submitModeRef.current = 'submit'; }}
+                data-testid="proposal-submit-review"
+              >
+                {loading && submitModeRef.current === 'submit' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('proposal.submitting_review')}
+                  </>
+                ) : (
+                  t('proposal.submit_for_review')
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground text-right">
+              {t('proposal.submit_vs_save_hint')}
+            </p>
           </div>
         </form>
       </CardContent>

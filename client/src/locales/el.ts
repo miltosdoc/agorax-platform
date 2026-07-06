@@ -390,6 +390,10 @@ const el: TranslationDictionary = {
   'proposal.create_error': 'Αποτυχία δημιουργίας πρότασης',
   'proposal.submit_button': 'Αποθήκευση προσχεδίου',
   'proposal.submitting': 'Αποθήκευση…',
+  'proposal.submit_for_review': 'Υποβολή για έλεγχο',
+  'proposal.submitting_review': 'Υποβολή…',
+  'proposal.submit_vs_save_hint': 'Το προσχέδιο δεν προχωρά στη διαβούλευση μέχρι να υποβληθεί για έλεγχο.',
+  'proposal.submitFailed': 'Η υποβολή απέτυχε. Δοκιμάστε ξανά.',
 
   // Verify Gov.gr Modal
   'verify.title': 'Επαλήθευση Ταυτότητας Gov.gr',

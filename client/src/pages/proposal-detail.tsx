@@ -145,6 +145,25 @@ export default function ProposalDetailPage() {
     }
   };
 
+  const [submittingDraft, setSubmittingDraft] = useState(false);
+  const [draftSubmitError, setDraftSubmitError] = useState<string | null>(null);
+
+  // Draft → review: the endpoint runs the LLM validation synchronously and
+  // returns the proposal in its post-validation state.
+  const handleSubmitDraft = async () => {
+    if (!proposalId || submittingDraft) return;
+    setSubmittingDraft(true);
+    setDraftSubmitError(null);
+    try {
+      const resp = await api.post<Proposal>(`/api/proposals/${proposalId}/submit`);
+      setProposal(resp.data);
+    } catch (error) {
+      setDraftSubmitError(error instanceof ApiError ? error.message : t('proposal.submitFailed'));
+    } finally {
+      setSubmittingDraft(false);
+    }
+  };
+
   const handleRevalidate = async () => {
     if (!proposalId || revalidating) return;
     setRevalidating(true);
@@ -194,6 +213,27 @@ export default function ProposalDetailPage() {
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-3" data-testid="proposal-validation-banner">
           <span className="text-lg leading-none">🤖</span>
           <span>{t('proposal.validating')}</span>
+        </div>
+      )}
+
+      {/* Draft call-to-action — the sidebar button alone is easy to miss
+          (it falls below the fold on mobile), so the path from draft to
+          deliberation is spelled out right at the top. */}
+      {userIsAuthor && proposal.status === 'draft' && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" data-testid="proposal-draft-banner">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="flex-1">{t('workspace.action.draft')}</span>
+            <Button
+              size="sm"
+              className="shrink-0"
+              disabled={submittingDraft}
+              onClick={handleSubmitDraft}
+              data-testid="proposal-draft-submit"
+            >
+              {submittingDraft ? t('proposal.submitting_review') : t('workspace.action.draftButton')}
+            </Button>
+          </div>
+          {draftSubmitError && <p className="mt-2 text-xs text-red-600">{draftSubmitError}</p>}
         </div>
       )}
 

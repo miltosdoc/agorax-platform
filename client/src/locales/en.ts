@@ -390,6 +390,10 @@ const en: TranslationDictionary = {
   'proposal.create_error': 'Failed to create proposal',
   'proposal.submit_button': 'Save as draft',
   'proposal.submitting': 'Saving…',
+  'proposal.submit_for_review': 'Submit for review',
+  'proposal.submitting_review': 'Submitting…',
+  'proposal.submit_vs_save_hint': 'A draft does not enter deliberation until it is submitted for review.',
+  'proposal.submitFailed': 'Submission failed. Please try again.',
 
   // Verify Gov.gr Modal
   'verify.title': 'Gov.gr Identity Verification',
