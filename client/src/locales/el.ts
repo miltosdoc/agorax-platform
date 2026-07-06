@@ -1168,7 +1168,7 @@ const el: TranslationDictionary = {
   'community.governance.noAdmin': 'Χωρίς διαχειριστή',
   'community.governance.adminFounded': 'Διαχειριστής-ιδρυτής',
   'community.governance.adminGuided': 'Καθοδηγούμενη',
-  'proposal.status.draft': 'Πρόχειρο',
+  'proposal.status.draft': 'Πρόχειρο — μόνο εσείς',
   'proposal.status.review': 'Έλεγχος',
   'proposal.status.authorReview': 'Ανασκόπηση',
   'proposal.status.communitySignal': 'Συμβουλή',
@@ -1240,7 +1240,7 @@ const el: TranslationDictionary = {
   'community.no_votes_yet': 'Δεν έχουν δοθεί ψήφοι ακόμη.',
   'community.settings_read_only': 'Προβολή μόνο — μόνο διαχειριστές και ιδρυτές μπορούν να αλλάξουν ρυθμίσεις.',
 
-  'workspace.action.draft': 'Αυτή η πρόταση είναι ακόμη προσχέδιο. Υποβάλετέ την για να ξεκινήσει ο έλεγχος από ΤΝ.',
+  'workspace.action.draft': 'Αυτή η πρόταση είναι ακόμη προσχέδιο, ορατό μόνο σε εσάς. Υποβάλετέ την για να ξεκινήσει ο έλεγχος από ΤΝ και να τη δει η κοινότητα.',
   'workspace.action.review': 'Περιμένετε τον έλεγχο από ΤΝ. Η πρόταση θα κατευθυνθεί αυτόματα βάσει του σκορ.',
   'workspace.action.author_review': 'Ο συγγραφέας εξετάζει τις τροπολογίες της κοινότητας.',
   'workspace.action.community_signal': 'Σήμα κοινότητας: τα μέλη ψηφίζουν ⬆/⬇ στις τροπολογίες που απέρριψε ο συγγραφέας. Όσες συγκεντρώσουν αρκετή υποστήριξη πάνε στο κληρωτό σώμα πολιτών· όταν λήξει ο χρόνος, η πρόταση προχωρά αυτόματα.',

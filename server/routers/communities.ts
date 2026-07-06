@@ -147,7 +147,11 @@ export function registerCommunitiesRoutes(app: Express): void {
       const currentUserRole = req.user?.id
         ? await communityRepo.getCommunityMemberRole(communityId, req.user.id)
         : undefined;
-      res.json(buildCommunitySummary(community, proposals, members.length, currentUserRole));
+      // Drafts are private to their author — keep them out of the shared view.
+      const visibleProposals = proposals.filter(
+        (p) => p.status !== 'draft' || p.authorId === req.user?.id,
+      );
+      res.json(buildCommunitySummary(community, visibleProposals, members.length, currentUserRole));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch community summary" });
     }

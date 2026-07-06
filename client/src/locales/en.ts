@@ -1168,7 +1168,7 @@ const en: TranslationDictionary = {
   'community.governance.noAdmin': 'No Admin',
   'community.governance.adminFounded': 'Admin-Founded',
   'community.governance.adminGuided': 'Admin-Guided',
-  'proposal.status.draft': 'Draft',
+  'proposal.status.draft': 'Draft — only you',
   'proposal.status.review': 'Review',
   'proposal.status.authorReview': 'Author Review',
   'proposal.status.communitySignal': 'Community Signal',
@@ -1240,7 +1240,7 @@ const en: TranslationDictionary = {
   'community.no_votes_yet': 'No votes yet.',
   'community.settings_read_only': 'Read-only view — only admins and the founder can change settings here.',
 
-  'workspace.action.draft': 'This proposal is still a draft. Submit it to start AI validation.',
+  'workspace.action.draft': 'This proposal is still a draft, visible only to you. Submit it to start AI validation and make it visible to the community.',
   'workspace.action.review': 'Awaiting AI validation. The proposal will be routed automatically based on its score.',
   'workspace.action.author_review': 'The author is reviewing community amendments.',
   'workspace.action.community_signal': 'Community signal: members vote ⬆/⬇ on the amendments the author rejected. Amendments with enough support go to the citizen jury (sortition); when the timer ends the proposal advances automatically.',

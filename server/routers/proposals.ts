@@ -72,16 +72,21 @@ export async function computeVoteResults(
 }
 
 export function registerProposalsRoutes(app: Express): void {
-  app.get("/api/proposals", async (req, res) => {
+  // Drafts are private to their author until submitted for review — every
+  // public read surface filters them out for other users.
+  const visibleTo = (userId: number | undefined) =>
+    (p: { status: string; authorId: number }) => p.status !== 'draft' || p.authorId === userId;
+
+  app.get("/api/proposals", async (req: any, res) => {
     try {
       const { limit } = req.query;
       const proposals = await proposalRepo.getAllProposals(limit ? parseInt(limit as string) : undefined);
-      res.json(proposals);
+      res.json(proposals.filter(visibleTo(req.user?.id)));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
   });
-  app.get("/api/communities/:communityId/proposals", async (req, res) => {
+  app.get("/api/communities/:communityId/proposals", async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.communityId);
       const { status, category } = req.query;
@@ -89,7 +94,7 @@ export function registerProposalsRoutes(app: Express): void {
         status: status as string,
         category: category as string,
       });
-      res.json(proposals);
+      res.json(proposals.filter(visibleTo(req.user?.id)));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
@@ -123,23 +128,23 @@ export function registerProposalsRoutes(app: Express): void {
         category,
         status: INITIAL_PROPOSAL_STATE,
       });
-      // Best-effort fan-out to community members; failures must not block the response.
-      try {
-        const { notifyNewProposal } = await import('../utils/notifications');
-        await notifyNewProposal(proposal.id, communityId, question, userId);
-      } catch (notifyErr) {
-        console.error('notifyNewProposal failed:', notifyErr);
-      }
+      // Members are notified on submit (draft → deliberation), not here —
+      // a draft is private to its author and shouldn't be announced.
       res.status(201).json(proposal);
     } catch (error) {
       console.error("create-proposal failed:", error);
       res.status(500).json({ message: "Failed to create proposal" });
     }
   });
-  app.get("/api/proposals/:id", async (req, res) => {
+  app.get("/api/proposals/:id", async (req: any, res) => {
     try {
       const proposal = await proposalRepo.getProposal(parseInt(req.params.id));
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      // A draft only exists for its author (and admins) — 404, not 403, so
+      // the URL doesn't confirm the draft exists.
+      if (proposal.status === 'draft' && proposal.authorId !== req.user?.id && !req.user?.isAdmin) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
       res.json(proposal);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposal" });
@@ -250,6 +255,16 @@ export function registerProposalsRoutes(app: Express): void {
       if (nextStatus !== 'review') {
         updated = await transitionProposal(scored, nextStatus, storage);
         await triggerSideEffects('review', nextStatus, updated);
+      }
+      // The proposal became visible to the community just now (not at draft
+      // creation) — announce it once it actually enters deliberation.
+      if (nextStatus === 'author_review') {
+        try {
+          const { notifyNewProposal } = await import('../utils/notifications');
+          await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId);
+        } catch (notifyErr) {
+          console.error('notifyNewProposal failed:', notifyErr);
+        }
       }
       res.json({
         ...updated,
