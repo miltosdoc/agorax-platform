@@ -7,4 +7,3 @@ sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
-nest-asyncio>=1.0.0

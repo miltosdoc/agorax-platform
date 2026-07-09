@@ -14,17 +14,16 @@ import sys
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-import nest_asyncio
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-# pyhanko's signature validation calls asyncio.run() internally. Under
-# uvicorn that happens inside an already-running event loop; nest_asyncio
-# makes the nested run() legal instead of raising RuntimeError.
-nest_asyncio.apply()
+# NOTE: pyhanko's signature validation drives its own asyncio internally;
+# the validator runs it via asyncio.to_thread so it never collides with the
+# server's event loop. (An earlier nest_asyncio.apply() workaround for the
+# same problem breaks anyio/FastAPI on Python 3.12+ and must not return.)
 
 from config import settings
 from database import get_db, init_db, engine
