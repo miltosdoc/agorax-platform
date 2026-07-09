@@ -14,6 +14,9 @@ import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 import { useToast } from "@/hooks/use-toast";
 import { downloadApk } from "@/lib/download-apk";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { api, ApiError } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -25,6 +28,23 @@ export default function ProfilePage() {
   const [exportCode, setExportCode] = useState<string | null>(null);
   const [importCode, setImportCode] = useState('');
   const [importing, setImporting] = useState(false);
+  const [unverifying, setUnverifying] = useState(false);
+
+  async function handleRemoveVerification() {
+    setUnverifying(true);
+    try {
+      await api.delete('/api/user/verify-govgr');
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({ title: t('profile.removeVerificationDone') });
+    } catch (error) {
+      toast({
+        title: error instanceof ApiError ? error.message : t('profile.removeVerificationFailed'),
+        variant: "destructive",
+      });
+    } finally {
+      setUnverifying(false);
+    }
+  }
 
   async function handleAnonImport() {
     setImporting(true);
@@ -201,6 +221,35 @@ export default function ProfilePage() {
                       {t('profile.verifyIdentity')}
                     </Button>
                   </>
+                )}
+                {effectiveUser.govgrVerified && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        disabled={unverifying}
+                        data-testid="button-remove-verification"
+                        className="gap-2 text-destructive"
+                      >
+                        {unverifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        {t('profile.removeVerification')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('profile.removeVerificationConfirmTitle')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('profile.removeVerificationConfirmBody')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('general.cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveVerification}>
+                          {t('profile.removeVerification')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </CardContent>
             </Card>

@@ -278,5 +278,30 @@ export function registerUsersRoutes(app: Express): void {
       res.status(500).json({ message: "Σφάλμα κατά την επαλήθευση ταυτότητας" });
     }
   });
+
+  // GDPR consent withdrawal: remove the verified badge and the verified
+  // demographics, but KEEP govgrVoterHash + govgrDocCodeHash reserved on
+  // this account. Clearing them would let one AFM hop between accounts
+  // (verify → act as "verified" → unverify → verify a second account),
+  // which breaks the one-person-one-account guarantee the hashes exist for.
+  app.delete("/api/user/verify-govgr", requireAuth, async (req: any, res) => {
+    try {
+      if (!req.user.govgrVerified) {
+        return res.status(409).json({ message: "Ο λογαριασμός δεν είναι επαληθευμένος" });
+      }
+      const updated = await userRepo.updateUser(req.user.id, {
+        govgrVerified: false,
+        govgrVerifiedAt: null,
+        govgrFirstName: null,
+        govgrLastName: null,
+        govgrMunicipality: null,
+        govgrPostcode: null,
+      });
+      const { password, ...safe } = updated as any;
+      res.json(safe);
+    } catch (error) {
+      res.status(500).json({ message: "Σφάλμα κατά την αφαίρεση της επαλήθευσης" });
+    }
+  });
   // ─── Community Routes ────────────────────────────────────────────
 }
