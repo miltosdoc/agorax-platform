@@ -188,16 +188,18 @@ async def validate_ballot(
 async def validate_identity(
     response: Response,
     file: UploadFile = File(..., description="Gov.gr Solemn Declaration PDF"),
+    challenge_token: Optional[str] = Form(None, description="Per-account code that must appear in the declaration text"),
     db: Session = Depends(get_db),
 ):
     """
     Validate identity only (one-time verification).
-    
+
     Checks:
     - Valid government PAdES signature
+    - challenge_token appears in the declaration text (when provided)
     - Extracts AFM and returns voter hash
-    
-    Does NOT check poll token or vote choice.
+
+    Does NOT check vote choice.
     """
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
@@ -215,7 +217,7 @@ async def validate_identity(
     validator = BallotValidator(db)
     
     try:
-        result = await validator.validate_identity(pdf_bytes)
+        result = await validator.validate_identity(pdf_bytes, challenge_token=challenge_token)
     except Exception as e:
         logger.error(f"Identity validation error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal validation error: {str(e)}")

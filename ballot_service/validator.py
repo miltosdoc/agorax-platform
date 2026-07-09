@@ -164,16 +164,18 @@ class BallotValidator:
             signer_name=gate1_result.signer_name
         )
 
-    async def validate_identity(self, pdf_bytes: bytes) -> ValidationResult:
+    async def validate_identity(self, pdf_bytes: bytes, challenge_token: Optional[str] = None) -> ValidationResult:
         """
         Validate identity only (for one-time user verification).
-        
+
         Checks:
         1. Valid Government Signature
-        2. Extract valid AFM
-        
+        2. Challenge token in the declaration text (when provided) — binds
+           the declaration to one account, so a leaked/stolen PDF or a
+           declaration written for another purpose cannot verify anyone else
+        3. Extract valid AFM
+
         Does NOT check:
-        - Poll token (allows any valid declaration)
         - Vote choice (not voting)
         - Uniqueness (allows checking identity multiple times if needed, though usually done once)
         """
@@ -181,7 +183,7 @@ class BallotValidator:
         gate1_result = await self._gate1_verify_signature(pdf_bytes)
         if not gate1_result.success:
             return gate1_result
-            
+
         # Extract text
         try:
             text = self._extract_text(pdf_bytes)
@@ -191,7 +193,20 @@ class BallotValidator:
                 rejection_reason=RejectionReason.PDF_READ_ERROR,
                 message=f"Failed to extract text from PDF: {str(e)}"
             )
-            
+
+        # Gate 2: the account's challenge code must appear in the free text.
+        # Normalize both sides (uppercase, drop whitespace/hyphens) so PDF
+        # line wrapping or the user typing "X7K2 94QD" doesn't cause a miss.
+        if challenge_token:
+            normalized_text = re.sub(r"[\s\-–—]", "", text.upper())
+            normalized_token = re.sub(r"[\s\-–—]", "", challenge_token.upper())
+            if normalized_token not in normalized_text:
+                return ValidationResult(
+                    success=False,
+                    rejection_reason=RejectionReason.TOKEN_NOT_FOUND,
+                    message="The verification code for this account was not found in the declaration text"
+                )
+
         # Extract AFM and hash it
         afm = self._extract_afm(text)
         if not afm:

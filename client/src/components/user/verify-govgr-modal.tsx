@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -44,6 +44,25 @@ export function VerifyGovgrModal({ isOpen, onClose }: VerifyGovgrModalProps) {
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
     const { toast } = useToast();
+
+    const { data: challenge } = useQuery<{ code: string }>({
+        queryKey: ["/api/user/verify-govgr/challenge"],
+        enabled: isOpen,
+        staleTime: Infinity,
+    });
+
+    const suggestedText = challenge
+        ? t('verify.challenge_template', { code: challenge.code })
+        : '';
+
+    const copySuggestedText = async () => {
+        try {
+            await navigator.clipboard.writeText(suggestedText);
+            toast({ title: t('verify.challenge_copied') });
+        } catch {
+            /* clipboard unavailable — the text is selectable on screen */
+        }
+    };
 
     const getRejectionLabel = (reason: string) => {
         const reasons: Record<string, string> = {
@@ -197,6 +216,25 @@ export function VerifyGovgrModal({ isOpen, onClose }: VerifyGovgrModalProps) {
                                 <p className="text-sm text-muted-foreground">
                                     {t('verify.step1_instruction')}
                                 </p>
+                                {challenge && (
+                                    <div className="rounded-md border bg-muted/50 p-3 space-y-2" data-testid="govgr-challenge-box">
+                                        <p className="text-sm select-all font-medium">{suggestedText}</p>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('verify.challenge_why', { code: challenge.code })}
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={copySuggestedText}
+                                                data-testid="govgr-challenge-copy"
+                                            >
+                                                {t('verify.challenge_copy')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <Separator />
 
@@ -231,6 +269,11 @@ export function VerifyGovgrModal({ isOpen, onClose }: VerifyGovgrModalProps) {
                                 {t('verify.upload_description')}
                             </AlertDescription>
                         </Alert>
+                        {challenge && (
+                            <p className="text-xs text-muted-foreground">
+                                {t('verify.challenge_reminder', { code: challenge.code })}
+                            </p>
+                        )}
 
                         <Card>
                             <CardContent className="p-6">

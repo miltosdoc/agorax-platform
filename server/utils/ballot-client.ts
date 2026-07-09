@@ -149,9 +149,11 @@ export async function validateBallot(
  */
 export async function verifyIdentity(
   pdfBuffer: Buffer,
+  challengeToken?: string,
 ): Promise<IdentityValidationResult> {
   const form = new FormData();
   form.append("file", pdfBuffer, { filename: "declaration.pdf" });
+  if (challengeToken) form.append("challenge_token", challengeToken);
 
   try {
     const response = await fetch(`${BALLOT_SERVICE_URL}/api/ballot/validate-identity`, {

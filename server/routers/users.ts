@@ -198,9 +198,12 @@ export function registerUsersRoutes(app: Express): void {
       if (!file) {
         return res.status(400).json({ message: "PDF file is required" });
       }
-      // Verify identity via Python ballot service
+      // Verify identity via Python ballot service. The declaration must
+      // contain this account's challenge code in its free text — see
+      // utils/govgr-challenge.ts for why.
       const { verifyIdentity } = await import('../utils/ballot-client');
-      const result = await verifyIdentity(file.buffer);
+      const { govgrChallengeCode } = await import('../utils/govgr-challenge');
+      const result = await verifyIdentity(file.buffer, govgrChallengeCode(req.user.id));
       if (result.success) {
         const voterHash = result.voter_hash || "";
         const docCodeHash = result.doc_code_hash || "";
@@ -276,6 +279,17 @@ export function registerUsersRoutes(app: Express): void {
       }
     } catch (error) {
       res.status(500).json({ message: "Σφάλμα κατά την επαλήθευση ταυτότητας" });
+    }
+  });
+
+  // The per-account code the user must include in the declaration's free
+  // text before uploading it. Stable per account, so retries are painless.
+  app.get("/api/user/verify-govgr/challenge", requireAuth, async (req: any, res) => {
+    try {
+      const { govgrChallengeCode } = await import('../utils/govgr-challenge');
+      res.json({ code: govgrChallengeCode(req.user.id) });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate verification code" });
     }
   });
 

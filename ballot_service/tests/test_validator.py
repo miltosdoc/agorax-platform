@@ -256,5 +256,47 @@ class TestGate4Identity:
         assert result.rejection_reason == RejectionReason.ALREADY_VOTED
 
 
+class TestIdentityChallengeToken:
+    """validate_identity's challenge code binds a declaration to one account:
+    a leaked PDF or a declaration written for another purpose must not verify
+    anyone else."""
+
+    HEADER_PRETEXT = "Με ατομική μου ευθύνη και γνωρίζοντας τις κυρώσεις:"
+    CODE = "X7K2-94QD"
+
+    def _run(self, validator, body, token):
+        import asyncio
+        from unittest.mock import AsyncMock
+        text = f"AFM: 123456789\n{self.HEADER_PRETEXT}\n{body}"
+        sig_ok = ValidationResult(success=True, message="ok", signer_name="gov.gr")
+        with patch.object(validator, "_gate1_verify_signature", new=AsyncMock(return_value=sig_ok)), \
+             patch.object(validator, "_extract_text", return_value=text):
+            return asyncio.run(validator.validate_identity(b"%PDF-fake", challenge_token=token))
+
+    def test_token_present_verbatim(self, validator):
+        result = self._run(validator, f"Βεβαιώνω την ταυτότητά μου — κωδικός: {self.CODE}", self.CODE)
+        assert result.success is True
+
+    def test_token_survives_line_wrap_and_case(self, validator):
+        # PDF extraction may wrap the code across lines or the user may type
+        # it lowercase without the hyphen; normalization must still match.
+        result = self._run(validator, "κωδικός: x7k2\n94qd", self.CODE)
+        assert result.success is True
+
+    def test_token_missing_rejected(self, validator):
+        result = self._run(validator, "Βεβαιώνω την ταυτότητά μου για επαλήθευση στο AgoraX.", self.CODE)
+        assert result.success is False
+        assert result.rejection_reason == RejectionReason.TOKEN_NOT_FOUND
+
+    def test_wrong_token_rejected(self, validator):
+        result = self._run(validator, "κωδικός: AAAA-BBBB", self.CODE)
+        assert result.success is False
+        assert result.rejection_reason == RejectionReason.TOKEN_NOT_FOUND
+
+    def test_no_token_required_keeps_old_behaviour(self, validator):
+        result = self._run(validator, "οποιοδήποτε κείμενο", None)
+        assert result.success is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
