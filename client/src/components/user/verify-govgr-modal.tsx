@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTranslation } from "@/hooks/use-translation";
+import { readCsrfCookie } from "@/lib/upload-media";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -70,8 +71,14 @@ export function VerifyGovgrModal({ isOpen, onClose }: VerifyGovgrModalProps) {
             const formData = new FormData();
             formData.append("file", selectedFile);
 
+            if (!readCsrfCookie()) {
+                await fetch('/api/csrf', { credentials: 'include' }).catch(() => {});
+            }
+            const csrf = readCsrfCookie();
             const response = await fetch("/api/user/verify-govgr", {
                 method: "POST",
+                credentials: "include",
+                headers: csrf ? { "X-CSRF-Token": csrf } : undefined,
                 body: formData,
             });
 
