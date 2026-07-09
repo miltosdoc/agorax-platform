@@ -21,6 +21,11 @@ import {
   castProposalVoteSchema,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState } from '@shared/proposal-lifecycle';
+import {
+  canViewCommunityContentById,
+  requireProposalContentAccess,
+  visibleCommunityIdSet,
+} from '../utils/community-visibility';
 import { compileProposal } from '../utils/proposal-compiler';
 import { isLlmConfigured } from '../utils/llm-client';
 import type { VoterView } from '../voting';
@@ -80,8 +85,11 @@ export function registerProposalsRoutes(app: Express): void {
   app.get("/api/proposals", async (req: any, res) => {
     try {
       const { limit } = req.query;
-      const proposals = await proposalRepo.getAllProposals(limit ? parseInt(limit as string) : undefined);
-      res.json(proposals.filter(visibleTo(req.user?.id)));
+      const all = await proposalRepo.getAllProposals(limit ? parseInt(limit as string) : undefined);
+      // Global list respects per-community content visibility (public
+      // communities plus the viewer's own memberships) and draft privacy.
+      const visible = await visibleCommunityIdSet(all.map((p) => p.communityId), req.user?.id);
+      res.json(all.filter((p) => visible.has(p.communityId)).filter(visibleTo(req.user?.id)));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
@@ -89,6 +97,9 @@ export function registerProposalsRoutes(app: Express): void {
   app.get("/api/communities/:communityId/proposals", async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.communityId);
+      if (!(await canViewCommunityContentById(communityId, req.user?.id))) {
+        return res.status(403).json({ message: "Members only", contentHidden: true });
+      }
       const { status, category } = req.query;
       const proposals = await proposalRepo.getProposals(communityId, {
         status: status as string,
@@ -136,7 +147,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to create proposal" });
     }
   });
-  app.get("/api/proposals/:id", async (req: any, res) => {
+  app.get("/api/proposals/:id", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposal = await proposalRepo.getProposal(parseInt(req.params.id));
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
@@ -279,7 +290,7 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
   // ─── Amendment Routes ───────────────────────────────────────────
-  app.post("/api/proposals/:id/support", requireAuth, requireConsent, async (req: any, res) => {
+  app.post("/api/proposals/:id/support", requireAuth, requireConsent, requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const { type } = req.body; // 'support' or 'oppose'
@@ -292,7 +303,7 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to create support" });
     }
   });
-  app.get("/api/proposals/:id/support", async (req: any, res) => {
+  app.get("/api/proposals/:id/support", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const userId = (req.user as any)?.id;
       const support = await proposalRepo.getProposalSupport(parseInt(req.params.id), userId);
@@ -307,7 +318,7 @@ export function registerProposalsRoutes(app: Express): void {
   // an append-only SHA-256 chain; a future Helios backend would encrypt the
   // ballot and decrypt only the aggregate tally. The receipt shape is
   // backend-specific, but every backend returns one.
-  app.post("/api/proposals/:id/vote", requireAuth, requireConsent, async (req: any, res) => {
+  app.post("/api/proposals/:id/vote", requireAuth, requireConsent, requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -600,7 +611,7 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
   // Get aggregated final-vote results for a proposal.
-  app.get("/api/proposals/:id/vote-results", async (req: any, res) => {
+  app.get("/api/proposals/:id/vote-results", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -820,7 +831,7 @@ export function registerProposalsRoutes(app: Express): void {
   });
   // Snapshot of the sortition body for a proposal: who's on the jury,
   // how many have responded, deadline, status, the AI-pre-merged baseline.
-  app.get("/api/proposals/:id/sortition-body", async (req: any, res) => {
+  app.get("/api/proposals/:id/sortition-body", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -879,7 +890,7 @@ export function registerProposalsRoutes(app: Express): void {
 
   // Preview or recompute the AI-merged final text. Anyone can read; the
   // POST variant persists the result to finalText (author or admin only).
-  app.get("/api/proposals/:id/merge-preview", async (req: any, res) => {
+  app.get("/api/proposals/:id/merge-preview", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {

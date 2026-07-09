@@ -13,6 +13,7 @@ import {
   COMMUNITY_GOVERNANCE_MODELS,
   COMMUNITY_SORTITION_MODES,
   COMMUNITY_JOIN_POLICIES,
+  COMMUNITY_VISIBILITY_LEVELS,
   type CommunityGovernanceModel,
   type CommunitySortitionMode,
   type CommunityJoinPolicy,
@@ -21,6 +22,8 @@ import {
 export const GOVERNABLE_SETTING_KEYS = [
   'governanceModel',
   'joinPolicy',
+  'memberListVisibility',
+  'contentVisibility',
   'sortitionMode',
   'requireGovgrVerification',
   'maxConcurrentVotes',
@@ -46,6 +49,10 @@ export interface GovernableSettingDescriptor {
 export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, GovernableSettingDescriptor> = {
   governanceModel:               { key: 'governanceModel',               type: 'enum',    allowed: COMMUNITY_GOVERNANCE_MODELS },
   joinPolicy:                    { key: 'joinPolicy',                    type: 'enum',    allowed: COMMUNITY_JOIN_POLICIES },
+  // Two-choice toggles: with two options the plurality tally is a straight
+  // majority — 50%+1 of cast votes flips the value, ties keep the current one.
+  memberListVisibility:          { key: 'memberListVisibility',          type: 'enum',    allowed: COMMUNITY_VISIBILITY_LEVELS },
+  contentVisibility:             { key: 'contentVisibility',             type: 'enum',    allowed: COMMUNITY_VISIBILITY_LEVELS },
   sortitionMode:                 { key: 'sortitionMode',                 type: 'enum',    allowed: COMMUNITY_SORTITION_MODES },
   requireGovgrVerification:      { key: 'requireGovgrVerification',      type: 'boolean' },
   maxConcurrentVotes:            { key: 'maxConcurrentVotes',            type: 'unlimited_or_positive_integer' },

@@ -27,6 +27,11 @@ import {
   isGovernableSettingKey,
   parseGovernableSetting,
 } from '@shared/governable-settings';
+import {
+  canViewCommunityContent,
+  isMemberListPublic,
+  visibleCommunityIdSet,
+} from '../utils/community-visibility';
 
 export function registerCommunitiesRoutes(app: Express): void {
   app.get("/api/communities", async (req, res) => {
@@ -91,10 +96,16 @@ export function registerCommunitiesRoutes(app: Express): void {
         }
       }
 
+      // Members-only content stays out of the public directory: the row is
+      // listed (name, description, member count), but proposal teasers are
+      // only shown to viewers who may read the community's content.
+      const visibleContent = await visibleCommunityIdSet(ids, userId);
+
       const enriched = list.map((c) => ({
         ...c,
         memberCount: memberCounts.get(c.id) ?? 0,
-        latestProposal: latestByCommunity.get(c.id)
+        contentHidden: !visibleContent.has(c.id),
+        latestProposal: visibleContent.has(c.id) && latestByCommunity.get(c.id)
           ? {
               id: latestByCommunity.get(c.id)!.id,
               question: latestByCommunity.get(c.id)!.question,
@@ -102,7 +113,7 @@ export function registerCommunitiesRoutes(app: Express): void {
               createdAt: latestByCommunity.get(c.id)!.createdAt,
             }
           : null,
-        mostPopularProposal: popularByCommunity.get(c.id) ?? null,
+        mostPopularProposal: visibleContent.has(c.id) ? (popularByCommunity.get(c.id) ?? null) : null,
       }));
 
       res.json(enriched);
@@ -140,9 +151,10 @@ export function registerCommunitiesRoutes(app: Express): void {
       const communityId = parseInt(req.params.id);
       const community = await communityRepo.getCommunity(communityId);
       if (!community) return res.status(404).json({ message: "Community not found" });
+      const canViewContent = await canViewCommunityContent(community, req.user?.id);
       const [members, proposals] = await Promise.all([
         communityRepo.getCommunityMembers(communityId),
-        proposalRepo.getProposals(communityId),
+        canViewContent ? proposalRepo.getProposals(communityId) : Promise.resolve([]),
       ]);
       const currentUserRole = req.user?.id
         ? await communityRepo.getCommunityMemberRole(communityId, req.user.id)
@@ -151,7 +163,10 @@ export function registerCommunitiesRoutes(app: Express): void {
       const visibleProposals = proposals.filter(
         (p) => p.status !== 'draft' || p.authorId === req.user?.id,
       );
-      res.json(buildCommunitySummary(community, visibleProposals, members.length, currentUserRole));
+      res.json({
+        ...buildCommunitySummary(community, visibleProposals, members.length, currentUserRole),
+        contentHidden: !canViewContent,
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch community summary" });
     }
@@ -246,9 +261,11 @@ export function registerCommunitiesRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to clear setting vote" });
     }
   });
-  app.get("/api/communities/:id/members", async (req, res) => {
+  app.get("/api/communities/:id/members", async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
       const rows = await db
         .select({
           userId: communityMembers.userId,
@@ -262,7 +279,20 @@ export function registerCommunitiesRoutes(app: Express): void {
         .innerJoin(users, eq(users.id, communityMembers.userId))
         .where(eq(communityMembers.communityId, communityId))
         .orderBy(desc(communityMembers.joinedAt));
-      res.json(rows);
+
+      // Hidden member lists still expose officeholders: whoever holds power
+      // in the community stays publicly accountable. Members see everyone.
+      if (!isMemberListPublic(community)) {
+        const viewerIsMember = !!req.user?.id && rows.some((r) => r.userId === req.user.id);
+        if (!viewerIsMember) {
+          return res.json({
+            membersHidden: true,
+            memberCount: rows.length,
+            members: rows.filter((r) => r.role === 'founder' || r.role === 'admin'),
+          });
+        }
+      }
+      res.json({ membersHidden: false, memberCount: rows.length, members: rows });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch members" });
     }

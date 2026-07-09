@@ -10,6 +10,9 @@ export type CommunitySortitionMode = typeof COMMUNITY_SORTITION_MODES[number];
 export const COMMUNITY_JOIN_POLICIES = ['open', 'approval', 'invite_only'] as const;
 export type CommunityJoinPolicy = typeof COMMUNITY_JOIN_POLICIES[number];
 
+export const COMMUNITY_VISIBILITY_LEVELS = ['public', 'members'] as const;
+export type CommunityVisibilityLevel = typeof COMMUNITY_VISIBILITY_LEVELS[number];
+
 export interface CommunitySettingsInput {
   name?: unknown;
   description?: unknown;
@@ -25,6 +28,8 @@ export interface CommunitySettingsInput {
   maxAmendmentsPerProposal?: unknown;
   requireGovgrVerification?: unknown;
   joinPolicy?: unknown;
+  memberListVisibility?: unknown;
+  contentVisibility?: unknown;
   authorReviewHours?: unknown;
   communitySignalHours?: unknown;
   votingHours?: unknown;
@@ -48,6 +53,8 @@ export interface CommunityCreateSettings {
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
   joinPolicy: CommunityJoinPolicy;
+  memberListVisibility: CommunityVisibilityLevel;
+  contentVisibility: CommunityVisibilityLevel;
   authorReviewHours: number;
   communitySignalHours: number;
   votingHours: number;
@@ -68,6 +75,8 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
   joinPolicy: 'open',
+  memberListVisibility: 'public',
+  contentVisibility: 'public',
   authorReviewHours: 72,
   communitySignalHours: 48,
   votingHours: 168,
@@ -170,6 +179,8 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
     joinPolicy: enumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, DEFAULT_COMMUNITY_SETTINGS.joinPolicy, 'Invalid join policy'),
+    memberListVisibility: enumValue(input.memberListVisibility, COMMUNITY_VISIBILITY_LEVELS, DEFAULT_COMMUNITY_SETTINGS.memberListVisibility, 'Invalid member list visibility'),
+    contentVisibility: enumValue(input.contentVisibility, COMMUNITY_VISIBILITY_LEVELS, DEFAULT_COMMUNITY_SETTINGS.contentVisibility, 'Invalid content visibility'),
     authorReviewHours: integerValue(input.authorReviewHours, DEFAULT_COMMUNITY_SETTINGS.authorReviewHours, 0, 8760, 'authorReviewHours must be 0–8760'),
     communitySignalHours: integerValue(input.communitySignalHours, DEFAULT_COMMUNITY_SETTINGS.communitySignalHours, 0, 8760, 'communitySignalHours must be 0–8760'),
     votingHours: integerValue(input.votingHours, DEFAULT_COMMUNITY_SETTINGS.votingHours, 0, 8760, 'votingHours must be 0–8760'),
@@ -218,6 +229,12 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const joinPolicy = optionalEnumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, 'Invalid join policy');
   if (joinPolicy !== undefined) updates.joinPolicy = joinPolicy;
+
+  const memberListVisibility = optionalEnumValue(input.memberListVisibility, COMMUNITY_VISIBILITY_LEVELS, 'Invalid member list visibility');
+  if (memberListVisibility !== undefined) updates.memberListVisibility = memberListVisibility;
+
+  const contentVisibility = optionalEnumValue(input.contentVisibility, COMMUNITY_VISIBILITY_LEVELS, 'Invalid content visibility');
+  if (contentVisibility !== undefined) updates.contentVisibility = contentVisibility;
 
   const authorReviewHours = optionalIntegerValue(input.authorReviewHours, 0, 8760, 'authorReviewHours must be 0–8760');
   if (authorReviewHours !== undefined) updates.authorReviewHours = authorReviewHours;

@@ -33,6 +33,7 @@ import { proposals, communities, users, surveyPolls } from '@shared/schema';
 import { desc, eq, inArray, ne } from 'drizzle-orm';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
+import { canViewProposal, requireProposalContentAccess, visibleCommunityIdSet } from '../utils/community-visibility';
 import { generatePodcastScript, generateTeaserScript } from '../utils/media-scripts';
 import { logger } from '../utils/logger';
 import { notifyFileLost } from '../utils/notifications';
@@ -327,7 +328,7 @@ export function registerMediaRoutes(app: Express): void {
 
   // ── List ─────────────────────────────────────────────────────────────
 
-  app.get('/api/proposals/:id/media', async (req: any, res) => {
+  app.get('/api/proposals/:id/media', requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id, 10);
       if (!Number.isFinite(proposalId)) {
@@ -486,7 +487,8 @@ export function registerMediaRoutes(app: Express): void {
 
       if (kind) {
         const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
-        const filtered = filterMissingFiles(rows).filter((r) => !r.fileMissing);
+        const withFiles = filterMissingFiles(rows).filter((r) => !r.fileMissing);
+        const filtered = await filterMediaByCommunityVisibility(withFiles, (req as any).user?.id);
         res.json({
           items: filtered.map((r) => ({ feedType: 'media' as const, ...r })),
           nextCursor: filtered.length === limit ? filtered[filtered.length - 1].id : null,
@@ -527,9 +529,16 @@ export function registerMediaRoutes(app: Express): void {
           : Promise.resolve([]),
       ]);
 
+      // Per-community content visibility: drop items from members-only
+      // communities the viewer doesn't belong to.
+      const viewerId = (req as any).user?.id;
+      const visibleMediaRows = await filterMediaByCommunityVisibility(mediaRows, viewerId);
+      const visibleSet = await visibleCommunityIdSet(proposalRows.map((p) => p.communityId), viewerId);
+      const visibleProposalRows = proposalRows.filter((p) => visibleSet.has(p.communityId));
+
       const items = [
-        ...mediaRows.map((r: any) => ({ feedType: 'media' as const, sortAt: r.createdAt, ...r })),
-        ...proposalRows.map((p) => ({
+        ...visibleMediaRows.map((r: any) => ({ feedType: 'media' as const, sortAt: r.createdAt, ...r })),
+        ...visibleProposalRows.map((p) => ({
           feedType: 'proposal' as const,
           sortAt: p.createdAt,
           id: p.id,
@@ -579,6 +588,7 @@ export function registerMediaRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(pid);
       if (!proposal) return next();
+      if (!(await canViewProposal(pid, (req as any).user?.id))) return next();
 
       const proto = (req.headers['x-forwarded-proto'] as string | undefined) || req.protocol;
       const host = req.get('host');
@@ -605,6 +615,29 @@ export function registerMediaRoutes(app: Express): void {
       logger.error('share route failed', { err: err?.message });
       next();
     }
+  });
+}
+
+/**
+ * Feed helper: keep only media rows whose proposal's community content the
+ * viewer may read. Rows without a proposal link pass through.
+ */
+async function filterMediaByCommunityVisibility<T extends { proposalId?: number | null }>(
+  rows: T[],
+  viewerId?: number,
+): Promise<T[]> {
+  const proposalIds = Array.from(new Set(rows.map((r) => r.proposalId).filter((x): x is number => !!x)));
+  if (proposalIds.length === 0) return rows;
+  const linkRows = await db
+    .select({ id: proposals.id, communityId: proposals.communityId })
+    .from(proposals)
+    .where(inArray(proposals.id, proposalIds));
+  const communityByProposal = new Map(linkRows.map((r) => [r.id, r.communityId]));
+  const visible = await visibleCommunityIdSet(Array.from(communityByProposal.values()), viewerId);
+  return rows.filter((r) => {
+    if (!r.proposalId) return true;
+    const cid = communityByProposal.get(r.proposalId);
+    return cid === undefined || visible.has(cid);
   });
 }
 

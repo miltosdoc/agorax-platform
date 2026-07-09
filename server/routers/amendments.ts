@@ -8,6 +8,7 @@ import type { Express, Request, Response } from 'express';
 import { amendmentRepo, communityRepo, proposalRepo } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
 import { awardPoints } from '../economy/points';
+import { requireProposalContentAccess } from '../utils/community-visibility';
 import {
   authorReviewAmendment,
   castRejectionVote,
@@ -34,7 +35,7 @@ async function isSortitionMember(proposalId: number, userId: number): Promise<bo
 }
 
 export function registerAmendmentsRoutes(app: Express): void {
-  app.get("/api/proposals/:id/amendments", async (req: any, res) => {
+  app.get("/api/proposals/:id/amendments", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const amendments = await amendmentRepo.getAmendments(parseInt(req.params.id));
       const userId = req.user?.id;
@@ -181,7 +182,7 @@ export function registerAmendmentsRoutes(app: Express): void {
   app.post("/api/amendments/:id/vote", requireAuth, requireConsent, handleAmendmentVote);
   app.post("/api/amendments/:id/rejection-vote", requireAuth, requireConsent, handleAmendmentVote);
   // ─── Amendment Duplicates: Flag overlapping amendments for author review ────
-  app.get("/api/proposals/:id/amendments/duplicates", async (req, res) => {
+  app.get("/api/proposals/:id/amendments/duplicates", requireProposalContentAccess(), async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (!Number.isFinite(proposalId)) {
@@ -202,7 +203,7 @@ export function registerAmendmentsRoutes(app: Express): void {
     }
   });
   // ─── Community Signal: Get signal data for all rejected amendments ──────────
-  app.get("/api/proposals/:id/amendments/signals", async (req, res) => {
+  app.get("/api/proposals/:id/amendments/signals", requireProposalContentAccess(), async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const proposal = await proposalRepo.getProposal(proposalId);
@@ -261,7 +262,7 @@ export function registerAmendmentsRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/proposals/:id/sortition-amendments", async (req: any, res) => {
+  app.get("/api/proposals/:id/sortition-amendments", requireProposalContentAccess(), async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const all = await amendmentRepo.getAmendments(proposalId);

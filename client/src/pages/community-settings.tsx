@@ -21,7 +21,7 @@ import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
-import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunityType } from '@shared/community-settings';
+import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -40,6 +40,8 @@ interface CommunitySettingsForm {
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
   joinPolicy: CommunityJoinPolicy;
+  memberListVisibility: CommunityVisibilityLevel;
+  contentVisibility: CommunityVisibilityLevel;
   authorReviewHours: number;
   communitySignalHours: number;
   votingHours: number;
@@ -61,6 +63,8 @@ function toForm(community: Community): CommunitySettingsForm {
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
     requireGovgrVerification: community.requireGovgrVerification ?? false,
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
+    memberListVisibility: ((community as any).memberListVisibility as CommunityVisibilityLevel) || 'public',
+    contentVisibility: ((community as any).contentVisibility as CommunityVisibilityLevel) || 'public',
     authorReviewHours: (community as any).authorReviewHours ?? 72,
     communitySignalHours: (community as any).communitySignalHours ?? 48,
     votingHours: (community as any).votingHours ?? 168,
@@ -88,13 +92,13 @@ export default function CommunitySettingsPage() {
 
     Promise.all([
       api.get<Community>(`/api/communities/${communityId}`),
-      api.get<Array<{ userId: number; role: string }>>(`/api/communities/${communityId}/members`).catch(() => ({ data: [] as Array<{ userId: number; role: string }> })),
+      api.get<{ members: Array<{ userId: number; role: string }> }>(`/api/communities/${communityId}/members`).catch(() => ({ data: { members: [] as Array<{ userId: number; role: string }> } })),
     ])
       .then(([communityResp, membersResp]) => {
         setCommunity(communityResp.data);
         setForm(toForm(communityResp.data));
         if (user) {
-          const me = membersResp.data.find((m) => m.userId === user.id);
+          const me = membersResp.data.members.find((m) => m.userId === user.id);
           setIsMember(!!me);
           setCanEdit(me?.role === 'admin' || me?.role === 'founder');
         }
@@ -245,6 +249,31 @@ export default function CommunitySettingsPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">{t('community.join_policy_help') || 'How prospective members get into the community.'}</p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="memberListVisibility">{t('community.member_list_visibility') || 'Ορατότητα καταλόγου μελών'}</Label>
+                      <Select value={form.memberListVisibility} onValueChange={(value) => update('memberListVisibility', value as CommunityVisibilityLevel)}>
+                        <SelectTrigger id="memberListVisibility"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">{t('community.visibility_public') || 'Δημόσια'}</SelectItem>
+                          <SelectItem value="members">{t('community.visibility_members') || 'Μόνο μέλη'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">{t('community.member_list_visibility_help') || 'Ο αριθμός μελών, ο ιδρυτής και οι διαχειριστές παραμένουν πάντα δημόσιοι.'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contentVisibility">{t('community.content_visibility') || 'Ορατότητα περιεχομένου'}</Label>
+                      <Select value={form.contentVisibility} onValueChange={(value) => update('contentVisibility', value as CommunityVisibilityLevel)}>
+                        <SelectTrigger id="contentVisibility"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">{t('community.visibility_public') || 'Δημόσιο'}</SelectItem>
+                          <SelectItem value="members">{t('community.visibility_members') || 'Μόνο μέλη'}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">{t('community.content_visibility_help') || 'Καλύπτει προτάσεις, συζητήσεις, ψηφοφορίες και τα συνημμένα αρχεία/πολυμέσα. Για ουσιαστική ιδιωτικότητα συνδυάστε με πολιτική εισδοχής με έγκριση ή πρόσκληση.'}</p>
+                    </div>
                   </div>
                 </section>
 

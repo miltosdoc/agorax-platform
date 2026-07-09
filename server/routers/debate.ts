@@ -8,9 +8,10 @@ import type { Express, Request, Response } from 'express';
 import { communityRepo, debateRepo, proposalRepo } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
 import * as debateService from '../utils/debate';
+import { requireProposalContentAccess } from '../utils/community-visibility';
 
 export function registerDebateRoutes(app: Express): void {
-  app.get("/api/proposals/:id/arguments", async (req, res) => {
+  app.get("/api/proposals/:id/arguments", requireProposalContentAccess(), async (req, res) => {
     try {
       const arguments_ = await debateRepo.getDebateArguments(parseInt(req.params.id));
       res.json(arguments_);
@@ -57,7 +58,7 @@ export function registerDebateRoutes(app: Express): void {
     }
   });
   // ─── Debate Threads (Διάλογος σε νήματα) ───────────────────────
-  app.get("/api/proposals/:id/debate", async (req, res) => {
+  app.get("/api/proposals/:id/debate", requireProposalContentAccess(), async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (Number.isNaN(proposalId)) {
@@ -69,7 +70,7 @@ export function registerDebateRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch debate threads" });
     }
   });
-  app.get("/api/proposals/:id/debate/stats", async (req, res) => {
+  app.get("/api/proposals/:id/debate/stats", requireProposalContentAccess(), async (req, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       if (Number.isNaN(proposalId)) {

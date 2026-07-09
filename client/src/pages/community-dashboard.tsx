@@ -59,6 +59,7 @@ export default function CommunityDashboardPage() {
   });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
+  const [membersHidden, setMembersHidden] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<Record<number, boolean>>({});
   const [targetCommunityId, setTargetCommunityId] = useState<number | null>(null);
@@ -83,13 +84,19 @@ export default function CommunityDashboardPage() {
       .finally(() => setLoading(false));
   }, [communityId]);
 
+  type MembersResponse = { membersHidden: boolean; memberCount: number; members: CommunityMember[] };
+  const refreshMembers = () =>
+    api.get<MembersResponse>(`/api/communities/${communityId}/members`)
+      .then((r) => {
+        setMembers(r.data.members);
+        setMembersHidden(r.data.membersHidden);
+      })
+      .catch(() => setMembers([]));
+
   useEffect(() => {
     if (!communityId) return;
     setMembersLoading(true);
-    api.get<CommunityMember[]>(`/api/communities/${communityId}/members`)
-      .then((r) => setMembers(r.data))
-      .catch(() => setMembers([]))
-      .finally(() => setMembersLoading(false));
+    refreshMembers().finally(() => setMembersLoading(false));
   }, [communityId]);
 
   const isMember = !!(user && members?.some((m) => m.userId === user.id));
@@ -111,8 +118,7 @@ export default function CommunityDashboardPage() {
       const status = (res.status === 202) ? 'pending' : 'idle';
       setJoinState(status as 'pending' | 'idle');
       if (status !== 'pending') {
-        const refreshed = await api.get<CommunityMember[]>(`/api/communities/${communityId}/members`);
-        setMembers(refreshed.data);
+        await refreshMembers();
       }
     } catch (error: any) {
       setJoinError(error.response?.data?.message || t('community.join_failed') || 'Failed to apply');
@@ -127,8 +133,7 @@ export default function CommunityDashboardPage() {
       await api.post(`/api/communities/${communityId}/join-requests/${requestId}/${decision}`, {});
       setPendingRequests((rows) => rows.filter((r) => r.id !== requestId));
       if (decision === 'approve') {
-        const refreshed = await api.get<CommunityMember[]>(`/api/communities/${communityId}/members`);
-        setMembers(refreshed.data);
+        await refreshMembers();
       }
     } catch {
       // surface inline failure on the row if needed; keep silent for now
@@ -334,7 +339,11 @@ export default function CommunityDashboardPage() {
               <CardTitle>{t('community.tab_proposals')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {proposals.length === 0 ? (
+              {(summary as any).contentHidden ? (
+                <p className="text-muted-foreground">
+                  {t('community.content_hidden_note') || 'Το περιεχόμενο αυτής της κοινότητας είναι ορατό μόνο στα μέλη της. Γίνετε μέλος για να δείτε τις προτάσεις και τις συζητήσεις.'}
+                </p>
+              ) : proposals.length === 0 ? (
                 <p className="text-muted-foreground">{t('community.no_proposals')}</p>
               ) : (
                 <div className="space-y-2">
@@ -445,7 +454,12 @@ export default function CommunityDashboardPage() {
               {membersLoading && (
                 <p className="text-muted-foreground">{t('common.loading')}</p>
               )}
-              {!membersLoading && members && members.length === 0 && (
+              {!membersLoading && membersHidden && (
+                <p className="mb-3 text-sm text-muted-foreground border rounded-md p-3">
+                  {t('community.members_hidden_note') || 'Ο κατάλογος μελών είναι ορατός μόνο στα μέλη της κοινότητας. Ο ιδρυτής και οι διαχειριστές εμφανίζονται πάντα δημόσια.'}
+                </p>
+              )}
+              {!membersLoading && members && members.length === 0 && !membersHidden && (
                 <p className="text-muted-foreground">{t('community.members_empty') || 'No members yet.'}</p>
               )}
               {!membersLoading && members && members.length > 0 && (

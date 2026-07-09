@@ -244,6 +244,13 @@ export const communities = pgTable("communities", {
   // pending community_join_requests row, 'invite_only' rejects unsolicited
   // applications outright.
   joinPolicy: text("join_policy").notNull().default("open"),
+
+  // Visibility toggles ('public' | 'members'). The community row itself
+  // (name, description, member count, founder/admins) is always public;
+  // these gate the member roster and the content (proposals, debates,
+  // votes, attached media/docs) respectively.
+  memberListVisibility: text("member_list_visibility").notNull().default("public"),
+  contentVisibility: text("content_visibility").notNull().default("public"),
 });
 
 export const communityMembers = pgTable("community_members", {
