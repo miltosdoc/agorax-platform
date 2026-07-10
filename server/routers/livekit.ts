@@ -36,6 +36,7 @@ import {
   notifyRoomOpened,
   buildIcs,
 } from '../utils/conference-notify';
+import { canViewCommunityContentById } from '../utils/community-visibility';
 import { logger } from '../utils/logger';
 
 function unavailable(res: any): void {
@@ -96,10 +97,15 @@ export function registerLivekitRoutes(app: Express): void {
 
   // ── Community rooms ──────────────────────────────────────────────────
 
-  app.get('/api/communities/:id/rooms', async (req, res) => {
+  app.get('/api/communities/:id/rooms', async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id, 10);
       if (!Number.isFinite(communityId)) return res.status(400).json({ message: 'invalid community id' });
+      // Rooms are community content — members-only communities keep them
+      // (and their titles/schedules) off the public surface.
+      if (!(await canViewCommunityContentById(communityId, req.user?.id))) {
+        return res.status(403).json({ message: 'Members only', contentHidden: true });
+      }
       const rooms = await livekitRepo.listOpenForCommunity(communityId);
       res.json(rooms);
     } catch (err: any) {
@@ -109,16 +115,78 @@ export function registerLivekitRoutes(app: Express): void {
   });
 
   // ── Past calls: closed community rooms with duration + participants ─
-  app.get('/api/communities/:id/rooms/history', async (req, res) => {
+  app.get('/api/communities/:id/rooms/history', async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id, 10);
       if (!Number.isFinite(communityId)) return res.status(400).json({ message: 'invalid community id' });
+      // History carries participants' real names + join/leave times — gate
+      // it like every other piece of community content.
+      if (!(await canViewCommunityContentById(communityId, req.user?.id))) {
+        return res.status(403).json({ message: 'Members only', contentHidden: true });
+      }
       const limit = Math.min(50, Math.max(1, parseInt((req.query.limit as string) ?? '10', 10) || 10));
       const history = await livekitRepo.listHistoryForCommunity(communityId, limit);
       res.json(history);
     } catch (err: any) {
       logger.error('list community history failed', { err: err?.message });
       res.status(500).json({ message: 'failed to list call history' });
+    }
+  });
+
+  // ── Single room — powers the dedicated /conference/:id page ──────────
+  app.get('/api/livekit/rooms/:id', requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: 'invalid room id' });
+      const room = await livekitRepo.getById(id);
+      if (!room) return res.status(404).json({ message: 'room not found' });
+
+      const userId: number = req.user.id;
+      const isAdmin = !!req.user.isAdmin;
+      let allowed: boolean;
+      if (room.kind === 'community') {
+        allowed = isAdmin
+          || (await canViewCommunityContentById(room.communityId, userId));
+      } else {
+        allowed = isAdmin
+          || (!!room.sortitionBodyId && await isSortitionMember(room.sortitionBodyId, userId));
+      }
+      if (!allowed) return res.status(403).json({ message: 'not allowed', contentHidden: true });
+
+      const isMember = room.kind === 'community'
+        ? (isAdmin || await communityRepo.isCommunityMember(room.communityId, userId))
+        : allowed;
+      // Host mirrors the token-issue logic: community founder/admin, or the
+      // proposal author for sortition rooms.
+      let isHost = false;
+      if (room.kind === 'community') {
+        isHost = await isCommunityHost(room.communityId, userId, isAdmin);
+      } else {
+        isHost = isAdmin;
+        if (!isHost && room.sortitionBodyId) {
+          const [body] = await db
+            .select({ proposalId: sortitionBodies.proposalId })
+            .from(sortitionBodies)
+            .where(eq(sortitionBodies.id, room.sortitionBodyId));
+          if (body?.proposalId) {
+            const proposal = await proposalRepo.getProposal(body.proposalId);
+            isHost = proposal?.authorId === userId;
+          }
+        }
+      }
+      const [community] = await db
+        .select({ name: communities.name })
+        .from(communities)
+        .where(eq(communities.id, room.communityId));
+      res.json({
+        ...room,
+        communityName: community?.name ?? null,
+        canJoin: isMember && room.status !== 'closed',
+        isHost,
+      });
+    } catch (err: any) {
+      logger.error('get livekit room failed', { err: err?.message });
+      res.status(500).json({ message: 'failed to load room' });
     }
   });
 
@@ -175,7 +243,7 @@ export function registerLivekitRoutes(app: Express): void {
         communityId,
         title: room.title,
         scheduledAt,
-        actionUrl: `/communities/${communityId}?room=${room.id}`,
+        actionUrl: `/conference/${room.id}`,
       }, userId, room.status === 'scheduled' ? 'conference_scheduled' : 'conference_starting');
 
       res.status(201).json(room);
@@ -323,19 +391,28 @@ export function registerLivekitRoutes(app: Express): void {
   });
 
   // ── iCalendar download — adds the conference to the user's calendar ─
-  // No auth gate: the URL is short-lived (room dies on close) and contains
-  // no secrets, just the room title + the public landing URL.
-  app.get('/api/livekit/rooms/:id/ics', async (req, res) => {
+  // No auth gate for PUBLIC communities: the URL is short-lived and calendar
+  // apps fetch without cookies. Members-only communities keep even the room
+  // title private, so those 403 for viewers who can't read the content.
+  app.get('/api/livekit/rooms/:id/ics', async (req: any, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       if (!Number.isFinite(id)) return res.status(400).send('invalid room id');
       const room = await livekitRepo.getById(id);
       if (!room) return res.status(404).send('not found');
+      // Mirror the room-view gate: content visibility, or the bypasses the
+      // conference page itself grants (platform admin, sortition-body member).
+      let icsAllowed = await canViewCommunityContentById(room.communityId, req.user?.id);
+      if (!icsAllowed && req.user?.isAdmin) icsAllowed = true;
+      if (!icsAllowed && room.kind === 'sortition' && room.sortitionBodyId && req.user?.id) {
+        icsAllowed = await isSortitionMember(room.sortitionBodyId, req.user.id);
+      }
+      if (!icsAllowed) return res.status(403).send('members only');
       const host = req.get('host') ?? 'agorax';
       const proto = (req.headers['x-forwarded-proto'] as string | undefined) || req.protocol;
       const landingUrl = room.kind === 'sortition' && room.sortitionBodyId
         ? `${proto}://${host}/sortition/body/${room.sortitionBodyId}`
-        : `${proto}://${host}/communities/${room.communityId}?room=${room.id}`;
+        : `${proto}://${host}/conference/${room.id}`;
       const start = room.scheduledAt ?? room.createdAt;
       const ics = buildIcs({
         uid: `agorax-room-${room.id}@${host}`,

@@ -317,10 +317,7 @@ export default function CommunityDashboardPage() {
         </CardContent>
       </Card>
 
-      <ActiveCallBanner
-        communityId={community.id}
-        onJoinClick={() => setActiveTab('conferences')}
-      />
+      <ActiveCallBanner communityId={community.id} />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>

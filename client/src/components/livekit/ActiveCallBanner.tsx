@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mic, ChevronRight } from 'lucide-react';
@@ -24,12 +25,13 @@ interface LivekitRoom {
 
 interface Props {
   communityId: number;
-  /** Called when the user clicks "Join" — host page can switch tabs etc. */
+  /** Optional override — by default Join navigates to /conference/:id. */
   onJoinClick?: (roomId: number) => void;
 }
 
 export function ActiveCallBanner({ communityId, onJoinClick }: Props) {
   const { t } = useTranslation();
+  const [, navigate] = useLocation();
   const [active, setActive] = useState<LivekitRoom[]>([]);
 
   const refresh = useCallback(async () => {
@@ -69,7 +71,7 @@ export function ActiveCallBanner({ communityId, onJoinClick }: Props) {
             <Button
               type="button"
               size="sm"
-              onClick={() => onJoinClick?.(room.id)}
+              onClick={() => onJoinClick ? onJoinClick(room.id) : navigate(`/conference/${room.id}`)}
               data-testid={`active-call-join-${room.id}`}
             >
               {t('livekit.join')}

@@ -16,6 +16,7 @@ import PrivacyPage from "@/pages/privacy";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminAccountsPage from "@/pages/admin-accounts";
 import CommunityDashboardPage from "@/pages/community-dashboard";
+import ConferenceRoomPage from "@/pages/conference-room";
 import CommunitySettingsPage from "@/pages/community-settings";
 import { PlatformSettingsPage } from "@/pages/platform-settings";
 import NotificationsPage from "@/pages/notifications";
@@ -148,6 +149,7 @@ function AppRouter() {
         <ProtectedRoute path="/proposals/:id/edit" component={EditProposalFormPage} />
         <ProtectedRoute path="/proposals/:id" component={ProposalDetailPage} />
         <ProtectedRoute path="/feed" component={FeedPage} />
+        <ProtectedRoute path="/conference/:roomId" component={ConferenceRoomPage} />
         <ProtectedRoute path="/sortition" component={SortitionDashboardPage} />
         <ProtectedRoute path="/sortition/body/:bodyId" component={SortitionBodyDetailPage} />
         <ProtectedRoute path="/sortition/:bodyId/ceremony" component={SortitionCeremonyPage} />
