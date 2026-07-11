@@ -758,6 +758,31 @@ export function registerProposalsRoutes(app: Express): void {
   // Step 3 (optional): verify your own vote landed. Deniable receipt —
   // anyone holding a token can do this lookup, so a third party cannot
   // use the result to prove how you voted.
+  // Choice-blind inclusion check: confirms a ballot fingerprint exists in
+  // this proposal's chain WITHOUT revealing the choice. This is what the
+  // downloadable receipt uses — a portable proof of "my ballot was counted"
+  // that cannot double as proof of HOW someone voted (receipt-freeness:
+  // choice-revealing artifacts enable coercion and vote-buying).
+  app.get("/api/proposals/:id/receipt-inclusion", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const rowHash = typeof req.query?.rowHash === 'string' ? req.query.rowHash : '';
+      if (!Number.isFinite(proposalId) || !/^[0-9a-f]{16,128}$/i.test(rowHash)) {
+        return res.status(400).json({ message: "proposal id + rowHash required" });
+      }
+      const { proposalVotes: pvTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [row] = await db
+        .select({ castAt: pvTable.castAt })
+        .from(pvTable)
+        .where(and(eq(pvTable.proposalId, proposalId), eq(pvTable.rowHash, rowHash)))
+        .limit(1);
+      res.json(row ? { found: true, castAt: row.castAt } : { found: false });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check inclusion" });
+    }
+  });
+
   app.get("/api/proposals/:id/verify-receipt", async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id, 10);

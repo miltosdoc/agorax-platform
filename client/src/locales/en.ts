@@ -1484,6 +1484,7 @@ const en: TranslationDictionary = {
   'proposal.withdrawOffer': 'Other members have contributed (amendments/debate/support), so this proposal cannot be deleted. Withdraw it instead? It will be archived and their contributions preserved.',
   'proposal.deleteOrWithdraw': 'Delete / Withdraw',
   'community.show_archived': 'Show archived',
+  'receipt.download': 'Download inclusion certificate (your choice is omitted)',
   'conference.connect_failed': 'Could not connect to the video server.',
   'conference.device_error': 'Camera/microphone problem',
 

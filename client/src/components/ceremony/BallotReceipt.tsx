@@ -20,6 +20,8 @@ interface Props {
   castAt: string;
   /** Option ballots: id → label lookup; unknown ids fall back to the raw id. */
   ballotOptions?: Array<{ id: string; label: string }> | null;
+  /** Enables the downloadable inclusion certificate (choice deliberately omitted). */
+  proposalId?: number;
 }
 
 function formatHash(hash: string): string[] {
@@ -32,7 +34,44 @@ function formatHash(hash: string): string[] {
   return lines;
 }
 
-export function BallotReceipt({ choice, rowHash, castAt, ballotOptions }: Props) {
+export function BallotReceipt({ choice, rowHash, castAt, ballotOptions, proposalId }: Props) {
+  // The exported certificate proves INCLUSION, never the choice: a portable
+  // "how I voted" would make votes coercible and sellable. The choice stays
+  // on-screen only, on this device.
+  function downloadCertificate() {
+    if (!proposalId) return;
+    const base = window.location.origin;
+    const body = [
+      'AgoraX — Πιστοποιητικό Καταχώρησης Ψήφου / Ballot Inclusion Certificate',
+      '='.repeat(72),
+      '',
+      `Πρόταση / Proposal: ${base}/proposals/${proposalId}`,
+      `Καταχώρηση / Cast at: ${new Date(castAt).toLocaleString()}`,
+      '',
+      'Αποτύπωμα αλυσίδας / Chain fingerprint (SHA-256):',
+      rowHash,
+      '',
+      'Επαλήθευση / Verify inclusion:',
+      `${base}/api/proposals/${proposalId}/receipt-inclusion?rowHash=${rowHash}`,
+      '→ {"found": true} σημαίνει ότι το ψηφοδέλτιο μετρήθηκε στην κάλπη.',
+      '→ {"found": true} means this ballot is counted in the tally.',
+      '',
+      'Σκόπιμα ΔΕΝ αναγράφεται η επιλογή σας: μια φορητή απόδειξη του πώς',
+      'ψηφίσατε θα έκανε την ψήφο αντικείμενο πίεσης ή εξαγοράς. Κανείς —',
+      'ούτε ο διαχειριστής — δεν μπορεί να συνδέσει αυτό το αποτύπωμα με εσάς.',
+      'Your choice is deliberately omitted: a portable proof of how you voted',
+      'would make votes coercible. No one — not even an administrator — can',
+      'link this fingerprint to you.',
+    ].join('\n');
+    const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agorax-ballot-${proposalId}-${rowHash.slice(0, 8)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const { t, locale } = useTranslation();
   const choiceColor =
     choice === 'yes' ? 'var(--yper)'
@@ -119,6 +158,21 @@ export function BallotReceipt({ choice, rowHash, castAt, ballotOptions }: Props)
           {t('vote.receiptVerifyNote') ||
             'Το αποτύπωμα αποθηκεύεται μόνο σε αυτή τη συσκευή. Επαληθεύστε την καταμέτρησή του ανά πάσα στιγμή — κανείς δεν γνωρίζει ότι είναι δικό σας.'}
         </p>
+
+        {proposalId && (
+          <button
+            type="button"
+            onClick={downloadCertificate}
+            style={{
+              margin: '0 auto', display: 'block', background: 'none', border: 'none',
+              cursor: 'pointer', fontSize: '.75rem', color: 'var(--ink-faint)',
+              textDecoration: 'underline', textUnderlineOffset: '2px',
+            }}
+            data-testid="receipt-download"
+          >
+            {t('receipt.download') || 'Λήψη πιστοποιητικού καταχώρησης (χωρίς την επιλογή σας)'}
+          </button>
+        )}
       </div>
       <GreekKeyRule />
     </article>
