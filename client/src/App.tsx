@@ -18,6 +18,7 @@ import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminAccountsPage from "@/pages/admin-accounts";
 import CommunityDashboardPage from "@/pages/community-dashboard";
 import ConferenceRoomPage from "@/pages/conference-room";
+import VerifyBallotPage from "@/pages/verify-ballot";
 import CommunitySettingsPage from "@/pages/community-settings";
 import { PlatformSettingsPage } from "@/pages/platform-settings";
 import NotificationsPage from "@/pages/notifications";
@@ -173,6 +174,7 @@ function AppRouter() {
         <ProtectedRoute path="/settings" component={PlatformSettingsPage} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <Route path="/walkthrough" component={DeliberationWalkthrough} />
+        <Route path="/verify" component={VerifyBallotPage} />
         <Route path="/how-it-works" component={HowItWorksPage} />
         <Route path="/faq" component={FAQPage} />
         <Route path="/terms" component={TermsPage} />
