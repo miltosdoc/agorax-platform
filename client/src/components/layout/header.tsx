@@ -451,6 +451,15 @@ export default function Header() {
               {t('nav.communities')}
             </button>
 
+            <button
+              type="button"
+              onClick={() => navigate("/surveys")}
+              className={navLinkClass(location.startsWith("/surveys"))}
+              data-testid="button-surveys"
+            >
+              {t('nav.surveys')}
+            </button>
+
             {/* Primary CTA */}
             <button
               type="button"
