@@ -426,14 +426,9 @@ export default function VotePanel({
         {pendingBallot && !localReceipt && (
           <div className="rounded-md border border-blue-200 bg-blue-50/70 px-4 py-3 space-y-1" data-testid="pending-ballot">
             <div className="text-sm font-medium text-blue-900">
-              {t('vote.ballotPendingTitle')}
+              ✓ {t('vote.ballotPendingTitle')}
             </div>
             <p className="text-xs text-blue-900/80">{t('vote.ballotPendingBody')}</p>
-            {ballotSecondsLeft !== null && ballotSecondsLeft > 0 && (
-              <div className="text-lg font-semibold tabular-nums text-blue-900">
-                {Math.floor(ballotSecondsLeft / 60)}:{String(ballotSecondsLeft % 60).padStart(2, '0')}
-              </div>
-            )}
             {ballotSecondsLeft === 0 && (
               <div className="text-sm text-blue-900">{t('vote.ballotCasting')}</div>
             )}
