@@ -9,6 +9,7 @@ import { amendmentRepo, communityRepo, proposalRepo } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
 import { awardPoints } from '../economy/points';
 import { requireProposalContentAccess } from '../utils/community-visibility';
+import { enqueueJob } from '../utils/job-queue';
 import {
   authorReviewAmendment,
   castRejectionVote,
@@ -160,6 +161,8 @@ export function registerAmendmentsRoutes(app: Express): void {
         return res.status(403).json({ message: "Only the proposal author can review amendments" });
       }
       await authorReviewAmendment(amendmentId, decision as 'accepted' | 'rejected', reason);
+      // Live re-merge: the vote-ready text updates in front of the community.
+      void enqueueJob({ type: 'refresh_final_text', data: { proposalId: amendment.proposalId } }).catch(() => {});
       res.json({ success: true, decision });
     } catch (error) {
       res.status(500).json({ message: "Failed to review amendment" });
@@ -183,6 +186,8 @@ export function registerAmendmentsRoutes(app: Express): void {
       const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
       if (!isMember) return res.status(403).json({ message: "Must be a community member" });
       await castRejectionVote(amendmentId, req.user.id, vote as 1 | -1);
+      // Amendment votes can flip community-promotion — refresh the live text.
+      void enqueueJob({ type: 'refresh_final_text', data: { proposalId: amendment.proposalId } }).catch(() => {});
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to cast vote" });

@@ -71,6 +71,8 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
   // changes its track, so the selector is hidden in edit mode.
   const [track, setTrack] = useState<'deliberation' | 'vote'>('deliberation');
   const [votingDurationHours, setVotingDurationHours] = useState('72');
+  // Optional author-defined multiple choice (vote track). Empty = Ναι/Όχι.
+  const [voteOptions, setVoteOptions] = useState<string[]>([]);
 
   // Document attachments — picked now, uploaded right after the proposal
   // is created (the upload endpoint needs a proposal id).
@@ -169,7 +171,12 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
         : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, {
             ...formData,
             track,
-            ...(track === 'vote' ? { votingDurationHours: parseInt(votingDurationHours, 10) } : {}),
+            ...(track === 'vote'
+              ? {
+                  votingDurationHours: parseInt(votingDurationHours, 10),
+                  ballotOptions: voteOptions.map(o => o.trim()).filter(Boolean),
+                }
+              : {}),
           });
 
       if (!res.ok) {
@@ -376,6 +383,44 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                   <p className="text-xs text-muted-foreground">
                     {t('proposal.track_vote_duration_hint') || '72 = 3 ημέρες, 168 = 1 εβδομάδα'}
                   </p>
+
+                  <div className="space-y-2 pt-2">
+                    <Label>{t('proposal.vote_options_label') || 'Επιλογές ψηφοφορίας (προαιρετικά)'}</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t('proposal.vote_options_hint') || 'Κενό = απλή ψηφοφορία Ναι/Όχι. Με επιλογές, οι ψηφοφόροι διαλέγουν μία — και προστίθεται αυτόματα η επιλογή «Καμία αλλαγή».'}
+                    </p>
+                    {voteOptions.map((opt, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input
+                          value={opt}
+                          maxLength={200}
+                          placeholder={`${t('proposal.vote_option_placeholder') || 'Επιλογή'} ${i + 1}`}
+                          onChange={(e) => setVoteOptions(v => v.map((o, j) => (j === i ? e.target.value : o)))}
+                          data-testid={`proposal-vote-option-${i}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setVoteOptions(v => v.filter((_, j) => j !== i))}
+                          aria-label={t('common.remove') || 'Αφαίρεση'}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    {voteOptions.length < 10 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVoteOptions(v => [...v, ''])}
+                        data-testid="proposal-vote-option-add"
+                      >
+                        + {t('proposal.vote_option_add') || 'Προσθήκη επιλογής'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </>

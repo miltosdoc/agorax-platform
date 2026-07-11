@@ -1,5 +1,5 @@
 import { ProposalState } from '@shared/proposal-lifecycle';
-import { ORDERED_STATES, STATUS_MAP } from '@/lib/proposal-status';
+import { STATUS_MAP } from '@/lib/proposal-status';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
@@ -9,7 +9,14 @@ interface LifecycleStepperProps {
   interactive?: boolean;
 }
 
-const VISIBLE_STATES: ProposalState[] = ORDERED_STATES.filter((s) => s !== 'archived');
+// 3-step macro view: submission (instant), deliberation (one phase),
+// vote & decision. Internal states map onto the macro step that contains
+// them so legacy proposals in author_review/sortition still render.
+const MACRO_STEPS: Array<{ key: string; labelEl: string; labelEn: string; states: ProposalState[] }> = [
+  { key: 'submit', labelEl: 'Υποβολή & Έλεγχος', labelEn: 'Submit & Check', states: ['draft', 'review'] },
+  { key: 'deliberate', labelEl: 'Διαβούλευση', labelEn: 'Deliberation', states: ['author_review', 'community_signal', 'sortition_synthesis', 'final_review'] },
+  { key: 'vote', labelEl: 'Ψηφοφορία & Απόφαση', labelEn: 'Vote & Decision', states: ['voting', 'decided'] },
+];
 
 // Per-phase accent color. Only applied to the CURRENT step so the rest of
 // the stepper stays neutral and the app keeps a serious tone.
@@ -27,23 +34,24 @@ const NEUTRAL_ACCENT = { ring: 'ring-primary/20', bg: 'bg-primary/10', border: '
 export default function LifecycleStepper({ status, interactive = true }: LifecycleStepperProps) {
   const { locale } = useTranslation();
 
-  const currentIndex = VISIBLE_STATES.indexOf(status as ProposalState);
+  const currentIndex = MACRO_STEPS.findIndex((m) => m.states.includes(status as ProposalState));
   const isArchived = status === 'archived';
+  const isDecided = status === 'decided';
+  const currentEntry = STATUS_MAP[status as ProposalState];
 
   return (
     <div className="w-full" data-testid="lifecycle-stepper">
       {/* Horizontal — desktop */}
       <ol className="hidden md:flex items-center justify-between gap-2 w-full">
-        {VISIBLE_STATES.map((state, idx) => {
-          const entry = STATUS_MAP[state];
-          const label = locale === 'el' ? entry.greekLabel : entry.englishLabel;
-          const isCompleted = !isArchived && currentIndex > idx;
-          const isCurrent = !isArchived && currentIndex === idx;
-          const isFuture = isArchived || currentIndex < idx;
+        {MACRO_STEPS.map((step, idx) => {
+          const label = locale === 'el' ? step.labelEl : step.labelEn;
+          const isCompleted = !isArchived && (currentIndex > idx || (isDecided && idx === MACRO_STEPS.length - 1));
+          const isCurrent = !isArchived && !isDecided && currentIndex === idx;
+          const isFuture = !isCompleted && !isCurrent;
 
-          const accent = isCurrent ? (PHASE_ACCENT[state] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
+          const accent = isCurrent ? (PHASE_ACCENT[status] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
           return (
-            <li key={state} className="flex items-center flex-1 min-w-0">
+            <li key={step.key} className="flex items-center flex-1 min-w-0">
               <div className="flex flex-col items-center text-center min-w-0">
                 <div
                   className={cn(
@@ -53,13 +61,13 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                     isCurrent && !interactive && `${accent.bg} ${accent.border} ${accent.text}`,
                     isFuture && 'bg-background border-muted text-muted-foreground',
                   )}
-                  data-testid={`stepper-circle-${state}`}
+                  data-testid={`stepper-circle-${step.key}`}
                 >
                   {isCompleted ? <Check className="w-4 h-4" /> : idx + 1}
                 </div>
                 <span
                   className={cn(
-                    'mt-1.5 text-xs leading-tight px-1 truncate max-w-[7rem]',
+                    'mt-1.5 text-xs leading-tight px-1 truncate max-w-[9rem]',
                     isCurrent && `font-semibold ${accent.text}`,
                     isCompleted && 'text-foreground',
                     isFuture && 'text-muted-foreground',
@@ -67,8 +75,13 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                 >
                   {label}
                 </span>
+                {isCurrent && currentEntry && (
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[9rem]">
+                    {locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel}
+                  </span>
+                )}
               </div>
-              {idx < VISIBLE_STATES.length - 1 && (
+              {idx < MACRO_STEPS.length - 1 && (
                 <div
                   className={cn(
                     'flex-1 h-0.5 mx-2 -mt-6',
@@ -83,17 +96,16 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
 
       {/* Vertical — mobile */}
       <ol className="md:hidden space-y-2">
-        {VISIBLE_STATES.map((state, idx) => {
-          const entry = STATUS_MAP[state];
-          const label = locale === 'el' ? entry.greekLabel : entry.englishLabel;
-          const isCompleted = !isArchived && currentIndex > idx;
-          const isCurrent = !isArchived && currentIndex === idx;
-          const isFuture = isArchived || currentIndex < idx;
-          const isLast = idx === VISIBLE_STATES.length - 1;
+        {MACRO_STEPS.map((step, idx) => {
+          const label = locale === 'el' ? step.labelEl : step.labelEn;
+          const isCompleted = !isArchived && (currentIndex > idx || (isDecided && idx === MACRO_STEPS.length - 1));
+          const isCurrent = !isArchived && !isDecided && currentIndex === idx;
+          const isFuture = !isCompleted && !isCurrent;
+          const isLast = idx === MACRO_STEPS.length - 1;
 
-          const accent = isCurrent ? (PHASE_ACCENT[state] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
+          const accent = isCurrent ? (PHASE_ACCENT[status] ?? NEUTRAL_ACCENT) : NEUTRAL_ACCENT;
           return (
-            <li key={state} className="flex gap-3 items-start">
+            <li key={step.key} className="flex gap-3 items-start">
               <div className="flex flex-col items-center">
                 <div
                   className={cn(
@@ -123,8 +135,13 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                     isFuture && 'text-muted-foreground',
                   )}
                 >
-                  {entry.icon} {label}
+                  {label}
                 </span>
+                {isCurrent && currentEntry && (
+                  <div className="text-xs text-muted-foreground">
+                    {currentEntry.icon} {locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel}
+                  </div>
+                )}
               </div>
             </li>
           );

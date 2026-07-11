@@ -340,6 +340,21 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
       finalText = localConcat(proposal.question, proposal.solution, mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text })));
     }
   }
+  // Re-apply the author's standing refine instruction on every recompute,
+  // so live re-merges never silently discard it. The refine prompt treats
+  // the incorporated amendments as inviolable.
+  if ((proposal as any).authorRefineInstruction && isLlmConfigured()) {
+    try {
+      const refined = await runRefine(
+        finalText,
+        (proposal as any).authorRefineInstruction,
+        mergeIncluded.map(a => a.text),
+      );
+      if (refined) finalText = refined;
+    } catch (refineErr) {
+      console.warn(`[ai-merger] standing refine failed: ${refineErr instanceof Error ? refineErr.message : refineErr}`);
+    }
+  }
   await db.update(proposals)
     .set({ finalText, updatedAt: new Date() })
     .where(eq(proposals.id, proposalId));
@@ -385,13 +400,38 @@ const REFINE_PROMPT = `Είσαι ειδικός στη σύνταξη πολι�
 
 ΝΕΟ ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:`;
 
+/** The raw guarded-refine LLM call. Returns null on empty output. */
+async function runRefine(finalText: string, instruction: string, inviolable: string[]): Promise<string | null> {
+  const amendmentsText = inviolable.length > 0
+    ? inviolable.map((t, i) => `${i + 1}. ${t}`).join('\n\n')
+    : '(καμία)';
+  const response = await chatCompletion({
+    messages: [
+      { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Εφαρμόζεις οδηγίες συγγραφέων χωρίς ποτέ να αποδυναμώνεις τις ενσωματωμένες τροπολογίες της κοινότητας.' },
+      {
+        role: 'user',
+        content: REFINE_PROMPT
+          .replace('{amendments}', amendmentsText.slice(0, 3000))
+          .replace('{finalText}', finalText.slice(0, 5000))
+          .replace('{instruction}', instruction.slice(0, 500)),
+      },
+    ],
+    maxTokens: 4000,
+    temperature: 0.2,
+    timeoutMs: 45_000,
+    enableThinking: false,
+  });
+  const refined = response.trim();
+  return refined.length > 0 ? refined : null;
+}
+
 /**
- * Author-requested refinement of the final text during final_review.
- * The author can ONLY modify the text through this constrained AI edit —
- * the incorporated amendments' substance is passed as inviolable context
- * so the instruction cannot dilute what the community added.
- * Throws LlmUnavailableError when no LLM is configured (no fallback: an
- * unguarded manual edit would defeat the purpose).
+ * Author-requested refinement of the final text. The author can ONLY modify
+ * the text through this constrained AI edit — the incorporated amendments'
+ * substance is passed as inviolable context so the instruction cannot
+ * dilute what the community added. The instruction is also persisted as the
+ * standing instruction, re-applied on every live re-merge during
+ * deliberation. Throws LlmUnavailableError when no LLM is configured.
  */
 export async function refineFinalText(proposalId: number, instruction: string): Promise<string> {
   if (!isLlmConfigured()) {
@@ -410,31 +450,12 @@ export async function refineFinalText(proposalId: number, instruction: string): 
     .from(proposalAmendments)
     .where(eq(proposalAmendments.proposalId, proposalId));
   const { mergeIncluded } = partitionAmendments(amendments, threshold);
-  const amendmentsText = mergeIncluded.length > 0
-    ? mergeIncluded.map((a, i) => `${i + 1}. ${a.text}`).join('\n\n')
-    : '(καμία)';
 
-  const response = await chatCompletion({
-    messages: [
-      { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Εφαρμόζεις οδηγίες συγγραφέων χωρίς ποτέ να αποδυναμώνεις τις ενσωματωμένες τροπολογίες της κοινότητας.' },
-      {
-        role: 'user',
-        content: REFINE_PROMPT
-          .replace('{amendments}', amendmentsText.slice(0, 3000))
-          .replace('{finalText}', proposal.finalText.slice(0, 5000))
-          .replace('{instruction}', instruction.slice(0, 500)),
-      },
-    ],
-    maxTokens: 4000,
-    temperature: 0.2,
-    timeoutMs: 45_000,
-    enableThinking: false,
-  });
-  const refined = response.trim();
-  if (refined.length === 0) throw new Error('Refinement produced empty text');
+  const refined = await runRefine(proposal.finalText, instruction, mergeIncluded.map(a => a.text));
+  if (!refined) throw new Error('Refinement produced empty text');
 
   await db.update(proposals)
-    .set({ finalText: refined, updatedAt: new Date() })
+    .set({ finalText: refined, authorRefineInstruction: instruction.slice(0, 500), updatedAt: new Date() })
     .where(eq(proposals.id, proposalId));
   return refined;
 }

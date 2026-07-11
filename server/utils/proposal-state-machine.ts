@@ -309,15 +309,27 @@ export async function triggerSideEffects(
       break;
 
     case 'sortition_synthesis->voting':
-    case 'community_signal->voting':
-      // Recalculate democracy score when voting opens
+      // Legacy sortition path: inline merge as before.
       await enqueueRecalculateScore(proposal.communityId);
-      // If we skipped sortition (no flagged amendments), run the AI merge
-      // now so the vote happens on the integrated text, not the raw draft.
       try {
         const { saveAiMergedFinalText } = await import('./ai-merger');
         await saveAiMergedFinalText(proposal.id);
       } catch { /* best-effort */ }
+      break;
+
+    case 'community_signal->voting':
+      // 3-step flow freeze: final re-merge (accepted + promoted amendments,
+      // standing author refine re-applied), restyle counters, then lock the
+      // option ballot. What everyone watched during deliberation is exactly
+      // what lands on the ballot.
+      await enqueueRecalculateScore(proposal.communityId);
+      try {
+        const { prepareFinalReview, buildBallotOptions } = await import('./ai-merger');
+        await prepareFinalReview(proposal.id);
+        await buildBallotOptions(proposal.id);
+      } catch (err: any) {
+        console.warn(`[final-text] freeze failed for proposal ${proposal.id}: ${err?.message}`);
+      }
       break;
 
     case 'community_signal->final_review':

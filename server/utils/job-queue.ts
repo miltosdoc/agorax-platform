@@ -26,7 +26,8 @@ export type JobType =
   | 'recalculate_score'     // Democracy score recalculation
   | 'cleanup_expired'       // Cleanup expired sessions/votes
   | 'sortition_timeout'     // Sortition deadline sweep & completion
-  | 'phase_auto_advance';   // Advance proposals past expired phase deadlines
+  | 'phase_auto_advance'    // Advance proposals past expired phase deadlines
+  | 'refresh_final_text';   // Live re-merge of the AI final text during deliberation
 
 export interface JobPayload {
   type: JobType;

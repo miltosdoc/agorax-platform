@@ -61,6 +61,8 @@ interface FinalReviewData {
   finalText: string;
   ballotOptions: Array<{ id: string; label: string }> | null;
   alternatives: Array<{ id: number; optionId: string; text: string }>;
+  authorAcceptedFinalAt?: string | null;
+  authorRefineInstruction?: string | null;
 }
 
 type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
@@ -148,7 +150,7 @@ export default function ProposalDetailPage() {
   // final_review: fetch the AI-merged text and the ballot alternatives.
   // If the endpoint fails we fall back to proposal.finalText for display.
   useEffect(() => {
-    if (!proposalId || proposal?.status !== 'final_review') return;
+    if (!proposalId || (proposal?.status !== 'final_review' && !(proposal?.status === 'community_signal' && proposal?.track !== 'vote'))) return;
     let cancelled = false;
     setFinalReviewLoading(true);
     api.get<FinalReviewData>(`/api/proposals/${proposalId}/final-review`)
@@ -163,6 +165,11 @@ export default function ProposalDetailPage() {
     setAcceptingFinal(true);
     try {
       await api.post(`/api/proposals/${proposalId}/final-review/accept`);
+      if (proposal?.status === 'community_signal') {
+        const fr = await api.get<FinalReviewData>(`/api/proposals/${proposalId}/final-review`);
+        setFinalReview(fr.data);
+        return;
+      }
       const resp = await api.get<Proposal>(`/api/proposals/${proposalId}`);
       setProposal(resp.data);
     } catch (error) {
@@ -418,7 +425,7 @@ export default function ProposalDetailPage() {
                 dedicated section below owns this display, so skip it here.
                 This is also what keeps the merged proposal.finalText visible
                 for option-ballot proposals once voting starts. */}
-            {proposal.status !== 'final_review' && proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
+            {proposal.status !== 'final_review' && proposal.status !== 'community_signal' && proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
               <div className="mt-4 p-4 bg-muted rounded space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-medium">{t('proposal.mergedFinalText') || 'Τελικό κείμενο (μετά τις τροπολογίες)'}</h4>
@@ -449,7 +456,7 @@ export default function ProposalDetailPage() {
           {/* Final review — the AI-merged vote-ready text. Everyone sees the
               text and the ballot alternatives; the author additionally gets
               accept + AI-refine controls. */}
-          {proposal.status === 'final_review' && (
+          {(proposal.status === 'final_review' || (proposal.status === 'community_signal' && finalReviewText.trim() !== '')) && (
             <section className="mb-8" data-testid="final-review-section">
               <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 {t('proposal.final_review_title') || 'Τελικό κείμενο προς ψηφοφορία'}
@@ -491,15 +498,23 @@ export default function ProposalDetailPage() {
 
               {userIsAuthor && (
                 <div className="mt-4 p-4 border rounded space-y-3" data-testid="final-review-author-actions">
-                  <Button
-                    className="w-full sm:w-auto"
-                    disabled={acceptingFinal || refining || finalReviewLoading}
-                    onClick={handleAcceptFinalReview}
-                    data-testid="final-review-accept"
-                  >
-                    {acceptingFinal && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    {t('proposal.final_review_accept') || 'Αποδοχή & έναρξη ψηφοφορίας'}
-                  </Button>
+                  {proposal.status === 'community_signal' && finalReview?.authorAcceptedFinalAt ? (
+                    <Badge variant="secondary" data-testid="final-review-accepted-badge">
+                      {t('proposal.final_review_accepted_badge') || 'Αποδεχθήκατε το τρέχον κείμενο — η ψηφοφορία ανοίγει στη λήξη της διαβούλευσης'}
+                    </Badge>
+                  ) : (
+                    <Button
+                      className="w-full sm:w-auto"
+                      disabled={acceptingFinal || refining || finalReviewLoading}
+                      onClick={handleAcceptFinalReview}
+                      data-testid="final-review-accept"
+                    >
+                      {acceptingFinal && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {proposal.status === 'community_signal'
+                        ? (t('proposal.final_review_accept_live') || 'Αποδοχή τελικού κειμένου')
+                        : (t('proposal.final_review_accept') || 'Αποδοχή & έναρξη ψηφοφορίας')}
+                    </Button>
+                  )}
                   <div className="space-y-2">
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Input

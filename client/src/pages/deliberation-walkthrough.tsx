@@ -38,12 +38,9 @@ import { Link } from 'wouter';
 function useStepData() {
   const { t } = useTranslation();
   return [
-    { id: 1, name: t('walkthrough.step1_name'), icon: FileText, color: 'blue', route: '/proposals/new' },
-    { id: 2, name: t('walkthrough.step2_name'), icon: CheckCircle, color: 'green', route: null },
-    { id: 3, name: t('walkthrough.stepDelib_name'), icon: Edit3, color: 'amber', route: '/proposals/5/amendments/signals' },
-    { id: 4, name: t('walkthrough.stepFinal_name'), icon: Users, color: 'purple', route: null },
-    { id: 5, name: t('walkthrough.step6_name'), icon: Vote, color: 'emerald', route: '/proposals/2' },
-    { id: 6, name: t('walkthrough.step7_name'), icon: Shield, color: 'red', route: null },
+    { id: 1, name: t('walkthrough.macro1_name'), icon: FileText, color: 'blue', route: '/proposals/new' },
+    { id: 2, name: t('walkthrough.macro2_name'), icon: Edit3, color: 'amber', route: '/proposals/5/amendments/signals' },
+    { id: 3, name: t('walkthrough.macro3_name'), icon: Vote, color: 'emerald', route: '/proposals/2' },
   ];
 }
 
@@ -751,12 +748,9 @@ export default function DeliberationWalkthrough() {
             </Badge>
           </div>
           <CardDescription>
-            {currentStep === 1 && t('walkthrough.step1_desc')}
-            {currentStep === 2 && t('walkthrough.step2_desc')}
-            {currentStep === 3 && t('walkthrough.stepDelib_desc')}
-            {currentStep === 4 && t('walkthrough.stepFinal_desc')}
-            {currentStep === 5 && t('walkthrough.step6_desc')}
-            {currentStep === 6 && t('walkthrough.step7_desc')}
+            {currentStep === 1 && t('walkthrough.macro1_desc')}
+            {currentStep === 2 && t('walkthrough.macro2_desc')}
+            {currentStep === 3 && t('walkthrough.macro3_desc')}
           </CardDescription>
         </CardHeader>
 
@@ -786,18 +780,29 @@ export default function DeliberationWalkthrough() {
           </div>
 
           {/* Step content */}
-          {currentStep === 1 && <StepProposal />}
-          {currentStep === 2 && <StepValidation />}
-          {currentStep === 3 && (
+          {currentStep === 1 && (
+            <div className="space-y-8">
+              <StepProposal />
+              <Separator />
+              <StepValidation />
+            </div>
+          )}
+          {currentStep === 2 && (
             <div className="space-y-8">
               <StepAuthorReview />
               <Separator />
               <StepCommunitySignal />
+              <Separator />
+              <StepFinalText />
             </div>
           )}
-          {currentStep === 4 && <StepFinalText />}
-          {currentStep === 5 && <StepRatificationVote />}
-          {currentStep === 6 && <StepVerifiedBallot />}
+          {currentStep === 3 && (
+            <div className="space-y-8">
+              <StepRatificationVote />
+              <Separator />
+              <StepVerifiedBallot />
+            </div>
+          )}
         </CardContent>
 
         {/* Navigation */}

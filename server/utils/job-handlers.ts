@@ -114,6 +114,24 @@ async function handleSortitionTimeout(payload: JobPayload): Promise<void> {
   
 }
 
+// ─── Handler: refresh_final_text ────────────────────────────────────────────
+
+/**
+ * Live re-merge during the deliberation phase: recompute the AI final text
+ * (and restyled counter-proposal alternatives) whenever an amendment
+ * decision or vote lands, so the community watches the vote-ready text
+ * evolve instead of meeting it for the first time on the ballot.
+ */
+async function handleRefreshFinalText(payload: JobPayload): Promise<void> {
+  const { proposalId } = payload.data as { proposalId: number };
+  if (typeof proposalId !== 'number') return;
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
+  if (!proposal || proposal.status !== 'community_signal') return;
+  if ((proposal as any).track === 'vote') return;
+  const { prepareFinalReview } = await import('./ai-merger');
+  await prepareFinalReview(proposalId);
+}
+
 // ─── Handler: phase_auto_advance ─────────────────────────────────────────────
 
 /**
@@ -145,12 +163,14 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
         await triggerSideEffects('author_review', 'community_signal', updated);
 
       } else if (proposal.status === 'community_signal') {
-        // Short deliberation flow: the amendments phase always hands over to
-        // final_review, where the AI merge + author acceptance happen and
-        // counter-proposals become ballot alternatives. (Sortition synthesis
-        // remains reachable via the manual /transition endpoint.)
-        const updated = await transitionProposal(proposal as any, 'final_review', storage);
-        await triggerSideEffects('community_signal', 'final_review', updated);
+        // 3-step flow: the final text has been merging LIVE throughout the
+        // phase (refresh_final_text jobs), so the deadline freezes it and
+        // opens the vote immediately — no waiting room. The freeze itself
+        // happens in the community_signal->voting side effect. (Sortition
+        // synthesis remains reachable via the manual /transition endpoint;
+        // final_review below only serves proposals already in it.)
+        const updated = await transitionProposal(proposal as any, 'voting', storage);
+        await triggerSideEffects('community_signal', 'voting', updated);
 
       } else if (proposal.status === 'final_review') {
         // Author silence = acceptance of the AI-merged text as-is.
@@ -184,6 +204,7 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
 
 export function registerAllHandlers(): void {
   registerHandler('structure_proposal', handleStructureProposal);
+  registerHandler('refresh_final_text', handleRefreshFinalText);
   registerHandler('send_notification', handleSendNotification);
   registerHandler('create_sortition', handleCreateSortition);
   registerHandler('recalculate_score', handleRecalculateScore);

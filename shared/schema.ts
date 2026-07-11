@@ -347,6 +347,13 @@ export const proposals = pgTable("proposals", {
   ballotOptions: jsonb("ballot_options"),
   // Winning option id once decided (option ballots only).
   winningOption: text("winning_option"),
+
+  // Live final text (migration 0034): the author's standing AI-refine
+  // instruction, re-applied on every live re-merge, and the moment the
+  // author explicitly accepted the current text (informational signal —
+  // silence still advances at the deadline).
+  authorRefineInstruction: text("author_refine_instruction"),
+  authorAcceptedFinalAt: timestamp("author_accepted_final_at"),
 });
 
 // ─── Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────

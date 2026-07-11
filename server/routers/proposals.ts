@@ -144,7 +144,7 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member to submit proposals" });
       }
-      const { question, solution, category, track, votingDurationHours } = req.body;
+      const { question, solution, category, track, votingDurationHours, ballotOptions } = req.body;
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
       }
@@ -152,10 +152,37 @@ export function registerProposalsRoutes(app: Express): void {
         return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
       }
       let durationHours: number | null = null;
+      let customBallot: Array<{ id: string; label: string }> | null = null;
       if (track === 'vote') {
         durationHours = Number(votingDurationHours);
         if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 8760) {
           return res.status(400).json({ message: "votingDurationHours must be 1–8760 for direct-vote proposals" });
+        }
+        // Optional author-defined multiple choice. Empty/absent = classic
+        // yes/no/abstain. «Καμία αλλαγή» is always appended so voters can
+        // reject every option — no forced-choice ballots.
+        if (ballotOptions !== undefined && ballotOptions !== null) {
+          if (!Array.isArray(ballotOptions)) {
+            return res.status(400).json({ message: "ballotOptions must be an array of option labels" });
+          }
+          const labels = ballotOptions
+            .map((o: unknown) => (typeof o === 'string' ? o.trim() : ''))
+            .filter((o: string) => o.length > 0);
+          if (labels.length > 0) {
+            if (labels.length < 2 || labels.length > 10) {
+              return res.status(400).json({ message: "Provide 2–10 ballot options" });
+            }
+            if (labels.some((o: string) => o.length > 200)) {
+              return res.status(400).json({ message: "Each ballot option must be at most 200 characters" });
+            }
+            if (new Set(labels.map((o: string) => o.toLowerCase())).size !== labels.length) {
+              return res.status(400).json({ message: "Ballot options must be distinct" });
+            }
+            customBallot = [
+              ...labels.map((label: string, i: number) => ({ id: `opt_${i + 1}`, label })),
+              { id: 'status_quo', label: 'Καμία αλλαγή' },
+            ];
+          }
         }
       }
       if (typeof question !== "string" || typeof solution !== "string") {
@@ -175,6 +202,7 @@ export function registerProposalsRoutes(app: Express): void {
         status: INITIAL_PROPOSAL_STATE,
         track: track ?? 'deliberation',
         votingDurationHours: durationHours,
+        ballotOptions: customBallot,
       });
       // Members are notified on submit (draft → deliberation), not here —
       // a draft is private to its author and shouldn't be announced.
@@ -363,6 +391,12 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
         return res.status(403).json({ message: "Only the author can accept the final text" });
       }
+      // 3-step flow: during deliberation, acceptance is a recorded signal
+      // (the phase still runs its course so amendment rights stay intact).
+      if (proposal.status === 'community_signal') {
+        const accepted = await storage.updateProposal(proposal.id, { authorAcceptedFinalAt: new Date() });
+        return res.json(accepted);
+      }
       if (proposal.status !== 'final_review') {
         return res.status(409).json({ message: "Proposal is not in final review" });
       }
@@ -394,17 +428,21 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.authorId !== req.user.id) {
         return res.status(403).json({ message: "Only the author can refine the final text" });
       }
-      if (proposal.status !== 'final_review') {
-        return res.status(409).json({ message: "Proposal is not in final review" });
+      if (proposal.status !== 'final_review' && proposal.status !== 'community_signal') {
+        return res.status(409).json({ message: "Refinement is only available during deliberation or final review" });
       }
       const instruction = typeof req.body?.instruction === 'string' ? req.body.instruction.trim() : '';
       if (instruction.length < 3 || instruction.length > 500) {
         return res.status(400).json({ message: "instruction must be 3–500 characters" });
       }
-      const { refineFinalText } = await import('../utils/ai-merger');
+      const { refineFinalText, prepareFinalReview } = await import('../utils/ai-merger');
       const { isLlmConfigured: llmUp } = await import('../utils/llm-client');
       if (!llmUp()) {
         return res.status(503).json({ message: "Η βελτίωση μέσω AI δεν είναι διαθέσιμη αυτή τη στιγμή." });
+      }
+      if (!proposal.finalText) {
+        // First refine can land before any amendment triggered a merge.
+        await prepareFinalReview(proposalId);
       }
       const finalText = await refineFinalText(proposalId, instruction);
       res.json({ finalText });
@@ -432,6 +470,8 @@ export function registerProposalsRoutes(app: Express): void {
         finalText: proposal.finalText,
         ballotOptions: proposal.ballotOptions ?? null,
         alternatives,
+        authorAcceptedFinalAt: (proposal as any).authorAcceptedFinalAt ?? null,
+        authorRefineInstruction: (proposal as any).authorRefineInstruction ?? null,
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to load final review" });

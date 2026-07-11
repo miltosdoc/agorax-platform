@@ -28,49 +28,25 @@ export default function HowItWorksPage() {
       step: 1,
       icon: FileText,
       color: "blue",
-      title: t('walkthrough.step1_name') || "Submission",
-      description: t('walkthrough.step1_desc'),
-      features: [t('walkthrough.hiw_feature1_1'), t('walkthrough.hiw_feature1_2'), t('walkthrough.hiw_feature1_3')]
+      title: t('walkthrough.macro1_name') || "Submit & Check",
+      description: t('walkthrough.macro1_desc'),
+      features: [t('walkthrough.hiw_macro1_feature1'), t('walkthrough.hiw_macro1_feature2'), t('walkthrough.hiw_macro1_feature3')]
     },
     {
       step: 2,
-      icon: CheckCircle,
-      color: "green",
-      title: t('walkthrough.step2_name') || "Validation",
-      description: t('walkthrough.step2_desc'),
-      features: [t('walkthrough.hiw_feature2_1'), t('walkthrough.hiw_feature2_2'), t('walkthrough.hiw_feature2_3')]
+      icon: Edit3,
+      color: "amber",
+      title: t('walkthrough.macro2_name') || "Deliberation",
+      description: t('walkthrough.macro2_desc'),
+      features: [t('walkthrough.hiw_macro2_feature1'), t('walkthrough.hiw_macro2_feature2'), t('walkthrough.hiw_macro2_feature3')]
     },
     {
       step: 3,
-      icon: Edit3,
-      color: "amber",
-      title: t('walkthrough.stepDelib_name') || "Deliberation & Amendments",
-      description: t('walkthrough.stepDelib_desc'),
-      features: [t('walkthrough.hiw_featureD_1'), t('walkthrough.hiw_featureD_2'), t('walkthrough.hiw_featureD_3')]
-    },
-    {
-      step: 4,
-      icon: Users,
-      color: "purple",
-      title: t('walkthrough.stepFinal_name') || "AI Final Text",
-      description: t('walkthrough.stepFinal_desc'),
-      features: [t('walkthrough.hiw_featureF_1'), t('walkthrough.hiw_featureF_2'), t('walkthrough.hiw_featureF_3')]
-    },
-    {
-      step: 5,
       icon: Vote,
       color: "emerald",
-      title: t('walkthrough.step6_name') || "Vote",
-      description: t('walkthrough.step6_desc'),
-      features: [t('walkthrough.hiw_feature6_1'), t('walkthrough.hiw_feature6_2'), t('walkthrough.hiw_feature6_3')]
-    },
-    {
-      step: 6,
-      icon: CheckCircle,
-      color: "teal",
-      title: t('walkthrough.step7_name') || "Decided",
-      description: t('walkthrough.step7_desc'),
-      features: [t('walkthrough.hiw_feature7_1'), t('walkthrough.hiw_feature7_2'), t('walkthrough.hiw_feature7_3')]
+      title: t('walkthrough.macro3_name') || "Vote & Decision",
+      description: t('walkthrough.macro3_desc'),
+      features: [t('walkthrough.hiw_macro3_feature1'), t('walkthrough.hiw_macro3_feature2'), t('walkthrough.hiw_macro3_feature3')]
     }
   ];
 
@@ -172,7 +148,7 @@ export default function HowItWorksPage() {
                         </div>
                       )}
 
-                      {phase.step === 2 && (
+                      {phase.step === 1 && (
                         <div className="mt-6 grid grid-cols-5 gap-2">
                           {[
                             { label: t('walkthrough.hiw_score_structure'), score: "8/10" },
@@ -189,7 +165,7 @@ export default function HowItWorksPage() {
                         </div>
                       )}
 
-                      {phase.step === 4 && (
+                      {phase.step === 2 && (
                         <div className="mt-6 flex flex-wrap gap-3 items-center">
                           <div className="px-3 py-2 rounded-lg border bg-purple-50 border-purple-200 text-sm font-medium text-purple-700">
                             {t('proposal.final_review_title')}
@@ -204,7 +180,7 @@ export default function HowItWorksPage() {
                           </div>
                         </div>
                       )}
-                      {phase.step === 5 && (
+                      {phase.step === 3 && (
                         <div className="mt-6 p-4 bg-muted/30 rounded-lg border text-sm text-muted-foreground">
                           {t('hiw.tracks_ballot_note')}
                         </div>
