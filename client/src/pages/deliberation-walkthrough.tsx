@@ -1,874 +1,351 @@
 /**
- * Deliberation Walkthrough v3
- * 
- * Interactive guided tour through the AgoraX deliberative democracy platform.
- * Uses real demo data, links to working pages, and is designed for
- * users AND investors to understand the full pipeline.
- * 
- * 7-phase flow:
- * 1. Proposal Submission
- * 2. LLM Validation
- * 3. Author Review (accepts/rejects amendments)
- * 4. Community Signal (⬆️/⬇️ on rejected amendments)
- * 5. Sortition Synthesis (composes final text)
- * 6. Ratification Vote
- * 7. Verified Ballot (Gov.gr + cryptographic verification)
+ * The walkthrough — one story, three beats, zero jargon.
+ *
+ * A first-time visitor should leave this page in about a minute feeling
+ * "my neighborhood could use this": a poll measures the need, deliberation
+ * shapes the idea in front of everyone (live AI final text, counter-
+ * proposals become ballot alternatives instead of getting buried), and an
+ * anonymous verifiable vote decides. One scrolling page, no clicking
+ * required. Bilingual content lives in a local map (same pattern as
+ * POLL_HOW_SECTIONS) — not in the locale files.
  */
 
-import { useState } from 'react';
-import Header from "@/components/layout/header";
-import Footer from "@/components/layout/footer";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useEffect } from 'react';
+import Header from '@/components/layout/header';
+import Footer from '@/components/layout/footer';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
-import {
-  FileText, CheckCircle, Users, MessageSquare, Vote,
-  ArrowRight, ThumbsUp, ThumbsDown,
-  Edit3, Shield, PenTool, TrendingUp,
-  Zap, Lock, BarChart3, ExternalLink
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { useTranslation } from '@/hooks/use-translation';
-import { Link } from 'wouter';
+import { useLocation } from 'wouter';
+import {
+  BarChart3, MessageSquarePlus, Vote, ArrowDown, ArrowRight,
+  CheckCircle2, Sparkles, Lock, Receipt, Zap,
+} from 'lucide-react';
 
-// ─── Step Config ────────────────────────────────────────────────────────────
+type Lang = 'el' | 'en';
 
-function useStepData() {
-  const { t } = useTranslation();
-  return [
-    { id: 1, name: t('walkthrough.macro1_name'), icon: FileText, color: 'blue', route: '/proposals/new' },
-    { id: 2, name: t('walkthrough.macro2_name'), icon: Edit3, color: 'amber', route: '/proposals/5/amendments/signals' },
-    { id: 3, name: t('walkthrough.macro3_name'), icon: Vote, color: 'emerald', route: '/proposals/2' },
-  ];
-}
+const STORY: Record<Lang, {
+  heroTitle: string; heroSub: string;
+  act1Kicker: string; act1Title: string; act1Body: string;
+  pollQuestion: string; pollAnswer: string; pollPct: number; pollMeta: string; act1Value: string;
+  act2Kicker: string; act2Title: string; act2Body: string;
+  proposalAuthor: string; proposalText: string; amendmentAuthor: string; amendmentText: string; accepted: string;
+  liveLabel: string; liveTextBefore: string; liveTextAdded: string;
+  counterAuthor: string; counterText: string; counterFate: string; act2Value: string;
+  act3Kicker: string; act3Title: string; act3Body: string;
+  ballotLabel: string; options: string[]; winnerBadge: string;
+  results: Array<{ label: string; pct: number; winner?: boolean }>;
+  receiptLine: string; act3Value: string; punch: string;
+  directVoteNote: string;
+  ctaTitle: string; ctaProposal: string; ctaPoll: string; ctaDetails: string;
+}> = {
+  el: {
+    heroTitle: 'Μια αλάνα. Μια ιδέα. Μια απόφαση.',
+    heroSub: 'Δες πώς μια γειτονιά αποφασίζει μαζί — σε τρία βήματα, χωρίς μυστικά.',
 
-// ─── Color helpers ──────────────────────────────────────────────────────────
+    act1Kicker: 'ΒΗΜΑ 1 — Η ΔΗΜΟΣΚΟΠΗΣΗ',
+    act1Title: 'Ρώτησε',
+    act1Body: 'Η Άννα περνάει κάθε μέρα από την αλάνα της οδού Ερμού. Αξίζει να παλέψει γι’ αυτήν; Πριν προτείνει οτιδήποτε, ρωτάει τη γειτονιά — ανώνυμα, σε ένα λεπτό.',
+    pollQuestion: '«Πόσο σας λείπει ένας χώρος για τα παιδιά στη γειτονιά;»',
+    pollAnswer: 'Πολύ',
+    pollPct: 78,
+    pollMeta: '214 απαντήσεις · ανώνυμο πάνελ',
+    act1Value: 'Γρήγορος σφυγμός, πραγματικές απαντήσεις. Κανείς δεν ξέρει ποιος απάντησε τι — γι’ αυτό απαντούν ειλικρινά.',
 
-const colorMap: Record<string, { bg: string; border: string; text: string; badge: string; btn: string }> = {
-  blue:    { bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700',  badge: 'bg-blue-100 text-blue-700',  btn: 'bg-blue-600 hover:bg-blue-700' },
-  green:   { bg: 'bg-green-50',   border: 'border-green-200',  text: 'text-green-700', badge: 'bg-green-100 text-green-700', btn: 'bg-green-600 hover:bg-green-700' },
-  indigo:  { bg: 'bg-indigo-50',  border: 'border-indigo-200', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700', btn: 'bg-indigo-600 hover:bg-indigo-700' },
-  amber:   { bg: 'bg-amber-50',   border: 'border-amber-200',  text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700', btn: 'bg-amber-600 hover:bg-amber-700' },
-  purple:  { bg: 'bg-purple-50',  border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700', btn: 'bg-purple-600 hover:bg-purple-700' },
-  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200',text: 'text-emerald-700',badge: 'bg-emerald-100 text-emerald-700', btn: 'bg-emerald-600 hover:bg-emerald-700' },
-  red:     { bg: 'bg-red-50',     border: 'border-red-200',    text: 'text-red-700',   badge: 'bg-red-100 text-red-700',    btn: 'bg-red-600 hover:bg-red-700' },
+    act2Kicker: 'ΒΗΜΑ 2 — Η ΔΙΑΒΟΥΛΕΥΣΗ',
+    act2Title: 'Συνδιαμόρφωσε',
+    act2Body: 'Το 78% έδωσε στην Άννα την απάντηση. Προτείνει: «Να γίνει η αλάνα παιδική χαρά.» Το AI ελέγχει την πρόταση σε δευτερόλεπτα και βγαίνει ζωντανή στην κοινότητα.',
+    proposalAuthor: 'Άννα',
+    proposalText: 'Να μετατραπεί η αλάνα της οδού Ερμού σε παιδική χαρά.',
+    amendmentAuthor: 'Γιώργος',
+    amendmentText: '+ φωτισμός και παγκάκια, για να ζει ο χώρος και το απόγευμα',
+    accepted: 'Η Άννα αποδέχεται',
+    liveLabel: 'Το τελικό κείμενο ενημερώνεται ζωντανά, μπροστά σε όλους:',
+    liveTextBefore: 'Να μετατραπεί η αλάνα της οδού Ερμού σε παιδική χαρά',
+    liveTextAdded: ', με φωτισμό και παγκάκια ώστε ο χώρος να ζει και το απόγευμα.',
+    counterAuthor: 'Μαρία',
+    counterText: '«Καλύτερα θερινό σινεμά — η γειτονιά έχει παιδικές χαρές, δεν έχει πουθενά να βρεθεί.»',
+    counterFate: 'Η αντιπρότασή της δεν θάβεται. Μπαίνει στο ψηφοδέλτιο ως εναλλακτική.',
+    act2Value: 'Καμία ιδέα δεν χάνεται. Το AI ενώνει τις αποδεκτές βελτιώσεις — δεν λογοκρίνει και δεν αλλοιώνει. Και όποιος διαφωνεί, δεν φιμώνεται: κατεβαίνει στην ψηφοφορία.',
+
+    act3Kicker: 'ΒΗΜΑ 3 — Η ΨΗΦΟΦΟΡΙΑ',
+    act3Title: 'Αποφάσισε',
+    act3Body: 'Στη λήξη της διαβούλευσης το κείμενο παγώνει — ακριβώς όπως το είδαν όλοι — και ανοίγει η κάλπη. Μία επιλογή ο καθένας:',
+    ballotLabel: 'ΨΗΦΟΔΕΛΤΙΟ',
+    options: ['Παιδική χαρά με φωτισμό & παγκάκια', 'Θερινό σινεμά', 'Καμία αλλαγή'],
+    winnerBadge: 'Νικήτρια',
+    results: [
+      { label: 'Παιδική χαρά με φωτισμό & παγκάκια', pct: 61, winner: true },
+      { label: 'Θερινό σινεμά', pct: 31 },
+      { label: 'Καμία αλλαγή', pct: 8 },
+    ],
+    receiptLine: 'Ανώνυμη σαν κάλπη, επαληθεύσιμη σαν απόδειξη: παίρνεις κρυπτογραφική απόδειξη ότι η ψήφος σου μέτρησε — χωρίς να φαίνεται πουθενά τι ψήφισες.',
+    act3Value: 'Κέρδισε μια ιδέα που δεν ήταν κανενός — και ήταν όλων. Η πρόταση της Άννας, καλύτερη από τον Γιώργο, δοκιμασμένη απέναντι στη Μαρία.',
+    punch: 'Αυτό είναι δημοκρατία που δουλεύει: μετράς, συνδιαμορφώνεις, αποφασίζεις.',
+    directVoteNote: 'Βιάζεστε; Υπάρχει και η Άμεση Ψηφοφορία: χωρίς διαβούλευση, ναι/όχι ή πολλαπλές επιλογές, με διάρκεια που ορίζεις εσύ.',
+
+    ctaTitle: 'Η δική σου γειτονιά τι θα αποφάσιζε;',
+    ctaProposal: 'Ξεκίνα μια πρόταση',
+    ctaPoll: 'Δοκίμασε μια δημοσκόπηση',
+    ctaDetails: 'Πώς λειτουργεί αναλυτικά',
+  },
+  en: {
+    heroTitle: 'An empty lot. An idea. A decision.',
+    heroSub: 'See how a neighborhood decides together — in three steps, with no secrets.',
+
+    act1Kicker: 'STEP 1 — THE POLL',
+    act1Title: 'Ask',
+    act1Body: 'Anna walks past the empty lot on Ermou street every day. Is it worth fighting for? Before proposing anything, she asks the neighborhood — anonymously, in one minute.',
+    pollQuestion: '“How much do you miss a space for kids in the neighborhood?”',
+    pollAnswer: 'A lot',
+    pollPct: 78,
+    pollMeta: '214 answers · anonymous panel',
+    act1Value: 'A fast pulse with honest answers. Nobody knows who said what — which is exactly why people answer honestly.',
+
+    act2Kicker: 'STEP 2 — THE DELIBERATION',
+    act2Title: 'Shape it together',
+    act2Body: 'The 78% gave Anna her answer. She proposes: “Turn the lot into a playground.” The AI checks the proposal in seconds and it goes live in the community.',
+    proposalAuthor: 'Anna',
+    proposalText: 'Turn the empty lot on Ermou street into a playground.',
+    amendmentAuthor: 'Giorgos',
+    amendmentText: '+ lighting and benches, so the space lives in the evenings too',
+    accepted: 'Anna accepts',
+    liveLabel: 'The final text updates live, in front of everyone:',
+    liveTextBefore: 'Turn the empty lot on Ermou street into a playground',
+    liveTextAdded: ', with lighting and benches so the space stays alive in the evenings.',
+    counterAuthor: 'Maria',
+    counterText: '“An open-air cinema would be better — the area has playgrounds, but nowhere to gather.”',
+    counterFate: 'Her counter-proposal is not buried. It goes on the ballot as an alternative.',
+    act2Value: 'No idea gets lost. The AI weaves accepted improvements together — it never censors or dilutes. And whoever disagrees isn’t silenced: their idea runs in the vote.',
+
+    act3Kicker: 'STEP 3 — THE VOTE',
+    act3Title: 'Decide',
+    act3Body: 'When deliberation ends, the text freezes — exactly as everyone saw it — and the ballot box opens. One choice each:',
+    ballotLabel: 'BALLOT',
+    options: ['Playground with lighting & benches', 'Open-air cinema', 'No change'],
+    winnerBadge: 'Winner',
+    results: [
+      { label: 'Playground with lighting & benches', pct: 61, winner: true },
+      { label: 'Open-air cinema', pct: 31 },
+      { label: 'No change', pct: 8 },
+    ],
+    receiptLine: 'Anonymous like a ballot box, verifiable like a receipt: you get cryptographic proof your vote counted — without anything revealing what you voted.',
+    act3Value: 'The winner was an idea that belonged to no one — and to everyone. Anna’s proposal, improved by Giorgos, tested against Maria’s.',
+    punch: 'This is democracy that works: measure, shape, decide.',
+    directVoteNote: 'In a hurry? There’s also the Direct Vote: no deliberation, yes/no or multiple choice, with a duration you set.',
+
+    ctaTitle: 'What would your neighborhood decide?',
+    ctaProposal: 'Start a proposal',
+    ctaPoll: 'Try a poll',
+    ctaDetails: 'How it works in detail',
+  },
 };
 
-// ─── Step 1: Proposal Submission ────────────────────────────────────────────
-
-function StepProposal() {
-  const { t } = useTranslation();
+function Avatar({ name, color }: { name: string; color: string }) {
   return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
-        <div className="flex items-center gap-2 mb-2">
-          <FileText className="w-5 h-5 text-blue-600" />
-          <span className="font-semibold text-blue-700">{t('walkthrough.demo_proposal')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">{t('walkthrough.demo_proposal_desc')}</p>
-      </div>
-
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('proposal.question_label')} *</label>
-        <div className="p-3 bg-background rounded border text-sm">
-          {t('walkthrough.demo_question')}
-        </div>
-      </div>
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('proposal.solution_label')} *</label>
-        <div className="p-3 bg-background rounded border text-sm">
-          {t('walkthrough.demo_solution')}
-        </div>
-      </div>
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('proposal.category_label')}</label>
-        <Badge variant="secondary">{t('proposal.category_infrastructure')}</Badge>
-      </div>
-      
-      <Separator />
-      
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-muted/30">
-          <CardContent className="p-3 text-center">
-            <Users className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-            <div className="text-sm font-medium">{t('walkthrough.demo_community')}</div>
-            <div className="text-xs text-muted-foreground">5 {t('community.members')} · 72.5 {t('community.score')}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="p-3 text-center">
-            <Zap className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-            <div className="text-sm font-medium">{t('walkthrough.auto_routed')}</div>
-            <div className="text-xs text-muted-foreground">{t('walkthrough.auto_routed_desc')}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex justify-end">
-        <Button asChild className="bg-blue-600 hover:bg-blue-700">
-          <Link to="/proposals/new">
-            {t('walkthrough.try_submit')} <ArrowRight className="ml-2 w-4 h-4" />
-          </Link>
-        </Button>
-      </div>
-    </div>
+    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold text-white shrink-0 ${color}`}>
+      {name.slice(0, 1)}
+    </span>
   );
 }
 
-// ─── Step 2: LLM Validation ─────────────────────────────────────────────────
-
-function StepValidation() {
-  const { t } = useTranslation();
+function ActKicker({ icon: Icon, text, color }: { icon: typeof Vote; text: string; color: string }) {
   return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-        <div className="flex items-center gap-2 mb-3">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <span className="font-semibold text-green-700">{t('walkthrough.validation_complete')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground mb-3">{t('walkthrough.validation_explanation')}</p>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_structure')}:</span>
-            <span className="ml-2 font-medium">8/10</span>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_specificity')}:</span>
-            <span className="ml-2 font-medium">9/10</span>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_feasibility')}:</span>
-            <span className="ml-2 font-medium">7/10</span>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_completeness')}:</span>
-            <span className="ml-2 font-medium">8/10</span>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('walkthrough.score_clarity')}:</span>
-            <span className="ml-2 font-medium">9/10</span>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <span className="text-muted-foreground">{t('proposal.category_label')}:</span>
-            <span className="ml-2 font-medium">{t('proposal.category_infrastructure')}</span>
-          </div>
-        </div>
-      </div>
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-medium">{t('walkthrough.total_score')}</span>
-          <span className="text-2xl font-bold text-green-600">82/100</span>
-        </div>
-        <Progress value={82} className="h-3" />
-        <div className="mt-3 text-sm space-y-1">
-          <div className="flex items-center gap-2 text-red-600">
-            <span className="w-16 text-xs">&lt;20:</span>
-            <span>{t('walkthrough.threshold_return')}</span>
-          </div>
-          <div className="flex items-center gap-2 text-yellow-600">
-            <span className="w-16 text-xs">20-90:</span>
-            <span>{t('walkthrough.threshold_sortition')}</span>
-            <Badge variant="outline" className="text-xs ml-auto">{t('walkthrough.current')}</Badge>
-          </div>
-          <div className="flex items-center gap-2 text-green-600">
-            <span className="w-16 text-xs">&gt;90:</span>
-            <span>{t('walkthrough.threshold_auto')}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-3 border rounded-lg bg-blue-50 border-blue-200">
-        <div className="flex items-start gap-2">
-          <Zap className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-          <div className="text-sm text-blue-800">
-            <strong>{t('walkthrough.key_innovation')}:</strong> {t('walkthrough.llm_innovation_desc')}
-          </div>
-        </div>
-      </div>
+    <div className={`inline-flex items-center gap-2 text-xs font-bold tracking-widest ${color}`}>
+      <Icon className="w-4 h-4" />
+      {text}
     </div>
   );
 }
-
-// ─── Step 3: Author Review ──────────────────────────────────────────────────
-
-function StepAuthorReview() {
-  const { t } = useTranslation();
-  const [reviewed, setReviewed] = useState(0);
-  
-  const amendments = [
-    { id: 1, author: 'Ε.Π.', type: t('walkthrough.amendment_improvement'), text: t('walkthrough.demo_amendment_1'), reviewed: true, decision: 'accepted' },
-    { id: 2, author: 'Γ.Ν.', type: t('walkthrough.amendment_addition'), text: t('walkthrough.demo_amendment_2'), reviewed: true, decision: 'rejected', reason: t('walkthrough.demo_rejection_reason_1') },
-    { id: 3, author: 'Μ.Κ.', type: t('walkthrough.amendment_counter'), text: t('walkthrough.demo_amendment_3'), reviewed: false, decision: null },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-indigo-50 border-indigo-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Edit3 className="w-5 h-5 text-indigo-600" />
-          <span className="font-semibold text-indigo-700">{t('walkthrough.author_review')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('walkthrough.author_review_description')}
-        </p>
-        <div className="mt-2 text-sm">
-          <span className="text-indigo-600 font-medium">{reviewed}/{amendments.length}</span> {t('walkthrough.reviewed_count')}
-        </div>
-      </div>
-      
-      {amendments.map((amendment) => (
-        <div key={amendment.id} className={`p-4 border rounded-lg ${
-          amendment.reviewed 
-            ? amendment.decision === 'accepted' 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-red-50 border-red-200'
-            : 'bg-muted/30'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{t('common.from')}: {amendment.author}</span>
-              <Badge variant="outline">{amendment.type}</Badge>
-            </div>
-            {amendment.reviewed && (
-              <Badge variant={amendment.decision === 'accepted' ? 'default' : 'secondary'} className={
-                amendment.decision === 'accepted' ? 'bg-green-600' : ''
-              }>
-                {amendment.decision === 'accepted' ? `✓ ${t('walkthrough.accepted')}` : `✗ ${t('walkthrough.rejected')}`}
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mb-3">{amendment.text}</p>
-          
-          {amendment.reviewed && amendment.decision === 'rejected' && amendment.reason && (
-            <div className="p-2 bg-white rounded border text-xs text-muted-foreground mb-3">
-              <strong>{t('walkthrough.justification')}:</strong> {amendment.reason}
-            </div>
-          )}
-          
-          {!amendment.reviewed && (
-            <div className="space-y-2">
-              <Textarea placeholder={t('walkthrough.justification_placeholder')} className="min-h-[40px] text-sm" />
-              <div className="flex gap-2">
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 flex-1" onClick={() => setReviewed(r => r + 1)}>
-                  ✓ {t('walkthrough.accept')}
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setReviewed(r => r + 1)}>
-                  ✗ {t('walkthrough.reject')}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-      
-      <div className="flex justify-between">
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <ExternalLink className="w-3 h-3" />
-          {t('walkthrough.live_demo')}: <Link to="/proposals/3/amendments/review" className="text-blue-600 underline">{t('walkthrough.proposal_3')}</Link>
-        </div>
-        <Button asChild className="bg-indigo-600 hover:bg-indigo-700" disabled={reviewed < amendments.length}>
-          <span>
-            {t('walkthrough.complete_review')} <ArrowRight className="ml-2 w-4 h-4 inline" />
-          </span>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 4: Community Signal ───────────────────────────────────────────────
-
-function StepCommunitySignal() {
-  const { t } = useTranslation();
-  const [upvoted, setUpvoted] = useState<number[]>([]);
-  
-  const rejectedAmendments = [
-    { 
-      id: 1, 
-      author: 'Γ.Ν.', 
-      text: t('walkthrough.demo_amendment_2'),
-      authorReason: t('walkthrough.demo_rejection_reason_1'),
-      upvotes: 18, 
-      downvotes: 4,
-      threshold: 0.5,
-    },
-    { 
-      id: 2, 
-      author: 'Κ.Α.', 
-      text: t('walkthrough.demo_amendment_4'),
-      authorReason: t('walkthrough.demo_rejection_reason_2'),
-      upvotes: 3, 
-      downvotes: 11,
-      threshold: 0.5,
-    },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-amber-50 border-amber-200">
-        <div className="flex items-center gap-2 mb-2">
-          <TrendingUp className="w-5 h-5 text-amber-600" />
-          <span className="font-semibold text-amber-700">{t('walkthrough.community_signal')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('walkthrough.community_signal_description')}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          {t('walkthrough.community_threshold')}
-        </p>
-      </div>
-      
-      {rejectedAmendments.map(amendment => {
-        const netScore = amendment.upvotes - amendment.downvotes;
-        const totalVotes = amendment.upvotes + amendment.downvotes;
-        // Matches server/utils/amendment-processor.ts: upvote share above
-        // the community's amendmentThreshold flags the amendment for sortition.
-        const ratio = totalVotes > 0 ? amendment.upvotes / totalVotes : 0;
-        const flagged = ratio >= amendment.threshold;
-        const userUpvoted = upvoted.includes(amendment.id);
-
-        return (
-          <div key={amendment.id} className={`p-4 border rounded-lg ${
-            flagged ? 'bg-green-50 border-green-300' : 'bg-muted/30'
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{t('common.from')}: {amendment.author}</span>
-              </div>
-              {flagged && (
-                <Badge className="bg-green-600">✓ {t('walkthrough.flagged_for_sortition')}</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">{amendment.text}</p>
-            <div className="p-2 bg-white rounded border text-xs text-muted-foreground mb-3">
-              <strong>{t('walkthrough.author_justification')}:</strong> {amendment.authorReason}
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant={userUpvoted ? "default" : "outline"}
-                  className={userUpvoted ? "bg-green-600" : ""}
-                  onClick={() => userUpvoted ? setUpvoted(upvoted.filter(id => id !== amendment.id)) : setUpvoted([...upvoted, amendment.id])}
-                >
-                  ⬆️ {t('walkthrough.disagree_rejection')} ({amendment.upvotes + (userUpvoted ? 1 : 0)})
-                </Button>
-                <Button size="sm" variant="outline" className="text-red-600">
-                  ⬇️ {t('walkthrough.agree_rejection')} ({amendment.downvotes})
-                </Button>
-              </div>
-              <div className="text-sm">
-                <span className={`font-medium ${flagged ? 'text-green-600' : 'text-muted-foreground'}`}>
-                  Net: {netScore > 0 ? '+' : ''}{netScore} ({(ratio * 100).toFixed(0)}%)
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      
-      <div className="flex justify-between items-center">
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <ExternalLink className="w-3 h-3" />
-          {t('walkthrough.live_demo')}: <Link to="/proposals/5/amendments/signals" className="text-blue-600 underline">{t('walkthrough.proposal_5')}</Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 5: Sortition Synthesis ────────────────────────────────────────────
-
-function StepSortitionSynthesis() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
-        <div className="flex items-center gap-2 mb-2">
-          <PenTool className="w-5 h-5 text-purple-600" />
-          <span className="font-semibold text-purple-700">{t('walkthrough.sortition_synthesis')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('walkthrough.sortition_synthesis_description')}
-        </p>
-      </div>
-
-      {/* Sortition body info — illustrative; actual size = community.sortitionSize */}
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium">{t('walkthrough.sortition_body_info')}</span>
-          <Badge>{t('walkthrough.active')}</Badge>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">12</div>
-            <div className="text-muted-foreground text-xs">{t('walkthrough.selected_citizens')}</div>
-          </div>
-          <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">9/12</div>
-            <div className="text-muted-foreground text-xs">{t('walkthrough.responded')}</div>
-          </div>
-          <div className="p-2 bg-background rounded text-center">
-            <div className="font-bold text-lg">72h</div>
-            <div className="text-muted-foreground text-xs">{t('walkthrough.remaining')}</div>
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {t('walkthrough.sortition_size_note') || 'Το μέγεθος και το χρονικό περιθώριο ορίζονται ανά κοινότητα στις Ρυθμίσεις. Default: 12 μέλη, 72 ώρες.'}
-        </p>
-      </div>
-
-      {/* AI pre-merge baseline (Phase 2 of the merge pipeline) */}
-      <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Zap className="w-4 h-4 text-purple-600" />
-          <span className="text-sm font-medium text-purple-800">
-            {t('walkthrough.ai_premerge_title') || 'AI-merged baseline (αυτόματη αφετηρία)'}
-          </span>
-        </div>
-        <p className="text-xs text-purple-700">
-          {t('walkthrough.ai_premerge_desc') || 'Το AI ενσωματώνει τις τροπολογίες που αποδέχθηκε ο συγγραφέας — και όσες υπερβαίνουν το όριο δημοφιλίας της κοινότητας (amendmentInclusionThreshold) — σε ρέοντα κείμενο. Το κληρωτό σώμα ξεκινά από αυτό αντί για άδειο πεδίο.'}
-        </p>
-      </div>
-
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('walkthrough.author_proposal_accepted')}</label>
-        <div className="p-3 bg-background rounded border text-sm space-y-2">
-          <p>{t('walkthrough.demo_solution')}</p>
-          <div className="border-l-2 border-green-500 pl-3 text-green-700 text-xs">
-            [{t('walkthrough.accepted')}] {t('walkthrough.demo_amendment_accepted')}
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-        <label className="text-sm font-medium mb-2 block">{t('walkthrough.flagged_amendments_community')}</label>
-        <div className="p-3 bg-white rounded border text-sm">
-          <p className="text-muted-foreground">
-            {t('walkthrough.demo_amendment_flagged')}
-          </p>
-          <div className="mt-1 text-xs text-green-600">
-            ✓ {t('walkthrough.community_overrode')} (Net: +14, 78%)
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('walkthrough.final_text_compose')}</label>
-      <Textarea 
-          className="min-h-[100px] text-sm"
-          defaultValue={t('walkthrough.demo_final_text')}
-        />
-      </div>
-      
-      <div className="flex justify-between items-center">
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <ExternalLink className="w-3 h-3" />
-          {t('walkthrough.live_demo')}: <Link to="/proposals/1/sortition" className="text-blue-600 underline">{t('walkthrough.proposal_1_sortition')}</Link>
-        </div>
-        <Button className="bg-purple-600 hover:bg-purple-700">
-          {t('walkthrough.submit_final_text')} <ArrowRight className="ml-2 w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 6: Ratification Vote ──────────────────────────────────────────────
-
-function StepFinalText() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Users className="w-5 h-5 text-purple-600" />
-          <span className="font-semibold text-purple-700">{t('proposal.final_review_title')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">{t('proposal.final_review_note')}</p>
-      </div>
-
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="text-sm font-medium mb-2">{t('proposal.final_review_title')}</div>
-        <div className="p-3 bg-background rounded border text-sm whitespace-pre-wrap">
-          {t('walkthrough.demo_final_merged')}
-        </div>
-      </div>
-
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="text-sm font-medium mb-2">{t('proposal.final_review_alternatives_title')}</div>
-        <div className="space-y-2">
-          <div className="p-3 bg-background rounded border text-sm">
-            <Badge variant="outline" className="mb-2">{t('proposal.final_review_alternative_label')} 1</Badge>
-            <p className="text-muted-foreground">{t('walkthrough.demo_final_alternative')}</p>
-          </div>
-          <div className="p-3 bg-background rounded border text-sm text-muted-foreground">
-            {t('proposal.final_review_status_quo')}
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" disabled className="pointer-events-none">
-            {t('proposal.final_review_accept')}
-          </Button>
-          <div className="flex-1 min-w-[220px] flex gap-2">
-            <div className="flex-1 px-3 py-1.5 rounded border bg-background text-sm text-muted-foreground truncate">
-              {t('proposal.final_review_refine_placeholder')}
-            </div>
-            <Button size="sm" variant="outline" disabled className="pointer-events-none shrink-0">
-              {t('proposal.final_review_refine_button')}
-            </Button>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">{t('proposal.final_review_ai_only_caption')}</p>
-      </div>
-    </div>
-  );
-}
-
-function StepRatificationVote() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Vote className="w-5 h-5 text-emerald-600" />
-          <span className="font-semibold text-emerald-700">{t('walkthrough.ratification_vote')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('walkthrough.ratification_description')}
-        </p>
-      </div>
-      
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-2 block">{t('walkthrough.final_text')}</label>
-        <div className="p-3 bg-background rounded border text-sm">
-          {t('walkthrough.demo_final_text')}
-        </div>
-      </div>
-
-      {/* Live demo data: Proposal 2 (forest fires) is in voting state */}
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="flex items-center justify-between mb-4">
-          <span className="font-medium">{t('walkthrough.live_results')}</span>
-          <Badge variant="secondary">1,247 {t('walkthrough.votes')}</Badge>
-        </div>
-        
-        <div className="space-y-3">
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-green-600 font-medium">{t('walkthrough.for')}</span>
-              <span className="font-bold">68%</span>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-4">
-              <div className="bg-green-600 h-4 rounded-full transition-all" style={{ width: '68%' }} />
-            </div>
-            <span className="text-xs text-muted-foreground">848 {t('walkthrough.votes')}</span>
-          </div>
-          
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-red-600 font-medium">{t('walkthrough.against')}</span>
-              <span className="font-bold">32%</span>
-            </div>
-            <div className="w-full bg-secondary rounded-full h-4">
-              <div className="bg-red-600 h-4 rounded-full transition-all" style={{ width: '32%' }} />
-            </div>
-            <span className="text-xs text-muted-foreground">399 {t('walkthrough.votes')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Debate preview */}
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="flex items-center gap-2 mb-2">
-          <MessageSquare className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium">{t('walkthrough.debate_preview')}</span>
-        </div>
-        <div className="space-y-2">
-          <div className="p-2 bg-green-50 rounded border border-green-100 text-xs">
-            <span className="text-green-700 font-medium">{t('walkthrough.for')} — Γ.Ν.:</span> {t('walkthrough.demo_debate_for')}
-          </div>
-          <div className="p-2 bg-red-50 rounded border border-red-100 text-xs">
-            <span className="text-red-700 font-medium">{t('walkthrough.against')} — Κ.Α.:</span> {t('walkthrough.demo_debate_against')}
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex justify-between items-center">
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
-          <ExternalLink className="w-3 h-3" />
-          {t('walkthrough.live_demo')}: <Link to="/proposals/2" className="text-blue-600 underline">{t('walkthrough.proposal_2_vote')}</Link>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button className="bg-green-600 hover:bg-green-700">
-            <ThumbsUp className="mr-2 w-4 h-4" /> {t('walkthrough.for')}
-          </Button>
-          <Button variant="outline" className="text-red-600">
-            <ThumbsDown className="mr-2 w-4 h-4" /> {t('walkthrough.against')}
-          </Button>
-          <Button variant="outline">
-            {t('proposal.abstain') || 'Abstain'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="p-3 border rounded-lg bg-blue-50 border-blue-200 text-xs text-blue-900">
-        {t('walkthrough.vote_quorum_note') || 'Η ψηφοφορία οριστικοποιείται από τον συγγραφέα (ή έναν διαχειριστή της κοινότητας). Αν η συμμετοχή πέσει κάτω από το minParticipationPct της κοινότητας ή δεν υπάρχει αποφασιστική ψήφος, η πρόταση αρχειοθετείται αντί να εγκριθεί.'}
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 7: Verified Ballot ────────────────────────────────────────────────
-
-function StepVerifiedBallot() {
-  const { t } = useTranslation();
-  return (
-    <div className="space-y-4">
-      <div className="p-4 border rounded-lg bg-red-50 border-red-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Shield className="w-5 h-5 text-red-600" />
-          <span className="font-semibold text-red-700">{t('walkthrough.verified_ballot')}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {t('walkthrough.verified_ballot_desc')}
-        </p>
-      </div>
-
-      {/* Gov.gr flow */}
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <label className="text-sm font-medium mb-3 block">{t('walkthrough.identity_flow')}</label>
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shrink-0">1</div>
-            <div>
-              <div className="text-sm font-medium">{t('walkthrough.govgr_declaration')}</div>
-              <div className="text-xs text-muted-foreground">{t('walkthrough.govgr_declaration_desc')}</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shrink-0">2</div>
-            <div>
-              <div className="text-sm font-medium">{t('walkthrough.pdf_upload')}</div>
-              <div className="text-xs text-muted-foreground">{t('walkthrough.pdf_upload_desc')}</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="bg-purple-100 text-purple-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shrink-0">3</div>
-            <div>
-              <div className="text-sm font-medium">{t('walkthrough.four_gate_validation')}</div>
-              <div className="text-xs text-muted-foreground">{t('walkthrough.four_gate_desc')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Security features */}
-      <div className="p-4 border rounded-lg bg-muted/30">
-        <div className="flex items-center gap-2 mb-3">
-          <Lock className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium">{t('walkthrough.security')}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-2 bg-background rounded text-xs">
-            <CheckCircle className="w-3 h-3 text-green-600 inline mr-1" />
-            {t('walkthrough.security_one_vote')}
-          </div>
-          <div className="p-2 bg-background rounded text-xs">
-            <CheckCircle className="w-3 h-3 text-green-600 inline mr-1" />
-            {t('walkthrough.security_public_results')}
-          </div>
-          <div className="p-2 bg-background rounded text-xs">
-            <CheckCircle className="w-3 h-3 text-green-600 inline mr-1" />
-            {t('walkthrough.security_encrypted')}
-          </div>
-          <div className="p-2 bg-background rounded text-xs">
-            <CheckCircle className="w-3 h-3 text-green-600 inline mr-1" />
-            {t('walkthrough.security_afm')}
-          </div>
-        </div>
-      </div>
-
-      {/* Platform highlights for investors */}
-      <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
-        <div className="flex items-center gap-2 mb-2">
-          <BarChart3 className="w-4 h-4 text-blue-600" />
-          <span className="text-sm font-medium text-blue-800">{t('walkthrough.platform_highlights')}</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 bg-white rounded">
-            <div className="text-lg font-bold text-blue-700">4</div>
-            <div className="text-xs text-muted-foreground">{t('walkthrough.gate_validation')}</div>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <div className="text-lg font-bold text-blue-700">3</div>
-            <div className="text-xs text-muted-foreground">{t('walkthrough.vote_types')}</div>
-          </div>
-          <div className="p-2 bg-white rounded">
-            <div className="text-lg font-bold text-blue-700">24h</div>
-            <div className="text-xs text-muted-foreground">{t('walkthrough.ballot_turnaround')}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function DeliberationWalkthrough() {
-  const { t } = useTranslation();
-  const [currentStep, setCurrentStep] = useState(1);
-  const STEPS = useStepData();
-  
-  const currentStepData = STEPS.find(s => s.id === currentStep);
-  const Icon = currentStepData?.icon || FileText;
-  const colors = colorMap[currentStepData?.color || 'blue'];
-  
+  const { locale } = useTranslation();
+  const [, navigate] = useLocation();
+  const s = STORY[locale === 'en' ? 'en' : 'el'];
+
+  useEffect(() => {
+    document.title = `AgoraX — ${s.heroTitle}`;
+  }, [s.heroTitle]);
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <div className="flex-grow flex items-start justify-center py-6">
-      <Card className="w-full max-w-4xl mx-auto">
+      <main className="flex-grow pt-16 pb-20">
+        <div className="container mx-auto px-4 max-w-2xl">
 
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Icon className="w-5 h-5" />
-              {currentStepData?.name}
-            </CardTitle>
-            <Badge className={colors.badge}>
-              {t('walkthrough.step')} {currentStep}/{STEPS.length}
-            </Badge>
-          </div>
-          <CardDescription>
-            {currentStep === 1 && t('walkthrough.macro1_desc')}
-            {currentStep === 2 && t('walkthrough.macro2_desc')}
-            {currentStep === 3 && t('walkthrough.macro3_desc')}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          {/* Step navigation pills */}
-          <div className="flex items-center justify-center gap-1.5 mb-6 overflow-x-auto pb-2">
-            {STEPS.map(step => {
-              const StepIcon = step.icon;
-              const stepColors = colorMap[step.color];
-              return (
-                <button
-                  key={step.id}
-                  onClick={() => setCurrentStep(step.id)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    currentStep === step.id
-                      ? `${stepColors.btn} text-white shadow-sm`
-                      : currentStep > step.id
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <StepIcon className="w-3.5 h-3.5" />
-                  {step.name}
-                </button>
-              );
-            })}
+          {/* ── Hero ── */}
+          <div className="text-center py-14">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold leading-tight mb-4" data-testid="walkthrough-hero">
+              {s.heroTitle}
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-md mx-auto">{s.heroSub}</p>
+            <ArrowDown className="w-5 h-5 mx-auto mt-8 text-muted-foreground animate-bounce" />
           </div>
 
-          {/* Step content */}
-          {currentStep === 1 && (
-            <div className="space-y-8">
-              <StepProposal />
-              <Separator />
-              <StepValidation />
-            </div>
-          )}
-          {currentStep === 2 && (
-            <div className="space-y-8">
-              <StepAuthorReview />
-              <Separator />
-              <StepCommunitySignal />
-              <Separator />
-              <StepFinalText />
-            </div>
-          )}
-          {currentStep === 3 && (
-            <div className="space-y-8">
-              <StepRatificationVote />
-              <Separator />
-              <StepVerifiedBallot />
-            </div>
-          )}
-        </CardContent>
+          {/* ── Act 1: the poll ── */}
+          <section className="py-10 space-y-4" data-testid="walkthrough-act-poll">
+            <ActKicker icon={BarChart3} text={s.act1Kicker} color="text-sky-600" />
+            <h2 className="text-3xl font-serif font-bold">{s.act1Title}</h2>
+            <p className="text-muted-foreground leading-relaxed">{s.act1Body}</p>
 
-        {/* Navigation */}
-        <div className="px-6 pb-4 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentStep(s => Math.max(1, s - 1))}
-            disabled={currentStep === 1}
-          >
-            ← {t('walkthrough.previous')}
-          </Button>
-          <div className="flex items-center gap-1">
-            {STEPS.map(step => (
-              <div
-                key={step.id}
-                onClick={() => setCurrentStep(step.id)}
-                className={`w-2 h-2 rounded-full cursor-pointer transition-all ${
-                  currentStep === step.id ? 'bg-primary w-4' : currentStep > step.id ? 'bg-primary/40' : 'bg-muted'
-                }`}
-              />
-            ))}
-          </div>
-          <Button
-            onClick={() => setCurrentStep(s => Math.min(STEPS.length, s + 1))}
-            disabled={currentStep === STEPS.length}
-          >
-            {t('walkthrough.next')} →
-          </Button>
+            <Card className="border-sky-200">
+              <CardContent className="p-5 space-y-3">
+                <p className="font-medium">{s.pollQuestion}</p>
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-semibold text-sky-700">{s.pollAnswer}</span>
+                    <span className="font-bold text-sky-700">{s.pollPct}%</span>
+                  </div>
+                  <div className="h-3 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-sky-500 rounded-full" style={{ width: `${s.pollPct}%` }} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{s.pollMeta}</p>
+              </CardContent>
+            </Card>
+            <p className="text-sm text-muted-foreground italic border-l-2 border-sky-300 pl-3">{s.act1Value}</p>
+          </section>
+
+          {/* ── Act 2: the deliberation ── */}
+          <section className="py-10 space-y-4" data-testid="walkthrough-act-deliberation">
+            <ActKicker icon={MessageSquarePlus} text={s.act2Kicker} color="text-amber-600" />
+            <h2 className="text-3xl font-serif font-bold">{s.act2Title}</h2>
+            <p className="text-muted-foreground leading-relaxed">{s.act2Body}</p>
+
+            {/* the proposal */}
+            <Card>
+              <CardContent className="p-5 flex gap-3 items-start">
+                <Avatar name={s.proposalAuthor} color="bg-emerald-600" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold mb-1">{s.proposalAuthor}</p>
+                  <p className="text-sm">{s.proposalText}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* the amendment */}
+            <Card>
+              <CardContent className="p-5 flex gap-3 items-start">
+                <Avatar name={s.amendmentAuthor} color="bg-indigo-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold mb-1">{s.amendmentAuthor}</p>
+                  <p className="text-sm">{s.amendmentText}</p>
+                  <Badge variant="secondary" className="mt-2 text-emerald-700 bg-emerald-50 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    {s.accepted}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* the live text */}
+            <div className="p-4 rounded-lg border border-amber-200 bg-amber-50/50 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                <Sparkles className="w-4 h-4" />
+                {s.liveLabel}
+              </div>
+              <p className="text-sm leading-relaxed">
+                {s.liveTextBefore}
+                <mark className="bg-emerald-100 text-emerald-900 rounded px-0.5">{s.liveTextAdded}</mark>
+              </p>
+            </div>
+
+            {/* the counter-proposal */}
+            <Card className="border-purple-200">
+              <CardContent className="p-5 flex gap-3 items-start">
+                <Avatar name={s.counterAuthor} color="bg-purple-600" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold mb-1">{s.counterAuthor}</p>
+                  <p className="text-sm">{s.counterText}</p>
+                  <p className="text-sm font-medium text-purple-700 mt-2 flex items-center gap-1">
+                    <ArrowRight className="w-4 h-4" />
+                    {s.counterFate}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <p className="text-sm text-muted-foreground italic border-l-2 border-amber-300 pl-3">{s.act2Value}</p>
+          </section>
+
+          {/* ── Act 3: the vote ── */}
+          <section className="py-10 space-y-4" data-testid="walkthrough-act-vote">
+            <ActKicker icon={Vote} text={s.act3Kicker} color="text-emerald-600" />
+            <h2 className="text-3xl font-serif font-bold">{s.act3Title}</h2>
+            <p className="text-muted-foreground leading-relaxed">{s.act3Body}</p>
+
+            {/* the ballot */}
+            <Card className="border-emerald-200">
+              <CardContent className="p-5 space-y-2">
+                <p className="text-xs font-bold tracking-widest text-muted-foreground">{s.ballotLabel}</p>
+                {s.options.map((opt, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded border bg-background text-sm">
+                    <span className="w-4 h-4 rounded-full border-2 border-muted-foreground/40 shrink-0" />
+                    {opt}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Lock className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
+              <p>{s.receiptLine}</p>
+            </div>
+
+            {/* the result */}
+            <Card>
+              <CardContent className="p-5 space-y-3">
+                {s.results.map((r, i) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className={r.winner ? 'font-semibold' : 'text-muted-foreground'}>
+                        {r.label}
+                        {r.winner && (
+                          <Badge className="ml-2 bg-emerald-600">
+                            <Receipt className="w-3 h-3 mr-1" />
+                            {s.winnerBadge}
+                          </Badge>
+                        )}
+                      </span>
+                      <span className={r.winner ? 'font-bold' : 'text-muted-foreground'}>{r.pct}%</span>
+                    </div>
+                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${r.winner ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
+                        style={{ width: `${r.pct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <p className="text-sm text-muted-foreground italic border-l-2 border-emerald-300 pl-3">{s.act3Value}</p>
+            <p className="text-lg font-serif font-semibold text-center pt-4">{s.punch}</p>
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+              <Zap className="w-3 h-3" />
+              {s.directVoteNote}
+            </p>
+          </section>
+
+          {/* ── CTA ── */}
+          <section className="text-center py-14 border-t mt-6">
+            <h2 className="text-2xl font-serif font-bold mb-6">{s.ctaTitle}</h2>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button size="lg" onClick={() => navigate('/proposals/new')} data-testid="walkthrough-cta-proposal">
+                {s.ctaProposal}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => navigate('/surveys')} data-testid="walkthrough-cta-poll">
+                {s.ctaPoll}
+              </Button>
+              <Button size="lg" variant="ghost" onClick={() => navigate('/how-it-works')}>
+                {s.ctaDetails}
+              </Button>
+            </div>
+          </section>
+
         </div>
-
-        {/* Pipeline overview */}
-        <div className="px-6 pb-6">
-          <Separator className="mb-4" />
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <h4 className="font-medium mb-3 text-sm">{t('walkthrough.pipeline_overview')}</h4>
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-1">
-              {STEPS.map((step, i) => {
-                const StepIcon = step.icon;
-                const stepColors = colorMap[step.color];
-                const isActive = currentStep === step.id;
-                return (
-                  <button
-                    key={step.id}
-                    onClick={() => setCurrentStep(step.id)}
-                    className={`flex flex-col items-center p-2 rounded-lg transition-all text-center ${
-                      isActive ? `${stepColors.bg} ${stepColors.border} border-2` : 'hover:bg-background'
-                    }`}
-                  >
-                    <StepIcon className={`w-4 h-4 mb-1 ${isActive ? stepColors.text : 'text-muted-foreground'}`} />
-                    <span className={`text-[10px] leading-tight ${isActive ? 'font-semibold' : 'text-muted-foreground'}`}>
-                      {i === 0 && t('walkthrough.summary_submit')}
-                      {i === 1 && t('walkthrough.summary_validate')}
-                      {i === 2 && t('walkthrough.summary_author')}
-                      {i === 3 && t('walkthrough.summary_community')}
-                      {i === 4 && t('walkthrough.summary_sortition')}
-                      {i === 5 && t('walkthrough.summary_ratify')}
-                      {i === 6 && t('walkthrough.summary_ballot')}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Card>
-      </div>
+      </main>
       <Footer />
     </div>
   );
