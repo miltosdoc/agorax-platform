@@ -289,6 +289,10 @@ export default function ProposalDetailPage() {
   // proposal.finalText is the fallback if the fetch failed.
   const finalReviewText = finalReview?.finalText ?? proposal.finalText ?? '';
   const finalReviewAlternatives = finalReview?.alternatives ?? [];
+  // Direct-vote proposals carry none of the deliberation apparatus: the
+  // ballot IS the page. Vote front and center, no amendments tab, no
+  // sortition/AI-validation widgets, no "final text" copy.
+  const isDirectVote = proposal.track === 'vote';
 
   return (
     <AppShell breadcrumb={[
@@ -564,18 +568,37 @@ export default function ProposalDetailPage() {
             </section>
           )}
 
+          {/* Direct vote: the ballot is the main event, right under the text */}
+          {isDirectVote && ['voting', 'decided', 'archived'].includes(proposal.status) && (
+            <section className="mb-8" data-testid="direct-vote-panel">
+              <VotePanel
+                proposalId={proposal.id}
+                proposalStatus={proposal.status}
+                proposalAuthorId={proposal.authorId}
+                votingMode={proposal.votingMode}
+                phaseDeadline={(proposal as any).phaseDeadline}
+                onProposalAdvanced={handleProposalAdvanced}
+              />
+              {voteError && (
+                <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
+              )}
+            </section>
+          )}
+
           {/* Participation — the people's surface, always visible */}
           <section>
-            <Tabs defaultValue={['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
-              <TabsList className="grid w-full grid-cols-3 h-auto gap-1">
+            <Tabs defaultValue={!isDirectVote && ['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
+              <TabsList className={`grid w-full ${isDirectVote ? 'grid-cols-2' : 'grid-cols-3'} h-auto gap-1`}>
                 <TabsTrigger value="debate" className="gap-1 py-2">
                   <MessageSquare className="w-4 h-4 sm:mr-1" />
                   <span className="text-xs sm:text-sm">{t('workspace.tabs.debate')}</span>
                 </TabsTrigger>
-                <TabsTrigger value="amendments" className="gap-1 py-2">
-                  <FileText className="w-4 h-4 sm:mr-1" />
-                  <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
-                </TabsTrigger>
+                {!isDirectVote && (
+                  <TabsTrigger value="amendments" className="gap-1 py-2">
+                    <FileText className="w-4 h-4 sm:mr-1" />
+                    <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="media" className="gap-1 py-2">
                   <Mic className="w-4 h-4 sm:mr-1" />
                   <span className="text-xs sm:text-sm">{t('media.tabLabel')}</span>
@@ -586,13 +609,15 @@ export default function ProposalDetailPage() {
                 <DebatePanel proposalId={proposal.id} />
               </TabsContent>
 
-              <TabsContent value="amendments">
-                <AmendmentsPanel
-                  proposalId={proposal.id}
-                  proposalStatus={proposal.status}
-                  userIsAuthor={userIsAuthor}
-                />
-              </TabsContent>
+              {!isDirectVote && (
+                <TabsContent value="amendments">
+                  <AmendmentsPanel
+                    proposalId={proposal.id}
+                    proposalStatus={proposal.status}
+                    userIsAuthor={userIsAuthor}
+                  />
+                </TabsContent>
+              )}
 
               <TabsContent value="media">
                 <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} />
@@ -608,13 +633,15 @@ export default function ProposalDetailPage() {
             {['author_review', 'community_signal'].includes(proposal.status) && (proposal as any).phaseDeadline && (
               <PhaseCountdown deadline={(proposal as any).phaseDeadline} />
             )}
-            <NextActionPanel
-              status={proposal.status}
-              proposalId={proposal.id}
-              userIsAuthor={userIsAuthor}
-            />
+            {(!isDirectVote || proposal.status === 'draft') && (
+              <NextActionPanel
+                status={proposal.status}
+                proposalId={proposal.id}
+                userIsAuthor={userIsAuthor}
+              />
+            )}
 
-            {['voting', 'decided', 'archived'].includes(proposal.status) && (
+            {!isDirectVote && ['voting', 'decided', 'archived'].includes(proposal.status) && (
               <div>
                 <VotePanel
                   proposalId={proposal.id}
@@ -630,14 +657,14 @@ export default function ProposalDetailPage() {
               </div>
             )}
 
-            {['sortition_synthesis', 'voting', 'decided', 'archived'].includes(proposal.status) && (
+            {!isDirectVote && ['sortition_synthesis', 'voting', 'decided', 'archived'].includes(proposal.status) && (
               <SortitionPanel
                 proposalId={proposal.id}
                 proposalStatus={proposal.status}
               />
             )}
 
-            {(() => {
+            {!isDirectVote && (() => {
               const numericScore = proposal.llmScore != null ? Number(proposal.llmScore) : null;
               const score = Number.isFinite(numericScore) ? (numericScore as number) : null;
               if (score === null) {
