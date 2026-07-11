@@ -335,14 +335,6 @@ export default function Header() {
                     {t('nav.communities')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => navigate("/sortition")}
-                    className="cursor-pointer"
-                    data-testid="menu-sortition"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    {t('nav.sortition')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
                     onClick={() => navigate("/surveys")}
                     className="cursor-pointer"
                     data-testid="menu-surveys"

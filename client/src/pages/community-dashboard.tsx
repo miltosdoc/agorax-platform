@@ -55,7 +55,7 @@ export default function CommunityDashboardPage() {
   // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return ['proposals', 'sortition', 'members', 'conferences', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
+    return ['proposals', 'members', 'conferences', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
   });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
@@ -322,7 +322,6 @@ export default function CommunityDashboardPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
-          <TabsTrigger value="sortition">{t('community.tab_sortition')}</TabsTrigger>
           <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
           <TabsTrigger value="conferences">
             <Mic className="w-4 h-4 mr-1" />
@@ -387,17 +386,6 @@ export default function CommunityDashboardPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="sortition">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('community.sortition_bodies')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{t('community.no_sortition_bodies')}</p>
             </CardContent>
           </Card>
         </TabsContent>

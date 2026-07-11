@@ -657,7 +657,10 @@ export default function ProposalDetailPage() {
               </div>
             )}
 
-            {!isDirectVote && ['sortition_synthesis', 'voting', 'decided', 'archived'].includes(proposal.status) && (
+            {/* Sortition is dormant: the panel appears only while a jury is
+                actually convened (manual dispute path), never as a "skipped"
+                explainer on ordinary proposals. */}
+            {!isDirectVote && proposal.status === 'sortition_synthesis' && (
               <SortitionPanel
                 proposalId={proposal.id}
                 proposalStatus={proposal.status}

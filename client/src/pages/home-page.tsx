@@ -235,13 +235,13 @@ export default function HomePage() {
             )}
           </section>
 
-          {/* Active Sortitions */}
+          {/* Active Sortitions — dormant institution: the section exists only
+              while you are actually drawn into a convened jury; no permanent
+              empty-state advertising a feature nothing triggers. */}
+          {activeBodies.length > 0 && (
           <section data-testid="dashboard-active-sortitions">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-semibold">{t('dashboard.activeSortitions')}</h2>
-              <Link href="/sortition" className="text-sm text-primary hover:underline">
-                {t('home.allCommunities')} →
-              </Link>
             </div>
             {activeBodies.length === 0 ? (
               <EmptyState title={t('home.noSortitions')} />
@@ -277,6 +277,7 @@ export default function HomePage() {
               </div>
             )}
           </section>
+          )}
 
           {/* Active conferences — live + scheduled rooms the user can join */}
           <DashboardActiveRoomsSection />
