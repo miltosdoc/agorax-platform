@@ -30,7 +30,7 @@ import express from 'express';
 import { mediaRepo, proposalRepo, communityRepo } from '../storage';
 import { db } from '../db';
 import { proposals, communities, users, surveyPolls } from '@shared/schema';
-import { desc, eq, inArray, ne } from 'drizzle-orm';
+import { desc, eq, inArray, ne, notInArray } from 'drizzle-orm';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
 import { canViewProposal, requireProposalContentAccess, visibleCommunityIdSet } from '../utils/community-visibility';
@@ -516,7 +516,7 @@ export function registerMediaRoutes(app: Express): void {
             .from(proposals)
             .innerJoin(communities, eq(proposals.communityId, communities.id))
             .innerJoin(users, eq(proposals.authorId, users.id))
-            .where(ne(proposals.status, 'draft'))
+            .where(notInArray(proposals.status, ['draft', 'archived']))
             .orderBy(desc(proposals.createdAt))
             .limit(20)
           : Promise.resolve([]),

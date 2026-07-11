@@ -1483,6 +1483,7 @@ const el: TranslationDictionary = {
   'proposal.vote_option_add': 'Προσθήκη επιλογής',
   'proposal.withdrawOffer': 'Άλλα μέλη έχουν συνεισφέρει (τροπολογίες/συζήτηση/στήριξη), οπότε η πρόταση δεν διαγράφεται. Να αποσυρθεί; Θα αρχειοθετηθεί και οι συνεισφορές τους θα διατηρηθούν.',
   'proposal.deleteOrWithdraw': 'Διαγραφή / Απόσυρση',
+  'community.show_archived': 'Εμφάνιση αρχειοθετημένων',
   'conference.connect_failed': 'Η σύνδεση με τον διακομιστή βίντεο απέτυχε.',
   'conference.device_error': 'Πρόβλημα με κάμερα/μικρόφωνο',
 

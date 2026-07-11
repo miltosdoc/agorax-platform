@@ -107,6 +107,9 @@ export default function ProposalsPage() {
 
     const matches = proposals.filter((p) => {
       if (statusFilter !== STATUS_ALL && p.status !== statusFilter) return false;
+      // Archived proposals are record, not feed: they appear only when the
+      // archived filter is explicitly selected.
+      if (statusFilter === STATUS_ALL && p.status === 'archived') return false;
       if (communityFilter !== COMMUNITY_ALL && String(p.communityId) !== communityFilter) return false;
       if (term) {
         const hay = `${p.question ?? ''} ${p.solution ?? ''}`.toLowerCase();

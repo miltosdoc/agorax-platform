@@ -67,6 +67,7 @@ export default function CommunityDashboardPage() {
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [mergeSuccess, setMergeSuccess] = useState(false);
   const [joinState, setJoinState] = useState<'idle' | 'submitting' | 'pending'>('idle');
+  const [showArchived, setShowArchived] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: number; userId: number; message: string | null; createdAt: string; user: { id: number; username: string; name: string | null; profilePicture: string | null } | null }>>([]);
   const [requestDeciding, setRequestDeciding] = useState<Record<number, boolean>>({});
@@ -344,7 +345,7 @@ export default function CommunityDashboardPage() {
                 <p className="text-muted-foreground">{t('community.no_proposals')}</p>
               ) : (
                 <div className="space-y-2">
-                  {proposals.map((proposal) => (
+                  {(showArchived ? proposals : proposals.filter((p) => p.status !== 'archived')).map((proposal) => (
                     <div
                       key={proposal.id}
                       role="link"
@@ -374,6 +375,16 @@ export default function CommunityDashboardPage() {
                       </Badge>
                     </div>
                   ))}
+                  {!showArchived && proposals.some((p) => p.status === 'archived') && (
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+                      onClick={() => setShowArchived(true)}
+                      data-testid="show-archived-proposals"
+                    >
+                      {(t('community.show_archived') || 'Εμφάνιση αρχειοθετημένων')} ({proposals.filter((p) => p.status === 'archived').length})
+                    </button>
+                  )}
                 </div>
               )}
             </CardContent>
