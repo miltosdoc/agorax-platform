@@ -1481,6 +1481,8 @@ const el: TranslationDictionary = {
   'proposal.vote_options_hint': 'Κενό = απλή ψηφοφορία Ναι/Όχι. Με επιλογές, οι ψηφοφόροι διαλέγουν μία — και προστίθεται αυτόματα η επιλογή «Καμία αλλαγή».',
   'proposal.vote_option_placeholder': 'Επιλογή',
   'proposal.vote_option_add': 'Προσθήκη επιλογής',
+  'proposal.withdrawOffer': 'Άλλα μέλη έχουν συνεισφέρει (τροπολογίες/συζήτηση/στήριξη), οπότε η πρόταση δεν διαγράφεται. Να αποσυρθεί; Θα αρχειοθετηθεί και οι συνεισφορές τους θα διατηρηθούν.',
+  'proposal.deleteOrWithdraw': 'Διαγραφή / Απόσυρση',
   'conference.connect_failed': 'Η σύνδεση με τον διακομιστή βίντεο απέτυχε.',
   'conference.device_error': 'Πρόβλημα με κάμερα/μικρόφωνο',
 

@@ -17,6 +17,11 @@ import {
   communityMembers,
   communities,
   proposals,
+  proposalAmendments,
+  proposalSupport,
+  proposalVotes,
+  debateThreads,
+  debateArguments,
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
@@ -1130,21 +1135,84 @@ export function registerProposalsRoutes(app: Express): void {
     }
   });
 
+  /**
+   * How many other people have invested in this proposal. Deletion is only
+   * for proposals that are still "the author's": zero engagement. Anything
+   * that reached the ballot, or that others amended/debated/signalled, is
+   * community record — withdraw (archive) instead.
+   */
+  async function proposalEngagement(proposalId: number) {
+    const [[am], [su], [vo], [th], [ar]] = await Promise.all([
+      db.select({ c: count() }).from(proposalAmendments).where(eq(proposalAmendments.proposalId, proposalId)),
+      db.select({ c: count() }).from(proposalSupport).where(eq(proposalSupport.proposalId, proposalId)),
+      db.select({ c: count() }).from(proposalVotes).where(eq(proposalVotes.proposalId, proposalId)),
+      db.select({ c: count() }).from(debateThreads).where(eq(debateThreads.proposalId, proposalId)),
+      db.select({ c: count() }).from(debateArguments).where(eq(debateArguments.proposalId, proposalId)),
+    ]);
+    return {
+      amendments: am?.c ?? 0,
+      support: su?.c ?? 0,
+      votes: vo?.c ?? 0,
+      debate: (th?.c ?? 0) + (ar?.c ?? 0),
+    };
+  }
+
   app.delete("/api/proposals/:id", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      if (proposal.authorId !== req.user.id) {
+      const isAdmin = !!req.user.isAdmin;
+      if (proposal.authorId !== req.user.id && !isAdmin) {
         return res.status(403).json({ message: "Only the author can delete this proposal" });
       }
-      if (proposal.status !== 'draft') {
-        return res.status(409).json({ message: "Only draft proposals can be deleted" });
+      // A ballot — open or concluded — is immutable record for everyone.
+      if (proposal.status === 'voting' || proposal.status === 'decided') {
+        return res.status(409).json({ message: "Ψηφισμένες προτάσεις δεν διαγράφονται — αποτελούν δημοκρατικό αρχείο." });
+      }
+      const eng = await proposalEngagement(proposalId);
+      if (eng.votes > 0) {
+        return res.status(409).json({ message: "Η πρόταση έχει ψήφους και δεν διαγράφεται." });
+      }
+      // Authors may hard-delete only engagement-free proposals; platform
+      // admins may also delete engaged-but-unvoted ones (moderation).
+      const engaged = eng.amendments + eng.support + eng.debate > 0;
+      if (engaged && !isAdmin) {
+        return res.status(409).json({
+          message: "Άλλα μέλη έχουν συνεισφέρει (τροπολογίες/συζήτηση/στήριξη). Μπορείτε να την αποσύρετε — θα αρχειοθετηθεί χωρίς να χαθεί η συνεισφορά τους.",
+          canWithdraw: true,
+          engagement: eng,
+        });
       }
       await proposalRepo.deleteProposal(proposalId);
       res.status(204).end();
     } catch (error) {
+      console.error('delete proposal failed:', error);
       res.status(500).json({ message: "Failed to delete proposal" });
+    }
+  });
+
+  // Withdraw (Απόσυρση): the author archives an engaged-but-fizzled
+  // proposal. The record and everyone's contributions stay visible; it just
+  // leaves the active lists. Not available once the ballot is open.
+  app.post("/api/proposals/:id/withdraw", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Only the author can withdraw this proposal" });
+      }
+      if (['voting', 'decided', 'archived'].includes(proposal.status)) {
+        return res.status(409).json({ message: "Η πρόταση δεν μπορεί να αποσυρθεί σε αυτή τη φάση." });
+      }
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      const updated = await transitionProposal(proposal, 'archived', storage);
+      await triggerSideEffects(proposal.status as any, 'archived', updated);
+      res.json(updated);
+    } catch (error) {
+      console.error('withdraw proposal failed:', error);
+      res.status(500).json({ message: "Failed to withdraw proposal" });
     }
   });
 

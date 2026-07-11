@@ -364,23 +364,42 @@ export default function ProposalDetailPage() {
                     {t('proposal.edit') || 'Edit'}
                   </Button>
                 )}
-                {userIsAuthor && proposal.status === 'draft' && (
+                {userIsAuthor && !['voting', 'decided', 'archived'].includes(proposal.status) && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="text-red-600 hover:bg-red-50"
+                    data-testid="proposal-delete"
                     onClick={async () => {
-                      if (!window.confirm(t('proposal.deleteConfirm') || 'Delete this draft proposal?')) return;
+                      if (!window.confirm(t('proposal.deleteConfirm') || 'Να διαγραφεί η πρόταση;')) return;
                       try {
                         await apiRequest('DELETE', `/api/proposals/${proposal.id}`);
                         setLocation('/home');
-                      } catch (err) {
-                        alert(err instanceof Error ? err.message : String(err));
+                      } catch (err: any) {
+                        // Others contributed — deletion refused; offer withdrawal
+                        // (archives the proposal, keeps everyone's work).
+                        const msg = err instanceof Error ? err.message : String(err);
+                        if (/409/.test(msg) || /συνεισφέρει|withdraw/i.test(msg)) {
+                          const offer = t('proposal.withdrawOffer')
+                            || 'Άλλα μέλη έχουν συνεισφέρει (τροπολογίες/συζήτηση/στήριξη), οπότε η πρόταση δεν διαγράφεται. Να αποσυρθεί; Θα αρχειοθετηθεί και οι συνεισφορές τους θα διατηρηθούν.';
+                          if (window.confirm(offer)) {
+                            try {
+                              await apiRequest('POST', `/api/proposals/${proposal.id}/withdraw`);
+                              window.location.reload();
+                            } catch (werr) {
+                              alert(werr instanceof Error ? werr.message : String(werr));
+                            }
+                          }
+                          return;
+                        }
+                        alert(msg);
                       }
                     }}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
-                    {t('proposal.delete') || 'Delete'}
+                    {proposal.status === 'draft'
+                      ? (t('proposal.delete') || 'Διαγραφή')
+                      : (t('proposal.deleteOrWithdraw') || 'Διαγραφή / Απόσυρση')}
                   </Button>
                 )}
               </div>

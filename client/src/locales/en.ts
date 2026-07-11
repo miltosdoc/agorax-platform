@@ -1481,6 +1481,8 @@ const en: TranslationDictionary = {
   'proposal.vote_options_hint': 'Empty = a simple Yes/No vote. With options, voters pick one — and a “No change” option is added automatically.',
   'proposal.vote_option_placeholder': 'Option',
   'proposal.vote_option_add': 'Add option',
+  'proposal.withdrawOffer': 'Other members have contributed (amendments/debate/support), so this proposal cannot be deleted. Withdraw it instead? It will be archived and their contributions preserved.',
+  'proposal.deleteOrWithdraw': 'Delete / Withdraw',
   'conference.connect_failed': 'Could not connect to the video server.',
   'conference.device_error': 'Camera/microphone problem',
 
