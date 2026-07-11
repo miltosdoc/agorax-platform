@@ -129,7 +129,7 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
     .from(proposals)
     .where(
       and(
-        inArray(proposals.status, ['author_review', 'community_signal', 'voting']),
+        inArray(proposals.status, ['author_review', 'community_signal', 'final_review', 'voting']),
         isNotNull(proposals.phaseDeadline),
         lt(proposals.phaseDeadline, now),
       ),
@@ -145,23 +145,17 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
         await triggerSideEffects('author_review', 'community_signal', updated);
 
       } else if (proposal.status === 'community_signal') {
-        // Check if any rejected amendments were flagged by community
-        const community = await db.query.communities?.findFirst?.({ where: (c: any, { eq: e }: any) => e(c.id, proposal.communityId) }) as any;
-        const threshold = parseFloat(String(community?.amendmentThreshold ?? '0.5'));
-        const allAmendments = await db
-          .select()
-          .from(proposalAmendments)
-          .where(and(eq(proposalAmendments.proposalId, proposal.id), eq(proposalAmendments.authorDecision, 'rejected')));
-        
-        const anyFlagged = allAmendments.some(a => {
-          const total = (a.rejectionUpvotes ?? 0) + (a.rejectionDownvotes ?? 0);
-          if (total === 0) return false;
-          return ((a.rejectionUpvotes ?? 0) / total) >= threshold;
-        });
+        // Short deliberation flow: the amendments phase always hands over to
+        // final_review, where the AI merge + author acceptance happen and
+        // counter-proposals become ballot alternatives. (Sortition synthesis
+        // remains reachable via the manual /transition endpoint.)
+        const updated = await transitionProposal(proposal as any, 'final_review', storage);
+        await triggerSideEffects('community_signal', 'final_review', updated);
 
-        const nextState = anyFlagged ? 'sortition_synthesis' : 'voting';
-        const updated = await transitionProposal(proposal as any, nextState, storage);
-        await triggerSideEffects('community_signal', nextState, updated);
+      } else if (proposal.status === 'final_review') {
+        // Author silence = acceptance of the AI-merged text as-is.
+        const updated = await transitionProposal(proposal as any, 'voting', storage);
+        await triggerSideEffects('final_review', 'voting', updated);
 
       } else if (proposal.status === 'voting') {
         // Auto-finalize the vote
@@ -171,10 +165,12 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
         const view = await backend.getVoterView({ proposalId: proposal.id });
         const { computeVoteResults } = await import('../routers/proposals');
         const results = await computeVoteResults(proposal as any, view);
-        const hasDecisive = (results.yes + results.no) > 0;
-        const nextState = results.meetsQuorum && hasDecisive ? 'decided' : 'archived';
+        const nextState = results.meetsQuorum && results.hasDecisive ? 'decided' : 'archived';
         const { storage: st } = await import('../storage');
-        const updated = await transitionProposal(proposal as any, nextState, st);
+        let updated = await transitionProposal(proposal as any, nextState, st);
+        if (results.ballotOptions && nextState === 'decided' && results.winner) {
+          updated = await st.updateProposal(proposal.id, { winningOption: results.winner });
+        }
         await triggerSideEffects('voting', nextState, updated);
       }
     } catch (err) {

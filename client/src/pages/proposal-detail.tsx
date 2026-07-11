@@ -12,8 +12,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, FileText, Trash2, Mic, Pencil } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, Trash2, Mic, Pencil, Loader2, ChevronDown } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { Input } from '@/components/ui/input';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { useToast } from '@/hooks/use-toast';
 import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
@@ -48,6 +51,16 @@ interface Proposal {
   category?: string;
   /** 'anonymous' (default for new proposals) | 'pseudonymous' (transparent ratification) */
   votingMode?: string;
+  /** 'deliberation' (amendments + final_review) | 'vote' (straight to ballot) */
+  track?: string;
+}
+
+interface FinalReviewData {
+  proposalId: number;
+  status: string;
+  finalText: string;
+  ballotOptions: Array<{ id: string; label: string }> | null;
+  alternatives: Array<{ id: number; optionId: string; text: string }>;
 }
 
 type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
@@ -70,8 +83,14 @@ export default function ProposalDetailPage() {
   const proposalId = location.split('/').pop();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [finalReview, setFinalReview] = useState<FinalReviewData | null>(null);
+  const [finalReviewLoading, setFinalReviewLoading] = useState(false);
+  const [acceptingFinal, setAcceptingFinal] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [refineInstruction, setRefineInstruction] = useState('');
   const [loading, setLoading] = useState(true);
   const [finalizing, setFinalizing] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -125,6 +144,69 @@ export default function ProposalDetailPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, [proposalId, proposal?.status]);
+
+  // final_review: fetch the AI-merged text and the ballot alternatives.
+  // If the endpoint fails we fall back to proposal.finalText for display.
+  useEffect(() => {
+    if (!proposalId || proposal?.status !== 'final_review') return;
+    let cancelled = false;
+    setFinalReviewLoading(true);
+    api.get<FinalReviewData>(`/api/proposals/${proposalId}/final-review`)
+      .then((resp) => { if (!cancelled) setFinalReview(resp.data); })
+      .catch(() => { if (!cancelled) setFinalReview(null); })
+      .finally(() => { if (!cancelled) setFinalReviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [proposalId, proposal?.status]);
+
+  const handleAcceptFinalReview = async () => {
+    if (!proposalId || acceptingFinal) return;
+    setAcceptingFinal(true);
+    try {
+      await api.post(`/api/proposals/${proposalId}/final-review/accept`);
+      const resp = await api.get<Proposal>(`/api/proposals/${proposalId}`);
+      setProposal(resp.data);
+    } catch (error) {
+      toast({
+        title: t('proposal.final_review_accept_failed') || 'Η έναρξη της ψηφοφορίας απέτυχε.',
+        description: error instanceof ApiError ? error.message : undefined,
+        variant: 'destructive',
+      });
+      // 409 = the proposal already left final_review elsewhere — resync.
+      if (error instanceof ApiError && error.status === 409) {
+        api.get<Proposal>(`/api/proposals/${proposalId}`)
+          .then((resp) => setProposal(resp.data))
+          .catch(() => { /* keep current view */ });
+      }
+    } finally {
+      setAcceptingFinal(false);
+    }
+  };
+
+  const handleRefineFinalReview = async () => {
+    const instruction = refineInstruction.trim();
+    if (!proposalId || refining || instruction.length < 3) return;
+    setRefining(true);
+    try {
+      const resp = await api.post<{ finalText: string }>(
+        `/api/proposals/${proposalId}/final-review/refine`,
+        { instruction },
+      );
+      const newText = resp.data.finalText;
+      setFinalReview((prev) => (prev ? { ...prev, finalText: newText } : prev));
+      setProposal((prev) => (prev ? { ...prev, finalText: newText } : prev));
+      setRefineInstruction('');
+    } catch (error) {
+      const message =
+        error instanceof ApiError && error.status === 503
+          ? (t('proposal.final_review_ai_unavailable') || 'Η βελτίωση μέσω AI δεν είναι διαθέσιμη.')
+          : error instanceof ApiError
+            ? error.message
+            : (t('proposal.final_review_refine_failed') || 'Η βελτίωση απέτυχε.');
+      toast({ title: message, variant: 'destructive' });
+    } finally {
+      setRefining(false);
+    }
+  };
 
   const handleFinalize = async () => {
     if (!proposalId || finalizing) return;
@@ -196,6 +278,10 @@ export default function ProposalDetailPage() {
 
   const userIsAuthor = !!user && user.id === proposal.authorId;
   const isVoting = proposal.status === 'voting';
+  // Displayed merged text during final_review: the endpoint's copy wins,
+  // proposal.finalText is the fallback if the fetch failed.
+  const finalReviewText = finalReview?.finalText ?? proposal.finalText ?? '';
+  const finalReviewAlternatives = finalReview?.alternatives ?? [];
 
   return (
     <AppShell breadcrumb={[
@@ -297,6 +383,11 @@ export default function ProposalDetailPage() {
                 {t('proposal.by')} {proposal.authorName || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
               </span>
               <StatusBadge status={proposal.status} />
+              {proposal.track === 'vote' && (
+                <Badge variant="outline" data-testid="proposal-track-badge">
+                  {t('proposal.final_review_track_vote_badge') || 'Άμεση ψηφοφορία'}
+                </Badge>
+              )}
               {proposal.category && <Badge variant="secondary">{proposal.category}</Badge>}
             </div>
           </header>
@@ -323,7 +414,11 @@ export default function ProposalDetailPage() {
               </div>
             )}
 
-            {proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
+            {/* Merged final text (voting/decided/…) — during final_review the
+                dedicated section below owns this display, so skip it here.
+                This is also what keeps the merged proposal.finalText visible
+                for option-ballot proposals once voting starts. */}
+            {proposal.status !== 'final_review' && proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
               <div className="mt-4 p-4 bg-muted rounded space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-medium">{t('proposal.mergedFinalText') || 'Τελικό κείμενο (μετά τις τροπολογίες)'}</h4>
@@ -350,6 +445,90 @@ export default function ProposalDetailPage() {
               <ProposalMediaPreview proposalId={proposal.id} />
             </div>
           </section>
+
+          {/* Final review — the AI-merged vote-ready text. Everyone sees the
+              text and the ballot alternatives; the author additionally gets
+              accept + AI-refine controls. */}
+          {proposal.status === 'final_review' && (
+            <section className="mb-8" data-testid="final-review-section">
+              <h2 className="text-sm font-medium text-muted-foreground mb-2">
+                {t('proposal.final_review_title') || 'Τελικό κείμενο προς ψηφοφορία'}
+              </h2>
+              <div className="p-4 bg-muted rounded space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  {t('proposal.final_review_note') || 'Το κείμενο συντέθηκε από το AI ενσωματώνοντας τις αποδεκτές και τις κοινοτικά προωθημένες τροπολογίες.'}
+                </p>
+                {finalReviewLoading ? (
+                  <p className="text-sm text-muted-foreground">{t('general.loading')}</p>
+                ) : (
+                  <p className="whitespace-pre-wrap text-base leading-relaxed" data-testid="final-review-text">
+                    {finalReviewText}
+                  </p>
+                )}
+              </div>
+
+              {finalReviewAlternatives.length > 0 && (
+                <div className="mt-4 space-y-2" data-testid="final-review-alternatives">
+                  <h3 className="text-sm font-medium">
+                    {t('proposal.final_review_alternatives_title') || 'Εναλλακτικές στην ψηφοφορία'}
+                  </h3>
+                  {finalReviewAlternatives.map((alt, i) => (
+                    <Collapsible key={alt.id} className="border rounded">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium hover:bg-muted/50">
+                        <span>{(t('proposal.final_review_alternative_label') || 'Εναλλακτική') + ` ${i + 1}`}</span>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="px-3 pb-3">
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{alt.text}</p>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                  <div className="border rounded px-3 py-2 text-sm text-muted-foreground">
+                    {t('proposal.final_review_status_quo') || 'Καμία αλλαγή'}
+                  </div>
+                </div>
+              )}
+
+              {userIsAuthor && (
+                <div className="mt-4 p-4 border rounded space-y-3" data-testid="final-review-author-actions">
+                  <Button
+                    className="w-full sm:w-auto"
+                    disabled={acceptingFinal || refining || finalReviewLoading}
+                    onClick={handleAcceptFinalReview}
+                    data-testid="final-review-accept"
+                  >
+                    {acceptingFinal && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {t('proposal.final_review_accept') || 'Αποδοχή & έναρξη ψηφοφορίας'}
+                  </Button>
+                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        value={refineInstruction}
+                        onChange={(e) => setRefineInstruction(e.target.value)}
+                        placeholder={t('proposal.final_review_refine_placeholder') || 'π.χ. Κάνε τη διατύπωση της παραγράφου 2 πιο συγκεκριμένη'}
+                        maxLength={500}
+                        disabled={refining}
+                        data-testid="final-review-refine-input"
+                      />
+                      <Button
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={refining || acceptingFinal || refineInstruction.trim().length < 3}
+                        onClick={handleRefineFinalReview}
+                        data-testid="final-review-refine"
+                      >
+                        {refining && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        {t('proposal.final_review_refine_button') || 'Βελτίωση με AI'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('proposal.final_review_ai_only_caption') || 'Το τελικό κείμενο τροποποιείται μόνο μέσω AI — οι ενσωματωμένες τροπολογίες προστατεύονται.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Participation — the people's surface, always visible */}
           <section>

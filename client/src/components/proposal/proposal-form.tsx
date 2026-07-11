@@ -3,13 +3,17 @@
  * 
  * Form for creating new proposals within a community.
  * Collects: question (problem), solution, category, and optional description.
+ * On creation it also collects the proposal track (deliberation vs. direct
+ * vote) and, for the vote track, the voting duration in hours.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, X } from 'lucide-react';
@@ -62,6 +66,11 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
     solution: '',
     category: '',
   });
+
+  // Proposal track — only chosen at creation time; editing a draft never
+  // changes its track, so the selector is hidden in edit mode.
+  const [track, setTrack] = useState<'deliberation' | 'vote'>('deliberation');
+  const [votingDurationHours, setVotingDurationHours] = useState('72');
 
   // Document attachments — picked now, uploaded right after the proposal
   // is created (the upload endpoint needs a proposal id).
@@ -157,7 +166,11 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
     try {
       const res = editProposalId
         ? await apiRequest('PATCH', `/api/proposals/${editProposalId}`, formData)
-        : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, formData);
+        : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, {
+            ...formData,
+            track,
+            ...(track === 'vote' ? { votingDurationHours: parseInt(votingDurationHours, 10) } : {}),
+          });
 
       if (!res.ok) {
         const data = await res.json();
@@ -290,6 +303,83 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
               {t('proposal.community_hint') || 'Μόνο κοινότητες όπου είστε μέλος.'}
             </p>
           </div>
+
+          {!editProposalId && (
+            <>
+              <div className="space-y-2">
+                <Label>
+                  {t('proposal.track_label') || 'Διαδικασία'} <span className="text-red-500">*</span>
+                </Label>
+                <RadioGroup
+                  value={track}
+                  onValueChange={(v) => setTrack(v as 'deliberation' | 'vote')}
+                  className="grid gap-2 sm:grid-cols-2"
+                >
+                  <label
+                    htmlFor="track-deliberation"
+                    className={`flex items-start gap-3 rounded-lg border p-4 cursor-pointer ${track === 'deliberation' ? 'border-primary bg-muted/40' : ''}`}
+                  >
+                    <RadioGroupItem
+                      value="deliberation"
+                      id="track-deliberation"
+                      className="mt-0.5"
+                      data-testid="proposal-track-deliberation"
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t('proposal.track_deliberation') || 'Διαβούλευση'}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('proposal.track_deliberation_help') || 'Η κοινότητα προτείνει τροπολογίες, το AI συνθέτει το τελικό κείμενο και οι αντιπροτάσεις ψηφίζονται ως εναλλακτικές.'}
+                      </span>
+                    </span>
+                  </label>
+                  <label
+                    htmlFor="track-vote"
+                    className={`flex items-start gap-3 rounded-lg border p-4 cursor-pointer ${track === 'vote' ? 'border-primary bg-muted/40' : ''}`}
+                  >
+                    <RadioGroupItem
+                      value="vote"
+                      id="track-vote"
+                      className="mt-0.5"
+                      data-testid="proposal-track-vote"
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium">
+                        {t('proposal.track_vote') || 'Άμεση ψηφοφορία'}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {t('proposal.track_vote_help') || 'Χωρίς διαβούλευση — η πρόταση πάει κατευθείαν σε ψηφοφορία ναι/όχι με διάρκεια που ορίζετε εσείς.'}
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              {track === 'vote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="votingDurationHours">
+                    {t('proposal.track_vote_duration_label') || 'Διάρκεια ψηφοφορίας (ώρες)'} <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="votingDurationHours"
+                    type="number"
+                    min={1}
+                    max={8760}
+                    step={1}
+                    required
+                    value={votingDurationHours}
+                    onChange={(e) => setVotingDurationHours(e.target.value)}
+                    className="max-w-[10rem]"
+                    data-testid="proposal-voting-duration"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('proposal.track_vote_duration_hint') || '72 = 3 ημέρες, 168 = 1 εβδομάδα'}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="question">
@@ -440,7 +530,9 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
               </Button>
             </div>
             <p className="text-xs text-muted-foreground text-right">
-              {t('proposal.submit_vs_save_hint')}
+              {!editProposalId && track === 'vote'
+                ? (t('proposal.track_vote_submit_hint') || 'Το προσχέδιο δεν προχωρά σε ψηφοφορία μέχρι να υποβληθεί για έλεγχο.')
+                : t('proposal.submit_vs_save_hint')}
             </p>
           </div>
         </form>

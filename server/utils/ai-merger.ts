@@ -221,3 +221,263 @@ export async function saveAiMergedFinalText(
     .where(eq(proposals.id, proposalId));
   return result;
 }
+
+// ─── Final review (short deliberation track) ────────────────────────────────
+//
+// Unlike the legacy merge above, the final-review pipeline treats
+// counter-proposals (αντιπροτάσεις) as COMPETING ALTERNATIVES, not inline
+// replacements: they are excluded from the merged text, restyled by the AI
+// to match the final proposal's form, and stand on the ballot next to it.
+
+/** Which amendments qualify for what, under the community's thresholds. */
+function partitionAmendments(
+  amendments: Array<typeof proposalAmendments.$inferSelect>,
+  threshold: number,
+) {
+  const qualifies = (a: typeof proposalAmendments.$inferSelect): boolean => {
+    const decision = decisionOf(a);
+    const ratio = popularityRatio(a);
+    if (decision === 'accepted') return true;
+    if (decision !== 'rejected' && threshold < 1 && ratio >= threshold) return true;
+    // Community override: enough members disagreed with the author's
+    // rejection that the amendment earns its place anyway.
+    if (decision === 'rejected' && ratio >= Math.max(threshold, 0.7)) return true;
+    return false;
+  };
+  const real = amendments.filter(a => a.type !== 'sortition_revision');
+  return {
+    mergeIncluded: real.filter(a => a.type !== 'counter_proposal' && qualifies(a)),
+    counterAlternatives: real.filter(a => a.type === 'counter_proposal' && qualifies(a)),
+    excluded: real.filter(a => !qualifies(a)).map(a => a.id),
+  };
+}
+
+const RESTYLE_PROMPT = `Είσαι ειδικός στη σύνταξη πολιτικών κειμένων.
+Παρακάτω είναι το ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ μιας πρότασης και μια ΑΝΤΙΠΡΟΤΑΣΗ που θα τεθεί σε ψηφοφορία ως εναλλακτική.
+Ξαναγράψε την αντιπρόταση ώστε να έχει την ίδια δομή, μορφή και πληρότητα με το τελικό κείμενο, ως αυτόνομη ολοκληρωμένη πρόταση.
+
+ΚΑΝΟΝΕΣ:
+1. ΔΙΑΤΗΡΕΣΕ ΑΠΑΡΕΓΚΛΙΤΑ την ουσία, τις θέσεις και το κεντρικό μήνυμα της αντιπρότασης — ΔΕΝ επιτρέπεται να τα αμβλύνεις, να τα αλλοιώσεις ή να τα πλησιάσεις προς το τελικό κείμενο.
+2. Άλλαξε ΜΟΝΟ ύφος, δομή και μορφοποίηση ώστε να συγκρίνεται δίκαια με το τελικό κείμενο.
+3. Αν η αντιπρόταση καλύπτει μέρος μόνο του θέματος, συμπλήρωσε ΟΥΔΕΤΕΡΑ τα υπόλοιπα σημεία από το τελικό κείμενο, ώστε να είναι πλήρης εναλλακτική.
+4. Απάντησε ΜΟΝΟ το κείμενο της εναλλακτικής, χωρίς σχόλια.
+
+ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:
+---
+{finalText}
+---
+
+ΑΝΤΙΠΡΟΤΑΣΗ:
+---
+{counter}
+---
+
+ΕΝΑΛΛΑΚΤΙΚΗ ΠΡΟΤΑΣΗ:`;
+
+async function restyleCounter(finalText: string, counterText: string): Promise<string | null> {
+  if (!isLlmConfigured()) return null;
+  try {
+    const response = await chatCompletion({
+      messages: [
+        { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Ξαναγράφεις αντιπροτάσεις ώστε να συγκρίνονται δίκαια, χωρίς ποτέ να αλλοιώνεις την ουσία τους.' },
+        { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, 4000)).replace('{counter}', counterText.slice(0, 4000)) },
+      ],
+      maxTokens: 4000,
+      temperature: 0.3,
+      timeoutMs: 45_000,
+      enableThinking: false,
+    });
+    return response.trim().length > 0 ? response.trim() : null;
+  } catch (err) {
+    console.warn(`[ai-merger] counter restyle failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
+export interface FinalReviewResult {
+  proposalId: number;
+  finalText: string;
+  source: 'llm' | 'fallback';
+  includedAmendmentIds: number[];
+  counterAlternativeIds: number[];
+  excludedAmendmentIds: number[];
+}
+
+/**
+ * Entering final_review: merge accepted/promoted improvements into
+ * proposal.finalText and restyle qualifying counter-proposals into
+ * amendment.restyledText (falling back to their original text).
+ */
+export async function prepareFinalReview(proposalId: number): Promise<FinalReviewResult> {
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
+  if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+
+  const [community] = await db
+    .select({ t: communities.amendmentInclusionThreshold })
+    .from(communities)
+    .where(eq(communities.id, proposal.communityId));
+  const threshold = community?.t != null ? Number(community.t) : 1;
+
+  const amendments = await db
+    .select()
+    .from(proposalAmendments)
+    .where(eq(proposalAmendments.proposalId, proposalId));
+  const { mergeIncluded, counterAlternatives, excluded } = partitionAmendments(amendments, threshold);
+
+  // Merge improvements/additions/removals into the vote-ready text.
+  let finalText = proposal.solution;
+  let source: 'llm' | 'fallback' = 'fallback';
+  if (mergeIncluded.length > 0) {
+    const llmResult = await llmMerge(
+      proposal.question,
+      proposal.solution,
+      mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text })),
+    );
+    if (llmResult.success) {
+      finalText = llmResult.text;
+      source = 'llm';
+    } else {
+      finalText = localConcat(proposal.question, proposal.solution, mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text })));
+    }
+  }
+  await db.update(proposals)
+    .set({ finalText, updatedAt: new Date() })
+    .where(eq(proposals.id, proposalId));
+
+  // Restyle each qualifying counter-proposal into a standalone alternative.
+  for (const counter of counterAlternatives) {
+    const restyled = await restyleCounter(finalText, counter.text);
+    await db.update(proposalAmendments)
+      .set({ restyledText: restyled ?? counter.text })
+      .where(eq(proposalAmendments.id, counter.id));
+  }
+
+  return {
+    proposalId,
+    finalText,
+    source,
+    includedAmendmentIds: mergeIncluded.map(a => a.id),
+    counterAlternativeIds: counterAlternatives.map(a => a.id),
+    excludedAmendmentIds: excluded,
+  };
+}
+
+const REFINE_PROMPT = `Είσαι ειδικός στη σύνταξη πολιτικών κειμένων.
+Ο συγγραφέας μιας πρότασης ζητά μια μικρή τροποποίηση στο ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ πριν την ψηφοφορία.
+Το τελικό κείμενο έχει προκύψει από ενσωμάτωση τροπολογιών της κοινότητας — αυτές είναι ΑΠΑΡΑΒΙΑΣΤΕΣ.
+
+ΚΑΝΟΝΕΣ:
+1. Εφάρμοσε την οδηγία του συγγραφέα ΜΟΝΟ εφόσον δεν αποδυναμώνει, δεν αλλοιώνει και δεν αφαιρεί την ουσία καμίας από τις ΕΝΣΩΜΑΤΩΜΕΝΕΣ ΤΡΟΠΟΛΟΓΙΕΣ παρακάτω.
+2. Αν η οδηγία συγκρούεται με τροπολογία, αγνόησε το συγκρουόμενο μέρος της οδηγίας και εφάρμοσε μόνο ό,τι δεν συγκρούεται.
+3. Κράτησε τις αλλαγές στο ελάχιστο αναγκαίο για την οδηγία.
+4. Απάντησε ΜΟΝΟ το νέο τελικό κείμενο, χωρίς σχόλια.
+
+ΕΝΣΩΜΑΤΩΜΕΝΕΣ ΤΡΟΠΟΛΟΓΙΕΣ (απαραβίαστες):
+{amendments}
+
+ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:
+---
+{finalText}
+---
+
+ΟΔΗΓΙΑ ΣΥΓΓΡΑΦΕΑ:
+{instruction}
+
+ΝΕΟ ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:`;
+
+/**
+ * Author-requested refinement of the final text during final_review.
+ * The author can ONLY modify the text through this constrained AI edit —
+ * the incorporated amendments' substance is passed as inviolable context
+ * so the instruction cannot dilute what the community added.
+ * Throws LlmUnavailableError when no LLM is configured (no fallback: an
+ * unguarded manual edit would defeat the purpose).
+ */
+export async function refineFinalText(proposalId: number, instruction: string): Promise<string> {
+  if (!isLlmConfigured()) {
+    throw new LlmUnavailableError('LLM required for guarded final-text refinement');
+  }
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
+  if (!proposal || !proposal.finalText) throw new Error('No final text to refine');
+
+  const [community] = await db
+    .select({ t: communities.amendmentInclusionThreshold })
+    .from(communities)
+    .where(eq(communities.id, proposal.communityId));
+  const threshold = community?.t != null ? Number(community.t) : 1;
+  const amendments = await db
+    .select()
+    .from(proposalAmendments)
+    .where(eq(proposalAmendments.proposalId, proposalId));
+  const { mergeIncluded } = partitionAmendments(amendments, threshold);
+  const amendmentsText = mergeIncluded.length > 0
+    ? mergeIncluded.map((a, i) => `${i + 1}. ${a.text}`).join('\n\n')
+    : '(καμία)';
+
+  const response = await chatCompletion({
+    messages: [
+      { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Εφαρμόζεις οδηγίες συγγραφέων χωρίς ποτέ να αποδυναμώνεις τις ενσωματωμένες τροπολογίες της κοινότητας.' },
+      {
+        role: 'user',
+        content: REFINE_PROMPT
+          .replace('{amendments}', amendmentsText.slice(0, 3000))
+          .replace('{finalText}', proposal.finalText.slice(0, 5000))
+          .replace('{instruction}', instruction.slice(0, 500)),
+      },
+    ],
+    maxTokens: 4000,
+    temperature: 0.2,
+    timeoutMs: 45_000,
+    enableThinking: false,
+  });
+  const refined = response.trim();
+  if (refined.length === 0) throw new Error('Refinement produced empty text');
+
+  await db.update(proposals)
+    .set({ finalText: refined, updatedAt: new Date() })
+    .where(eq(proposals.id, proposalId));
+  return refined;
+}
+
+/**
+ * Freeze the option ballot when final_review hands over to voting.
+ * Options: the merged final text, each restyled counter-proposal, and the
+ * status quo. With no qualifying counter-proposals the ballot stays null —
+ * the classic yes/no/abstain vote — so nothing degrades for simple cases.
+ */
+export async function buildBallotOptions(proposalId: number): Promise<Array<{ id: string; label: string }> | null> {
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
+  if (!proposal) throw new Error(`Proposal ${proposalId} not found`);
+
+  const [community] = await db
+    .select({ t: communities.amendmentInclusionThreshold })
+    .from(communities)
+    .where(eq(communities.id, proposal.communityId));
+  const threshold = community?.t != null ? Number(community.t) : 1;
+  const amendments = await db
+    .select()
+    .from(proposalAmendments)
+    .where(eq(proposalAmendments.proposalId, proposalId));
+  // Only counters that were restyled when final_review opened stand on the
+  // ballot — qualification is frozen at merge time so late rejection-votes
+  // can't add an option nobody saw during the review.
+  const { counterAlternatives: qualified } = partitionAmendments(amendments, threshold);
+  const counterAlternatives = qualified.filter(a => a.restyledText != null);
+
+  if (counterAlternatives.length === 0) {
+    return null; // classic yes/no/abstain ballot
+  }
+
+  const options = [
+    { id: 'final', label: 'Η τελική πρόταση' },
+    ...counterAlternatives.map((a, i) => ({
+      id: `counter_${a.id}`,
+      label: counterAlternatives.length === 1 ? 'Η αντιπρόταση' : `Αντιπρόταση ${i + 1}`,
+    })),
+    { id: 'status_quo', label: 'Καμία αλλαγή' },
+  ];
+  await db.update(proposals)
+    .set({ ballotOptions: options, updatedAt: new Date() })
+    .where(eq(proposals.id, proposalId));
+  return options;
+}

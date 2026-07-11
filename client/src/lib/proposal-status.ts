@@ -34,9 +34,16 @@ export const STATUS_MAP: Record<ProposalState, StatusEntry> = {
   community_signal: {
     color: 'bg-purple-100 text-purple-800 border-purple-200',
     icon: '📢',
-    greekLabel: 'Σήμα Κοινότητας',
-    englishLabel: 'Community Signal',
+    greekLabel: 'Διαβούλευση & Τροπολογίες',
+    englishLabel: 'Deliberation & Amendments',
     nextAction: 'Vote on amendments',
+  },
+  final_review: {
+    color: 'bg-teal-100 text-teal-800 border-teal-200',
+    icon: '🤖',
+    greekLabel: 'Τελικό Κείμενο',
+    englishLabel: 'Final Text Review',
+    nextAction: 'Author accepts the AI-merged text',
   },
   sortition_synthesis: {
     color: 'bg-indigo-100 text-indigo-800 border-indigo-200',

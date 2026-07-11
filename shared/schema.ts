@@ -329,9 +329,24 @@ export const proposals = pgTable("proposals", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 
-  // Phase deadline — set when entering author_review, community_signal, or voting.
-  // null means no deadline configured (unlimited).
+  // Phase deadline — set when entering author_review, community_signal,
+  // final_review, or voting. null means no deadline configured (unlimited).
   phaseDeadline: timestamp("phase_deadline"),
+
+  // ── Two-track flow (migration 0033) ──
+  // 'deliberation': short flow — amendments phase, AI-merged final text with
+  // author acceptance, counter-proposals on the ballot as alternatives.
+  // 'vote': straight to a yes/no/abstain vote with an author-chosen duration.
+  track: text("track").notNull().default("deliberation"),
+  // Author-chosen voting duration (hours) — overrides the community's
+  // votingHours when this proposal enters voting. null = community default.
+  votingDurationHours: integer("voting_duration_hours"),
+  // Option ballot for deliberation-track final votes: array of
+  // { id: 'final' | 'counter_<amendmentId>' | 'status_quo', label: string }.
+  // null = classic yes/no/abstain ballot (all legacy proposals).
+  ballotOptions: jsonb("ballot_options"),
+  // Winning option id once decided (option ballots only).
+  winningOption: text("winning_option"),
 });
 
 // ─── Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────
@@ -345,6 +360,11 @@ export const proposalAmendments = pgTable("proposal_amendments", {
 
   // Content
   text: text("text").notNull(),
+
+  // AI-restyled version of a counter_proposal, rewritten to match the final
+  // proposal's structure/style so it can stand on the ballot as a complete
+  // alternative (migration 0033). null until the final_review merge runs.
+  restyledText: text("restyled_text"),
 
   // Author review (Κρίση συγγραφέα)
   authorDecision: text("author_decision"), // 'accepted' | 'rejected' | null (not yet reviewed)
@@ -1184,7 +1204,23 @@ export const insertProposalMediaSchema = createInsertSchema(proposalMedia).omit(
 export const insertLivekitRoomSchema = createInsertSchema(livekitRooms).omit({ id: true, createdAt: true, closedAt: true });
 export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true, prevHash: true, rowHash: true, supersededById: true });
 
-export const proposalVoteChoiceSchema = z.enum(['yes', 'no', 'abstain']);
+// Classic ballots use yes/no/abstain; option ballots (deliberation track
+// with counter-proposal alternatives) use ids like 'final', 'counter_12',
+// 'status_quo'. The route validates against the proposal's actual option
+// set — this schema only enforces shape.
+export const proposalVoteChoiceSchema = z.string().min(1).max(64).regex(/^[a-z0-9_]+$/);
+export const CLASSIC_BALLOT_CHOICES = ['yes', 'no', 'abstain'] as const;
+
+export interface BallotOption { id: string; label: string }
+
+/** The valid choice ids for a proposal, from its ballotOptions or the classic trio. */
+export function validBallotChoices(proposal: { ballotOptions?: unknown }): string[] {
+  const opts = proposal.ballotOptions;
+  if (Array.isArray(opts) && opts.length > 0) {
+    return (opts as BallotOption[]).map(o => o.id);
+  }
+  return [...CLASSIC_BALLOT_CHOICES];
+}
 export const castProposalVoteSchema = z.object({
   choice: proposalVoteChoiceSchema,
 });

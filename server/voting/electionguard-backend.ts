@@ -176,6 +176,11 @@ export class ElectionGuardBackend implements VotingBackend {
       throw new Error('electionguard: election is closed');
     }
 
+    // The EG manifest is the classic yes/no/abstain ratification contest;
+    // option ballots (deliberation-track alternatives) are hash-chain only.
+    if (input.choice !== 'yes' && input.choice !== 'no' && input.choice !== 'abstain') {
+      throw new Error('electionguard backend supports only yes/no/abstain ballots');
+    }
     const manifest = eg.agoraxRatificationManifest(electionIdFor(input.proposalId));
     const jointKey = parseElement(election.jointPublicKey);
     const plaintext = eg.ratificationBallot(
@@ -226,7 +231,7 @@ export class ElectionGuardBackend implements VotingBackend {
     // a production deployment must not expose a tally before close.
     const eg = await sdk();
     const election = await this.loadElection(args.proposalId);
-    if (!election) return { yes: 0, no: 0, abstain: 0, total: 0 };
+    if (!election) return { yes: 0, no: 0, abstain: 0, total: 0, counts: {} };
 
     const manifest = eg.agoraxRatificationManifest(electionIdFor(args.proposalId));
     const ballots = await this.activeBallots(eg, election.id);
@@ -440,5 +445,5 @@ function toElectionTally(result: ThresholdDecryptionResult): ElectionTally {
   const yes = countOf('yes');
   const no = countOf('no');
   const abstain = countOf('abstain');
-  return { yes, no, abstain, total: yes + no + abstain };
+  return { yes, no, abstain, total: yes + no + abstain, counts: { yes, no, abstain } };
 }

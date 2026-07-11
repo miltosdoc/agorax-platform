@@ -10,12 +10,16 @@
 import { useTranslation } from '@/hooks/use-translation';
 import { GreekKeyRule } from './GreekKeyRule';
 
-type Choice = 'yes' | 'no' | 'abstain';
-
 interface Props {
-  choice: Choice;
+  /**
+   * 'yes' | 'no' | 'abstain' for classic ballots, or an option id
+   * ('final', 'counter_12', 'status_quo') for option ballots.
+   */
+  choice: string;
   rowHash: string;
   castAt: string;
+  /** Option ballots: id → label lookup; unknown ids fall back to the raw id. */
+  ballotOptions?: Array<{ id: string; label: string }> | null;
 }
 
 function formatHash(hash: string): string[] {
@@ -28,12 +32,18 @@ function formatHash(hash: string): string[] {
   return lines;
 }
 
-export function BallotReceipt({ choice, rowHash, castAt }: Props) {
+export function BallotReceipt({ choice, rowHash, castAt, ballotOptions }: Props) {
   const { t, locale } = useTranslation();
   const choiceColor =
-    choice === 'yes' ? 'var(--yper)' : choice === 'no' ? 'var(--kata)' : 'var(--apochi)';
+    choice === 'yes' ? 'var(--yper)'
+    : choice === 'no' ? 'var(--kata)'
+    : choice === 'abstain' ? 'var(--apochi)'
+    : 'var(--ink)'; // option ballots carry no valence — neutral ink
   const choiceLabel =
-    choice === 'yes' ? t('proposal.support') : choice === 'no' ? t('proposal.oppose') : t('proposal.abstain');
+    choice === 'yes' ? t('proposal.support')
+    : choice === 'no' ? t('proposal.oppose')
+    : choice === 'abstain' ? t('proposal.abstain')
+    : ballotOptions?.find(o => o.id === choice)?.label ?? choice;
   const when = new Date(castAt);
   const stamp = when.toLocaleString(locale === 'en' ? 'en-GB' : 'el-GR', {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',

@@ -79,6 +79,15 @@ export function registerAmendmentsRoutes(app: Express): void {
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
       const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user!.id);
       if (!isMember) return res.status(403).json({ message: "Must be a community member" });
+      // Amendments land only while deliberation is open. After final_review
+      // starts, the merge and the ballot are frozen — a late amendment would
+      // be silently ignored, which is worse than a clear refusal.
+      if (!['review', 'author_review', 'community_signal'].includes(proposal.status)) {
+        return res.status(409).json({
+          message: "Η φάση τροπολογιών έχει κλείσει για αυτή την πρόταση.",
+          current_status: proposal.status,
+        });
+      }
       // Check amendment cap
       const community = await communityRepo.getCommunity(proposal.communityId);
       const cap = community?.maxAmendmentsPerProposal ?? -1;

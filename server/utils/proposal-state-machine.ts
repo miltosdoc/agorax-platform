@@ -99,10 +99,24 @@ export async function transitionProposal(
     );
   }
 
-  // Compute phase deadline when entering a time-limited phase.
+  // Track guards — the static transition map can't express per-proposal
+  // rules, so the two track-specific edges are enforced here:
+  // draft → voting is the direct-vote track only; final_review belongs to
+  // the deliberation track only.
+  const track = (proposal as any).track ?? 'deliberation';
+  if (currentState === 'draft' && newState === 'voting' && track !== 'vote') {
+    throw new Error('Only direct-vote proposals can go straight from draft to voting');
+  }
+  if (newState === 'final_review' && track === 'vote') {
+    throw new Error('Direct-vote proposals have no final_review phase');
+  }
+
+  // Compute phase deadline when entering a time-limited phase. final_review
+  // reuses the community's authorReviewHours budget.
   const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'votingHours'> = {
     author_review: 'authorReviewHours',
     community_signal: 'communitySignalHours',
+    final_review: 'authorReviewHours',
     voting: 'votingHours',
   };
   let phaseDeadline: Date | null = null;
@@ -110,7 +124,11 @@ export async function transitionProposal(
     try {
       const { communityRepo } = await import('../storage');
       const community = await communityRepo.getCommunity(proposal.communityId);
-      const hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
+      let hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
+      // The author's own duration wins for the vote they configured.
+      if (newState === 'voting' && (proposal as any).votingDurationHours > 0) {
+        hours = (proposal as any).votingDurationHours;
+      }
       phaseDeadline = hours > 0 ? new Date(Date.now() + hours * 3600 * 1000) : null;
     } catch {
       // Best-effort — missing deadline is non-fatal.
@@ -122,7 +140,7 @@ export async function transitionProposal(
   // Democracy Points: a proposal that passes quality validation — leaving
   // `review` for deliberation or straight to the vote — earns its author.
   // A return to `draft` or `archived` does not qualify.
-  if (currentState === 'review' && (newState === 'author_review' || newState === 'voting')) {
+  if (currentState === 'review' && (newState === 'author_review' || newState === 'community_signal' || newState === 'voting')) {
     const { awardPoints } = await import('../economy/points');
     await awardPoints({
       userId: proposal.authorId,
@@ -160,10 +178,11 @@ export function isEditable(state: ProposalState): boolean {
 
 /**
  * Check if amendments can be submitted.
- * During review and author_review phases.
+ * Legacy flow: review/author_review. Short deliberation flow: the single
+ * community_signal amendments phase.
  */
 export function canAmend(state: ProposalState): boolean {
-  return state === 'review' || state === 'author_review';
+  return state === 'review' || state === 'author_review' || state === 'community_signal';
 }
 
 /**
@@ -301,6 +320,36 @@ export async function triggerSideEffects(
       } catch { /* best-effort */ }
       break;
 
+    case 'community_signal->final_review':
+      // Short deliberation track: AI merges accepted + community-promoted
+      // improvements into the vote-ready text and restyles qualifying
+      // counter-proposals into standalone ballot alternatives. The author
+      // then accepts (or AI-refines) the result during this phase.
+      try {
+        const { prepareFinalReview } = await import('./ai-merger');
+        await prepareFinalReview(proposal.id);
+      } catch (err: any) {
+        console.warn(`[final-review] merge failed for proposal ${proposal.id}: ${err?.message}`);
+      }
+      await enqueueNotification(
+        proposal.authorId,
+        'final_review_ready',
+        'Το τελικό κείμενο της πρότασής σας είναι έτοιμο για αποδοχή',
+      );
+      break;
+
+    case 'final_review->voting':
+      // Freeze the option ballot: final text + restyled counter-proposals +
+      // status quo. Must happen before the first ballot is validated.
+      try {
+        const { buildBallotOptions } = await import('./ai-merger');
+        await buildBallotOptions(proposal.id);
+      } catch (err: any) {
+        console.warn(`[final-review] ballot build failed for proposal ${proposal.id}: ${err?.message}`);
+      }
+      await enqueueRecalculateScore(proposal.communityId);
+      break;
+
     default:
       // Any transition into a terminal state should refresh the score too,
       // so the badge on the community dashboard reflects new outcomes.
@@ -423,7 +472,7 @@ function targetStateFor(category: LLMValidationResult['category']): ProposalStat
     case 'return':
       return 'draft';
     case 'sortition':
-      return 'author_review';
+      return 'community_signal';
     case 'auto_approve':
       return 'voting';
   }

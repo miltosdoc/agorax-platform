@@ -43,6 +43,13 @@ import {
 
 export type VoteChoice = 'yes' | 'no' | 'abstain';
 
+/** An option on an option ballot (deliberation track). Ids look like
+ *  'final', 'counter_12', 'status_quo'. */
+export interface BallotOption {
+  id: string;
+  label: string;
+}
+
 export interface VoteResults {
   yes: number;
   no: number;
@@ -53,7 +60,14 @@ export interface VoteResults {
   passes: boolean;
   meetsQuorum: boolean;
   minParticipationPct: number;
-  userVote: VoteChoice | null;
+  /** 'yes' | 'no' | 'abstain' for classic ballots, an option id otherwise. */
+  userVote: string | null;
+  /** Non-null ⇒ single-choice option ballot instead of yes/no/abstain. */
+  ballotOptions?: BallotOption[] | null;
+  /** Per-option tallies (option ballots; null while sealed). */
+  counts?: Record<string, number> | null;
+  /** Leading/winning option id (option ballots). */
+  winner?: string | null;
   /** True while the running tally is withheld (private backends, pre-close). */
   sealed?: boolean;
   /** Whether the viewer has cast a ballot — known even when `userVote` is not. */
@@ -84,6 +98,9 @@ interface VotePanelProps {
   proposalAuthorId?: number;
   votingMode?: string;
   phaseDeadline?: string | null;
+  /** The proposal's option-ballot definition, if the caller has it. Also
+   *  arrives with the vote-results payload, so this prop is optional. */
+  ballotOptions?: BallotOption[] | null;
   onVoteResultsChange?: (results: VoteResults) => void;
   onProposalAdvanced?: (newStatus: string) => void;
 }
@@ -94,6 +111,7 @@ export default function VotePanel({
   proposalAuthorId,
   votingMode = 'pseudonymous',
   phaseDeadline,
+  ballotOptions: ballotOptionsProp,
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
@@ -113,6 +131,15 @@ export default function VotePanel({
   // automatically the moment it matures while this panel is mounted.
   const [pendingBallot, setPendingBallot] = useState<PendingBallot | undefined>(() => getPendingBallot(proposalId));
   const [ballotSecondsLeft, setBallotSecondsLeft] = useState<number | null>(null);
+  // Option ballots: the currently highlighted (not yet cast) option, plus
+  // the lazily fetched full texts from /final-review.
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [finalReview, setFinalReview] = useState<{
+    finalText: string | null;
+    alternatives: Array<{ optionId: string; text: string }>;
+  } | null>(null);
+  const [finalReviewLoading, setFinalReviewLoading] = useState(false);
+  const [finalReviewError, setFinalReviewError] = useState(false);
 
   const isAnonymous = votingMode === 'anonymous';
   const isVoting = proposalStatus === 'voting';
@@ -157,7 +184,45 @@ export default function VotePanel({
     }
   };
 
-  const handleCastVote = async (choice: VoteChoice) => {
+  // Option ballots: null ⇒ classic yes/no/abstain. Prefer the prop (the
+  // caller may have the proposal), fall back to the vote-results payload.
+  const ballotOptions = ballotOptionsProp ?? results.ballotOptions ?? null;
+  const isOptionBallot = !!ballotOptions && ballotOptions.length > 0;
+
+  /** Human label for any choice id — classic trio or ballot option. */
+  const optionLabel = (choice: string | null): string => {
+    if (!choice) return '';
+    if (choice === 'yes') return t('proposal.support');
+    if (choice === 'no') return t('proposal.oppose');
+    if (choice === 'abstain') return t('proposal.abstain');
+    return ballotOptions?.find(o => o.id === choice)?.label ?? choice;
+  };
+
+  // Which options carry a full text: 'final' ⇒ proposal.finalText,
+  // 'counter_<id>' ⇒ the amendment's restyled text. 'status_quo' has none.
+  const optionHasText = (id: string) => id === 'final' || id.startsWith('counter_');
+  const optionFullText = (id: string): string | null => {
+    if (!finalReview) return null;
+    if (id === 'final') return finalReview.finalText ?? null;
+    if (id.startsWith('counter_')) {
+      return finalReview.alternatives.find(a => a.optionId === id)?.text ?? null;
+    }
+    return null;
+  };
+  const ensureFinalReview = () => {
+    if (finalReview || finalReviewLoading) return;
+    setFinalReviewLoading(true);
+    setFinalReviewError(false);
+    api
+      .get<{ finalText: string | null; alternatives: Array<{ optionId: string; text: string }> }>(
+        `/api/proposals/${proposalId}/final-review`,
+      )
+      .then((resp) => setFinalReview(resp.data))
+      .catch(() => setFinalReviewError(true))
+      .finally(() => setFinalReviewLoading(false));
+  };
+
+  const handleCastVote = async (choice: string) => {
     if (voting) return;
     // Anonymous proposals: open the confirm modal. The actual cast runs
     // in confirmAnonymousVote() so the voter sees the one-shot warning.
@@ -375,7 +440,90 @@ export default function VotePanel({
           </div>
         )}
 
-        {showVoteButtons && user && !pendingBallot && (
+        {showVoteButtons && user && !pendingBallot && isOptionBallot && ballotOptions && (
+          <div>
+            <div className="text-sm text-muted-foreground mb-3">
+              {userVoted ? t('vote.changeYourVote') : t('vote.castYourVote')}
+            </div>
+            <div role="radiogroup" aria-label={t('vote.panelTitle')} className="space-y-2">
+              {ballotOptions.map((opt) => {
+                const selected = (selectedOption ?? results.userVote) === opt.id;
+                return (
+                  <div
+                    key={opt.id}
+                    className={`rounded-md border transition-colors ${
+                      selected ? 'border-yper bg-yper-wash' : 'hover:border-ink-faint'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className="flex w-full items-center gap-3 p-3 text-left disabled:opacity-60"
+                      onClick={() => setSelectedOption(opt.id)}
+                      disabled={voting}
+                      data-testid={`vote-option-${opt.id}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                          selected ? 'border-yper' : 'border-muted-foreground'
+                        }`}
+                      >
+                        {selected && <span className="h-2 w-2 rounded-full bg-yper" />}
+                      </span>
+                      <span className="flex-1 text-sm font-medium">{opt.label}</span>
+                      {results.userVote === opt.id && (
+                        <Badge variant="secondary" className="shrink-0">
+                          {t('vote.youVoted')}
+                        </Badge>
+                      )}
+                    </button>
+                    {optionHasText(opt.id) && (
+                      <details
+                        className="px-3 pb-3"
+                        onToggle={(e) => {
+                          if ((e.currentTarget as HTMLDetailsElement).open) ensureFinalReview();
+                        }}
+                      >
+                        <summary className="cursor-pointer select-none text-xs text-muted-foreground underline-offset-2 hover:underline">
+                          {t('vote.option_fullText') || 'Δείτε το πλήρες κείμενο'}
+                        </summary>
+                        <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap border-l-2 pl-3 text-sm text-muted-foreground">
+                          {finalReviewLoading
+                            ? t('general.loading')
+                            : finalReviewError
+                            ? t('vote.option_textLoadFailed') || 'Δεν ήταν δυνατή η φόρτωση του κειμένου.'
+                            : optionFullText(opt.id) ??
+                              (t('vote.option_noText') || 'Δεν υπάρχει διαθέσιμο κείμενο.')}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <Button
+              className="mt-3 w-full gap-2"
+              onClick={() => {
+                const choice = selectedOption ?? results.userVote;
+                if (choice) handleCastVote(choice);
+              }}
+              disabled={voting || !(selectedOption ?? results.userVote)}
+              data-testid="vote-option-confirm"
+            >
+              <Vote className="w-4 h-4" />
+              {voting ? t('general.loading') : t('vote.option_confirm') || 'Επιβεβαίωση ψήφου'}
+            </Button>
+            {changing && (
+              <Button variant="ghost" size="sm" onClick={() => setChanging(false)} className="mt-2">
+                {t('general.cancel')}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {showVoteButtons && user && !pendingBallot && !isOptionBallot && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
               {userVoted ? t('vote.changeYourVote') : t('vote.castYourVote')}
@@ -434,6 +582,7 @@ export default function VotePanel({
             choice={localReceipt.choice}
             rowHash={localReceipt.rowHash}
             castAt={localReceipt.castAt}
+            ballotOptions={ballotOptions}
           />
         )}
 
@@ -446,11 +595,7 @@ export default function VotePanel({
                 {results.userVote ? (
                   <>
                     {t('vote.youVoted')}{' '}
-                    <span className="font-medium">
-                      {results.userVote === 'yes' && t('proposal.support')}
-                      {results.userVote === 'no' && t('proposal.oppose')}
-                      {results.userVote === 'abstain' && t('proposal.abstain')}
-                    </span>
+                    <span className="font-medium">{optionLabel(results.userVote)}</span>
                   </>
                 ) : (
                   t('vote.ballotCast')
@@ -492,6 +637,18 @@ export default function VotePanel({
             quorumPct={results.minParticipationPct}
             meetsQuorum={results.meetsQuorum}
             live={isVoting}
+            options={
+              isOptionBallot && ballotOptions
+                ? ballotOptions.map((o) => ({
+                    id: o.id,
+                    label: o.label,
+                    count: results.counts?.[o.id] ?? 0,
+                  }))
+                : undefined
+            }
+            winner={
+              isOptionBallot && isClosed && results.total > 0 ? results.winner ?? null : null
+            }
           />
         )}
 
@@ -518,11 +675,7 @@ export default function VotePanel({
               </span>
               <span className="block">
                 {t('vote.anonConfirmChoice') || 'Επιλογή:'}{' '}
-                <span className="font-semibold">
-                  {pendingAnon === 'yes' && t('proposal.support')}
-                  {pendingAnon === 'no' && t('proposal.oppose')}
-                  {pendingAnon === 'abstain' && t('proposal.abstain')}
-                </span>
+                <span className="font-semibold">{optionLabel(pendingAnon)}</span>
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>

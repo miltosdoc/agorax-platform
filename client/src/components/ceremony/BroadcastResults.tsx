@@ -19,6 +19,22 @@ interface Props {
   meetsQuorum: boolean;
   live?: boolean;             // still in the voting phase
   title?: string;
+  /**
+   * Option ballots: per-option rows replace the classic yes/no/abstain
+   * rows and drive the hemicycle seat colors. Omit for classic ballots.
+   */
+  options?: Array<{ id: string; label: string; count: number }>;
+  /** Winning option id to highlight (option ballots, once decided). */
+  winner?: string | null;
+}
+
+// Categorical accents for option ballots, tuned for the dark broadcast
+// ground (--bc-ground is a constant). The status quo always renders in the
+// neutral slate used for abstentions.
+const OPTION_ACCENTS = ['var(--bc-yper)', '#5B9BD5', '#C7A34F', '#B07AC7', 'var(--bc-kata)', '#5FB8B0'];
+function optionColor(id: string, index: number): string {
+  if (id === 'status_quo') return 'var(--bc-apochi)';
+  return OPTION_ACCENTS[index % OPTION_ACCENTS.length];
 }
 
 function usePrefersReducedMotion() {
@@ -82,7 +98,7 @@ function CountUp({ target, reduced, play }: { target: number; reduced: boolean; 
   return <>{val.toFixed(1)}</>;
 }
 
-export function BroadcastResults({ yes, no, abstain, total, participationPct, quorumPct, meetsQuorum, live, title }: Props) {
+export function BroadcastResults({ yes, no, abstain, total, participationPct, quorumPct, meetsQuorum, live, title, options, winner }: Props) {
   const { t } = useTranslation();
   const reduced = usePrefersReducedMotion();
   const seats = useSeats(total);
@@ -101,13 +117,25 @@ export function BroadcastResults({ yes, no, abstain, total, participationPct, qu
   }, []);
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-  const rows = [
-    { key: 'yes', label: t('proposal.support'), color: 'var(--bc-yper)', n: yes },
-    { key: 'no', label: t('proposal.oppose'), color: 'var(--bc-kata)', n: no },
-    { key: 'abstain', label: t('proposal.abstain'), color: 'var(--bc-apochi)', n: abstain },
-  ];
-  const seatColor = (i: number) =>
-    i < yes ? 'var(--bc-yper)' : i < yes + abstain ? 'var(--bc-apochi)' : 'var(--bc-kata)';
+  const isOptionBallot = !!options && options.length > 0;
+  const rows = isOptionBallot
+    ? options.map((o, i) => ({ key: o.id, label: o.label, color: optionColor(o.id, i), n: o.count }))
+    : [
+        { key: 'yes', label: t('proposal.support'), color: 'var(--bc-yper)', n: yes },
+        { key: 'no', label: t('proposal.oppose'), color: 'var(--bc-kata)', n: no },
+        { key: 'abstain', label: t('proposal.abstain'), color: 'var(--bc-apochi)', n: abstain },
+      ];
+  const seatColor = (i: number) => {
+    if (isOptionBallot) {
+      let acc = 0;
+      for (const r of rows) {
+        acc += r.n;
+        if (i < acc) return r.color;
+      }
+      return 'var(--bc-panel)';
+    }
+    return i < yes ? 'var(--bc-yper)' : i < yes + abstain ? 'var(--bc-apochi)' : 'var(--bc-kata)';
+  };
   const partPct = Math.round(participationPct * 100);
   const quorPct = Math.round(quorumPct * 100);
 
@@ -144,20 +172,28 @@ export function BroadcastResults({ yes, no, abstain, total, participationPct, qu
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const isWinner = winner != null && r.key === winner;
+            return (
             <div key={r.key} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--sp-3)', borderBottom: '1px solid var(--bc-line)', paddingBottom: 'var(--sp-2)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', minWidth: 0 }}>
                 <span style={{ width: '.85rem', height: '.85rem', background: r.color, flexShrink: 0 }} />
                 <span style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontFamily: 'var(--font-data)', fontSize: '.7rem', letterSpacing: '.1em', color: 'var(--bc-ink-soft)' }}>{r.label}</span>
+                  <span style={{ fontFamily: 'var(--font-data)', fontSize: '.7rem', letterSpacing: '.1em', color: isWinner ? 'var(--bc-ink)' : 'var(--bc-ink-soft)' }}>{r.label}</span>
                   <span style={{ fontFamily: 'var(--font-data)', fontSize: '.7rem', color: 'var(--bc-ink-soft)', fontVariantNumeric: 'tabular-nums' }}>{r.n}</span>
                 </span>
+                {isWinner && (
+                  <span style={{ fontFamily: 'var(--font-data)', fontSize: '.6rem', letterSpacing: '.14em', fontWeight: 700, color: 'var(--bc-ground)', background: 'var(--bc-ink)', padding: '2px 6px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {(t('vote.option_winner') || 'Νικήτρια').toLocaleUpperCase('el')}
+                  </span>
+                )}
               </span>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 9vw, 2.6rem)', lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: r.color, whiteSpace: 'nowrap' }}>
                 <CountUp target={pct(r.n)} reduced={reduced} play={play} /><span style={{ fontSize: '1rem' }}>%</span>
               </span>
             </div>
-          ))}
+            );
+          })}
           <div style={{ marginTop: 'var(--sp-1)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-data)', fontSize: '.75rem', letterSpacing: '.08em', color: 'var(--bc-ink-soft)' }}>
               <span>{(t('vote.participationShort') || 'ΣΥΜΜΕΤΟΧΗ')} {partPct}%</span>

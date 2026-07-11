@@ -20,7 +20,8 @@ import {
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
-import { INITIAL_PROPOSAL_STATE, isProposalState } from '@shared/proposal-lifecycle';
+import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
+import { validBallotChoices } from '@shared/schema';
 import {
   canViewCommunityContentById,
   requireProposalContentAccess,
@@ -38,7 +39,7 @@ import { createServer, type Server } from 'http';
  * until the election closes.
  */
 export async function computeVoteResults(
-  proposal: { communityId: number },
+  proposal: { communityId: number; ballotOptions?: unknown },
   view: VoterView,
 ) {
   const [community] = await db
@@ -63,11 +64,35 @@ export async function computeVoteResults(
   const no = tally?.no ?? 0;
   const abstain = tally?.abstain ?? 0;
   const total = tally?.total ?? view.ballotCount;
-  const yesRatio = yes + no > 0 ? yes / (yes + no) : 0;
-  const passes = !!tally && meetsQuorum && yes + no > 0 && yesRatio > votePassThreshold;
+
+  // Option ballots (deliberation track with counter-proposal alternatives):
+  // plurality wins; ties keep the earlier-listed option (final text first).
+  const ballotOptions = Array.isArray((proposal as any).ballotOptions) && (proposal as any).ballotOptions.length > 0
+    ? (proposal as any).ballotOptions as Array<{ id: string; label: string }>
+    : null;
+  let winner: string | null = null;
+  let counts: Record<string, number> | null = null;
+  let passes: boolean;
+  let hasDecisive: boolean;
+  if (ballotOptions) {
+    counts = {};
+    for (const opt of ballotOptions) counts[opt.id] = tally?.counts?.[opt.id] ?? 0;
+    for (const opt of ballotOptions) {
+      if (winner === null || (counts[opt.id] ?? 0) > (counts[winner] ?? 0)) winner = opt.id;
+    }
+    hasDecisive = total > 0;
+    // "Passes" = a change wins: any option other than the status quo.
+    passes = !!tally && meetsQuorum && hasDecisive && winner !== 'status_quo';
+  } else {
+    const yesRatio = yes + no > 0 ? yes / (yes + no) : 0;
+    hasDecisive = yes + no > 0;
+    passes = !!tally && meetsQuorum && hasDecisive && yesRatio > votePassThreshold;
+    winner = passes ? 'yes' : null;
+  }
 
   return {
     yes, no, abstain, total,
+    ballotOptions, counts, winner, hasDecisive,
     sealed: view.tallySealed || !tally,
     hasVoted: view.hasVoted,
     ballotCount: view.ballotCount,
@@ -119,9 +144,19 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member to submit proposals" });
       }
-      const { question, solution, category } = req.body;
+      const { question, solution, category, track, votingDurationHours } = req.body;
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
+      }
+      if (track !== undefined && !PROPOSAL_TRACKS.includes(track)) {
+        return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
+      }
+      let durationHours: number | null = null;
+      if (track === 'vote') {
+        durationHours = Number(votingDurationHours);
+        if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 8760) {
+          return res.status(400).json({ message: "votingDurationHours must be 1–8760 for direct-vote proposals" });
+        }
       }
       if (typeof question !== "string" || typeof solution !== "string") {
         return res.status(400).json({ message: "Question and solution must be strings" });
@@ -138,6 +173,8 @@ export function registerProposalsRoutes(app: Express): void {
         solution,
         category,
         status: INITIAL_PROPOSAL_STATE,
+        track: track ?? 'deliberation',
+        votingDurationHours: durationHours,
       });
       // Members are notified on submit (draft → deliberation), not here —
       // a draft is private to its author and shouldn't be announced.
@@ -231,13 +268,37 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.status !== 'draft') return res.status(409).json({ message: "Already submitted" });
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
       const { storage: storageInstance } = await import('../storage');
+
+      // Direct-vote track: no deliberation — straight to the ballot with the
+      // author's chosen duration. Mirrors /transition's concurrent-votes cap.
+      if ((proposal as any).track === 'vote') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        const cap = community?.maxConcurrentVotes ?? -1;
+        if (cap > 0) {
+          const active = await proposalRepo.getProposals(proposal.communityId, { status: 'voting' });
+          if (active.length >= cap) {
+            return res.status(409).json({
+              message: `Community has reached its concurrent-votes cap (${cap}). Wait for an existing vote to finalize.`,
+            });
+          }
+        }
+        const live = await transitionProposal(proposal, 'voting', storage);
+        await triggerSideEffects('draft', 'voting', live);
+        try {
+          const { notifyNewProposal } = await import('../utils/notifications');
+          await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId);
+        } catch (notifyErr) {
+          console.error('notifyNewProposal failed:', notifyErr);
+        }
+        return res.json({ ...live, validation: null });
+      }
       // draft → review (validated by the state machine; archived states blocked).
       const inReview = await transitionProposal(proposal, 'review', storage);      await triggerSideEffects(proposal.status, 'review', inReview);
       // ─── LLM Validation while the proposal sits in `review` ───────────────
       let llmScore: string | undefined;
       let llmFeedback: string | undefined;
       let llmValidatedAt: Date | undefined;
-      let nextStatus: 'author_review' | 'draft' | 'review' = 'review';
+      let nextStatus: 'community_signal' | 'draft' | 'review' = 'review';
       let category: 'return' | 'sortition' | 'auto_approve' | null = null;
       try {
         const { validateProposal } = await import('../utils/llm-validation');
@@ -246,10 +307,11 @@ export function registerProposalsRoutes(app: Express): void {
         llmFeedback = result.feedback;
         llmValidatedAt = new Date();
         category = result.category;
-        // Canonical lifecycle mapping from review:
-        // - return:   review → draft   (author revises)
-        // - sortition / auto_approve: review → author_review (amendments open)
-        nextStatus = result.category === 'return' ? 'draft' : 'author_review';
+        // Short deliberation flow mapping from review:
+        // - return: review → draft (author revises)
+        // - sortition / auto_approve: review → community_signal (the single
+        //   amendments phase: members amend + vote, author accepts/rejects)
+        nextStatus = result.category === 'return' ? 'draft' : 'community_signal';
       } catch (llmError) {
         // Persist the failure on the row but leave it in `review` for manual handling.
         llmFeedback = 'Το σύστημα αξιολόγησης δεν ήταν διαθέσιμο. Η πρόταση θα εξεταστεί χειροκίνητα.';
@@ -269,7 +331,7 @@ export function registerProposalsRoutes(app: Express): void {
       }
       // The proposal became visible to the community just now (not at draft
       // creation) — announce it once it actually enters deliberation.
-      if (nextStatus === 'author_review') {
+      if (nextStatus === 'community_signal') {
         try {
           const { notifyNewProposal } = await import('../utils/notifications');
           await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId);
@@ -289,6 +351,93 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to submit proposal" });
     }
   });
+  // ─── Final review (short deliberation track) ─────────────────────────
+  // The author accepts the AI-merged text (→ voting), or refines it through
+  // a constrained AI edit that cannot dilute the incorporated amendments.
+
+  app.post("/api/proposals/:id/final-review/accept", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Only the author can accept the final text" });
+      }
+      if (proposal.status !== 'final_review') {
+        return res.status(409).json({ message: "Proposal is not in final review" });
+      }
+      // Self-heal: if the merge crashed on phase entry, run it now so the
+      // vote never opens on a null final text.
+      if (!proposal.finalText) {
+        try {
+          const { prepareFinalReview } = await import('../utils/ai-merger');
+          await prepareFinalReview(proposal.id);
+        } catch (mergeErr: any) {
+          console.warn(`[final-review] self-heal merge failed for ${proposal.id}: ${mergeErr?.message}`);
+        }
+      }
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      const updated = await transitionProposal(proposal, 'voting', storage);
+      await triggerSideEffects('final_review', 'voting', updated);
+      res.json(updated);
+    } catch (error) {
+      console.error('final-review accept failed:', error);
+      res.status(500).json({ message: "Failed to accept final text" });
+    }
+  });
+
+  app.post("/api/proposals/:id/final-review/refine", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        return res.status(403).json({ message: "Only the author can refine the final text" });
+      }
+      if (proposal.status !== 'final_review') {
+        return res.status(409).json({ message: "Proposal is not in final review" });
+      }
+      const instruction = typeof req.body?.instruction === 'string' ? req.body.instruction.trim() : '';
+      if (instruction.length < 3 || instruction.length > 500) {
+        return res.status(400).json({ message: "instruction must be 3–500 characters" });
+      }
+      const { refineFinalText } = await import('../utils/ai-merger');
+      const { isLlmConfigured: llmUp } = await import('../utils/llm-client');
+      if (!llmUp()) {
+        return res.status(503).json({ message: "Η βελτίωση μέσω AI δεν είναι διαθέσιμη αυτή τη στιγμή." });
+      }
+      const finalText = await refineFinalText(proposalId, instruction);
+      res.json({ finalText });
+    } catch (error: any) {
+      console.error('final-review refine failed:', error);
+      res.status(500).json({ message: "Failed to refine final text" });
+    }
+  });
+
+  // Read model for the final-review screen: merged text, what was
+  // incorporated, and the alternatives that will stand on the ballot.
+  app.get("/api/proposals/:id/final-review", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { proposalAmendments: pa } = await import('@shared/schema');
+      const rows = await db.select().from(pa).where(eq(pa.proposalId, proposalId));
+      const alternatives = rows
+        .filter(a => a.type === 'counter_proposal' && a.restyledText)
+        .map(a => ({ id: a.id, optionId: `counter_${a.id}`, text: a.restyledText }));
+      res.json({
+        proposalId,
+        status: proposal.status,
+        finalText: proposal.finalText,
+        ballotOptions: proposal.ballotOptions ?? null,
+        alternatives,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load final review" });
+    }
+  });
+
   // ─── Amendment Routes ───────────────────────────────────────────
   app.post("/api/proposals/:id/support", requireAuth, requireConsent, requireProposalContentAccess(), async (req: any, res) => {
     try {
@@ -327,12 +476,16 @@ export function registerProposalsRoutes(app: Express): void {
       const parsed = castProposalVoteSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({
-          message: "Choice must be one of 'yes', 'no', 'abstain'",
+          message: "Invalid ballot choice",
           errors: parsed.error.flatten(),
         });
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const validChoices = validBallotChoices(proposal);
+      if (!validChoices.includes(parsed.data.choice)) {
+        return res.status(400).json({ message: `Choice must be one of: ${validChoices.join(', ')}` });
+      }
       if (proposal.status !== 'voting') {
         return res.status(409).json({
           message: "Proposal is not currently in the voting phase",
@@ -485,12 +638,16 @@ export function registerProposalsRoutes(app: Express): void {
       if (typeof token !== 'string' || typeof preparedMsg !== 'string' || typeof signature !== 'string') {
         return res.status(400).json({ message: "token + preparedMsg + signature (base64) required" });
       }
-      if (choice !== 'yes' && choice !== 'no' && choice !== 'abstain') {
-        return res.status(400).json({ message: "choice must be yes / no / abstain" });
+      if (typeof choice !== 'string' || !/^[a-z0-9_]{1,64}$/.test(choice)) {
+        return res.status(400).json({ message: "invalid ballot choice" });
       }
 
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const validAnonChoices = validBallotChoices(proposal);
+      if (!validAnonChoices.includes(choice)) {
+        return res.status(400).json({ message: `choice must be one of: ${validAnonChoices.join(', ')}` });
+      }
       if (proposal.status !== 'voting') {
         return res.status(409).json({ message: "Proposal is not in the voting phase" });
       }
@@ -664,10 +821,12 @@ export function registerProposalsRoutes(app: Express): void {
       // Use the community's minParticipationPct + decisive-vote check.
       // Archive if quorum was not met, or if there are zero yes/no votes
       // (only abstains can't decide a yes/no outcome).
-      const hasDecisive = (results.yes + results.no) > 0;
-      const nextState = results.meetsQuorum && hasDecisive ? 'decided' : 'archived';
+      const nextState = results.meetsQuorum && results.hasDecisive ? 'decided' : 'archived';
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
-      const updated = await transitionProposal(proposal, nextState, storage);
+      let updated = await transitionProposal(proposal, nextState, storage);
+      if (results.ballotOptions && nextState === 'decided' && results.winner) {
+        updated = await storage.updateProposal(proposalId, { winningOption: results.winner });
+      }
       await triggerSideEffects(proposal.status, nextState, updated);
       res.json({ proposal: updated, results });
     } catch (error) {
@@ -914,6 +1073,14 @@ export function registerProposalsRoutes(app: Express): void {
         if (role !== 'admin' && role !== 'founder') {
           return res.status(403).json({ message: "Only the author or an admin can recompute the merge" });
         }
+      }
+      // The merge is frozen once final_review begins: from there the text
+      // changes only via the constrained AI refine, and never mid-vote.
+      if (['final_review', 'voting', 'decided', 'archived'].includes(proposal.status)) {
+        return res.status(409).json({
+          message: "Η συγχώνευση έχει κλειδώσει για αυτή τη φάση.",
+          current_status: proposal.status,
+        });
       }
       const { saveAiMergedFinalText } = await import('../utils/ai-merger');
       const result = await saveAiMergedFinalText(proposalId);

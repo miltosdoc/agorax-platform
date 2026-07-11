@@ -72,14 +72,19 @@ export class HashChainBackend implements VotingBackend {
       ))
       .groupBy(proposalVotes.choice);
 
-    const tally: ElectionTally = { yes: 0, no: 0, abstain: 0, total: 0 };
+    const counts: Record<string, number> = {};
+    let total = 0;
     for (const r of rows) {
-      if (r.choice === 'yes') tally.yes = r.count;
-      else if (r.choice === 'no') tally.no = r.count;
-      else if (r.choice === 'abstain') tally.abstain = r.count;
+      counts[r.choice] = r.count;
+      total += r.count;
     }
-    tally.total = tally.yes + tally.no + tally.abstain;
-    return tally;
+    return {
+      yes: counts['yes'] ?? 0,
+      no: counts['no'] ?? 0,
+      abstain: counts['abstain'] ?? 0,
+      total,
+      counts,
+    };
   }
 
   async getProof(args: { proposalId: number }): Promise<ElectionProof> {

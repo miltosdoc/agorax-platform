@@ -24,7 +24,11 @@ import {
 } from '@shared/blind-sig';
 import { api } from './api';
 
-export type AnonymousChoice = 'yes' | 'no' | 'abstain';
+// Classic ballots use 'yes' | 'no' | 'abstain'; option ballots use ids like
+// 'final', 'counter_12', 'status_quo'. The blind-signature crypto is
+// choice-agnostic — the server validates the choice against the proposal's
+// actual option set when the ballot is cast.
+export type AnonymousChoice = string;
 
 export interface AnonymousReceipt {
   proposalId: number;

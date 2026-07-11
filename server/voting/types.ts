@@ -16,7 +16,16 @@
  * client can sign locally without changing the API surface when it lands.
  */
 
-export type VoteChoice = 'yes' | 'no' | 'abstain';
+/**
+ * A ballot choice. Classic ratification votes use 'yes' | 'no' | 'abstain';
+ * option-ballot proposals (deliberation track with counter-proposal
+ * alternatives) use option ids like 'final', 'counter_12', 'status_quo'.
+ * Validation against the proposal's actual option set happens at the route
+ * layer — the crypto substrate (blind sig, hash chain) is choice-agnostic.
+ */
+export type VoteChoice = string;
+export type ClassicVoteChoice = 'yes' | 'no' | 'abstain';
+export const CLASSIC_VOTE_CHOICES: readonly ClassicVoteChoice[] = ['yes', 'no', 'abstain'];
 
 /** Cryptographic signature produced by the voter's device. */
 export interface BallotSignature {
@@ -50,10 +59,15 @@ export interface BallotReceipt {
 }
 
 export interface ElectionTally {
+  /** Classic fields — 0 for choices outside yes/no/abstain. Kept so the
+   *  legacy yes/no result paths stay untouched. */
   yes: number;
   no: number;
   abstain: number;
   total: number;
+  /** Full per-choice counts, including option-ballot ids. Superset of the
+   *  classic fields. */
+  counts: Record<string, number>;
 }
 
 /** A backend-specific verifiable artifact an external observer can pin.
