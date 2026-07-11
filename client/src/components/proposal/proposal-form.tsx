@@ -138,6 +138,21 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
         solution: resp.data.solution,
         category: resp.data.category,
       });
+      // The AI also reads the intent for track/duration/options — apply them
+      // to the toggles (create mode only; the author can still change them).
+      if (!editProposalId) {
+        const d = resp.data as any;
+        if (d.track === 'vote' || d.track === 'deliberation') setTrack(d.track);
+        if (d.track === 'vote' && Number.isInteger(d.votingDurationHours) && d.votingDurationHours > 0) {
+          setVotingDurationHours(String(d.votingDurationHours));
+        }
+        if (Array.isArray(d.ballotOptions) && d.ballotOptions.length >= 2) {
+          setVoteOptions(d.ballotOptions.map((o: unknown) => String(o)));
+          setTrack('vote');
+        } else if (d.track !== 'vote') {
+          setVoteOptions([]);
+        }
+      }
     } catch (e) {
       setAiError(e instanceof ApiError ? e.message : (t('proposal.ai_failed') || 'AI drafting failed'));
     } finally {
