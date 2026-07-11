@@ -432,13 +432,20 @@ export async function handleSortitionCompletion(
     targetState = 'voting';
   }
   
-  // Transition the proposal
+  // Transition the proposal — but only when the lifecycle allows it. A jury
+  // finishing late (e.g. the proposal already moved on in the short flow)
+  // must not force-rewrite the status: the body still completes and the
+  // scores stay recorded, the state machine stays authoritative.
   const currentState = assertProposalState(proposal.status);
   if (!canTransitionProposal(currentState, targetState)) {
+    console.warn(
+      `[sortition] body ${bodyId} completed but ${currentState} → ${targetState} is not a legal transition — leaving proposal ${proposalId} untouched`,
+    );
+    return;
   }
-  
+
   await storage.updateProposal(proposalId, { status: targetState });
-  
+
   // Trigger side effects for the transition
   await triggerSideEffects(currentState, targetState, { ...proposal, status: targetState });
   
@@ -567,7 +574,11 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
       );
       break;
     case 'sortition':
-      await enqueueCreateSortition(proposal.communityId, 12, proposalId, 'scoring');
+      // Short flow: no automatic scoring jury — deliberation + the ballot
+      // (with «Καμία αλλαγή») are the quality gate. Sortition remains a
+      // deliberate, manually-invoked institution (dispute juries via the
+      // community_signal → sortition_synthesis transition), not a conveyor
+      // step that drafts 12 members for every mid-score proposal.
       await enqueueNotification(
         proposal.authorId,
         'proposal_validated',
