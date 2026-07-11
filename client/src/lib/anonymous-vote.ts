@@ -75,6 +75,19 @@ function saveReceipt(r: AnonymousReceipt): void {
 // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G2
 // Overridable for local testing via VITE_VOTE_DECOUPLE_MS.
 export const MIN_CAST_DELAY_MS = Number((import.meta as any).env?.VITE_VOTE_DECOUPLE_MS ?? 30 * 60 * 1000);
+// Random jitter ADDED to the minimum delay. A fixed delay defeats itself:
+// cast time would equal issuance + exactly 30:00, restoring the timing
+// correlation the delay exists to break. With uniform jitter the cast time
+// only reveals "issued somewhere in the last 30-60 minutes" — a window, not
+// a point. Drawn with crypto randomness; overridable via VITE_VOTE_JITTER_MS.
+export const CAST_JITTER_MS = Number((import.meta as any).env?.VITE_VOTE_JITTER_MS ?? MIN_CAST_DELAY_MS);
+
+function drawJitterMs(): number {
+  if (CAST_JITTER_MS <= 0) return 0;
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return Math.floor((buf[0] / 0x1_0000_0000) * CAST_JITTER_MS);
+}
 
 /**
  * A ballot that has been blind-signed but is not yet valid to cast (the
@@ -134,7 +147,7 @@ export async function requestAnonymousBallot(
   const publicKey = keyResp.data;
 
   // 2. Generate token + blinding factor + blinded value.
-  const minCastTime = Date.now() + MIN_CAST_DELAY_MS;
+  const minCastTime = Date.now() + MIN_CAST_DELAY_MS + drawJitterMs();
   const req = await blind(publicKey, minCastTime);
 
   // 3. Get the server's blind signature.
