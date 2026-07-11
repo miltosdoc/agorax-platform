@@ -15,7 +15,6 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic, LogOut } from 'lucide-react';
 import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
-import { ActiveCallBanner } from '@/components/livekit/ActiveCallBanner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
@@ -55,7 +54,7 @@ export default function CommunityDashboardPage() {
   // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return ['proposals', 'members', 'conferences', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
+    return ['proposals', 'members', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
   });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
@@ -318,15 +317,14 @@ export default function CommunityDashboardPage() {
         </CardContent>
       </Card>
 
-      <ActiveCallBanner communityId={community.id} />
+      <CommunityRoomsSection
+        communityId={community.id}
+        viewerIsAdmin={canManageSettings}
+      />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
           <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
-          <TabsTrigger value="conferences">
-            <Mic className="w-4 h-4 mr-1" />
-            {t('livekit.communitySectionTitle')}
-          </TabsTrigger>
           <TabsTrigger value="merge">{t('community.tab_merge')}</TabsTrigger>
         </TabsList>
         
@@ -513,13 +511,6 @@ export default function CommunityDashboardPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="conferences">
-          <CommunityRoomsSection
-            communityId={community.id}
-            viewerIsAdmin={canManageSettings}
-          />
         </TabsContent>
 
         <TabsContent value="merge">

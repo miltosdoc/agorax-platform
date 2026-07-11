@@ -96,7 +96,7 @@ export default function ConferenceRoomPage() {
   const backUrl = room
     ? (room.kind === 'sortition' && room.sortitionBodyId
         ? `/sortition/body/${room.sortitionBodyId}`
-        : `/communities/${room.communityId}?tab=conferences`)
+        : `/communities/${room.communityId}`)
     : '/communities';
 
   const loadRoom = useCallback(async () => {

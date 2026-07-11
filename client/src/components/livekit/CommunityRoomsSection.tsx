@@ -1,19 +1,24 @@
 /**
- * "Συναντήσεις / Conferences" section embedded in the community
- * dashboard. Lists open community rooms; if the viewer is an admin
- * they get a "New conference" form that scheduled-or-creates a room.
+ * «Συνδιασκέψεις» — the community's conference strip.
+ *
+ * Always visible directly under the community header (no longer buried in a
+ * tab): live rooms pulse with a join button, scheduled rooms show with their
+ * calendar link, admins create inline, and past calls collapse underneath.
+ * The actual call experience lives on /conference/:roomId.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLocation } from 'wouter';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mic, Plus, Clock, Users as UsersIcon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { Mic, Plus, Clock, Users as UsersIcon, Video, CalendarPlus, ChevronDown, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
-import { ConferenceRoomCard } from './ConferenceRoomCard';
 
 interface LivekitRoom {
   id: number;
@@ -51,12 +56,15 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
+  const [, navigate] = useLocation();
   const [rooms, setRooms] = useState<LivekitRoom[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
   const [creating, setCreating] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [ending, setEnding] = useState<Record<number, boolean>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -78,6 +86,9 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
     api.get<{ available: boolean }>('/api/livekit/config')
       .then(r => setAvailable(r.data.available))
       .catch(() => setAvailable(false));
+    // Soft-poll so a call started elsewhere appears within a minute.
+    const interval = setInterval(refresh, 60_000);
+    return () => clearInterval(interval);
   }, [refresh]);
 
   const handleCreate = async () => {
@@ -87,6 +98,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
       await api.post<LivekitRoom>(`/api/communities/${communityId}/rooms`, { title: newTitle.trim() });
       toast({ title: t('livekit.created') });
       setNewTitle('');
+      setShowCreate(false);
       await refresh();
     } catch (err: any) {
       errorToast(t('livekit.createFailed'), err?.message);
@@ -95,110 +107,163 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
     }
   };
 
+  const handleEnd = async (roomId: number) => {
+    if (!window.confirm(t('livekit.endConfirm') || 'Τερματισμός της κλήσης για όλους;')) return;
+    setEnding(s => ({ ...s, [roomId]: true }));
+    try {
+      await api.patch(`/api/livekit/rooms/${roomId}`, { status: 'closed' });
+      await refresh();
+    } catch (err: any) {
+      errorToast(t('livekit.endFailed') || 'Ο τερματισμός απέτυχε', err?.message);
+    } finally {
+      setEnding(s => ({ ...s, [roomId]: false }));
+    }
+  };
+
   if (!loaded) return null;
-  // Hide the entire section when no rooms exist AND the viewer can't create one
-  // AND LiveKit isn't even configured — keeps the dashboard clean.
-  if (rooms.length === 0 && !viewerIsAdmin && available !== true) return null;
+  // Members with nothing live and no way to create see nothing at all when
+  // LiveKit isn't even configured.
+  if (rooms.length === 0 && history.length === 0 && !viewerIsAdmin && available !== true) return null;
+
+  const live = rooms.filter(r => r.status === 'active');
+  const scheduled = rooms.filter(r => r.status === 'scheduled');
 
   return (
-    <section data-testid="community-rooms-section">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Mic className="w-5 h-5" />
-          {t('livekit.communitySectionTitle')}
-        </h2>
-      </div>
+    <Card className="mb-6" data-testid="community-rooms-section">
+      <CardContent className="p-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Mic className="w-4 h-4" />
+            {t('livekit.communitySectionTitle')}
+          </h2>
+          {viewerIsAdmin && available !== false && (
+            <Button size="sm" variant={showCreate ? 'secondary' : 'outline'} onClick={() => setShowCreate(v => !v)} data-testid="livekit-toggle-create">
+              <Plus className="w-4 h-4 mr-1" />
+              {t('livekit.newRoom')}
+            </Button>
+          )}
+        </div>
 
-      {available === false && (
-        <Card className="mb-3">
-          <CardContent className="p-4 text-sm text-muted-foreground">
-            {t('livekit.unavailableBody')}
-          </CardContent>
-        </Card>
-      )}
+        {available === false && (
+          <p className="text-sm text-muted-foreground">{t('livekit.unavailableBody')}</p>
+        )}
 
-      {viewerIsAdmin && available !== false && (
-        <Card className="mb-3">
-          <CardHeader>
-            <CardTitle className="text-base">{t('livekit.newRoom')}</CardTitle>
-            <CardDescription>{t('livekit.newRoomDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder={t('livekit.titlePlaceholder')}
-                className="flex-1 min-w-[200px]"
-                data-testid="livekit-new-title"
-              />
-              <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
-                <Plus className="w-4 h-4 mr-1" />
-                {t('livekit.createButton')}
+        {/* Inline create */}
+        {showCreate && (
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder={t('livekit.titlePlaceholder')}
+              className="flex-1 min-w-[200px]"
+              data-testid="livekit-new-title"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+            />
+            <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
+              {t('livekit.createButton')}
+            </Button>
+          </div>
+        )}
+
+        {/* Live rooms — the loudest thing in the strip */}
+        {live.map(room => (
+          <div
+            key={room.id}
+            className="flex items-center justify-between gap-3 rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
+            data-testid={`live-room-${room.id}`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-teal-500/20 text-teal-700 shrink-0">
+                <Video className="w-4 h-4" />
+                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{room.title}</div>
+                <div className="text-xs text-teal-700">{t('livekit.liveNow')}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {viewerIsAdmin && (
+                <Button size="sm" variant="ghost" className="text-red-600" disabled={!!ending[room.id]} onClick={() => handleEnd(room.id)} data-testid={`livekit-end-${room.id}`}>
+                  <XCircle className="w-4 h-4" />
+                </Button>
+              )}
+              <Button size="sm" onClick={() => navigate(`/conference/${room.id}`)} data-testid={`live-room-join-${room.id}`}>
+                {t('livekit.join')}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        ))}
 
-      {rooms.length === 0 ? (
-        available !== false && (
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-muted-foreground">
-              {t('livekit.noRooms')}
-            </CardContent>
-          </Card>
-        )
-      ) : (
-        <div className="space-y-3">
-          {rooms.map(room => (
-            <ConferenceRoomCard
-              key={room.id}
-              roomId={room.id}
-              title={room.title}
-              badge={room.status === 'active' ? t('livekit.live') : t('livekit.scheduled')}
-              viewerIsAdmin={viewerIsAdmin}
-              onEnded={refresh}
-              shareUrl={`/communities/${communityId}?tab=conferences`}
-            />
-          ))}
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="mt-6" data-testid="livekit-history">
-          <h3 className="text-base font-semibold mb-2 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            {t('livekit.historyTitle')}
-          </h3>
-          <Card>
-            <CardContent className="p-0 divide-y">
-              {history.map(h => (
-                <div key={h.id} className="p-3 flex items-start justify-between gap-3 flex-wrap" data-testid={`livekit-history-${h.id}`}>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm truncate">{h.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2">
-                      <span>{h.closedAt ? new Date(h.closedAt).toLocaleString() : new Date(h.createdAt).toLocaleString()}</span>
-                      <span>·</span>
-                      <span>{formatDuration(h.durationSeconds)}</span>
-                      <span>·</span>
-                      <span className="inline-flex items-center gap-1">
-                        <UsersIcon className="w-3 h-3" />
-                        {h.participants.length}
-                      </span>
-                    </div>
-                    {h.participants.length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {h.participants.map(p => p.name).join(', ')}
-                      </div>
-                    )}
-                  </div>
+        {/* Scheduled rooms — quiet rows */}
+        {scheduled.map(room => (
+          <div key={room.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
+            <div className="min-w-0 flex items-center gap-3">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{room.title}</div>
+                <div className="text-xs text-muted-foreground">
+                  {room.scheduledAt ? new Date(room.scheduledAt).toLocaleString() : t('livekit.scheduled')}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </section>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <a
+                href={`/api/livekit/rooms/${room.id}/ics`}
+                download={`agorax-room-${room.id}.ics`}
+                className="inline-flex items-center p-2 rounded-md hover:bg-muted"
+                title={t('livekit.addToCalendar')}
+              >
+                <CalendarPlus className="w-4 h-4 text-muted-foreground" />
+              </a>
+              <Button size="sm" variant="outline" onClick={() => navigate(`/conference/${room.id}`)}>
+                {t('conference.open_room') || 'Είσοδος'}
+              </Button>
+            </div>
+          </div>
+        ))}
+
+        {live.length === 0 && scheduled.length === 0 && available !== false && (
+          <p className="text-sm text-muted-foreground">{t('livekit.noRooms')}</p>
+        )}
+
+        {/* Past calls — collapsed */}
+        {history.length > 0 && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" data-testid="livekit-history-toggle">
+              <ChevronDown className="w-3.5 h-3.5" />
+              {t('livekit.historyTitle')} ({history.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 divide-y border rounded-md" data-testid="livekit-history">
+                {history.map(h => (
+                  <div key={h.id} className="p-2.5 flex items-start justify-between gap-3 flex-wrap" data-testid={`livekit-history-${h.id}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-sm truncate">{h.title}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2">
+                        <span>{h.closedAt ? new Date(h.closedAt).toLocaleString() : new Date(h.createdAt).toLocaleString()}</span>
+                        <span>·</span>
+                        <span>{formatDuration(h.durationSeconds)}</span>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1">
+                          <UsersIcon className="w-3 h-3" />
+                          {h.participants.length}
+                        </span>
+                      </div>
+                      {h.participants.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                          {h.participants.map(p => p.name).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </CardContent>
+    </Card>
   );
 }
