@@ -43,29 +43,21 @@ export default function HowItWorksPage() {
     {
       step: 3,
       icon: Edit3,
-      color: "indigo",
-      title: t('walkthrough.step3_name') || "Author",
-      description: t('walkthrough.step3_desc'),
-      features: [t('walkthrough.hiw_feature3_1'), t('walkthrough.hiw_feature3_2'), t('walkthrough.hiw_feature3_3')]
+      color: "amber",
+      title: t('walkthrough.stepDelib_name') || "Deliberation & Amendments",
+      description: t('walkthrough.stepDelib_desc'),
+      features: [t('walkthrough.hiw_featureD_1'), t('walkthrough.hiw_featureD_2'), t('walkthrough.hiw_featureD_3')]
     },
     {
       step: 4,
-      icon: TrendingUp,
-      color: "amber",
-      title: t('walkthrough.step4_name') || "Community",
-      description: t('walkthrough.step4_desc'),
-      features: [t('walkthrough.hiw_feature4_1'), t('walkthrough.hiw_feature4_2'), t('walkthrough.hiw_feature4_3')]
+      icon: Users,
+      color: "purple",
+      title: t('walkthrough.stepFinal_name') || "AI Final Text",
+      description: t('walkthrough.stepFinal_desc'),
+      features: [t('walkthrough.hiw_featureF_1'), t('walkthrough.hiw_featureF_2'), t('walkthrough.hiw_featureF_3')]
     },
     {
       step: 5,
-      icon: Users,
-      color: "purple",
-      title: t('walkthrough.step5_name') || "Sortition",
-      description: t('walkthrough.step5_desc'),
-      features: [t('walkthrough.hiw_feature5_1'), t('walkthrough.hiw_feature5_2'), t('walkthrough.hiw_feature5_3')]
-    },
-    {
-      step: 6,
       icon: Vote,
       color: "emerald",
       title: t('walkthrough.step6_name') || "Vote",
@@ -73,7 +65,7 @@ export default function HowItWorksPage() {
       features: [t('walkthrough.hiw_feature6_1'), t('walkthrough.hiw_feature6_2'), t('walkthrough.hiw_feature6_3')]
     },
     {
-      step: 7,
+      step: 6,
       icon: CheckCircle,
       color: "teal",
       title: t('walkthrough.step7_name') || "Decided",
@@ -113,6 +105,28 @@ export default function HowItWorksPage() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Two tracks */}
+          <div className="mb-16">
+            <h2 className="text-2xl font-bold text-center mb-2">{t('hiw.tracks_title') || 'Δύο διαδρομές'}</h2>
+            <p className="text-center text-muted-foreground mb-6 max-w-2xl mx-auto">{t('hiw.tracks_subtitle')}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <Card>
+                <CardContent className="p-6">
+                  <Users className="w-8 h-8 text-primary mb-3" />
+                  <h3 className="font-semibold text-lg mb-2">{t('proposal.track_deliberation')}</h3>
+                  <p className="text-sm text-muted-foreground">{t('proposal.track_deliberation_help')}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Zap className="w-8 h-8 text-amber-500 mb-3" />
+                  <h3 className="font-semibold text-lg mb-2">{t('proposal.track_vote')}</h3>
+                  <p className="text-sm text-muted-foreground">{t('proposal.track_vote_help')}</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
@@ -175,23 +189,24 @@ export default function HowItWorksPage() {
                         </div>
                       )}
 
+                      {phase.step === 4 && (
+                        <div className="mt-6 flex flex-wrap gap-3 items-center">
+                          <div className="px-3 py-2 rounded-lg border bg-purple-50 border-purple-200 text-sm font-medium text-purple-700">
+                            {t('proposal.final_review_title')}
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                          <div className="px-3 py-2 rounded-lg border bg-muted/30 text-sm">
+                            {t('proposal.final_review_alternatives_title')}
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                          <div className="px-3 py-2 rounded-lg border bg-muted/30 text-sm">
+                            {t('proposal.final_review_status_quo')}
+                          </div>
+                        </div>
+                      )}
                       {phase.step === 5 && (
-                        <div className="mt-6 flex gap-4">
-                          <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
-                            <Users className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-                            <div className="text-lg font-bold">12</div>
-                            <div className="text-xs text-muted-foreground">{t('walkthrough.hiw_step5_citizens')}</div>
-                          </div>
-                          <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
-                            <Globe className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-                            <div className="text-lg font-bold">72h</div>
-                            <div className="text-xs text-muted-foreground">{t('walkthrough.hiw_step5_deadline')}</div>
-                          </div>
-                          <div className="flex-1 p-4 bg-muted/30 rounded-lg border text-center">
-                            <Lock className="w-6 h-6 mx-auto mb-2 text-purple-600" />
-                            <div className="text-lg font-bold">{t('walkthrough.hiw_step5_anonymous')}</div>
-                            <div className="text-xs text-muted-foreground">{t('walkthrough.hiw_step5_no_identity')}</div>
-                          </div>
+                        <div className="mt-6 p-4 bg-muted/30 rounded-lg border text-sm text-muted-foreground">
+                          {t('hiw.tracks_ballot_note')}
                         </div>
                       )}
                     </div>

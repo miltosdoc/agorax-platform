@@ -40,11 +40,10 @@ function useStepData() {
   return [
     { id: 1, name: t('walkthrough.step1_name'), icon: FileText, color: 'blue', route: '/proposals/new' },
     { id: 2, name: t('walkthrough.step2_name'), icon: CheckCircle, color: 'green', route: null },
-    { id: 3, name: t('walkthrough.step3_name'), icon: Edit3, color: 'indigo', route: '/proposals/3/amendments/review' },
-    { id: 4, name: t('walkthrough.step4_name'), icon: TrendingUp, color: 'amber', route: '/proposals/5/amendments/signals' },
-    { id: 5, name: t('walkthrough.step5_name'), icon: Users, color: 'purple', route: '/proposals/1/sortition' },
-    { id: 6, name: t('walkthrough.step6_name'), icon: Vote, color: 'emerald', route: '/proposals/2' },
-    { id: 7, name: t('walkthrough.step7_name'), icon: Shield, color: 'red', route: null },
+    { id: 3, name: t('walkthrough.stepDelib_name'), icon: Edit3, color: 'amber', route: '/proposals/5/amendments/signals' },
+    { id: 4, name: t('walkthrough.stepFinal_name'), icon: Users, color: 'purple', route: null },
+    { id: 5, name: t('walkthrough.step6_name'), icon: Vote, color: 'emerald', route: '/proposals/2' },
+    { id: 6, name: t('walkthrough.step7_name'), icon: Shield, color: 'red', route: null },
   ];
 }
 
@@ -483,6 +482,58 @@ function StepSortitionSynthesis() {
 
 // ─── Step 6: Ratification Vote ──────────────────────────────────────────────
 
+function StepFinalText() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4">
+      <div className="p-4 border rounded-lg bg-purple-50 border-purple-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Users className="w-5 h-5 text-purple-600" />
+          <span className="font-semibold text-purple-700">{t('proposal.final_review_title')}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">{t('proposal.final_review_note')}</p>
+      </div>
+
+      <div className="p-4 border rounded-lg bg-muted/30">
+        <div className="text-sm font-medium mb-2">{t('proposal.final_review_title')}</div>
+        <div className="p-3 bg-background rounded border text-sm whitespace-pre-wrap">
+          {t('walkthrough.demo_final_merged')}
+        </div>
+      </div>
+
+      <div className="p-4 border rounded-lg bg-muted/30">
+        <div className="text-sm font-medium mb-2">{t('proposal.final_review_alternatives_title')}</div>
+        <div className="space-y-2">
+          <div className="p-3 bg-background rounded border text-sm">
+            <Badge variant="outline" className="mb-2">{t('proposal.final_review_alternative_label')} 1</Badge>
+            <p className="text-muted-foreground">{t('walkthrough.demo_final_alternative')}</p>
+          </div>
+          <div className="p-3 bg-background rounded border text-sm text-muted-foreground">
+            {t('proposal.final_review_status_quo')}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" disabled className="pointer-events-none">
+            {t('proposal.final_review_accept')}
+          </Button>
+          <div className="flex-1 min-w-[220px] flex gap-2">
+            <div className="flex-1 px-3 py-1.5 rounded border bg-background text-sm text-muted-foreground truncate">
+              {t('proposal.final_review_refine_placeholder')}
+            </div>
+            <Button size="sm" variant="outline" disabled className="pointer-events-none shrink-0">
+              {t('proposal.final_review_refine_button')}
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">{t('proposal.final_review_ai_only_caption')}</p>
+      </div>
+    </div>
+  );
+}
+
 function StepRatificationVote() {
   const { t } = useTranslation();
   return (
@@ -696,17 +747,16 @@ export default function DeliberationWalkthrough() {
               {currentStepData?.name}
             </CardTitle>
             <Badge className={colors.badge}>
-              {t('walkthrough.step')} {currentStep}/7
+              {t('walkthrough.step')} {currentStep}/{STEPS.length}
             </Badge>
           </div>
           <CardDescription>
             {currentStep === 1 && t('walkthrough.step1_desc')}
             {currentStep === 2 && t('walkthrough.step2_desc')}
-            {currentStep === 3 && t('walkthrough.step3_desc')}
-            {currentStep === 4 && t('walkthrough.step4_desc')}
-            {currentStep === 5 && t('walkthrough.step5_desc')}
-            {currentStep === 6 && t('walkthrough.step6_desc')}
-            {currentStep === 7 && t('walkthrough.step7_desc')}
+            {currentStep === 3 && t('walkthrough.stepDelib_desc')}
+            {currentStep === 4 && t('walkthrough.stepFinal_desc')}
+            {currentStep === 5 && t('walkthrough.step6_desc')}
+            {currentStep === 6 && t('walkthrough.step7_desc')}
           </CardDescription>
         </CardHeader>
 
@@ -738,11 +788,16 @@ export default function DeliberationWalkthrough() {
           {/* Step content */}
           {currentStep === 1 && <StepProposal />}
           {currentStep === 2 && <StepValidation />}
-          {currentStep === 3 && <StepAuthorReview />}
-          {currentStep === 4 && <StepCommunitySignal />}
-          {currentStep === 5 && <StepSortitionSynthesis />}
-          {currentStep === 6 && <StepRatificationVote />}
-          {currentStep === 7 && <StepVerifiedBallot />}
+          {currentStep === 3 && (
+            <div className="space-y-8">
+              <StepAuthorReview />
+              <Separator />
+              <StepCommunitySignal />
+            </div>
+          )}
+          {currentStep === 4 && <StepFinalText />}
+          {currentStep === 5 && <StepRatificationVote />}
+          {currentStep === 6 && <StepVerifiedBallot />}
         </CardContent>
 
         {/* Navigation */}
