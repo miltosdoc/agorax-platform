@@ -806,7 +806,7 @@ const en: TranslationDictionary = {
   'vote.quorumShort': 'Quorum',
   'vote.panelTitle': 'Final Ratification Vote',
   'vote.ballotPendingTitle': 'Your ballot is sealed — casting soon',
-  'vote.ballotPendingBody': 'For your vote to stay unlinkable to your identity, a privacy delay separates ballot issuance from casting. Your vote is cast automatically when the timer ends — you can keep this page open or come back later; the ballot is saved in this browser.',
+  'vote.ballotPendingBody': 'So your vote cannot be linked to your identity, a privacy delay separates ballot issuance from casting. The vote is cast automatically when the timer ends — you can even close the browser: the ballot stays saved on this device and will be cast as soon as you reopen AgoraX, as long as the vote is still open. Careful: clearing browser data or switching devices loses the ballot permanently.',
   'vote.ballotCasting': 'Casting your ballot…',
   'vote.castYourVote': 'Cast your vote on this proposal:',
   'vote.changeYourVote': 'Update your vote:',

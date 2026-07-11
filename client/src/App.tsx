@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Redirect, Router, useParams } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -93,9 +94,20 @@ function CommunityFormPage() {
   );
 }
 
+// Complete any anonymous ballots whose privacy delay elapsed while the app
+// was closed — opening AgoraX anywhere finishes the vote.
+function usePendingBallotSweep() {
+  useEffect(() => {
+    import('@/lib/anonymous-vote')
+      .then(m => m.castMaturedPendingBallots())
+      .catch(() => { /* best-effort */ });
+  }, []);
+}
+
 function AppRouter() {
   const { user } = useAuth();
   useMobileAuthDeepLink();
+  usePendingBallotSweep();
 
   return (
     <Router>

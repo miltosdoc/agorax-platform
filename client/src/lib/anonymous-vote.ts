@@ -231,6 +231,35 @@ export async function castPendingBallot(pending: PendingBallot): Promise<Anonymo
  * it carries. The deniable property: anyone holding the token can do this
  * lookup, so the result cannot be used to coerce the voter.
  */
+/**
+ * Cast every pending ballot whose privacy delay has elapsed — called once on
+ * app start so a voter who closed the browser mid-delay completes their vote
+ * by merely opening AgoraX again, on any page. Best-effort: failures stay
+ * pending and retry on the next app start or proposal-page visit.
+ */
+export async function castMaturedPendingBallots(): Promise<number> {
+  let cast = 0;
+  const raw = localStorage.getItem('agorax_pending_ballots_v1');
+  if (!raw) return 0;
+  let list: PendingBallot[] = [];
+  try { list = JSON.parse(raw); } catch { return 0; }
+  for (const pending of list) {
+    if (pending.minCastTime > Date.now()) continue;
+    try {
+      await castPendingBallot(pending);
+      cast++;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      // Counted elsewhere (double-spend) or the vote closed — drop it so it
+      // doesn't retry forever; anything else stays pending for retry.
+      if (/already|duplicate|closed|410/i.test(message)) {
+        clearPendingBallot(pending.proposalId);
+      }
+    }
+  }
+  return cast;
+}
+
 export async function verifyReceipt(
   proposalId: number,
   token: string,
