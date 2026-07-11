@@ -35,20 +35,39 @@ export function registerPlatformRoutes(app: Express): void {
   app.put("/api/platform-settings", requireAuth, updatePlatformSettingHandler);
   app.patch("/api/platform-settings", requireAuth, updatePlatformSettingHandler);
   // Search members and communities
-  app.get("/api/search", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/search", requireAuth, async (req: any, res: Response) => {
     try {
       const query = req.query.q as string;
       const limit = parseInt(req.query.limit as string) || 10;
       if (!query) {
-        return res.json({ members: [], communities: [] });
+        return res.json({ proposals: [], members: [], communities: [] });
       }
-      const [members, communities] = await Promise.all([
+      const { proposalRepo } = await import('../storage');
+      const { visibleCommunityIdSet } = await import('../utils/community-visibility');
+      const [members, communities, rawProposals] = await Promise.all([
         platformRepo.searchMembers(query, limit),
         platformRepo.searchCommunities(query, limit),
+        proposalRepo.searchProposals(query, limit * 2),
       ]);
+      // Proposals respect content visibility and draft/archived privacy —
+      // same rules as every other read surface.
+      const visible = await visibleCommunityIdSet(rawProposals.map((p: any) => p.communityId), req.user?.id);
+      const proposals = rawProposals
+        .filter((p: any) => visible.has(p.communityId))
+        .filter((p: any) => p.status !== 'draft' || p.authorId === req.user?.id)
+        .filter((p: any) => p.status !== 'archived')
+        .slice(0, limit);
       res.json({
+        proposals: proposals.map((p: any) => ({
+          id: p.id,
+          question: p.question,
+          status: p.status,
+          communityId: p.communityId,
+          category: p.category ?? null,
+        })),
         members: members.map(m => ({
           id: m.id,
+          name: m.name ?? m.username,
           username: m.username,
           profilePicture: m.profilePicture,
         })),
@@ -59,6 +78,7 @@ export function registerPlatformRoutes(app: Express): void {
         })),
       });
     } catch (error) {
+      console.error('search failed:', error);
       res.status(500).json({ message: "Search failed" });
     }
   });

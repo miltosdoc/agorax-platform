@@ -39,9 +39,9 @@ type Item =
 
 function flatten(results: SearchResults): Item[] {
   return [
-    ...results.communities.map((data) => ({ kind: 'community' as const, data })),
-    ...results.proposals.map((data) => ({ kind: 'proposal' as const, data })),
-    ...results.members.map((data) => ({ kind: 'member' as const, data })),
+    ...(results.communities ?? []).map((data) => ({ kind: 'community' as const, data })),
+    ...(results.proposals ?? []).map((data) => ({ kind: 'proposal' as const, data })),
+    ...(results.members ?? []).map((data) => ({ kind: 'member' as const, data })),
   ];
 }
 
@@ -175,7 +175,7 @@ export default function SearchBar() {
                     )}
                     {item.kind === 'member' && (
                       <>
-                        <div className="font-medium truncate">{item.data.name}</div>
+                        <div className="font-medium truncate">{item.data.name || item.data.username}</div>
                         <div className="text-xs text-muted-foreground">{t('search.kind.member')} · @{item.data.username}</div>
                       </>
                     )}
