@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
+import { GuideCard } from '@/components/GuideCard';
 import ShareButton from '@/components/ShareButton';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import TierBadge from '@/components/surveys/TierBadge';
@@ -337,6 +338,8 @@ export default function FeedPage() {
           <h1 className="text-4xl leading-[1.1] sm:text-5xl">{t('feed.title')}</h1>
           <p className="mb-0 mt-3 max-w-[60ch] text-base text-ink-soft">{t('feed.subtitle')}</p>
         </header>
+
+        <GuideCard />
 
         {/* ── Underline tab rail ── */}
         <div className="mt-8 border-b border-line sm:mt-10" data-testid="feed-filter">

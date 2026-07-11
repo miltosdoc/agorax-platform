@@ -31,6 +31,48 @@ const PHASE_ACCENT: Record<string, { ring: string; bg: string; border: string; t
 };
 const NEUTRAL_ACCENT = { ring: 'ring-primary/20', bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
 
+// One plain-language sentence per state: what is happening NOW and what
+// comes next. This is the mini-guidance layer — shown under the stepper so
+// nobody has to guess what the current phase means.
+const STATE_GUIDE: Record<string, { el: string; en: string }> = {
+  draft: {
+    el: 'Προσχέδιο — ορατό μόνο σε εσάς. Υποβάλετέ το για να ξεκινήσει η διαδικασία.',
+    en: 'Draft — visible only to you. Submit it to start the process.',
+  },
+  review: {
+    el: 'Το AI ελέγχει την πρόταση για πληρότητα — διαρκεί λίγα δευτερόλεπτα.',
+    en: 'The AI is checking the proposal for completeness — takes a few seconds.',
+  },
+  author_review: {
+    el: 'Ο συγγραφέας εξετάζει τις τροπολογίες που υποβλήθηκαν.',
+    en: 'The author is reviewing the submitted amendments.',
+  },
+  community_signal: {
+    el: 'Διαβούλευση σε εξέλιξη: τα μέλη προτείνουν τροπολογίες και αντιπροτάσεις, ο συγγραφέας αποφασίζει, και το τελικό κείμενο του AI ενημερώνεται ζωντανά. Στη λήξη ανοίγει αυτόματα η ψηφοφορία.',
+    en: 'Deliberation in progress: members propose amendments and counter-proposals, the author decides, and the AI final text updates live. Voting opens automatically at the deadline.',
+  },
+  sortition_synthesis: {
+    el: 'Κληρωτό σώμα πολιτών συνθέτει το τελικό κείμενο.',
+    en: 'A randomly selected citizen jury is composing the final text.',
+  },
+  final_review: {
+    el: 'Ο συγγραφέας εγκρίνει το τελικό κείμενο που συνέθεσε το AI — μετά ανοίγει η ψηφοφορία.',
+    en: 'The author is approving the AI-composed final text — then the vote opens.',
+  },
+  voting: {
+    el: 'Η κάλπη είναι ανοιχτή. Ψηφίστε στην ενότητα της ψηφοφορίας — το αποτέλεσμα οριστικοποιείται αυτόματα στη λήξη.',
+    en: 'The ballot box is open. Vote in the voting section — the result finalizes automatically at the deadline.',
+  },
+  decided: {
+    el: 'Η κοινότητα αποφάσισε — το αποτέλεσμα είναι οριστικό και επαληθεύσιμο.',
+    en: 'The community has decided — the result is final and verifiable.',
+  },
+  archived: {
+    el: 'Έκλεισε χωρίς απόφαση (απόσυρση, μη απαρτία ή επιστροφή).',
+    en: 'Closed without a decision (withdrawn, no quorum, or returned).',
+  },
+};
+
 export default function LifecycleStepper({ status, interactive = true }: LifecycleStepperProps) {
   const { locale } = useTranslation();
 
@@ -147,6 +189,12 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
           );
         })}
       </ol>
+
+      {STATE_GUIDE[status] && !isArchived && (
+        <p className="mt-3 text-xs text-muted-foreground text-center max-w-xl mx-auto" data-testid="stepper-guide">
+          {locale === 'el' ? STATE_GUIDE[status].el : STATE_GUIDE[status].en}
+        </p>
+      )}
 
       {isArchived && (
         <div className="mt-3 text-center text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
