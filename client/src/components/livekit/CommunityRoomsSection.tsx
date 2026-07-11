@@ -50,9 +50,12 @@ function formatDuration(seconds: number | null): string {
 interface Props {
   communityId: number;
   viewerIsAdmin: boolean;
+  /** Members can start conferences too — not an admin privilege. */
+  viewerIsMember?: boolean;
 }
 
-export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
+export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMember = false }: Props) {
+  const canCreate = viewerIsAdmin || viewerIsMember;
   const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
@@ -120,13 +123,13 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
     }
   };
 
-  if (!loaded) return null;
-  // Members with nothing live and no way to create see nothing at all when
-  // LiveKit isn't even configured.
-  if (rooms.length === 0 && history.length === 0 && !viewerIsAdmin && available !== true) return null;
-
   const live = rooms.filter(r => r.status === 'active');
   const scheduled = rooms.filter(r => r.status === 'scheduled');
+
+  if (!loaded) return null;
+  // Viewers with nothing live and no way to create see nothing at all when
+  // LiveKit isn't even configured.
+  if (rooms.length === 0 && history.length === 0 && !canCreate && available !== true) return null;
 
   return (
     <Card className="mb-6" data-testid="community-rooms-section">
@@ -137,7 +140,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
             <Mic className="w-4 h-4" />
             {t('livekit.communitySectionTitle')}
           </h2>
-          {viewerIsAdmin && available !== false && (
+          {canCreate && available !== false && (live.length > 0 || scheduled.length > 0 || showCreate) && (
             <Button size="sm" variant={showCreate ? 'secondary' : 'outline'} onClick={() => setShowCreate(v => !v)} data-testid="livekit-toggle-create">
               <Plus className="w-4 h-4 mr-1" />
               {t('livekit.newRoom')}
@@ -224,8 +227,27 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin }: Props) {
           </div>
         ))}
 
-        {live.length === 0 && scheduled.length === 0 && available !== false && (
-          <p className="text-sm text-muted-foreground">{t('livekit.noRooms')}</p>
+        {live.length === 0 && scheduled.length === 0 && available !== false && !showCreate && (
+          canCreate ? (
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="w-full rounded-md border-2 border-dashed border-teal-300/70 bg-teal-50/40 hover:bg-teal-50 px-4 py-5 flex flex-col items-center gap-1.5 transition-colors"
+              data-testid="livekit-start-cta"
+            >
+              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-teal-500/15 text-teal-700">
+                <Video className="w-5 h-5" />
+              </span>
+              <span className="text-sm font-medium text-teal-900">
+                {t('livekit.startCta') || 'Έναρξη συνδιάσκεψης'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {t('livekit.startCtaHint') || 'Βίντεο, συνομιλία και κοινή χρήση οθόνης — τα μέλη ειδοποιούνται αυτόματα.'}
+              </span>
+            </button>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('livekit.noRooms')}</p>
+          )
         )}
 
         {/* Past calls — collapsed */}

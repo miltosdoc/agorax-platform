@@ -320,6 +320,7 @@ export default function CommunityDashboardPage() {
       <CommunityRoomsSection
         communityId={community.id}
         viewerIsAdmin={canManageSettings}
+        viewerIsMember={isMember}
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

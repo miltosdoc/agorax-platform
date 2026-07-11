@@ -214,8 +214,12 @@ export function registerLivekitRoutes(app: Express): void {
       if (!Number.isFinite(communityId)) return res.status(400).json({ message: 'invalid community id' });
       const userId: number = req.user.id;
       const isAdmin = !!req.user.isAdmin;
-      if (!await isCommunityHost(communityId, userId, isAdmin)) {
-        return res.status(403).json({ message: 'only community admins can schedule conferences' });
+      // Any member can start a conference — calling a meeting is a normal
+      // act of community life, not an admin privilege. Admins retain the
+      // power to end any call; creators can end their own.
+      const isMember = await communityRepo.isCommunityMember(communityId, userId);
+      if (!isMember && !(await isCommunityHost(communityId, userId, isAdmin))) {
+        return res.status(403).json({ message: 'only community members can start conferences' });
       }
       const title = typeof req.body?.title === 'string' && req.body.title.trim() ? req.body.title.trim() : null;
       if (!title) return res.status(400).json({ message: 'title is required' });
@@ -444,7 +448,7 @@ export function registerLivekitRoutes(app: Express): void {
 
       const userId: number = req.user.id;
       const isAdmin = !!req.user.isAdmin;
-      let isHost = isAdmin;
+      let isHost = isAdmin || room.createdById === userId;
       if (!isHost) {
         if (room.kind === 'community') {
           isHost = await isCommunityHost(room.communityId, userId, isAdmin);

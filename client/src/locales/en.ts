@@ -1485,6 +1485,8 @@ const en: TranslationDictionary = {
   'proposal.deleteOrWithdraw': 'Delete / Withdraw',
   'community.show_archived': 'Show archived',
   'receipt.download': 'Download inclusion certificate (your choice is omitted)',
+  'livekit.startCta': 'Start a conference',
+  'livekit.startCtaHint': 'Video, chat and screen sharing — members are notified automatically.',
   'conference.connect_failed': 'Could not connect to the video server.',
   'conference.device_error': 'Camera/microphone problem',
 

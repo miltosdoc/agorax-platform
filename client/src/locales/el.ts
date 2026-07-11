@@ -1485,6 +1485,8 @@ const el: TranslationDictionary = {
   'proposal.deleteOrWithdraw': 'Διαγραφή / Απόσυρση',
   'community.show_archived': 'Εμφάνιση αρχειοθετημένων',
   'receipt.download': 'Λήψη πιστοποιητικού καταχώρησης (χωρίς την επιλογή σας)',
+  'livekit.startCta': 'Έναρξη συνδιάσκεψης',
+  'livekit.startCtaHint': 'Βίντεο, συνομιλία και κοινή χρήση οθόνης — τα μέλη ειδοποιούνται αυτόματα.',
   'conference.connect_failed': 'Η σύνδεση με τον διακομιστή βίντεο απέτυχε.',
   'conference.device_error': 'Πρόβλημα με κάμερα/μικρόφωνο',
 
