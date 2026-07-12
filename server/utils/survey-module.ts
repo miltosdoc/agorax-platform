@@ -67,7 +67,13 @@ export async function assignModuleSubset(
       eq(moduleAssignments.poolVersion, poolVersion),
     ))
     .limit(1);
-  if (existing) return existing.itemIds as number[];
+  // An empty stored assignment means the panelist was first touched while
+  // the pool was empty (bank not yet seeded). Recompute instead of
+  // returning it — the hash ranking is deterministic, so healing yields
+  // exactly the subset they would have been assigned originally.
+  if (existing && (existing.itemIds as number[]).length > 0) {
+    return existing.itemIds as number[];
+  }
 
   const pool = await loadPool(poolVersion);
   const subset = pool
@@ -76,12 +82,22 @@ export async function assignModuleSubset(
     .slice(0, MODULE_ITEMS_PER_RESPONDENT)
     .sort((a, b) => a.position - b.position) // restore fixed module order
     .map((x) => x.id);
+  if (subset.length === 0) return subset; // pool still empty — persist nothing
 
-  await voteDb.insert(moduleAssignments).values({
-    panelistId,
-    poolVersion,
-    itemIds: subset,
-  }).onConflictDoNothing();
+  if (existing) {
+    await voteDb.update(moduleAssignments)
+      .set({ itemIds: subset })
+      .where(and(
+        eq(moduleAssignments.panelistId, panelistId),
+        eq(moduleAssignments.poolVersion, poolVersion),
+      ));
+  } else {
+    await voteDb.insert(moduleAssignments).values({
+      panelistId,
+      poolVersion,
+      itemIds: subset,
+    }).onConflictDoNothing();
+  }
   return subset;
 }
 
