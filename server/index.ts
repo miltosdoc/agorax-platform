@@ -5,7 +5,7 @@ import { logger } from './utils/logger';
 import { csrfBootstrap, csrfMiddleware } from './utils/csrf';
 import { initSentry } from './utils/sentry';
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic, log } from "./static";
 import { validateRuntimeConfig } from "./config";
 import { startJobQueue } from "./utils/job-handlers";
 
@@ -124,8 +124,12 @@ app.get('/health', (_req, res) => {
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  // doesn't interfere with the other routes.
+  // The literal NODE_ENV check lets esbuild (--define) eliminate the
+  // dynamic import in the production bundle — vite is a devDependency
+  // and must never be required at runtime in production.
+  if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("./vite");
     await setupVite(app, server);
   } else {
     serveStatic(app);
