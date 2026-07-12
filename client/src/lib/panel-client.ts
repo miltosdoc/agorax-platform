@@ -36,9 +36,20 @@ export function clearPanelToken(): void {
  * Import a panel identity from another device. The token is the bearer
  * credential — we validate it against /api/panel/me before storing, so a
  * typo can't silently brick the panel UI.
+ *
+ * Also accepts a full transfer code (Profile → Export): users routinely
+ * paste that here instead of the raw identity code, and the two are
+ * indistinguishable to them. If the pasted value decodes to a v1 bundle,
+ * the panel identity inside it is imported.
  */
 export async function importPanelToken(token: string): Promise<boolean> {
-  const trimmed = token.trim();
+  let trimmed = token.trim();
+  if (!trimmed) return false;
+  try {
+    const bytes = Uint8Array.from(atob(trimmed), (c) => c.charCodeAt(0));
+    const bundle = JSON.parse(new TextDecoder().decode(bytes));
+    if (bundle?.v === 1 && typeof bundle.panel === 'string') trimmed = bundle.panel;
+  } catch { /* not a transfer bundle — treat as a raw identity code */ }
   if (!trimmed || trimmed.length > 200) return false;
   const res = await fetch('/api/panel/me', {
     credentials: 'omit',

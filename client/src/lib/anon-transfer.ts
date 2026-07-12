@@ -11,6 +11,8 @@
  * merges it on the other device.
  */
 
+import { importPanelToken } from './panel-client';
+
 const PANEL_KEY = 'agorax_panel_token_v1';
 const RECEIPTS_KEY = 'agorax_anon_receipts_v1';
 const PENDING_KEY = 'agorax_pending_ballots_v1';
@@ -90,6 +92,11 @@ export async function importAnonData(code: string): Promise<ImportResult> {
     const bytes = Uint8Array.from(atob(code.trim()), (c) => c.charCodeAt(0));
     bundle = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
+    // Not a transfer bundle — maybe the user pasted the raw panel identity
+    // code (panel page → "Show identity code"). The two codes are
+    // indistinguishable to users; accept either in either field.
+    const panelOk = await importPanelToken(code).catch(() => false);
+    if (panelOk) return { ok: true, panelImported: true, receiptsAdded: 0, pendingAdded: 0 };
     return fail('invalid_code');
   }
   if (!bundle || bundle.v !== 1) return fail('invalid_code');
