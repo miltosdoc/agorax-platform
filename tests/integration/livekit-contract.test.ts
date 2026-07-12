@@ -52,8 +52,8 @@ describe('LiveKit server SDK wrapper', () => {
     expect(client).toMatch(/LIVEKIT_API_SECRET/);
   });
 
-  it('issues AccessToken with explicit grants (not blanket roomAdmin for everyone)', () => {
-    expect(client).toMatch(/new AccessToken/);
+  it('issues join tokens with explicit grants (not blanket roomAdmin for everyone)', () => {
+    expect(client).toMatch(/issueJoinToken/);
     expect(client).toMatch(/roomAdmin:\s*!!opts\.isAdmin/);
   });
 
@@ -96,9 +96,11 @@ describe('LiveKit router — route surface', () => {
     expect(router).toMatch(/res\.status\(503\)/);
   });
 
-  it('gates community room creation behind admin/founder', () => {
+  it('gates community room creation behind membership (any member may start a conference)', () => {
+    expect(router).toMatch(/isCommunityMember\(/);
+    expect(router).toMatch(/only community members can start conferences/);
+    // Ending a call stays privileged: creator or community host/admin.
     expect(router).toMatch(/isCommunityHost\(/);
-    expect(router).toMatch(/only community admins can schedule conferences/);
   });
 
   it('gates sortition room access by sortition_members membership', () => {

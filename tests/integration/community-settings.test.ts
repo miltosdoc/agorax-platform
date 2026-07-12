@@ -53,6 +53,11 @@ describe('community settings contract', () => {
       maxAmendmentsPerProposal: 8,
       requireGovgrVerification: true,
       joinPolicy: 'open',
+      memberListVisibility: 'public',
+      contentVisibility: 'public',
+      authorReviewHours: 72,
+      communitySignalHours: 48,
+      votingHours: 168,
     });
   });
 
@@ -71,6 +76,11 @@ describe('community settings contract', () => {
       maxAmendmentsPerProposal: -1,
       requireGovgrVerification: false,
       joinPolicy: 'open',
+      memberListVisibility: 'public',
+      contentVisibility: 'public',
+      authorReviewHours: 72,
+      communitySignalHours: 48,
+      votingHours: 168,
     });
   });
 

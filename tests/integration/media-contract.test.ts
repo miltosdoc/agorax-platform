@@ -60,8 +60,8 @@ describe('media router — route shape', () => {
     expect(router).toMatch(/\/api\/proposals\/:id\/scripts\/:kind/);
   });
 
-  it('registers the upload endpoint with multer', () => {
-    expect(router).toMatch(/upload\.single\('file'\)/);
+  it('registers the upload endpoint with a raw-body parser', () => {
+    expect(router).toMatch(/express\.raw\(/);
     expect(router).toMatch(/\/api\/proposals\/:id\/media/);
   });
 

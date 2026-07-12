@@ -21,7 +21,6 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import multer from 'multer';
 import { randomBytes, createHash } from 'crypto';
 import { mkdir, rename, unlink, writeFile, stat } from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
@@ -112,12 +111,6 @@ async function ensureProposalDir(proposalId: number): Promise<string> {
 function hashId(buf: Buffer): string {
   return createHash('sha256').update(buf).digest('hex').slice(0, 16);
 }
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  // The largest of any limit — actual per-kind enforcement happens below.
-  limits: { fileSize: LIMITS.video.maxBytes },
-});
 
 /** Resolve a media row and its on-disk file, or 404. */
 async function loadMediaOr404(req: Request, res: Response) {
