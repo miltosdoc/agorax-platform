@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
-      - run: npx eslint server/ client/src/ shared/
+      - run: npm run check:i18n
 
   test:
     name: Test Suite
@@ -50,7 +50,7 @@ jobs:
       - run: npx drizzle-kit push
         env:
           DATABASE_URL: postgresql://agorax:agorax_test@localhost:5432/agorax_test
-      - run: npx vitest run
+      - run: npm test
         env:
           DATABASE_URL: postgresql://agorax:agorax_test@localhost:5432/agorax_test
           NODE_ENV: test
@@ -93,6 +93,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
-          path: |
-            build/
-            client/build/
+          path: dist/
