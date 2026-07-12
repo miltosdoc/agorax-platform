@@ -17,7 +17,6 @@ import type {
   PollQuestion, PollAnswer, PollUserResponse, InsertPollUserResponse,
   PollNotification,
   PlatformSetting,
-  Comment, InsertComment
 } from '../../shared/schema';
 
 /**
@@ -127,9 +126,5 @@ export interface IStorage {
   updatePlatformSetting(key: string, value: string, userId: number): Promise<PlatformSetting>;
   searchMembers(query: string, limit?: number): Promise<User[]>;
   searchCommunities(query: string, limit?: number): Promise<Community[]>;
-
-  // Comment methods (temporary)
-  createComment(comment: InsertComment): Promise<Comment>;
-  getPollComments(pollId: number): Promise<Comment[]>;
 }
 
