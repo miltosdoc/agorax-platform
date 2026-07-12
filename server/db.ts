@@ -1,4 +1,5 @@
 import pg from 'pg';
+import type { Pool as PgPool } from 'pg';
 const { Pool } = pg;
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from "@shared/schema";
@@ -33,7 +34,7 @@ export const db = drizzle(pool, { schema });
 // Falls back to the main pool if not configured (backward compat for
 // deployments that haven't applied the grants yet).
 
-let votePool: Pool | null = null;
+let votePool: PgPool | null = null;
 let configuredVoteDb: typeof db | null = null;
 
 if (process.env.VOTE_DATABASE_URL) {
