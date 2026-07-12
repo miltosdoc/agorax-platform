@@ -5,7 +5,7 @@
  * Import this module during server startup to wire up the job queue.
  */
 
-import { registerHandler, startWorker, enqueueJob, type JobPayload } from './job-queue';
+import { registerHandler, startWorker, enqueueJob, enqueueSortitionTimeout, type JobPayload } from './job-queue';
 import { handleSortitionCompletion, transitionToValidation } from './proposal-state-machine';
 import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembers } from './sortition-timeout';
 import { db } from '../db';
@@ -231,8 +231,18 @@ export function startJobQueue(): () => void {
     enqueueJob({ type: 'phase_auto_advance', data: {} }).catch(() => {});
   }, 60_000);
 
+  // Sortition timeout sweep: replaces non-responders and completes timed-out
+  // bodies (advancing their proposal out of sortition_synthesis). Deadlines
+  // are hours-scale, so a 5-minute sweep is ample. Without this the
+  // sortition_timeout handler is registered but never fed — a proposal whose
+  // jury never fully responds would sit in sortition_synthesis forever.
+  const sortitionSweepId = setInterval(() => {
+    enqueueSortitionTimeout().catch(() => {});
+  }, 5 * 60_000);
+
   return () => {
     stopWorker();
     clearInterval(autoAdvanceId);
+    clearInterval(sortitionSweepId);
   };
 }

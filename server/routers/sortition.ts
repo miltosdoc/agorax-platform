@@ -166,6 +166,15 @@ export function registerSortitionRoutes(app: Express): void {
       if (body.status === 'completed') {
         return res.status(400).json({ message: "Sortition body already completed" });
       }
+      // For proposal-bound bodies, completing must also advance the proposal
+      // out of sortition_synthesis — completeSortitionBody alone would close
+      // the jury while the proposal stays stuck in that phase forever.
+      if (body.proposalId) {
+        const { handleSortitionCompletion } = await import('../utils/proposal-state-machine');
+        await handleSortitionCompletion(bodyId, body.proposalId);
+        const completed = await sortitionRepo.getSortitionBody(bodyId);
+        return res.json(completed);
+      }
       const completed = await sortitionRepo.completeSortitionBody(bodyId);
       res.json(completed);
     } catch (error) {
