@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Community Library** — per-community media tab (audio / video / documents)
+  decoupled from proposals and the global feed; members upload, founder and
+  admins pin items to the top; content respects the community's
+  public/members-only visibility. New `community_media` table
+  (migration `0035_community_media`), routes under
+  `/api/communities/:id/media`, shared upload rules extracted to
+  `server/utils/media-rules.ts`, Library tab on the community dashboard.
+- **General community activated** — idempotent
+  `scripts/create-general-community.ts` creates the single
+  `is_general = true` community and backfills every existing user;
+  Google-OAuth signups now auto-enroll too (previously only local
+  registration did).
+- **Explainer-video source material** — `docs/explainer/` carries a full
+  Greek platform guide plus a 7-scene video production brief, ready as
+  NotebookLM sources.
+
+### Fixed
+- **Sortition timeout sweep never ran** — the `sortition_timeout` job was
+  registered but never enqueued, so a proposal whose jury never fully
+  responded sat in `sortition_synthesis` forever. The queue now sweeps
+  every 5 minutes and the admin complete route advances the proposal.
+- **Poll piggyback-module poisoning** — panelists first touched while the
+  question bank was empty were stored with an empty module assignment
+  forever; assignments now self-heal and empty subsets are never persisted.
+- **Members-only content leak via debate votes** — argument/thread vote
+  endpoints now require community membership, matching authorship rules.
+- **Production bundle required vite at runtime** — dev-only server code is
+  now eliminated from the production build (`--define:process.env.NODE_ENV`),
+  fixing the Jul 10 crash-loop class.
+- **Anonymous-identity transfer UX** — either code format (raw identity
+  code or Profile transfer bundle) is now accepted in either import field.
+- **Dependencies** — removed unused `svg2img` chain and upgraded
+  `drizzle-orm` to 0.45.2: `npm audit` reports zero vulnerabilities.
+- **CI** — lockfile re-pinned for npm 10, workflow steps made real
+  (`check:i18n` instead of unconfigured eslint, correct artifact paths);
+  the pipeline is green end to end.
 - **Real-time conferences via LiveKit** — self-hosted SFU sidecar, two room
   kinds (community, sortition deliberation), JWT-token join, host-only
   End-call, in-app banner showing active calls on the community dashboard

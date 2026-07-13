@@ -747,6 +747,34 @@ export const proposalMedia = pgTable("proposal_media", {
   proposalMediaFeedIdx: index('proposal_media_feed_idx').on(table.status, table.createdAt),
 }));
 
+// ─── Community Media (Βιβλιοθήκη κοινότητας) ────────────────────────────────
+// Media posted INSIDE a community — audio, video, documents — deliberately
+// decoupled from proposals and from the global /feed. Items live on the
+// community page only, gated by the community's contentVisibility.
+// Founder/admins can pin items to the top of the library ("start here"
+// material). Kind reuses the proposal-media vocabulary so the upload
+// validation pipeline (media-rules.ts) is shared.
+export const communityMedia = pgTable("community_media", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  uploaderId: integer("uploader_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),                          // 'podcast' | 'video' | 'document'
+  title: text("title").notNull(),
+  description: text("description"),
+  filePath: text("file_path").notNull(),                 // relative to AGORAX_MEDIA_DIR
+  thumbPath: text("thumb_path"),                          // jpg poster for videos
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"),
+  durationS: numeric("duration_s"),                       // ffprobe-derived; null if probe failed
+  status: text("status").notNull().default("published"), // 'published' | 'hidden'
+  pinned: boolean("pinned").notNull().default(false),
+  pinnedAt: timestamp("pinned_at"),
+  pinnedBy: integer("pinned_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  communityMediaLibraryIdx: index('community_media_library_idx').on(table.communityId, table.pinned, table.createdAt),
+}));
+
 // ─── LiveKit Conference Rooms ───────────────────────────────────────────────
 // Two flavours, gated by `kind`:
 //   • 'community'  — open to every member of `communityId`; only admins can
@@ -1208,6 +1236,7 @@ export const insertDebateThreadSchema = createInsertSchema(debateThreads).omit({
 export const insertDebateVoteSchema = createInsertSchema(debateVotes).omit({ id: true, createdAt: true });
 export const insertProposalSupportSchema = createInsertSchema(proposalSupport).omit({ id: true, createdAt: true });
 export const insertProposalMediaSchema = createInsertSchema(proposalMedia).omit({ id: true, createdAt: true });
+export const insertCommunityMediaSchema = createInsertSchema(communityMedia).omit({ id: true, createdAt: true });
 export const insertLivekitRoomSchema = createInsertSchema(livekitRooms).omit({ id: true, createdAt: true, closedAt: true });
 export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({ id: true, castAt: true, prevHash: true, rowHash: true, supersededById: true });
 
@@ -1355,6 +1384,9 @@ export type ProposalSupport = typeof proposalSupport.$inferSelect;
 export type ProposalVote = typeof proposalVotes.$inferSelect;
 export type ProposalMedia = typeof proposalMedia.$inferSelect;
 export type ProposalMediaKind = 'podcast' | 'video';
+export type CommunityMedia = typeof communityMedia.$inferSelect;
+export type InsertCommunityMedia = z.infer<typeof insertCommunityMediaSchema>;
+export type CommunityMediaKind = 'podcast' | 'video' | 'document';
 export type LivekitRoom = typeof livekitRooms.$inferSelect;
 export type LivekitRoomKind = 'community' | 'sortition';
 export type LivekitRoomStatus = 'scheduled' | 'active' | 'closed';

@@ -297,6 +297,16 @@ export function setupAuth(app: Express) {
               profilePicture: profile.photos?.[0]?.value || null
             });
 
+            // Auto-enrol in the General community, same as local
+            // registration. Best-effort: never block a Google signup.
+            try {
+              const general = await getGeneralCommunity();
+              if (general) {
+                await addCommunityMember(general.id, newUser.id);
+              }
+            } catch (enrolErr) {
+              }
+
             return done(null, newUser);
           } catch (error) {
             return done(error);

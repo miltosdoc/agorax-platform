@@ -12,6 +12,17 @@ import { startJobQueue } from "./utils/job-handlers";
 validateRuntimeConfig();
 initSentry();
 
+// Last-resort guards: a rejected promise or thrown error escaping an async
+// route handler must never take the whole process down (Node's default on
+// unhandledRejection is to crash). Log and keep serving — individual
+// handlers still own their own error responses.
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandledRejection', { reason: reason instanceof Error ? reason.stack : String(reason) });
+});
+process.on('uncaughtException', (err) => {
+  logger.error('uncaughtException', { err: err?.stack ?? String(err) });
+});
+
 const app = express();
 
 // Inline CORS middleware (replaces the 'cors' package for dev)

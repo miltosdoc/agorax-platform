@@ -16,6 +16,7 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8');
 const migration = read('migrations/0026_proposal_media.sql');
 const schema = read('shared/schema.ts');
 const router = read('server/routers/media.ts');
+const rules = read('server/utils/media-rules.ts');
 const storage = read('server/storage/media.ts');
 const routes = read('server/routes.ts');
 
@@ -105,18 +106,23 @@ describe('media router — security gates', () => {
     expect(router).toMatch(/isCommunityMember/);
   });
 
-  it('enforces a per-kind file-size limit', () => {
-    expect(router).toMatch(/maxBytes/);
+  it('enforces upload rules via the shared media-rules module', () => {
+    // Size/ext/mime enforcement lives in server/utils/media-rules.ts,
+    // shared with the community-library router so the two can't drift.
+    expect(router).toMatch(/validateUpload\(/);
+    expect(rules).toMatch(/maxBytes/);
+    expect(rules).toMatch(/exts\.has/);
+    expect(rules).toMatch(/mimes\.has/);
   });
 
   it('does not reject on duration — size is the only limit', () => {
-    expect(router).not.toMatch(/maxDurationS/);
+    expect(rules).not.toMatch(/maxDurationS/);
     expect(router).not.toMatch(/too long;\s*max/);
   });
 
-  it('validates file extension and mime', () => {
-    expect(router).toMatch(/limits\.exts\.has/);
-    expect(router).toMatch(/limits\.mimes/);
+  it('decodes client headers without throwing (no URIError DoS)', () => {
+    expect(router).toMatch(/safeDecodeHeader/);
+    expect(rules).toMatch(/function safeDecodeHeader/);
   });
 });
 

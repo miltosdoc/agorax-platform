@@ -57,6 +57,16 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
   MP3 / MP4 externally (NotebookLM, ElevenLabs, anything) and uploads it
   back. The author marks one as *Featured* — that one surfaces in the
   global Feed with a shareable social-card preview.
+- **Community Library** — every community has a Library tab where members
+  post audio, video, and documents that live *inside* the community only —
+  deliberately excluded from the global Feed so it stays decision-centric.
+  Founder/admins pin important items ("start here" material) to the top;
+  visibility follows the community's public/members-only content setting.
+- **The General community (Γενική Κοινότητα)** — a single instance-wide
+  community every user joins automatically at registration (local and
+  Google sign-up alike). It hosts platform-wide discussion, poll trials,
+  and shared material; activation + backfill via
+  `scripts/create-general-community.ts`.
 - **AgoraX Feed (`/feed`)** — a unified activity stream merging three
   date-sorted sources: new proposals (with lifecycle status), live and
   closed polls (with their tier badge), and featured podcasts/videos

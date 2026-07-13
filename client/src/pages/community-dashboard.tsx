@@ -19,6 +19,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
 import { ImpactMetricsDashboard } from '@/components/community/ImpactMetricsDashboard';
+import { CommunityLibrary } from '@/components/community/CommunityLibrary';
 import ShareButton from '@/components/ShareButton';
 import {
   getCommunityDashboardMetrics,
@@ -54,7 +55,7 @@ export default function CommunityDashboardPage() {
   // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return ['proposals', 'members', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
+    return ['proposals', 'library', 'members', 'merge'].includes(tab ?? '') ? tab! : 'proposals';
   });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
@@ -325,9 +326,19 @@ export default function CommunityDashboardPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
+          <TabsTrigger value="library">{t('community.tab_library')}</TabsTrigger>
           <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
           <TabsTrigger value="merge">{t('community.tab_merge')}</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="library">
+          <CommunityLibrary
+            communityId={parseInt(communityId!, 10)}
+            isMember={isMember || currentUserRole != null}
+            canManage={!!canManageSettings}
+            contentHidden={!!(summary as any).contentHidden}
+          />
+        </TabsContent>
         
         <TabsContent value="proposals">
           <Card>

@@ -21,7 +21,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import { mkdir, rename, unlink, writeFile, stat } from 'fs/promises';
 import { existsSync, createReadStream } from 'fs';
 import path from 'path';
@@ -36,9 +36,7 @@ import { canViewProposal, requireProposalContentAccess, visibleCommunityIdSet } 
 import { generatePodcastScript, generateTeaserScript } from '../utils/media-scripts';
 import { logger } from '../utils/logger';
 import { notifyFileLost } from '../utils/notifications';
-
-const MEDIA_ROOT = process.env.AGORAX_MEDIA_DIR
-  || path.resolve(process.cwd(), 'uploads', 'media');
+import { MEDIA_ROOT, isKind, hashId, safeDecodeHeader, validateUpload, type Kind } from '../utils/media-rules';
 
 /**
  * Read-only check: tag rows whose file is missing on disk with fileMissing=true.
@@ -68,48 +66,10 @@ async function handleFileLost(row: { id: number; uploaderId: number; proposalId:
   }
 }
 
-// Per-kind caps. Size is the only enforced limit (same 120MB ceiling for
-// audio and video). Duration is still probed and stored so the UI can
-// display it, but is no longer a rejection reason — the proposal author
-// decides what length makes sense for their content.
-const LIMITS = {
-  podcast: {
-    maxBytes: 120 * 1024 * 1024,
-    mimes: new Set(['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a']),
-    exts: new Set(['.mp3', '.m4a']),
-  },
-  video: {
-    maxBytes: 120 * 1024 * 1024,
-    mimes: new Set(['video/mp4', 'video/quicktime']),
-    exts: new Set(['.mp4', '.mov']),
-  },
-  document: {
-    maxBytes: 25 * 1024 * 1024,
-    mimes: new Set([
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.oasis.opendocument.text',
-      'text/plain',
-    ]),
-    exts: new Set(['.pdf', '.doc', '.docx', '.odt', '.txt']),
-  },
-} as const;
-
-type Kind = keyof typeof LIMITS;
-
-function isKind(v: unknown): v is Kind {
-  return v === 'podcast' || v === 'video' || v === 'document';
-}
-
 async function ensureProposalDir(proposalId: number): Promise<string> {
   const dir = path.join(MEDIA_ROOT, String(proposalId));
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });
   return dir;
-}
-
-function hashId(buf: Buffer): string {
-  return createHash('sha256').update(buf).digest('hex').slice(0, 16);
 }
 
 /** Resolve a media row and its on-disk file, or 404. */
@@ -214,13 +174,14 @@ export function registerMediaRoutes(app: Express): void {
       const defaultMime = kind === 'podcast' ? 'audio/mpeg' : kind === 'video' ? 'video/mp4' : 'application/pdf';
       const defaultExt = kind === 'podcast' ? '.mp3' : kind === 'video' ? '.mp4' : '.pdf';
       const mimeType = (req.headers['content-type'] || '').split(';')[0].trim() || defaultMime;
-      const rawName = req.headers['x-file-name']
-        ? decodeURIComponent(req.headers['x-file-name'] as string)
-        : `upload${defaultExt}`;
+      // Client headers are attacker-controlled: a malformed percent-escape
+      // must not throw a URIError out of this async handler.
+      const rawName = safeDecodeHeader(req.headers['x-file-name'], `upload${defaultExt}`)
+        || `upload${defaultExt}`;
       // User-provided post name (required by the UI; tolerated absent for
       // older clients — display falls back to the proposal question).
       const title = req.headers['x-media-title']
-        ? decodeURIComponent(req.headers['x-media-title'] as string).trim().slice(0, 200)
+        ? (safeDecodeHeader(req.headers['x-media-title']).trim().slice(0, 200) || null)
         : null;
 
       const proposal = await proposalRepo.getProposal(proposalId);
@@ -233,27 +194,9 @@ export function registerMediaRoutes(app: Express): void {
         return res.status(403).json({ message: 'must be a community member to upload media' });
       }
 
-      const limits = LIMITS[kind];
-      if (buffer.length > limits.maxBytes) {
-        return res.status(413).json({
-          message: `file too large; ${kind} max is ${Math.round(limits.maxBytes / 1024 / 1024)}MB`,
-        });
-      }
       const ext = path.extname(rawName).toLowerCase();
-      if (!limits.exts.has(ext)) {
-        return res.status(415).json({
-          message: `unsupported extension ${ext || '(none)'}; expected one of ${[...limits.exts].join(', ')}`,
-        });
-      }
-      if (mimeType && !limits.mimes.has(mimeType) && mimeType !== 'application/octet-stream') {
-        // Podcast/video tolerate any audio/video mime (browsers report many
-        // variants); documents must match the allow-list exactly.
-        const prefixOk = kind !== 'document'
-          && (mimeType.startsWith('audio/') || mimeType.startsWith('video/'));
-        if (!prefixOk) {
-          return res.status(415).json({ message: `mime ${mimeType} not allowed` });
-        }
-      }
+      const invalid = validateUpload(kind, buffer.length, ext, mimeType);
+      if (invalid) return res.status(invalid.status).json({ message: invalid.message });
 
       const dir = await ensureProposalDir(proposalId);
       const id = hashId(buffer) + '-' + randomBytes(4).toString('hex');
