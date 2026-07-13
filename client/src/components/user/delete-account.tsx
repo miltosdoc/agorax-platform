@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
 import { Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
 
 export function DeleteAccount() {
   const { t } = useTranslation();
@@ -18,18 +19,12 @@ export function DeleteAccount() {
   const handleDeleteAccount = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/user?deletePolls=${deletePolls}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(t('notification.failedDeleteAccount'));
-      }
-      
-      const data = await response.json();
+      // api.delete attaches the CSRF token (a raw fetch here used to be
+      // rejected by the CSRF middleware) and throws ApiError with the
+      // server's message on failure.
+      const { data } = await api.delete<{ message: string }>(
+        `/api/user?deletePolls=${deletePolls}`
+      );
       
       // Close the dialog
       setOpen(false);
