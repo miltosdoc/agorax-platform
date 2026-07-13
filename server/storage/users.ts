@@ -18,6 +18,13 @@ import {
   pointTransactions,
   pointBalances,
   pointRedemptions,
+  polls,
+  pollOptions,
+  pollQuestions,
+  pollAnswers,
+  pollUserResponses,
+  votes,
+  comments,
   type User,
   type InsertUser,
   type InsertAccountActivity,
@@ -26,6 +33,8 @@ import {
   type ErasureRequest,
 } from '../../shared/schema';
 import { eq, and, ilike, desc, sql, isNull, inArray } from 'drizzle-orm';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class UserRepository {
 
@@ -241,6 +250,43 @@ export class UserRepository {
     const targetUserId = request.userId;
 
     return await db.transaction(async (tx) => {
+      const erased = await this.eraseUserDataInTx(tx, targetUserId);
+
+      // Mark the request processed.
+      await tx
+        .update(erasureRequests)
+        .set({ processedAt: erased.now, processedBy: args.processedBy, notes: args.notes })
+        .where(eq(erasureRequests.id, args.requestId));
+
+      return {
+        processed: true,
+        targetUserId,
+        cryptoShredded: erased.cryptoShredded,
+        deferredVoteRowIds: erased.deferredVoteIds,
+        userAnonymised: true,
+      };
+    });
+  }
+
+  /**
+   * Core Art. 17 erasure, shared by the admin path (processErasureRequest)
+   * and self-service account deletion (deleteUser). Must run inside a
+   * transaction. Crypto-shreds vote/points bindings and anonymises the users
+   * row IN PLACE — dozens of tables reference users.id with NO ACTION FKs,
+   * so the row must survive; a hard DELETE would be rejected by Postgres.
+   * voter_hash / doc_code_hash are retained as anti-replay controls.
+   */
+  private async eraseUserDataInTx(tx: Tx, targetUserId: number): Promise<{
+    now: Date;
+    cryptoShredded: {
+      proposalVotes: number;
+      egBallots: number;
+      pointTransactions: number;
+      pointRedemptions: number;
+      pointBalanceDeleted: boolean;
+    };
+    deferredVoteIds: number[];
+  }> {
       // 1. Find which proposal_votes rows belong to closed proposals (eligible
       //    for immediate crypto-shred) vs active (deferred).
       const voteRows = await tx
@@ -349,15 +395,8 @@ export class UserRepository {
         .set({ withdrawnAt: now })
         .where(and(eq(userConsents.userId, targetUserId), isNull(userConsents.withdrawnAt)));
 
-      // 7. Mark the request processed.
-      await tx
-        .update(erasureRequests)
-        .set({ processedAt: now, processedBy: args.processedBy, notes: args.notes })
-        .where(eq(erasureRequests.id, args.requestId));
-
       return {
-        processed: true,
-        targetUserId,
+        now,
         cryptoShredded: {
           proposalVotes: pvShredded,
           egBallots: egShredded,
@@ -365,10 +404,8 @@ export class UserRepository {
           pointRedemptions: redUpdated.length,
           pointBalanceDeleted: balDeleted.length > 0,
         },
-        deferredVoteRowIds: deferredVoteIds,
-        userAnonymised: true,
+        deferredVoteIds,
       };
-    });
   }
 
   /** GDPR Art. 15 — full export of everything we hold about a member. */
@@ -399,10 +436,54 @@ export class UserRepository {
     return user;
   }
 
-  /** Delete a user and optionally their polls. */
+  /**
+   * Self-service account deletion. Runs the shared Art. 17 erasure core
+   * (anonymise-in-place — a hard DELETE FROM users is impossible: dozens of
+   * tables reference users.id with NO ACTION FKs, so it always failed with
+   * an FK violation). With deletePolls=false the member's polls survive
+   * under the anonymised "Erased Member" row — the "transferred to the
+   * community" behaviour the UI promises.
+   */
   async deleteUser(userId: number, deletePolls: boolean): Promise<boolean> {
-    // TODO: Implement with transaction for data integrity
-    await db.delete(users).where(eq(users.id, userId));
+    await db.transaction(async (tx) => {
+      if (deletePolls) {
+        const owned = await tx
+          .select({ id: polls.id })
+          .from(polls)
+          .where(eq(polls.creatorId, userId));
+        const pollIds = owned.map((p) => p.id);
+        if (pollIds.length > 0) {
+          // FK-safe order; ballot_votes and poll_notifications cascade.
+          const questionIds = (
+            await tx
+              .select({ id: pollQuestions.id })
+              .from(pollQuestions)
+              .where(inArray(pollQuestions.pollId, pollIds))
+          ).map((q) => q.id);
+          await tx.delete(pollUserResponses).where(inArray(pollUserResponses.pollId, pollIds));
+          if (questionIds.length > 0) {
+            await tx.delete(pollAnswers).where(inArray(pollAnswers.questionId, questionIds));
+            await tx.delete(pollQuestions).where(inArray(pollQuestions.id, questionIds));
+          }
+          await tx.delete(votes).where(inArray(votes.pollId, pollIds));
+          await tx.delete(pollOptions).where(inArray(pollOptions.pollId, pollIds));
+          await tx.delete(comments).where(inArray(comments.pollId, pollIds));
+          await tx.delete(polls).where(inArray(polls.id, pollIds));
+        }
+      }
+
+      // Record a pre-processed erasure request so votes deferred on active
+      // proposals get crypto-shredded when those proposals close —
+      // processDeferredErasuresForProposal keys off processed requests.
+      await tx.insert(erasureRequests).values({
+        userId,
+        reason: 'self-service account deletion',
+        processedAt: new Date(),
+        processedBy: userId,
+      });
+
+      await this.eraseUserDataInTx(tx, userId);
+    });
     return true;
   }
 
