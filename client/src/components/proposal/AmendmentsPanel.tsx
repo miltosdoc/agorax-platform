@@ -35,6 +35,9 @@ interface Amendment {
   type?: string;
   text: string;
   status: 'pending' | 'accepted' | 'rejected' | 'flagged';
+  parentAmendmentId?: number | null;
+  authorDecision?: 'accepted' | 'rejected' | null;
+  authorReason?: string | null;
   createdAt: string;
   duplicateGroupId?: number | null;
   siblingIds?: number[];
@@ -70,6 +73,9 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voting, setVoting] = useState<Record<number, boolean>>({});
   const [showTree, setShowTree] = useState(false);
+  // When set, the form submits an amendment ON this counter-proposal.
+  const [amendTarget, setAmendTarget] = useState<Amendment | null>(null);
+  const [reviewing, setReviewing] = useState<Record<number, boolean>>({});
 
   const refresh = () =>
     api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`)
@@ -106,18 +112,44 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
     setSubmitError(null);
     try {
       const resp = await api.post<Amendment>(`/api/proposals/${proposalId}/amendments`, {
-        type: newType,
+        // Amendments on a counter-proposal are always improvements — a
+        // counter-proposal cannot receive a counter-proposal.
+        type: amendTarget ? 'improvement' : newType,
         text: newText.trim(),
+        ...(amendTarget ? { parentAmendmentId: amendTarget.id } : {}),
       });
       setAmendments(prev => [...prev, resp.data]);
       setNewText('');
       setNewType('improvement');
+      setAmendTarget(null);
     } catch (error) {
       setSubmitError(error instanceof ApiError ? error.message : t('workspace.amendments.submitFailed'));
     } finally {
       setSubmitting(false);
     }
   };
+
+  // The counter-proposal's author judges the amendments on their counter.
+  const canReviewChild = (child: Amendment, parent: Amendment | undefined) =>
+    !!user && !!parent && parent.authorId === user.id && !child.authorDecision
+    && ['author_review', 'community_signal'].includes(proposalStatus);
+
+  async function reviewChild(child: Amendment, decision: 'accepted' | 'rejected') {
+    if (reviewing[child.id]) return;
+    let reason = '';
+    if (decision === 'rejected') {
+      reason = window.prompt(t('workspace.amendments.rejectReasonPrompt') || 'Αιτιολογία απόρριψης (προαιρετική):') ?? '';
+    }
+    setReviewing(prev => ({ ...prev, [child.id]: true }));
+    try {
+      await api.post(`/api/amendments/${child.id}/review`, { decision, reason });
+      await refresh();
+    } catch {
+      // server message surfacing is not critical here — state stays pending
+    } finally {
+      setReviewing(prev => ({ ...prev, [child.id]: false }));
+    }
+  }
 
   if (loading) {
     return (
@@ -175,10 +207,17 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   }
 
   // Sort by popularity (highest score first) so the most-supported amendments
-  // sit at the top of each duplicate-group cluster.
-  const sortedAmendments = [...amendments].sort(
-    (a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0),
-  );
+  // sit at the top of each duplicate-group cluster. Amendments ON a
+  // counter-proposal render nested under their parent, not in the main flow.
+  const sortedAmendments = [...amendments]
+    .filter(a => a.parentAmendmentId == null)
+    .sort((a, b) => (b.popularityScore ?? 0) - (a.popularityScore ?? 0));
+  const childrenBy = new Map<number, Amendment[]>();
+  for (const a of amendments) {
+    if (a.parentAmendmentId == null) continue;
+    if (!childrenBy.has(a.parentAmendmentId)) childrenBy.set(a.parentAmendmentId, []);
+    childrenBy.get(a.parentAmendmentId)!.push(a);
+  }
   // Group by duplicate group
   const groups = new Map<number | null, Amendment[]>();
   for (const a of sortedAmendments) {
@@ -227,15 +266,27 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
         {Array.from(groups.entries()).map(([groupId, group]) => (
           <div key={groupId ?? 'ungrouped'} className="space-y-2">
             {group.map((amendment) => {
-              const config = STATUS_CONFIG[amendment.status];
+              const effectiveStatus = (amendment.authorDecision ?? amendment.status) as keyof typeof STATUS_CONFIG;
+              const config = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.pending;
               const Icon = config.icon;
+              const isCounter = amendment.type === 'counter_proposal';
+              const children = childrenBy.get(amendment.id) ?? [];
               return (
                 <div
                   key={amendment.id}
-                  className="p-4 rounded-lg border bg-card hover:border-primary/30 transition-colors"
+                  className={`p-4 rounded-lg border transition-colors ${
+                    isCounter
+                      ? 'border-antip/40 bg-antip-wash/40 hover:border-antip/60'
+                      : 'bg-card hover:border-primary/30'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-4 mb-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isCounter && (
+                        <Badge className="bg-antip-wash text-antip-deep border border-antip/30 hover:bg-antip-wash">
+                          {t('workspace.amendments.counterBadge') || 'Αντιπρόταση'}
+                        </Badge>
+                      )}
                       <Badge className={config.color}>
                         <Icon className="w-3 h-3 mr-1" />
                         {t(config.labelKey)}
@@ -288,6 +339,103 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                       )}
                     </div>
                   </div>
+                  {isCounter && canSubmit && user && (
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 border-antip/40 text-antip-deep hover:bg-antip-wash"
+                        onClick={() => {
+                          setAmendTarget(amendment);
+                          document.getElementById('new-amendment')?.focus();
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {t('workspace.amendments.amendCounter') || 'Τροπολογία στην αντιπρόταση'}
+                      </Button>
+                    </div>
+                  )}
+                  {children.length > 0 && (
+                    <div className="mt-3 space-y-2 border-l-2 border-antip/30 pl-3">
+                      {children.map((child) => {
+                        const childStatus = (child.authorDecision ?? child.status) as keyof typeof STATUS_CONFIG;
+                        const childConfig = STATUS_CONFIG[childStatus] ?? STATUS_CONFIG.pending;
+                        const ChildIcon = childConfig.icon;
+                        return (
+                          <div key={child.id} className="rounded-md border bg-card/60 p-3">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-xs text-antip-deep border-antip/30">
+                                  {t('workspace.amendments.childBadge') || 'Τροπολογία αντιπρότασης'}
+                                </Badge>
+                                <Badge className={childConfig.color}>
+                                  <ChildIcon className="w-3 h-3 mr-1" />
+                                  {t(childConfig.labelKey)}
+                                </Badge>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(child.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{child.text}</p>
+                            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground gap-2 flex-wrap">
+                              <span>{child.authorName || t('proposal.userWithId', { id: child.authorId })}</span>
+                              <div className="flex items-center gap-1">
+                                {canReviewChild(child, amendment) && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-green-700 border-green-300 hover:bg-green-50"
+                                      onClick={() => reviewChild(child, 'accepted')}
+                                      disabled={!!reviewing[child.id]}
+                                    >
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      {t('workspace.amendments.accept') || 'Αποδοχή'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 px-2 text-red-700 border-red-300 hover:bg-red-50"
+                                      onClick={() => reviewChild(child, 'rejected')}
+                                      disabled={!!reviewing[child.id]}
+                                    >
+                                      <XCircle className="w-3 h-3 mr-1" />
+                                      {t('workspace.amendments.reject') || 'Απόρριψη'}
+                                    </Button>
+                                  </>
+                                )}
+                                {user && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant={child.userVote === 1 ? 'default' : 'outline'}
+                                      className={`h-7 px-2 ${child.userVote === 1 ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                      onClick={() => castVote(child.id, 1, child.userVote ?? 0)}
+                                      disabled={!!voting[child.id]}
+                                    >
+                                      <TrendingUp className="w-3 h-3 mr-1" />
+                                      {child.upvotes ?? 0}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant={child.userVote === -1 ? 'default' : 'outline'}
+                                      className={`h-7 px-2 ${child.userVote === -1 ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                                      onClick={() => castVote(child.id, -1, child.userVote ?? 0)}
+                                      disabled={!!voting[child.id]}
+                                    >
+                                      <TrendingDown className="w-3 h-3 mr-1" />
+                                      {child.downvotes ?? 0}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -296,18 +444,35 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
 
         {canSubmit && user && (
           <div className="pt-4 border-t space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="amendment-type-2">{t('workspace.amendments.typeLabel') || 'Τύπος'}</Label>
-              <Select value={newType} onValueChange={(v) => setNewType(v as 'improvement' | 'counter_proposal')}>
-                <SelectTrigger id="amendment-type-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="improvement">{t('workspace.amendments.type.improvement') || 'Βελτίωση'}</SelectItem>
-                  <SelectItem value="counter_proposal">{t('workspace.amendments.type.counter_proposal') || 'Αντιπρόταση'}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {amendTarget ? (
+              <div className="flex items-start justify-between gap-2 rounded-md border border-antip/40 bg-antip-wash/60 px-3 py-2">
+                <p className="text-xs text-antip-deep">
+                  <span className="font-medium">{t('workspace.amendments.amendingCounter') || 'Τροπολογία στην αντιπρόταση:'}</span>{' '}
+                  «{amendTarget.text.slice(0, 100)}{amendTarget.text.length > 100 ? '…' : ''}»
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs shrink-0"
+                  onClick={() => setAmendTarget(null)}
+                >
+                  {t('general.cancel') || 'Ακύρωση'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label htmlFor="amendment-type-2">{t('workspace.amendments.typeLabel') || 'Τύπος'}</Label>
+                <Select value={newType} onValueChange={(v) => setNewType(v as 'improvement' | 'counter_proposal')}>
+                  <SelectTrigger id="amendment-type-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="improvement">{t('workspace.amendments.type.improvement') || 'Βελτίωση'}</SelectItem>
+                    <SelectItem value="counter_proposal">{t('workspace.amendments.type.counter_proposal') || 'Αντιπρόταση'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Textarea
               id="new-amendment"
               placeholder={t('workspace.amendments.placeholder') || 'Προτείνετε τροπολογία...'}

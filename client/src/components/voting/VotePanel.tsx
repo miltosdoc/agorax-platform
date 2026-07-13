@@ -443,11 +443,16 @@ export default function VotePanel({
             <div role="radiogroup" aria-label={t('vote.panelTitle')} className="space-y-2">
               {ballotOptions.map((opt) => {
                 const selected = (selectedOption ?? results.userVote) === opt.id;
+                const isCounter = opt.id.startsWith('counter_');
                 return (
                   <div
                     key={opt.id}
                     className={`rounded-md border transition-colors ${
-                      selected ? 'border-yper bg-yper-wash' : 'hover:border-ink-faint'
+                      selected
+                        ? 'border-yper bg-yper-wash'
+                        : isCounter
+                        ? 'border-antip/40 bg-antip-wash/30 hover:border-antip/60'
+                        : 'hover:border-ink-faint'
                     }`}
                   >
                     <button
@@ -462,12 +467,17 @@ export default function VotePanel({
                       <span
                         aria-hidden="true"
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                          selected ? 'border-yper' : 'border-muted-foreground'
+                          selected ? 'border-yper' : isCounter ? 'border-antip' : 'border-muted-foreground'
                         }`}
                       >
                         {selected && <span className="h-2 w-2 rounded-full bg-yper" />}
                       </span>
                       <span className="flex-1 text-sm font-medium">{opt.label}</span>
+                      {isCounter && (
+                        <Badge className="shrink-0 border border-antip/30 bg-antip-wash text-antip-deep hover:bg-antip-wash">
+                          {t('vote.option_counterBadge') || 'Αντιπρόταση'}
+                        </Badge>
+                      )}
                       {results.userVote === opt.id && (
                         <Badge variant="secondary" className="shrink-0">
                           {t('vote.youVoted')}

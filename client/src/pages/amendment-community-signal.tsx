@@ -17,6 +17,7 @@ import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api } from '@/lib/api';
 import { ArrowLeft, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/hooks/use-auth';
 
 interface RejectedAmendment {
   id: number;
@@ -43,16 +44,21 @@ interface CommunitySignal {
 
 interface ProposalMeta {
   phaseDeadline?: string | null;
+  authorId?: number;
+  communityId?: number;
 }
 
 export default function AmendmentCommunitySignal() {
   const params = useParams<{ id: string }>();
   const proposalId = parseInt(params.id || '0', 10);
   const { t } = useTranslation();
-  
+  const { user } = useAuth();
+
   const [amendments, setAmendments] = useState<RejectedAmendment[]>([]);
   const [signals, setSignals] = useState<CommunitySignal[]>([]);
   const [proposal, setProposal] = useState<ProposalMeta | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState<Record<number, boolean>>({});
   const [userVotes, setUserVotes] = useState<Record<number, number>>({});
@@ -60,7 +66,21 @@ export default function AmendmentCommunitySignal() {
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState<string | null>(null);
 
+  // Only the proposal author or a community admin/founder can fast-forward
+  // the phase (the server enforces the same rule). Everyone else waits for
+  // the deadline — the platform advances the proposal automatically.
+  const canAdvance = !!user && (
+    user.id === proposal?.authorId || userRole === 'admin' || userRole === 'founder'
+  );
+
   async function advanceToNextPhase() {
+    if (pendingCount > 0) {
+      const ok = window.confirm(
+        (t('amendment.communitySignal.pendingConfirm', { count: pendingCount })
+          || `Υπάρχουν ${pendingCount} τροπολογίες που δεν έχουν κριθεί ακόμη. Αν προχωρήσετε τώρα θα απορριφθούν σιωπηρά. Συνέχεια;`),
+      );
+      if (!ok) return;
+    }
     const anyFlagged = signals.some((s) => s.flagged);
     const next = anyFlagged ? 'sortition_synthesis' : 'voting';
     setAdvancing(true);
@@ -81,13 +101,21 @@ export default function AmendmentCommunitySignal() {
   async function loadData() {
     try {
       const [amendmentsRes, signalsRes, proposalRes] = await Promise.all([
-        api.get<(RejectedAmendment & { authorDecision?: string })[]>(`/api/proposals/${proposalId}/amendments`),
+        api.get<(RejectedAmendment & { authorDecision?: string | null })[]>(`/api/proposals/${proposalId}/amendments`),
         api.get<CommunitySignal[]>(`/api/proposals/${proposalId}/amendments/signals`),
         api.get<ProposalMeta>(`/api/proposals/${proposalId}`).catch(() => ({ data: null })),
       ]);
       setAmendments(amendmentsRes.data.filter((a) => a.authorDecision === 'rejected'));
+      setPendingCount(amendmentsRes.data.filter((a) => a.authorDecision == null).length);
       setSignals(signalsRes.data);
-      if (proposalRes.data) setProposal(proposalRes.data);
+      if (proposalRes.data) {
+        setProposal(proposalRes.data);
+        if (proposalRes.data.communityId) {
+          api.get<{ currentUserRole?: string }>(`/api/communities/${proposalRes.data.communityId}`)
+            .then((r) => setUserRole(r.data.currentUserRole ?? null))
+            .catch(() => setUserRole(null));
+        }
+      }
     } catch (e) {
       setError(t('amendment.error.loadDataFailed'));
     } finally {
@@ -136,11 +164,21 @@ export default function AmendmentCommunitySignal() {
 
       {proposal?.phaseDeadline && (
         <div className="mb-4">
+          {/* The server's phase_auto_advance job moves the proposal at the
+              deadline — the page only refreshes to show the new state. */}
           <PhaseCountdown
             deadline={proposal.phaseDeadline}
             label="Χρόνος φάσης κοινοτικού σήματος:"
-            onExpired={advanceToNextPhase}
+            onExpired={() => window.location.reload()}
           />
+        </div>
+      )}
+
+      {pendingCount > 0 && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {t('amendment.communitySignal.pendingNotice', { count: pendingCount })
+            || `${pendingCount} τροπολογίες εκκρεμούν ακόμη για κρίση από τον συγγραφέα.`}
         </div>
       )}
 
@@ -170,12 +208,21 @@ export default function AmendmentCommunitySignal() {
         <Card>
           <CardContent className="py-8 text-center space-y-4">
             <p className="text-muted-foreground">{t('amendment.communitySignal.noRejectedAmendments')}</p>
-            <Button onClick={advanceToNextPhase} disabled={advancing}>
-              {advancing
-                ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
-                : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην ψηφοφορία')}
-            </Button>
-            {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+            {canAdvance ? (
+              <>
+                <Button onClick={advanceToNextPhase} disabled={advancing}>
+                  {advancing
+                    ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
+                    : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην ψηφοφορία')}
+                </Button>
+                {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t('amendment.communitySignal.autoAdvanceNotice')
+                  || 'Η πρόταση θα προχωρήσει αυτόματα στην επόμενη φάση όταν λήξει η προθεσμία.'}
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -194,7 +241,14 @@ export default function AmendmentCommunitySignal() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">{amendment.type}</Badge>
+                      <Badge
+                        variant="outline"
+                        className={amendment.type === 'counter_proposal' ? 'bg-antip-wash text-antip-deep border-antip/40' : ''}
+                      >
+                        {amendment.type === 'counter_proposal'
+                          ? (t('workspace.amendments.type.counter_proposal') || 'Αντιπρόταση')
+                          : (t('workspace.amendments.type.improvement') || 'Βελτίωση')}
+                      </Badge>
                       <span className="text-sm text-muted-foreground">
                         {t('amendment.fromUser', { id: amendment.authorId })}
                       </span>
@@ -254,12 +308,21 @@ export default function AmendmentCommunitySignal() {
                   ? (t('amendment.communitySignal.advanceHintFlagged') || 'Υπάρχουν επισημασμένες τροπολογίες — μετάβαση στο κληρωτό σώμα.')
                   : (t('amendment.communitySignal.advanceHintNoFlagged') || 'Καμία τροπολογία δεν επισημάνθηκε — μετάβαση στην ψηφοφορία.')}
               </p>
-              <Button onClick={advanceToNextPhase} disabled={advancing}>
-                {advancing
-                  ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
-                  : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην επόμενη φάση')}
-              </Button>
-              {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+              {canAdvance ? (
+                <>
+                  <Button onClick={advanceToNextPhase} disabled={advancing}>
+                    {advancing
+                      ? (t('amendment.communitySignal.advancing') || 'Μετάβαση…')
+                      : (t('amendment.communitySignal.advanceButton') || 'Συνέχεια στην επόμενη φάση')}
+                  </Button>
+                  {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t('amendment.communitySignal.autoAdvanceNotice')
+                    || 'Η πρόταση θα προχωρήσει αυτόματα στην επόμενη φάση όταν λήξει η προθεσμία.'}
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -909,7 +909,7 @@ export function registerProposalsRoutes(app: Express): void {
       const proposalId = parseInt(req.params.id);
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const { newState } = req.body;
+      let { newState } = req.body;
       if (!isProposalState(newState)) {
         return res.status(400).json({ message: "A valid canonical proposal state is required" });
       }
@@ -918,6 +918,16 @@ export function registerProposalsRoutes(app: Express): void {
           message: `Proposal has legacy or invalid status: ${proposal.status}`,
           current_status: proposal.status,
         });
+      }
+      // Synthesis mode: a sortition jury only convenes in communities that
+      // opted into it — everywhere else the AI merge synthesizes and the
+      // vote opens directly. (AI is also the automatic fallback when a jury
+      // cannot form or does not respond; see job-handlers.)
+      if (newState === 'sortition_synthesis') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        if ((community as any)?.synthesisMode !== 'sortition') {
+          newState = 'voting';
+        }
       }
       // Import state machine
       const { transitionProposal, canTransition, getNextStates, triggerSideEffects } = await import('../utils/proposal-state-machine');
@@ -934,6 +944,30 @@ export function registerProposalsRoutes(app: Express): void {
         const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
         if (role !== 'admin' && role !== 'founder') {
           return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+      // A manual fast-forward out of deliberation must not silently discard
+      // amendments nobody has reviewed. Before the phase deadline, the
+      // advance is blocked while author decisions are outstanding; once the
+      // deadline passes, unreviewed = dropped (same rule the automatic
+      // advance applies).
+      if (proposal.status === 'community_signal' && (newState === 'voting' || newState === 'sortition_synthesis')) {
+        const deadlinePassed = (proposal as any).phaseDeadline
+          && new Date((proposal as any).phaseDeadline).getTime() <= Date.now();
+        if (!deadlinePassed) {
+          const { proposalAmendments: pa } = await import('@shared/schema');
+          const { isNull } = await import('drizzle-orm');
+          const [pending] = await db
+            .select({ n: count() })
+            .from(pa)
+            .where(and(eq(pa.proposalId, proposalId), isNull(pa.authorDecision)));
+          if ((pending?.n ?? 0) > 0) {
+            return res.status(409).json({
+              message: `Υπάρχουν ${pending.n} τροπολογίες που εκκρεμούν για κρίση. Η πρόταση δεν μπορεί να προχωρήσει σε ψηφοφορία πριν κριθούν ή πριν λήξει η προθεσμία της φάσης.`,
+              rejection_reason: 'pending_amendments',
+              pendingAmendments: pending.n,
+            });
+          }
         }
       }
       // Enforce maxConcurrentVotes when entering the voting phase.

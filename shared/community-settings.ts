@@ -7,6 +7,12 @@ export type CommunityGovernanceModel = typeof COMMUNITY_GOVERNANCE_MODELS[number
 export const COMMUNITY_SORTITION_MODES = ['absolute', 'percentage'] as const;
 export type CommunitySortitionMode = typeof COMMUNITY_SORTITION_MODES[number];
 
+// Who synthesizes the final text after deliberation. 'ai' is the default;
+// 'sortition' draws a jury but always falls back to AI when the jury cannot
+// form or does not respond in time.
+export const COMMUNITY_SYNTHESIS_MODES = ['ai', 'sortition'] as const;
+export type CommunitySynthesisMode = typeof COMMUNITY_SYNTHESIS_MODES[number];
+
 export const COMMUNITY_JOIN_POLICIES = ['open', 'approval', 'invite_only'] as const;
 export type CommunityJoinPolicy = typeof COMMUNITY_JOIN_POLICIES[number];
 
@@ -23,6 +29,7 @@ export interface CommunitySettingsInput {
   sortitionSize?: unknown;
   sortitionMode?: unknown;
   sortitionResponseHours?: unknown;
+  synthesisMode?: unknown;
   amendmentThreshold?: unknown;
   amendmentInclusionThreshold?: unknown;
   maxAmendmentsPerProposal?: unknown;
@@ -48,6 +55,7 @@ export interface CommunityCreateSettings {
   sortitionSize: number;
   sortitionMode: CommunitySortitionMode;
   sortitionResponseHours: number;
+  synthesisMode: CommunitySynthesisMode;
   amendmentThreshold: string;
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
@@ -70,6 +78,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   sortitionSize: 12,
   sortitionMode: 'absolute',
   sortitionResponseHours: 72,
+  synthesisMode: 'ai',
   amendmentThreshold: '0.5',
   amendmentInclusionThreshold: '1',
   maxAmendmentsPerProposal: -1,
@@ -174,6 +183,7 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     sortitionSize: integerValue(input.sortitionSize, DEFAULT_COMMUNITY_SETTINGS.sortitionSize ?? 12, 3, 500, 'sortitionSize must be between 3 and 500'),
     sortitionMode: enumValue(input.sortitionMode, COMMUNITY_SORTITION_MODES, DEFAULT_COMMUNITY_SETTINGS.sortitionMode ?? 'absolute', 'Invalid sortition mode'),
     sortitionResponseHours: integerValue(input.sortitionResponseHours, DEFAULT_COMMUNITY_SETTINGS.sortitionResponseHours ?? 72, 1, 720, 'sortitionResponseHours must be between 1 and 720'),
+    synthesisMode: enumValue(input.synthesisMode, COMMUNITY_SYNTHESIS_MODES, DEFAULT_COMMUNITY_SETTINGS.synthesisMode, 'Invalid synthesis mode'),
     amendmentThreshold: decimalString(input.amendmentThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentThreshold ?? '0.5', 0, 1, 'amendmentThreshold must be between 0 and 1'),
     amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold ?? '1', 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
@@ -215,6 +225,9 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const sortitionResponseHours = optionalIntegerValue(input.sortitionResponseHours, 1, 720, 'sortitionResponseHours must be between 1 and 720');
   if (sortitionResponseHours !== undefined) updates.sortitionResponseHours = sortitionResponseHours;
+
+  const synthesisMode = optionalEnumValue(input.synthesisMode, COMMUNITY_SYNTHESIS_MODES, 'Invalid synthesis mode');
+  if (synthesisMode !== undefined) updates.synthesisMode = synthesisMode;
 
   const amendmentThreshold = optionalDecimalString(input.amendmentThreshold, 0, 1, 'amendmentThreshold must be between 0 and 1');
   if (amendmentThreshold !== undefined) updates.amendmentThreshold = amendmentThreshold;

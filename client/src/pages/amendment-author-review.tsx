@@ -23,6 +23,7 @@ interface Amendment {
   authorId: number;
   type: string;
   text: string;
+  parentAmendmentId?: number | null;
   authorDecision: 'accepted' | 'rejected' | null;
   authorReason: string | null;
   llmScore: number | null;
@@ -69,7 +70,9 @@ export default function AmendmentAuthorReview() {
         api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`),
         api.get<ProposalMeta>(`/api/proposals/${proposalId}`).catch(() => ({ data: null })),
       ]);
-      setAmendments(amendmentsRes.data);
+      // Amendments ON a counter-proposal are judged by the counter's author
+      // (inline in the amendments panel), not by the proposal author here.
+      setAmendments(amendmentsRes.data.filter((a) => a.parentAmendmentId == null));
       if (proposalRes.data) setProposal(proposalRes.data);
     } catch (e) {
       setError(t('amendment.error.loadFailed'));

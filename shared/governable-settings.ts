@@ -12,6 +12,7 @@
 import {
   COMMUNITY_GOVERNANCE_MODELS,
   COMMUNITY_SORTITION_MODES,
+  COMMUNITY_SYNTHESIS_MODES,
   COMMUNITY_JOIN_POLICIES,
   COMMUNITY_VISIBILITY_LEVELS,
   type CommunityGovernanceModel,
@@ -25,6 +26,7 @@ export const GOVERNABLE_SETTING_KEYS = [
   'memberListVisibility',
   'contentVisibility',
   'sortitionMode',
+  'synthesisMode',
   'requireGovgrVerification',
   'maxConcurrentVotes',
   'minParticipationPct',
@@ -54,6 +56,7 @@ export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, Govern
   memberListVisibility:          { key: 'memberListVisibility',          type: 'enum',    allowed: COMMUNITY_VISIBILITY_LEVELS },
   contentVisibility:             { key: 'contentVisibility',             type: 'enum',    allowed: COMMUNITY_VISIBILITY_LEVELS },
   sortitionMode:                 { key: 'sortitionMode',                 type: 'enum',    allowed: COMMUNITY_SORTITION_MODES },
+  synthesisMode:                 { key: 'synthesisMode',                 type: 'enum',    allowed: COMMUNITY_SYNTHESIS_MODES },
   requireGovgrVerification:      { key: 'requireGovgrVerification',      type: 'boolean' },
   maxConcurrentVotes:            { key: 'maxConcurrentVotes',            type: 'unlimited_or_positive_integer' },
   minParticipationPct:           { key: 'minParticipationPct',           type: 'decimal', min: 0,    max: 100 },

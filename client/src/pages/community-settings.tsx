@@ -21,7 +21,7 @@ import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
-import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
+import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -35,6 +35,7 @@ interface CommunitySettingsForm {
   sortitionSize: number;
   sortitionMode: CommunitySortitionMode;
   sortitionResponseHours: number;
+  synthesisMode: CommunitySynthesisMode;
   amendmentThreshold: string;
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
@@ -58,6 +59,7 @@ function toForm(community: Community): CommunitySettingsForm {
     sortitionSize: community.sortitionSize ?? 12,
     sortitionMode: (community.sortitionMode as CommunitySortitionMode) || 'absolute',
     sortitionResponseHours: community.sortitionResponseHours ?? 72,
+    synthesisMode: ((community as any).synthesisMode as CommunitySynthesisMode) || 'ai',
     amendmentThreshold: String(community.amendmentThreshold ?? '0.5'),
     amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '1'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
@@ -306,6 +308,21 @@ export default function CommunitySettingsPage() {
                   <div>
                     <h2 className="text-lg font-semibold">{t('community.settings_sortition')}</h2>
                     <p className="text-sm text-muted-foreground">{t('community.settings_sortition_help')}</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="synthesisMode">{t('community.synthesis_mode') || 'Σύνθεση τελικού κειμένου'}</Label>
+                    <Select value={form.synthesisMode} onValueChange={(value) => update('synthesisMode', value as CommunitySynthesisMode)}>
+                      <SelectTrigger id="synthesisMode"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ai">{t('community.synthesis_mode_ai') || 'AI (προεπιλογή)'}</SelectItem>
+                        <SelectItem value="sortition">{t('community.synthesis_mode_sortition') || 'Κληρωτό σώμα (με AI ως εφεδρεία)'}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t('community.synthesis_mode_help')
+                        || 'Ποιος συνθέτει το τελικό κείμενο μετά τη διαβούλευση. Με «Κληρωτό σώμα», αν δεν μπορεί να συγκροτηθεί ή δεν απαντήσει εγκαίρως, η σύνθεση γίνεται αυτόματα από το AI ώστε η πρόταση να μην κολλήσει ποτέ.'}
+                    </p>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-3">

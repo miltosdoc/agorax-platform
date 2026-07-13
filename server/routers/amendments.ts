@@ -100,15 +100,35 @@ export function registerAmendmentsRoutes(app: Express): void {
           });
         }
       }
-      const { type, text } = req.body;
+      const { type, text, parentAmendmentId } = req.body;
       if (!type || !text) {
         return res.status(400).json({ message: "Type and text are required" });
+      }
+      // Amendments on a counter-proposal: one level deep, and a
+      // counter-proposal cannot itself receive a counter-proposal.
+      let parentId: number | null = null;
+      if (parentAmendmentId !== undefined && parentAmendmentId !== null) {
+        parentId = parseInt(String(parentAmendmentId));
+        if (!Number.isInteger(parentId)) {
+          return res.status(400).json({ message: "Invalid parentAmendmentId" });
+        }
+        if (type === 'counter_proposal') {
+          return res.status(400).json({ message: "Δεν επιτρέπεται αντιπρόταση σε αντιπρόταση — μόνο τροπολογίες." });
+        }
+        const parent = await amendmentRepo.getAmendment(parentId);
+        if (!parent || parent.proposalId !== proposalId) {
+          return res.status(404).json({ message: "Parent amendment not found on this proposal" });
+        }
+        if (parent.type !== 'counter_proposal' || (parent as any).parentAmendmentId != null) {
+          return res.status(400).json({ message: "Τροπολογίες επιτρέπονται μόνο πάνω σε αντιπροτάσεις." });
+        }
       }
       const amendment = await amendmentRepo.createAmendment({
         proposalId,
         authorId: req.user.id,
         type,
         text,
+        parentAmendmentId: parentId,
         status: 'pending',
       });
       // Best-effort fan-out to community members; failures must not block the response.
@@ -154,10 +174,17 @@ export function registerAmendmentsRoutes(app: Express): void {
       }
       const amendment = await amendmentRepo.getAmendment(amendmentId);
       if (!amendment) return res.status(404).json({ message: "Amendment not found" });
-      // Only the proposal author can review amendments
       const proposal = await proposalRepo.getProposal(amendment.proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      if (proposal.authorId !== req.user.id) {
+      // Top-level amendments are judged by the proposal author; amendments
+      // on a counter-proposal by that counter-proposal's author.
+      const parentId = (amendment as any).parentAmendmentId as number | null;
+      if (parentId != null) {
+        const parent = await amendmentRepo.getAmendment(parentId);
+        if (!parent || parent.authorId !== req.user.id) {
+          return res.status(403).json({ message: "Only the counter-proposal's author can review its amendments" });
+        }
+      } else if (proposal.authorId !== req.user.id) {
         return res.status(403).json({ message: "Only the proposal author can review amendments" });
       }
       await authorReviewAmendment(amendmentId, decision as 'accepted' | 'rejected', reason);

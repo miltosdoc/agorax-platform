@@ -44,19 +44,36 @@ async function handleSendNotification(payload: JobPayload): Promise<void> {
 
 async function handleCreateSortition(payload: JobPayload): Promise<void> {
   const { communityId, size, proposalId, purpose } = payload.data;
-  
+
   const { createSortitionBody } = await import('./sortition');
   const { storage } = await import('../storage');
-  
-  // createSortitionBody handles selection + DB insert in one call
-  const result = await createSortitionBody(
-    communityId,
-    size,
-    storage,
-    purpose,
-    proposalId ?? undefined,
-  );
-  
+
+  try {
+    // createSortitionBody handles selection + DB insert in one call
+    await createSortitionBody(
+      communityId,
+      size,
+      storage,
+      purpose,
+      proposalId ?? undefined,
+    );
+  } catch (err: any) {
+    // AI fallback: a synthesis jury that cannot form (e.g. the community is
+    // too small to have eligible members) must not deadlock the proposal in
+    // sortition_synthesis. The AI merge synthesizes instead and the vote
+    // opens — same outcome as a jury that never responds.
+    if (purpose !== 'text_synthesis' || typeof proposalId !== 'number') throw err;
+    console.warn(`[sortition] jury could not form for proposal ${proposalId} (${err?.message}) — falling back to AI synthesis`);
+    const proposal = await storage.getProposal(proposalId);
+    if (!proposal || proposal.status !== 'sortition_synthesis') return;
+    const { prepareFinalReview } = await import('./ai-merger');
+    try {
+      await prepareFinalReview(proposalId);
+    } catch { /* the transition side effect re-tries the merge */ }
+    const { transitionProposal, triggerSideEffects } = await import('./proposal-state-machine');
+    const updated = await transitionProposal(proposal as any, 'voting', storage);
+    await triggerSideEffects('sortition_synthesis', 'voting', updated);
+  }
 }
 
 // ─── Handler: recalculate_score ─────────────────────────────────────────────

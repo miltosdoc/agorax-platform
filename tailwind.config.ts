@@ -29,6 +29,7 @@ export default {
         apochi: { DEFAULT: "var(--apochi)", wash: "var(--apochi-wash)" },
         warn: { DEFAULT: "var(--warn)", wash: "var(--warn-wash)" },
         bronze: { DEFAULT: "var(--bronze)", deep: "var(--bronze-deep)", wash: "var(--bronze-wash)" },
+        antip: { DEFAULT: "var(--antip)", deep: "var(--antip-deep)", wash: "var(--antip-wash)" },
         bc: {
           ground: "var(--bc-ground)", panel: "var(--bc-panel)", line: "var(--bc-line)",
           "ink": "var(--bc-ink)", "ink-soft": "var(--bc-ink-soft)",

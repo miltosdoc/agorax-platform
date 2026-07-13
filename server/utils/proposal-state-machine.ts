@@ -309,11 +309,16 @@ export async function triggerSideEffects(
       break;
 
     case 'sortition_synthesis->voting':
-      // Legacy sortition path: inline merge as before.
       await enqueueRecalculateScore(proposal.communityId);
       try {
-        const { saveAiMergedFinalText } = await import('./ai-merger');
-        await saveAiMergedFinalText(proposal.id);
+        const { saveAiMergedFinalText, buildBallotOptions } = await import('./ai-merger');
+        // The text already on the proposal wins: either the jury's synthesis
+        // or the AI pre-fill from phase entry. Merge only when neither
+        // happened, then freeze the option ballot.
+        if (!proposal.finalText) {
+          await saveAiMergedFinalText(proposal.id);
+        }
+        await buildBallotOptions(proposal.id);
       } catch { /* best-effort */ }
       break;
 
@@ -412,16 +417,26 @@ export async function handleSortitionCompletion(
 ): Promise<void> {
   // Complete the body and get the average score
   const average = await completeSortitionBody(bodyId);
-  
+
   // Get the proposal
   const proposal = await storage.getProposal(proposalId);
   if (!proposal) {
     return;
   }
-  
+
+  const [body] = await database()
+    .select({ purpose: sortitionBodies.purpose })
+    .from(sortitionBodies)
+    .where(eq(sortitionBodies.id, bodyId));
+
   // Determine target state based on score
   let targetState: ProposalState;
-  if (average === null) {
+  if (body?.purpose === 'text_synthesis') {
+    // A synthesis jury that times out must never kill the proposal: the AI
+    // merge (pre-filled at phase entry, re-run in the side effect if
+    // missing) stands in for the jury and the vote opens.
+    targetState = 'voting';
+  } else if (average === null) {
     // No scores submitted — archive
     targetState = 'archived';
   } else if (average <= 33) {
@@ -450,9 +465,11 @@ export async function handleSortitionCompletion(
   await triggerSideEffects(currentState, targetState, { ...proposal, status: targetState });
   
   // Notify author
-  const reason = average === null 
-    ? 'No scores were submitted by the sortition body' 
-    : average <= 33 
+  const reason = body?.purpose === 'text_synthesis'
+    ? 'Η φάση σύνθεσης ολοκληρώθηκε — η πρόταση προχωρά σε ψηφοφορία.'
+    : average === null
+    ? 'No scores were submitted by the sortition body'
+    : average <= 33
       ? `Low average score (${average.toFixed(1)}/100). Please revise and resubmit.`
       : `Approved with average score ${average.toFixed(1)}/100. Moving to voting phase.`;
   

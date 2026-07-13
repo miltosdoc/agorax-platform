@@ -33,6 +33,10 @@
     --warn:         #8A5A00;  --warn-wash:   #F8F2E6;
     /* ── Ceremony — bronze laurel. ONLY on the three ceremony surfaces ── */
     --bronze:       #8A6420;  --bronze-deep: #6E4F18;  --bronze-wash: #F6F1E4;
+
+    /* Counter-proposals (αντιπροτάσεις): a muted violet, distinct from the
+       vote colours and the bronze of the sortition ceremony. */
+    --antip:        #5B3E8C;  --antip-deep:  #47316E;  --antip-wash:  #F1EEF7;
     /* ── Broadcast — the live-results surface only ── */
     --bc-ground: #0C1B2A;  --bc-panel: #12253A;  --bc-line: #27405C;
     --bc-ink: #F2F6FA;     --bc-ink-soft: #93A6BA;

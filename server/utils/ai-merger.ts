@@ -165,7 +165,9 @@ export async function aiMergeAmendments(
 
   const included: Array<{ id: number; type: string; text: string; reason: string }> = [];
   const excluded: number[] = [];
-  for (const a of amendments) {
+  // Children of counter-proposals belong to their parent's restyle, not here.
+  const mergeable = amendments.filter(a => (a as any).parentAmendmentId == null);
+  for (const a of mergeable) {
     const decision = decisionOf(a);
     const ratio = popularityRatio(a);
     if (decision === 'accepted') {
@@ -245,9 +247,22 @@ function partitionAmendments(
     return false;
   };
   const real = amendments.filter(a => a.type !== 'sortition_revision');
+  // Children (amendments ON a counter-proposal) never touch the main text:
+  // qualifying ones are folded into their parent counter when it is restyled
+  // for the ballot. Same qualification rules, judged by the counter's author.
+  const topLevel = real.filter(a => (a as any).parentAmendmentId == null);
+  const children = real.filter(a => (a as any).parentAmendmentId != null);
+  const counterChildren = new Map<number, Array<typeof proposalAmendments.$inferSelect>>();
+  for (const child of children) {
+    if (!qualifies(child)) continue;
+    const parentId = (child as any).parentAmendmentId as number;
+    if (!counterChildren.has(parentId)) counterChildren.set(parentId, []);
+    counterChildren.get(parentId)!.push(child);
+  }
   return {
-    mergeIncluded: real.filter(a => a.type !== 'counter_proposal' && qualifies(a)),
-    counterAlternatives: real.filter(a => a.type === 'counter_proposal' && qualifies(a)),
+    mergeIncluded: topLevel.filter(a => a.type !== 'counter_proposal' && qualifies(a)),
+    counterAlternatives: topLevel.filter(a => a.type === 'counter_proposal' && qualifies(a)),
+    counterChildren,
     excluded: real.filter(a => !qualifies(a)).map(a => a.id),
   };
 }
@@ -260,7 +275,8 @@ const RESTYLE_PROMPT = `Είσαι ειδικός στη σύνταξη πολι
 1. ΔΙΑΤΗΡΕΣΕ ΑΠΑΡΕΓΚΛΙΤΑ την ουσία, τις θέσεις και το κεντρικό μήνυμα της αντιπρότασης — ΔΕΝ επιτρέπεται να τα αμβλύνεις, να τα αλλοιώσεις ή να τα πλησιάσεις προς το τελικό κείμενο.
 2. Άλλαξε ΜΟΝΟ ύφος, δομή και μορφοποίηση ώστε να συγκρίνεται δίκαια με το τελικό κείμενο.
 3. Αν η αντιπρόταση καλύπτει μέρος μόνο του θέματος, συμπλήρωσε ΟΥΔΕΤΕΡΑ τα υπόλοιπα σημεία από το τελικό κείμενο, ώστε να είναι πλήρης εναλλακτική.
-4. Απάντησε ΜΟΝΟ το κείμενο της εναλλακτικής, χωρίς σχόλια.
+4. ΕΝΣΩΜΑΤΩΣΕ φυσικά στην εναλλακτική ΟΛΕΣ τις ΤΡΟΠΟΛΟΓΙΕΣ ΤΗΣ ΑΝΤΙΠΡΟΤΑΣΗΣ παρακάτω — έχουν γίνει δεκτές από τη διαβούλευση και είναι εξίσου απαραβίαστες με την ίδια την αντιπρόταση.
+5. Απάντησε ΜΟΝΟ το κείμενο της εναλλακτικής, χωρίς σχόλια.
 
 ΤΕΛΙΚΟ ΚΕΙΜΕΝΟ:
 ---
@@ -272,15 +288,21 @@ const RESTYLE_PROMPT = `Είσαι ειδικός στη σύνταξη πολι
 {counter}
 ---
 
+ΤΡΟΠΟΛΟΓΙΕΣ ΤΗΣ ΑΝΤΙΠΡΟΤΑΣΗΣ:
+{childAmendments}
+
 ΕΝΑΛΛΑΚΤΙΚΗ ΠΡΟΤΑΣΗ:`;
 
-async function restyleCounter(finalText: string, counterText: string): Promise<string | null> {
+async function restyleCounter(finalText: string, counterText: string, childAmendments: string[] = []): Promise<string | null> {
   if (!isLlmConfigured()) return null;
+  const childText = childAmendments.length > 0
+    ? childAmendments.map((t, i) => `${i + 1}. ${t}`).join('\n\n')
+    : '(καμία)';
   try {
     const response = await chatCompletion({
       messages: [
         { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Ξαναγράφεις αντιπροτάσεις ώστε να συγκρίνονται δίκαια, χωρίς ποτέ να αλλοιώνεις την ουσία τους.' },
-        { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, 4000)).replace('{counter}', counterText.slice(0, 4000)) },
+        { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, 4000)).replace('{counter}', counterText.slice(0, 4000)).replace('{childAmendments}', childText.slice(0, 3000)) },
       ],
       maxTokens: 4000,
       temperature: 0.3,
@@ -322,7 +344,7 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
     .select()
     .from(proposalAmendments)
     .where(eq(proposalAmendments.proposalId, proposalId));
-  const { mergeIncluded, counterAlternatives, excluded } = partitionAmendments(amendments, threshold);
+  const { mergeIncluded, counterAlternatives, counterChildren, excluded } = partitionAmendments(amendments, threshold);
 
   // Merge improvements/additions/removals into the vote-ready text.
   let finalText = proposal.solution;
@@ -359,9 +381,11 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
     .set({ finalText, updatedAt: new Date() })
     .where(eq(proposals.id, proposalId));
 
-  // Restyle each qualifying counter-proposal into a standalone alternative.
+  // Restyle each qualifying counter-proposal into a standalone alternative,
+  // folding in the amendments the deliberation accepted on that counter.
   for (const counter of counterAlternatives) {
-    const restyled = await restyleCounter(finalText, counter.text);
+    const childTexts = (counterChildren.get(counter.id) ?? []).map(c => c.text);
+    const restyled = await restyleCounter(finalText, counter.text, childTexts);
     await db.update(proposalAmendments)
       .set({ restyledText: restyled ?? counter.text })
       .where(eq(proposalAmendments.id, counter.id));

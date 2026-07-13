@@ -218,6 +218,10 @@ export const communities = pgTable("communities", {
   sortitionSize: integer("sortition_size").default(20),
   sortitionMode: text("sortition_mode").default("absolute"), // 'absolute' | 'percentage'
   sortitionResponseHours: integer("sortition_response_hours").default(72),
+  // Who synthesizes the final text after deliberation: 'ai' (default) or
+  // 'sortition' (a drawn jury, with AI as automatic fallback when the jury
+  // cannot form or does not respond).
+  synthesisMode: text("synthesis_mode").default("ai"), // 'ai' | 'sortition'
 
   // Amendment parameters (per-community config)
   amendmentThreshold: numeric("amendment_threshold").default("0.5"), // upvote ratio to flag rejected amendments
@@ -364,6 +368,11 @@ export const proposalAmendments = pgTable("proposal_amendments", {
   authorId: integer("author_id").notNull().references(() => users.id),
 
   type: text("type").notNull(), // 'improvement' (βελτίωση) | 'counter_proposal' (αντιπρόταση)
+
+  // Set when this amendment targets a counter-proposal instead of the main
+  // text. One level only: the parent must be a counter_proposal and children
+  // cannot themselves be counter_proposals.
+  parentAmendmentId: integer("parent_amendment_id").references((): any => proposalAmendments.id, { onDelete: "cascade" }),
 
   // Content
   text: text("text").notNull(),
