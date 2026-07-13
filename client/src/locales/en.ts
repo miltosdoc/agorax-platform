@@ -463,6 +463,8 @@ const en: TranslationDictionary = {
   'verify.rejection.already_voted': 'You have already voted',
   'verify.rejection.vote_choice_not_found': 'No clear vote choice found',
   'verify.rejection.pdf_read_error': 'Error reading PDF file',
+  'verify.rejection.already_verified': 'This ID is already linked to another account',
+  'verify.rejection.identity_cooldown': 'This ID belonged to a recently deleted account — it is released after a 30-day waiting period',
 
   // Poll
 

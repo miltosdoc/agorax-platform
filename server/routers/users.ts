@@ -225,14 +225,42 @@ export function registerUsersRoutes(app: Express): void {
         }
 
         // One person = one account: the AFM hash must not already belong to
-        // a different account.
+        // a different account. Exception: an ERASED account releases its AFM
+        // after a 30-day cooling-off (long enough to make delete-and-recreate
+        // account hopping unattractive, short enough that a citizen who
+        // deleted their account isn't locked out forever). The doc_code_hash
+        // is never released — a used declaration stays used.
+        const AFM_COOLDOWN_DAYS = 30;
         const existingUser = await userRepo.getUserByVoterHash(voterHash);
         if (existingUser && existingUser.id !== req.user.id) {
-          return res.status(400).json({
-            success: false,
-            message: "Αυτή η ταυτότητα είναι ήδη συνδεδεμένη με άλλο λογαριασμό",
-            rejection_reason: "already_verified"
-          });
+          let released = false;
+          if (existingUser.accountStatus === 'erased') {
+            const erasedAt = await userRepo.getLatestErasureProcessedAt(existingUser.id);
+            if (erasedAt) {
+              const releaseAt = erasedAt.getTime() + AFM_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+              if (Date.now() >= releaseAt) {
+                await userRepo.updateUser(existingUser.id, {
+                  govgrVoterHash: null,
+                  govgrVerified: false,
+                });
+                released = true;
+              } else {
+                const daysLeft = Math.ceil((releaseAt - Date.now()) / (24 * 60 * 60 * 1000));
+                return res.status(400).json({
+                  success: false,
+                  message: `Αυτή η ταυτότητα ανήκε σε λογαριασμό που διαγράφηκε πρόσφατα. Θα είναι ξανά διαθέσιμη σε ${daysLeft} ημέρες.`,
+                  rejection_reason: "identity_cooldown",
+                });
+              }
+            }
+          }
+          if (!released) {
+            return res.status(400).json({
+              success: false,
+              message: "Αυτή η ταυτότητα είναι ήδη συνδεδεμένη με άλλο λογαριασμό",
+              rejection_reason: "already_verified"
+            });
+          }
         }
 
         // Anti-replay: the same declaration document cannot verify two accounts.

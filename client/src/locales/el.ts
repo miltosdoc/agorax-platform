@@ -463,6 +463,8 @@ const el: TranslationDictionary = {
   'verify.rejection.already_voted': 'Έχετε ήδη ψηφίσει',
   'verify.rejection.vote_choice_not_found': 'Δεν βρέθηκε ξεκάθαρη επιλογή ψήφου',
   'verify.rejection.pdf_read_error': 'Σφάλμα ανάγνωσης του αρχείου PDF',
+  'verify.rejection.already_verified': 'Αυτή η ταυτότητα είναι ήδη συνδεδεμένη με άλλο λογαριασμό',
+  'verify.rejection.identity_cooldown': 'Αυτή η ταυτότητα ανήκε σε λογαριασμό που διαγράφηκε πρόσφατα — απελευθερώνεται μετά από περίοδο αναμονής 30 ημερών',
 
   // Poll
 

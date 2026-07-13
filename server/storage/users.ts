@@ -32,7 +32,7 @@ import {
   type UserConsent,
   type ErasureRequest,
 } from '../../shared/schema';
-import { eq, and, ilike, desc, sql, isNull, inArray } from 'drizzle-orm';
+import { eq, and, ilike, desc, sql, isNull, isNotNull, inArray } from 'drizzle-orm';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -81,6 +81,21 @@ export class UserRepository {
       .from(users)
       .where(eq(users.govgrVoterHash, voterHash));
     return user;
+  }
+
+  /**
+   * When an erased account's AFM hash is still reserved, this is the moment
+   * the erasure was processed — the start of the 30-day cooling-off window
+   * after which the AFM may verify a new account.
+   */
+  async getLatestErasureProcessedAt(userId: number): Promise<Date | null> {
+    const [row] = await db
+      .select({ processedAt: erasureRequests.processedAt })
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.userId, userId), isNotNull(erasureRequests.processedAt)))
+      .orderBy(desc(erasureRequests.processedAt))
+      .limit(1);
+    return row?.processedAt ?? null;
   }
 
   /** Create a new user. */

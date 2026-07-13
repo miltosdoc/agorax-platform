@@ -73,6 +73,8 @@ export function VerifyGovgrModal({ isOpen, onClose }: VerifyGovgrModalProps) {
             "invalid_token": t('verify.rejection.invalid_token'),
             "token_not_found": t('verify.rejection.token_not_found'),
             "afm_not_found": t('verify.rejection.afm_not_found'),
+            "already_verified": t('verify.rejection.already_verified'),
+            "identity_cooldown": t('verify.rejection.identity_cooldown'),
             "already_voted": t('verify.rejection.already_voted'),
             "vote_choice_not_found": t('verify.rejection.vote_choice_not_found'),
             "pdf_read_error": t('verify.rejection.pdf_read_error')
