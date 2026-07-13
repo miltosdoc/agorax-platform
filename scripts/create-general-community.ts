@@ -14,7 +14,7 @@
  */
 
 import 'dotenv/config';
-import { and, asc, eq, isNull, or, ne } from 'drizzle-orm';
+import { asc, eq, or, isNull } from 'drizzle-orm';
 import { db } from '../server/db';
 import { users } from '../shared/schema';
 import { addMember, createCommunity, getGeneralCommunity } from '../server/utils/community-manager';
@@ -45,13 +45,11 @@ async function main() {
     console.log(`General community already exists: #${general.id} "${general.name}"`);
   }
 
-  // Backfill active accounts only: skip Art. 17 crypto-shredded users
-  // (erasedAt set) and any non-'active' accountStatus (banned/suspended).
+  // Backfill active accounts only. accountStatus vocabulary is
+  // 'active' | 'banned' | 'erased' (Art. 17 crypto-shred sets 'erased');
+  // legacy rows may have NULL, which we treat as active.
   const allUsers = await db.select({ id: users.id }).from(users)
-    .where(and(
-      isNull(users.erasedAt),
-      or(isNull(users.accountStatus), eq(users.accountStatus, 'active')),
-    ))
+    .where(or(isNull(users.accountStatus), eq(users.accountStatus, 'active')))
     .orderBy(asc(users.id));
   for (const u of allUsers) {
     await addMember(general.id, u.id); // idempotent: select-before-insert
