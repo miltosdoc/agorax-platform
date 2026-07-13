@@ -121,6 +121,8 @@ const en: TranslationDictionary = {
   'proposal.by': 'by',
   'proposal.userWithId': 'User #{id}',
   'proposal.proposedSolution': 'Proposed Solution',
+  'proposal.initialSolution': 'Initial proposal',
+  'proposal.initialSolutionContext': 'The text before amendments and final synthesis',
   'proposal.sortitionRevisions': 'Sortition revisions',
   'proposal.sortitionRevisionsHint': 'Changes proposed by the sortition jury, layered on the original proposal above.',
   'proposal.sortitionRevisionLabel': 'Revision {n}',

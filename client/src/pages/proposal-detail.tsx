@@ -98,6 +98,7 @@ export default function ProposalDetailPage() {
   const [voteError, setVoteError] = useState<string | null>(null);
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState<string | null>(null);
+  const [initialSolutionOpen, setInitialSolutionOpen] = useState<boolean | null>(null);
   const [sortitionRevisions, setSortitionRevisions] = useState<
     Array<{ id: number; text: string; authorName: string }>
   >([]);
@@ -133,6 +134,10 @@ export default function ProposalDetailPage() {
       .then((resp) => setSortitionRevisions(resp.data))
       .catch(() => setSortitionRevisions([]));
   }, [proposalId]);
+
+  useEffect(() => {
+    setInitialSolutionOpen(null);
+  }, [proposalId, proposal?.status]);
 
   // While LLM validation is in flight the proposal sits in 'review' for
   // ~10–15s. Poll every 3s so the page reflects the post-validation status
@@ -293,6 +298,10 @@ export default function ProposalDetailPage() {
   // ballot IS the page. Vote front and center, no amendments tab, no
   // sortition/AI-validation widgets, no "final text" copy.
   const isDirectVote = proposal.track === 'vote';
+  const hasDistinctFinalText = !!proposal.finalText
+    && proposal.finalText.trim() !== proposal.solution.trim();
+  const initialSolutionExpanded = initialSolutionOpen
+    ?? !(proposal.status === 'voting' && hasDistinctFinalText);
 
   return (
     <AppShell breadcrumb={[
@@ -422,10 +431,37 @@ export default function ProposalDetailPage() {
             </div>
           </header>
 
-          {/* Proposal text — the star of the page */}
+          {/* During an active vote, the distinct final text is primary. */}
           <section className="mb-8">
-            <h2 className="text-sm font-medium text-muted-foreground mb-2">{t('proposal.proposedSolution')}</h2>
-            <p className="whitespace-pre-wrap text-base leading-relaxed">{proposal.solution}</p>
+            <Collapsible
+              open={initialSolutionExpanded}
+              onOpenChange={setInitialSolutionOpen}
+              className="border-y"
+              data-testid="initial-solution"
+            >
+              <CollapsibleTrigger
+                className="flex w-full items-center justify-between gap-4 py-3 text-left hover:text-foreground"
+                data-testid="initial-solution-toggle"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">
+                    {hasDistinctFinalText ? t('proposal.initialSolution') : t('proposal.proposedSolution')}
+                  </span>
+                  {hasDistinctFinalText && (
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      {t('proposal.initialSolutionContext')}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${initialSolutionExpanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent data-testid="initial-solution-content">
+                <p className="whitespace-pre-wrap pb-4 text-base leading-relaxed">{proposal.solution}</p>
+              </CollapsibleContent>
+            </Collapsible>
 
             {sortitionRevisions.length > 0 && (
               <div className="mt-4 p-4 border rounded space-y-3">

@@ -121,6 +121,8 @@ const el: TranslationDictionary = {
   'proposal.by': 'από',
   'proposal.userWithId': 'Χρήστης #{id}',
   'proposal.proposedSolution': 'Προτεινόμενη Λύση',
+  'proposal.initialSolution': 'Αρχική πρόταση',
+  'proposal.initialSolutionContext': 'Το κείμενο πριν από τις τροπολογίες και την τελική σύνθεση',
   'proposal.sortitionRevisions': 'Αναθεωρήσεις κληρωτού σώματος',
   'proposal.sortitionRevisionsHint': 'Αλλαγές που πρότεινε το κληρωτό σώμα, πάνω στην αρχική πρόταση παραπάνω.',
   'proposal.sortitionRevisionLabel': 'Αναθεώρηση {n}',
