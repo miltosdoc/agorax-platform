@@ -325,6 +325,7 @@ const el: TranslationDictionary = {
   'library.itemTitle': 'Τίτλος',
   'library.itemTitlePlaceholder': 'π.χ. Πώς λειτουργεί η πλατφόρμα (βίντεο)',
   'library.file': 'Αρχείο',
+  'library.chooseFile': 'Επιλογή αρχείου…',
   'library.uploadButton': 'Μεταφόρτωση',
   'library.uploading': 'Μεταφόρτωση…',
   'library.uploadSuccess': 'Προστέθηκε στη βιβλιοθήκη',

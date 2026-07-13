@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import { api } from '@/lib/api';
 import { uploadProposalFile } from '@/lib/upload-media';
-import { FileAudio, FileText, FileVideo, Pin, PinOff, Trash2, Upload } from 'lucide-react';
+import { FileAudio, FileText, FileUp, FileVideo, Pin, PinOff, Trash2, Upload } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 type LibraryKind = 'podcast' | 'video' | 'document';
@@ -61,6 +61,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
   const [items, setItems] = useState<LibraryItem[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState('');
+  const [fileName, setFileName] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [loadError, setLoadError] = useState(false);
@@ -103,6 +104,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
       await uploadProposalFile(file, `/api/communities/${communityId}/media?kind=${kind}`, title.trim());
       toast({ title: t('library.uploadSuccess') });
       setTitle('');
+      setFileName(null);
       if (fileRef.current) fileRef.current.value = '';
       await load();
     } catch (err: any) {
@@ -156,13 +158,27 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="library-file">{t('library.file')}</Label>
-                <Input
+                {/* Hidden native input: its button text renders in the
+                    browser's language, not the app locale. */}
+                <input
                   id="library-file"
                   type="file"
                   ref={fileRef}
                   accept="audio/*,video/*,.mp3,.m4a,.mp4,.mov,.pdf,.doc,.docx,.odt,.txt"
+                  className="hidden"
+                  onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
                   data-testid="library-file-input"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start font-normal"
+                  onClick={() => fileRef.current?.click()}
+                  data-testid="library-file-button"
+                >
+                  <FileUp className="h-4 w-4 mr-2 shrink-0" />
+                  <span className="truncate">{fileName ?? t('library.chooseFile')}</span>
+                </Button>
               </div>
             </div>
             <Button onClick={handleUpload} disabled={uploading} data-testid="library-upload-button">

@@ -325,6 +325,7 @@ const en: TranslationDictionary = {
   'library.itemTitle': 'Title',
   'library.itemTitlePlaceholder': 'e.g. How the platform works (video)',
   'library.file': 'File',
+  'library.chooseFile': 'Choose file…',
   'library.uploadButton': 'Upload',
   'library.uploading': 'Uploading…',
   'library.uploadSuccess': 'Added to the library',
