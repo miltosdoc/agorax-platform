@@ -16,14 +16,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { el as dateFnsEl, enUS as dateFnsEn } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../../assets/logo.png";
 import { VerifyGovgrModal } from "../user/verify-govgr-modal";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
-import { useUnreadCount, useNotifications, useMarkAsRead } from "@/hooks/use-notifications";
+import { useUnreadCount, useNotifications } from "@/hooks/use-notifications";
+import { NotificationItem } from "@/components/notifications/notification-item";
 import type { SortitionNotification } from "@/types/notifications";
 import SearchBar from "@/components/SearchBar";
 import { downloadApk } from "@/lib/download-apk";
@@ -31,9 +30,8 @@ import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/
 
 export default function Header() {
   const { user, logoutMutation } = useAuth();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [location, navigate] = useLocation();
-  const dateFnsLocale = locale === 'el' ? dateFnsEl : dateFnsEn;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
@@ -68,22 +66,12 @@ export default function Header() {
     limit: 20,
   });
 
-  // Mark notification as read mutation
-  const markAsRead = useMarkAsRead();
-
+  // Navigation only: NotificationItem marks the notification read itself, and
+  // calls this back solely when there is somewhere to go — a message that is
+  // clipped expands in place instead, so the reader never has to leave the
+  // popover to finish reading it.
   const handleNotificationClick = (notification: SortitionNotification) => {
-    if (!notification.read) {
-      markAsRead.mutate(notification.id);
-    }
     setIsNotificationsOpen(false);
-    // A message clipped in this popover has to be readable somewhere. Sending
-    // an announcement-style notification to its actionUrl drops the reader on
-    // a page that does not contain the text they were trying to read. The
-    // popover is 320px wide, so two lines run out at roughly 80 characters.
-    if ((notification.message?.length ?? 0) > 80) {
-      navigate("/notifications");
-      return;
-    }
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
     } else if (notification.proposalId) {
@@ -224,34 +212,13 @@ export default function Header() {
                         {t('notification.loading')}
                       </div>
                     ) : notifications.length > 0 ? (
-                      <div className="divide-y divide-line" data-testid="list-notifications">
+                      <div data-testid="list-notifications">
                         {notifications.map((notification) => (
-                          <div
+                          <NotificationItem
                             key={notification.id}
+                            notification={notification}
                             onClick={() => handleNotificationClick(notification)}
-                            className={`cursor-pointer p-3 transition-colors duration-[120ms] hover:bg-sunken ${!notification.read ? "bg-kyanos-wash" : ""}`}
-                            data-testid={`notification-item-${notification.id}`}
-                          >
-                            <div className="flex items-start gap-2.5">
-                              <div className="min-w-0 flex-1">
-                                <p className={`text-sm text-ink ${!notification.read ? "font-semibold" : ""}`}>
-                                  {notification.title}
-                                </p>
-                                {notification.message && (
-                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-soft">{notification.message}</p>
-                                )}
-                                <p className="mt-1 font-mono text-[11px] tabular-nums text-ink-faint" data-testid={`text-time-ago-${notification.id}`}>
-                                  {formatDistanceToNow(new Date(notification.createdAt), {
-                                    addSuffix: true,
-                                    locale: dateFnsLocale
-                                  })}
-                                </p>
-                              </div>
-                              {!notification.read && (
-                                <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-kyanos" data-testid="indicator-unread" />
-                              )}
-                            </div>
-                          </div>
+                          />
                         ))}
                       </div>
                     ) : (
