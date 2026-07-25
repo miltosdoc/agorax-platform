@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { el as dateFnsEl, enUS as dateFnsEn } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
@@ -11,30 +11,40 @@ interface NotificationItemProps {
   onClick?: () => void;
 }
 
-/**
- * Beyond roughly two lines the clamp hides text, and the row click
- * navigates away — so a long message could not be read at all. Anything
- * past this length gets an expand toggle.
- */
-const CLAMP_THRESHOLD = 110;
-
 export function NotificationItem({ notification, onClick }: NotificationItemProps) {
   const { t, locale } = useTranslation();
   const markAsRead = useMarkAsRead();
   const dateFnsLocale = locale === 'el' ? dateFnsEl : dateFnsEn;
   const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const messageRef = useRef<HTMLParagraphElement>(null);
 
   const config = notificationTypeConfig[notification.type] || { icon: '📋', color: 'bg-gray-50 border-gray-200' };
-  const isLong = (notification.message?.length ?? 0) > CLAMP_THRESHOLD;
+
+  // Whether two lines actually clip the text depends on the viewport, not on
+  // a character count: ~47 characters fill a line on a 360px phone against
+  // more than twice that on a desktop. Measure the element instead of
+  // guessing, and re-measure on resize/rotation.
+  useLayoutEffect(() => {
+    const el = messageRef.current;
+    if (!el || expanded) return;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [notification.message, expanded]);
+
+  const canExpand = overflows || expanded;
 
   const handleClick = () => {
     if (!notification.read) {
       markAsRead.mutate(notification.id);
     }
-    // Tapping the row is how you read a notification on a phone — a small
+    // Tapping the row is how you open a notification on a phone — a small
     // "more" link is not a realistic tap target. So a clipped message
     // expands in place, and navigation moves to its own explicit button.
-    if (isLong) {
+    if (canExpand) {
       setExpanded((v) => !v);
       return;
     }
@@ -62,12 +72,13 @@ export function NotificationItem({ notification, onClick }: NotificationItemProp
         {notification.message && (
           <>
             <p
+              ref={messageRef}
               className={`text-sm text-muted-foreground mt-0.5 whitespace-pre-line ${expanded ? '' : 'line-clamp-2'}`}
               data-testid={`notification-message-${notification.id}`}
             >
               {notification.message}
             </p>
-            {isLong && (
+            {canExpand && (
               <div className="mt-1 flex flex-wrap items-center gap-4">
                 <button
                   type="button"

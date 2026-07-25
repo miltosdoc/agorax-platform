@@ -78,8 +78,9 @@ export default function Header() {
     setIsNotificationsOpen(false);
     // A message clipped in this popover has to be readable somewhere. Sending
     // an announcement-style notification to its actionUrl drops the reader on
-    // a page that does not contain the text they were trying to read.
-    if ((notification.message?.length ?? 0) > 110) {
+    // a page that does not contain the text they were trying to read. The
+    // popover is 320px wide, so two lines run out at roughly 80 characters.
+    if ((notification.message?.length ?? 0) > 80) {
       navigate("/notifications");
       return;
     }
