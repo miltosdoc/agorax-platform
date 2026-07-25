@@ -69,6 +69,48 @@ function localConcat(question: string, solution: string, accepted: Array<{ id: n
   ].join('');
 }
 
+// Prompt-side input caps. These sit far above real proposal sizes: the point
+// is to bound a runaway input, not to trim ordinary ones. Prompt tokens are
+// billed separately from `max_tokens`, so a generous cap costs nothing.
+const MAX_TEXT_CHARS = 12_000;
+const MAX_LIST_CHARS = 24_000;
+
+/**
+ * Render a numbered amendment list for a prompt, dropping WHOLE amendments if
+ * the list would exceed `maxChars` — never cutting mid-sentence. The previous
+ * `slice(0, 4000)` cut proposal 30's 5633-char list mid-word, silently losing
+ * three author-accepted amendments from the vote-ready text. Dropping is now
+ * both boundary-aligned and logged.
+ */
+function renderAmendmentList(
+  items: Array<{ id: number; label?: string; text: string }>,
+  maxChars: number,
+  context: string,
+): string {
+  const kept: string[] = [];
+  const dropped: number[] = [];
+  let used = 0;
+  for (const item of items) {
+    const entry = item.label
+      ? `${kept.length + 1}. [${item.label}] ${item.text}`
+      : `${kept.length + 1}. ${item.text}`;
+    const cost = entry.length + (kept.length > 0 ? 2 : 0);
+    if (used + cost > maxChars) {
+      dropped.push(item.id);
+      continue;
+    }
+    kept.push(entry);
+    used += cost;
+  }
+  if (dropped.length > 0) {
+    console.warn(
+      `[ai-merger] ${context}: amendment list exceeds ${maxChars} chars — ` +
+      `${dropped.length} amendment(s) omitted from the prompt: ${dropped.join(', ')}`,
+    );
+  }
+  return kept.length > 0 ? kept.join('\n\n') : '(καμία)';
+}
+
 const MERGE_PROMPT = `Είσαι ειδικός στη σύνταξη πολιτικών κειμένων.
 Έχεις μια αρχική πρόταση και μια λίστα αποδεκτών τροπολογιών.
 Ενσωμάτωσε ΟΛΕΣ τις τροπολογίες στην αρχική πρόταση, παράγοντας ένα ενιαίο, συνεκτικό κείμενο.
@@ -101,20 +143,23 @@ async function llmMerge(
     return { text: '', success: false };
   }
 
-  const amendmentsText = amendments
-    .map((a, i) => {
-      const typeLabel =
+  const amendmentsText = renderAmendmentList(
+    amendments.map(a => ({
+      id: a.id,
+      label:
         a.type === 'improvement' ? 'Βελτίωση' :
         a.type === 'addition' ? 'Προσθήκη' :
         a.type === 'removal' ? 'Αφαίρεση' :
-        a.type === 'counter_proposal' ? 'Αντιπρόταση' : 'Τροπολογία';
-      return `${i + 1}. [${typeLabel}] ${a.text}`;
-    })
-    .join('\n\n');
+        a.type === 'counter_proposal' ? 'Αντιπρόταση' : 'Τροπολογία',
+      text: a.text,
+    })),
+    MAX_LIST_CHARS,
+    'merge',
+  );
 
   const prompt = MERGE_PROMPT
-    .replace('{solution}', solution.slice(0, 4000))
-    .replace('{amendments}', amendmentsText.slice(0, 4000));
+    .replace('{solution}', solution.slice(0, MAX_TEXT_CHARS))
+    .replace('{amendments}', amendmentsText);
 
   try {
     const response = await chatCompletion({
@@ -122,9 +167,11 @@ async function llmMerge(
         { role: 'system', content: 'Είσαι ειδικός στη σύνταξη και επεξεργασία πολιτικών κειμένων. Ενσωματώνεις τροπολογίες σε προτάσεις με φυσικό και συνεκτικό τρόπο.' },
         { role: 'user', content: prompt },
       ],
-      maxTokens: 4000,
+      // The merged text grows with the amendment count — 15 amendments already
+      // produce ~3k tokens of Greek. Leave room so the answer is never clipped.
+      maxTokens: 8000,
       temperature: 0.3,
-      timeoutMs: 45_000,
+      timeoutMs: 90_000,
       enableThinking: false,
     });
 
@@ -296,18 +343,20 @@ const RESTYLE_PROMPT = `Είσαι ειδικός στη σύνταξη πολι
 
 async function restyleCounter(finalText: string, counterText: string, childAmendments: string[] = []): Promise<string | null> {
   if (!isLlmConfigured()) return null;
-  const childText = childAmendments.length > 0
-    ? childAmendments.map((t, i) => `${i + 1}. ${t}`).join('\n\n')
-    : '(καμία)';
+  const childText = renderAmendmentList(
+    childAmendments.map((t, i) => ({ id: i + 1, text: t })),
+    MAX_LIST_CHARS,
+    'counter restyle',
+  );
   try {
     const response = await chatCompletion({
       messages: [
         { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Ξαναγράφεις αντιπροτάσεις ώστε να συγκρίνονται δίκαια, χωρίς ποτέ να αλλοιώνεις την ουσία τους.' },
-        { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, 4000)).replace('{counter}', counterText.slice(0, 4000)).replace('{childAmendments}', childText.slice(0, 3000)) },
+        { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, MAX_TEXT_CHARS)).replace('{counter}', counterText.slice(0, MAX_TEXT_CHARS)).replace('{childAmendments}', childText) },
       ],
-      maxTokens: 4000,
+      maxTokens: 8000,
       temperature: 0.3,
-      timeoutMs: 45_000,
+      timeoutMs: 90_000,
       enableThinking: false,
     });
     return response.trim().length > 0 ? response.trim() : null;
@@ -427,23 +476,25 @@ const REFINE_PROMPT = `Είσαι ειδικός στη σύνταξη πολι�
 
 /** The raw guarded-refine LLM call. Returns null on empty output. */
 async function runRefine(finalText: string, instruction: string, inviolable: string[]): Promise<string | null> {
-  const amendmentsText = inviolable.length > 0
-    ? inviolable.map((t, i) => `${i + 1}. ${t}`).join('\n\n')
-    : '(καμία)';
+  const amendmentsText = renderAmendmentList(
+    inviolable.map((t, i) => ({ id: i + 1, text: t })),
+    MAX_LIST_CHARS,
+    'refine',
+  );
   const response = await chatCompletion({
     messages: [
       { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Εφαρμόζεις οδηγίες συγγραφέων χωρίς ποτέ να αποδυναμώνεις τις ενσωματωμένες τροπολογίες της κοινότητας.' },
       {
         role: 'user',
         content: REFINE_PROMPT
-          .replace('{amendments}', amendmentsText.slice(0, 3000))
-          .replace('{finalText}', finalText.slice(0, 5000))
+          .replace('{amendments}', amendmentsText)
+          .replace('{finalText}', finalText.slice(0, MAX_TEXT_CHARS))
           .replace('{instruction}', instruction.slice(0, 500)),
       },
     ],
-    maxTokens: 4000,
+    maxTokens: 8000,
     temperature: 0.2,
-    timeoutMs: 45_000,
+    timeoutMs: 90_000,
     enableThinking: false,
   });
   const refined = response.trim();

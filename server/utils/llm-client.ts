@@ -81,50 +81,82 @@ export async function chatCompletion(opts: ChatCompletionOptions): Promise<strin
   }
   const url = `${cfg.url}/chat/completions`;
   const timeoutMs = opts.timeoutMs ?? 45_000;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  // Reasoning models bill hidden thinking tokens against the SAME max_tokens
+  // budget as the visible answer, so one number has to cover both. Measured on
+  // the configured endpoint: a 15-amendment merge spent 3838 of 4000 tokens
+  // thinking, and what came back as `content` was a mid-word fragment of the
+  // model's internal plan rather than an answer. Budget the two separately.
+  const answerBudget = Math.max(opts.maxTokens ?? 4000, 4000);
+  const reasoningBudget = opts.enableThinking === false ? 4000 : 8000;
+
+  const attempt = async (capReasoning: boolean): Promise<string> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cfg.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: cfg.model,
+          messages: opts.messages,
+          max_tokens: answerBudget + reasoningBudget,
+          temperature: opts.temperature ?? 0.7,
+          // `reasoning: {enabled: false}` is rejected outright for models where
+          // reasoning is mandatory, but a token cap is accepted — that is how
+          // enableThinking:false is honoured. The cap is advisory (the model may
+          // overshoot it), which is why the headroom above is separate from it.
+          // Dropped on retry if a model refuses the field entirely.
+          ...(capReasoning ? { reasoning: { max_tokens: reasoningBudget } } : {}),
+          ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        const httpErr = new LlmUnavailableError(`LLM HTTP ${res.status}: ${text.slice(0, 200)}`);
+        (httpErr as any).httpStatus = res.status;
+        throw httpErr;
+      }
+      const json = (await res.json()) as {
+        choices?: Array<{ finish_reason?: string; message?: { content?: string | null } }>;
+      };
+      const choice = json.choices?.[0];
+      // A truncated completion is worse than none: the gateway hands back a
+      // mid-word slice of the model's internal plan, which callers would
+      // otherwise persist as finished text. Force the deterministic fallback.
+      if (choice?.finish_reason === 'length') {
+        throw new LlmUnavailableError(
+          `LLM output truncated at max_tokens (${answerBudget + reasoningBudget}) — discarding partial text`,
+        );
+      }
+      const content = choice?.message?.content;
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        throw new LlmUnavailableError('LLM returned empty content');
+      }
+      return content;
+    } catch (err: any) {
+      if (err instanceof LlmUnavailableError) throw err;
+      if (err?.name === 'AbortError') {
+        throw new LlmUnavailableError(`LLM call timed out after ${timeoutMs}ms`, err);
+      }
+      throw new LlmUnavailableError(`LLM call failed: ${err?.message ?? String(err)}`, err);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const capReasoning = opts.enableThinking === false;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: opts.messages,
-        // Reasoning models (mandatory on this endpoint for e.g. gemini) spend
-        // hidden thinking tokens inside the same budget: small caps come back
-        // as empty content. Keep a floor so every call has room to think.
-        max_tokens: Math.max(opts.maxTokens ?? 4000, 4000),
-        temperature: opts.temperature ?? 0.7,
-        // Note: no reasoning-disable flag here. The xsilico endpoint rejects
-        // `reasoning: {enabled: false}` outright for models where reasoning
-        // is mandatory (e.g. gemini-3.5-flash), so callers' enableThinking
-        // hint is accepted but not forwarded.
-        ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
-      }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new LlmUnavailableError(`LLM HTTP ${res.status}: ${text.slice(0, 200)}`);
-    }
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content || typeof content !== 'string' || content.trim().length === 0) {
-      throw new LlmUnavailableError('LLM returned empty content');
-    }
-    return content;
+    return await attempt(capReasoning);
   } catch (err: any) {
-    if (err instanceof LlmUnavailableError) throw err;
-    if (err?.name === 'AbortError') {
-      throw new LlmUnavailableError(`LLM call timed out after ${timeoutMs}ms`, err);
+    if (capReasoning && err?.httpStatus === 400) {
+      console.warn('[llm-client] endpoint rejected the reasoning cap; retrying without it');
+      return attempt(false);
     }
-    throw new LlmUnavailableError(`LLM call failed: ${err?.message ?? String(err)}`, err);
-  } finally {
-    clearTimeout(timer);
+    throw err;
   }
 }

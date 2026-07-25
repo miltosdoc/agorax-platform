@@ -56,6 +56,10 @@ const STATUS_CONFIG = {
   flagged: { icon: AlertTriangle, color: 'bg-purple-100 text-purple-800', labelKey: 'workspace.amendments.statusFlagged' },
 };
 
+/** The author's decision overrides the raw row status, which stays 'pending'. */
+const effectiveStatusOf = (a: { status: Amendment['status']; authorDecision?: Amendment['authorDecision'] }) =>
+  (a.authorDecision ?? a.status) as keyof typeof STATUS_CONFIG;
+
 interface AmendmentsPanelProps {
   proposalId: number;
   proposalStatus: string;
@@ -254,11 +258,16 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
           )}
         </CardTitle>
         <CardDescription>
-          {amendments.filter(a => a.status === 'accepted').length}{' '}
+          {/* Count by the same precedence the per-amendment badge and the
+              server's decisionOf() use — authorDecision wins over status,
+              which stays 'pending' after the author judges. Counting raw
+              status showed "0 accepted, 16 pending" under 16 cards that all
+              read "Αποδεκτή". */}
+          {amendments.filter(a => effectiveStatusOf(a) === 'accepted').length}{' '}
           {t('workspace.amendments.statusAccepted').toLowerCase()},{' '}
-          {amendments.filter(a => a.status === 'rejected').length}{' '}
+          {amendments.filter(a => effectiveStatusOf(a) === 'rejected').length}{' '}
           {t('workspace.amendments.statusRejected').toLowerCase()},{' '}
-          {amendments.filter(a => a.status === 'pending').length}{' '}
+          {amendments.filter(a => effectiveStatusOf(a) === 'pending').length}{' '}
           {t('workspace.amendments.statusPending').toLowerCase()}
         </CardDescription>
         {/* One hint for the one amendment phase the deliberation track uses.
@@ -273,7 +282,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
         {Array.from(groups.entries()).map(([groupId, group]) => (
           <div key={groupId ?? 'ungrouped'} className="space-y-2">
             {group.map((amendment) => {
-              const effectiveStatus = (amendment.authorDecision ?? amendment.status) as keyof typeof STATUS_CONFIG;
+              const effectiveStatus = effectiveStatusOf(amendment);
               const config = STATUS_CONFIG[effectiveStatus] ?? STATUS_CONFIG.pending;
               const Icon = config.icon;
               const isCounter = amendment.type === 'counter_proposal';
