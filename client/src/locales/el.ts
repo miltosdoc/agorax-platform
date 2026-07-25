@@ -243,6 +243,7 @@ const el: TranslationDictionary = {
   'notification.browseProposals': 'Προβολή προτάσεων',
   'notification.showMore': 'Περισσότερα',
   'notification.showLess': 'Λιγότερα',
+  'notification.open': 'Άνοιγμα',
   'notification.markAllRead': 'Όλες ως αναγνωσμένες',
   'notification.loading': 'Φόρτωση ειδοποιήσεων...',
 

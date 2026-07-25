@@ -76,6 +76,13 @@ export default function Header() {
       markAsRead.mutate(notification.id);
     }
     setIsNotificationsOpen(false);
+    // A message clipped in this popover has to be readable somewhere. Sending
+    // an announcement-style notification to its actionUrl drops the reader on
+    // a page that does not contain the text they were trying to read.
+    if ((notification.message?.length ?? 0) > 110) {
+      navigate("/notifications");
+      return;
+    }
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
     } else if (notification.proposalId) {
@@ -230,7 +237,7 @@ export default function Header() {
                                   {notification.title}
                                 </p>
                                 {notification.message && (
-                                  <p className="mt-0.5 line-clamp-1 text-xs text-ink-soft">{notification.message}</p>
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-soft">{notification.message}</p>
                                 )}
                                 <p className="mt-1 font-mono text-[11px] tabular-nums text-ink-faint" data-testid={`text-time-ago-${notification.id}`}>
                                   {formatDistanceToNow(new Date(notification.createdAt), {
