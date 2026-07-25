@@ -262,7 +262,7 @@ export const communities = pgTable("communities", {
 
   // Apply-to-join policy: 'open' adds members directly, 'approval' creates a
   // pending community_join_requests row, 'invite_only' rejects unsolicited
-  // applications outright.
+  // applications outright — the only way in is a community_invites token.
   joinPolicy: text("join_policy").notNull().default("open"),
 
   // Visibility toggles ('public' | 'members'). The community row itself
@@ -292,6 +292,30 @@ export const communityJoinRequests = pgTable("community_join_requests", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   decidedAt: timestamp("decided_at"),
   decidedByUserId: integer("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+});
+
+// Invitations into a community. Two shapes share one table:
+//   • targeted — invitedUserId set, maxUses 1. Only that user can redeem it,
+//     and they get a notification pointing at the token link.
+//   • link — invitedUserId null. Anyone holding the token can redeem it until
+//     it expires or maxUses is reached (-1 = unlimited).
+// An invite is redeemable while status = 'pending', expiresAt is in the future
+// (or null), and useCount is below maxUses. Redeeming increments useCount and
+// flips status to 'accepted' once exhausted; 'revoked' kills it early.
+export const communityInvites = pgTable("community_invites", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  invitedUserId: integer("invited_user_id").references(() => users.id, { onDelete: "cascade" }),
+  createdByUserId: integer("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  role: text("role").notNull().default("member"), // role granted on redemption: 'member' | 'admin'
+  maxUses: integer("max_uses").notNull().default(1), // -1 = unlimited
+  useCount: integer("use_count").notNull().default(0),
+  message: text("message"),
+  status: text("status").notNull().default("pending"), // 'pending' | 'accepted' | 'revoked'
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  acceptedAt: timestamp("accepted_at"), // most recent redemption
 });
 
 // Liquid settings votes for autonomous communities. Each member can cast one
@@ -1400,6 +1424,7 @@ export type Community = typeof communities.$inferSelect;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type CommunityMember = typeof communityMembers.$inferSelect;
 export type CommunityJoinRequest = typeof communityJoinRequests.$inferSelect;
+export type CommunityInvite = typeof communityInvites.$inferSelect;
 export type CommunitySettingVote = typeof communitySettingVotes.$inferSelect;
 export type Proposal = typeof proposals.$inferSelect;
 export type ProposalAmendment = typeof proposalAmendments.$inferSelect;

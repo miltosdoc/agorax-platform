@@ -326,7 +326,7 @@ export function registerCommunitiesRoutes(app: Express): void {
       const policy = community.joinPolicy ?? 'open';
 
       if (policy === 'invite_only') {
-        return res.status(403).json({ message: "This community is invite-only" });
+        return res.status(403).json({ message: "This community is invite-only — ask an admin for an invitation" });
       }
 
       if (policy === 'approval') {
@@ -396,6 +396,244 @@ export function registerCommunitiesRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update join request" });
     }
   });
+  // ─── Invitations ───────────────────────────────────────────────────────────
+  // The counterpart to joinPolicy 'invite_only', which by itself only turns
+  // applicants away. Admins issue either a targeted invite (one named user, one
+  // use, delivered as a notification) or a shareable link (redeemable up to
+  // maxUses until it expires). Redemption works under any join policy — an
+  // invitation is a decision the community already made.
+
+  const INVITE_ROLES = ['member', 'admin'];
+  const MAX_INVITE_DAYS = 365;
+
+  /** Public view of an invite: never leaks the token to anyone but its holder. */
+  const publicInvite = (invite: any, community: { id: number; name: string; description: string | null }) => ({
+    token: invite.token,
+    communityId: community.id,
+    communityName: community.name,
+    communityDescription: community.description,
+    targeted: invite.invitedUserId != null,
+    role: invite.role,
+    message: invite.message,
+    expiresAt: invite.expiresAt,
+  });
+
+  app.post("/api/communities/:id/invites", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (!Number.isFinite(communityId)) return res.status(400).json({ message: "Invalid community id" });
+
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+
+      const callerRole = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (callerRole !== 'admin' && callerRole !== 'founder') {
+        return res.status(403).json({ message: "Only admins or the founder can invite" });
+      }
+
+      const { username, role, maxUses, expiresInDays, message } = req.body as {
+        username?: string; role?: string; maxUses?: number; expiresInDays?: number; message?: string;
+      };
+
+      const grantedRole = role ?? 'member';
+      if (!INVITE_ROLES.includes(grantedRole)) {
+        return res.status(400).json({ message: "Role must be 'member' or 'admin'" });
+      }
+
+      // A named recipient turns this into a targeted invite. Resolving by
+      // username rather than exposing a user-search endpoint keeps the member
+      // directory of other communities out of reach.
+      let invitedUserId: number | null = null;
+      if (typeof username === 'string' && username.trim()) {
+        const handle = username.trim().replace(/^@/, '');
+        const [target] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(sql`lower(${users.username}) = lower(${handle})`);
+        if (!target) return res.status(404).json({ message: "No user with that username" });
+
+        if (await communityRepo.isCommunityMember(communityId, target.id)) {
+          return res.status(409).json({ message: "That user is already a member" });
+        }
+        const outstanding = await communityRepo.getPendingInviteForUser(communityId, target.id);
+        if (outstanding) {
+          return res.status(409).json({ message: "That user already has a pending invitation" });
+        }
+        invitedUserId = target.id;
+      }
+
+      // Targeted invites are single-use by construction: they name one person.
+      let uses = 1;
+      if (invitedUserId === null) {
+        const requested = Number(maxUses ?? 1);
+        if (!Number.isInteger(requested) || (requested !== -1 && requested < 1)) {
+          return res.status(400).json({ message: "maxUses must be -1 (unlimited) or a positive integer" });
+        }
+        uses = requested;
+      }
+
+      const days = expiresInDays === undefined || expiresInDays === null ? 14 : Number(expiresInDays);
+      if (!Number.isInteger(days) || days < 1 || days > MAX_INVITE_DAYS) {
+        return res.status(400).json({ message: `expiresInDays must be between 1 and ${MAX_INVITE_DAYS}` });
+      }
+      const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+      const invite = await communityRepo.createInvite({
+        communityId,
+        createdByUserId: req.user.id,
+        invitedUserId,
+        role: grantedRole,
+        maxUses: uses,
+        message: typeof message === 'string' ? message.slice(0, 500) : null,
+        expiresAt,
+      });
+
+      if (invitedUserId !== null) {
+        const { createNotification } = await import('../utils/notifications');
+        await createNotification({
+          userId: invitedUserId,
+          type: 'community_invite',
+          title: `Πρόσκληση στην κοινότητα «${community.name}»`,
+          message: invite.message || `Ο/Η ${req.user.name || req.user.username} σε προσκαλεί να γίνεις μέλος.`,
+          communityId,
+          actionUrl: `/invite/${invite.token}`,
+        });
+      }
+
+      res.status(201).json(invite);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create invitation" });
+    }
+  });
+
+  app.get("/api/communities/:id/invites", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const callerRole = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (callerRole !== 'admin' && callerRole !== 'founder') {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const invites = await communityRepo.listPendingInvites(communityId);
+      if (invites.length === 0) return res.json([]);
+
+      const targetIds = Array.from(new Set(invites.map(i => i.invitedUserId).filter((id): id is number => id != null)));
+      const userById = new Map<number, { id: number; username: string; name: string | null; profilePicture: string | null }>();
+      if (targetIds.length > 0) {
+        const rows = await db
+          .select({ id: users.id, username: users.username, name: users.name, profilePicture: users.profilePicture })
+          .from(users)
+          .where(inArray(users.id, targetIds));
+        rows.forEach(u => userById.set(u.id, u));
+      }
+
+      res.json(invites.map(i => ({
+        ...i,
+        invitedUser: i.invitedUserId != null ? (userById.get(i.invitedUserId) ?? null) : null,
+      })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invitations" });
+    }
+  });
+
+  app.delete("/api/communities/:id/invites/:inviteId", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const inviteId = parseInt(req.params.inviteId);
+      if (!Number.isFinite(communityId) || !Number.isFinite(inviteId)) {
+        return res.status(400).json({ message: "Invalid community or invitation id" });
+      }
+      const callerRole = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (callerRole !== 'admin' && callerRole !== 'founder') {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const revoked = await communityRepo.revokeInvite(inviteId, communityId);
+      if (!revoked) return res.status(404).json({ message: "Pending invitation not found" });
+      res.json(revoked);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to revoke invitation" });
+    }
+  });
+
+  // Lets the community page offer an "accept" button to someone who was invited
+  // but never opened the link — the notification is easy to miss.
+  app.get("/api/communities/:id/my-invite", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (!Number.isFinite(communityId)) return res.status(400).json({ message: "Invalid community id" });
+      if (await communityRepo.isCommunityMember(communityId, req.user.id)) return res.json(null);
+      const invite = await communityRepo.getPendingInviteForUser(communityId, req.user.id);
+      res.json(invite ? { token: invite.token, role: invite.role, message: invite.message, expiresAt: invite.expiresAt } : null);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invitation" });
+    }
+  });
+
+  // Unauthenticated on purpose: someone following a link needs to see what they
+  // are being invited to before deciding to sign in.
+  app.get("/api/invites/:token", async (req: any, res) => {
+    try {
+      const invite = await communityRepo.getInviteByToken(req.params.token);
+      if (!invite) return res.status(404).json({ message: "Invitation not found" });
+
+      const community = await communityRepo.getCommunity(invite.communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+
+      const expired = invite.expiresAt != null && invite.expiresAt.getTime() <= Date.now();
+      const exhausted = invite.maxUses !== -1 && invite.useCount >= invite.maxUses;
+      const reason = invite.status === 'revoked' ? 'revoked'
+        : expired ? 'expired'
+        : (invite.status !== 'pending' || exhausted) ? 'used'
+        : null;
+
+      // A targeted invite must not reveal that it is addressed to someone else
+      // beyond the fact itself, so the mismatch is reported only to a signed-in
+      // caller who is not the recipient.
+      const mismatched = invite.invitedUserId != null && req.user != null && req.user.id !== invite.invitedUserId;
+
+      res.json({
+        ...publicInvite(invite, community),
+        valid: reason === null && !mismatched,
+        reason: mismatched ? 'not_for_you' : reason,
+        alreadyMember: req.user != null && await communityRepo.isCommunityMember(community.id, req.user.id),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invitation" });
+    }
+  });
+
+  app.post("/api/invites/:token/accept", requireAuth, async (req: any, res) => {
+    try {
+      const preview = await communityRepo.getInviteByToken(req.params.token);
+      if (!preview) return res.status(404).json({ message: "Invitation not found" });
+
+      if (await communityRepo.isCommunityMember(preview.communityId, req.user.id)) {
+        return res.status(409).json({ message: "Already a member" });
+      }
+
+      // Single atomic gate — see redeemInvite. Anything that makes the token
+      // unusable (revoked, expired, exhausted, addressed to someone else) comes
+      // back as undefined rather than a row we would have to re-check.
+      const invite = await communityRepo.redeemInvite(req.params.token, req.user.id);
+      if (!invite) {
+        return res.status(410).json({ message: "This invitation is no longer valid" });
+      }
+
+      try {
+        await communityRepo.addCommunityMember(invite.communityId, req.user.id, invite.role);
+      } catch (err) {
+        // Unique index on (community, user): another request added them between
+        // our membership check and here. Membership is the goal, so treat it as
+        // success rather than stranding a spent invite.
+        if (!await communityRepo.isCommunityMember(invite.communityId, req.user.id)) throw err;
+      }
+
+      res.status(201).json({ communityId: invite.communityId, role: invite.role });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to accept invitation" });
+    }
+  });
+
   app.delete("/api/communities/:id/members", requireAuth, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);

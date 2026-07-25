@@ -14,7 +14,8 @@ export interface SortitionNotification {
     | 'new_proposal'
     | 'new_media'
     | 'file_lost'
-    | 'deliberation_reminder';
+    | 'deliberation_reminder'
+    | 'community_invite';
   title: string;
   message: string | null;
   sortitionBodyId: number | null;
@@ -46,4 +47,5 @@ export const notificationTypeConfig: Record<SortitionNotification['type'], { ico
   new_media: { icon: '🎧', color: 'bg-rose-50 border-rose-200' },
   file_lost: { icon: '⚠️', color: 'bg-red-50 border-red-200' },
   deliberation_reminder: { icon: '⏳', color: 'bg-amber-50 border-amber-200' },
+  community_invite: { icon: '✉️', color: 'bg-sky-50 border-sky-200' },
 };

@@ -13,7 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic, LogOut } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge, Plus, Mic, LogOut, MailOpen, Link2, Copy, X } from 'lucide-react';
 import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
@@ -41,6 +44,19 @@ interface CommunityMember {
   profilePicture: string | null;
   role: string;
   joinedAt: string;
+}
+
+interface CommunityInvite {
+  id: number;
+  token: string;
+  role: string;
+  maxUses: number;
+  useCount: number;
+  message: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  invitedUserId: number | null;
+  invitedUser: { id: number; username: string; name: string | null; profilePicture: string | null } | null;
 }
 
 export default function CommunityDashboardPage() {
@@ -71,6 +87,14 @@ export default function CommunityDashboardPage() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: number; userId: number; message: string | null; createdAt: string; user: { id: number; username: string; name: string | null; profilePicture: string | null } | null }>>([]);
   const [requestDeciding, setRequestDeciding] = useState<Record<number, boolean>>({});
+  const [invites, setInvites] = useState<CommunityInvite[]>([]);
+  const [inviteUsername, setInviteUsername] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [myInvite, setMyInvite] = useState<{ token: string } | null>(null);
 
   useEffect(() => {
     if (!communityId) return;
@@ -140,6 +164,74 @@ export default function CommunityDashboardPage() {
       // surface inline failure on the row if needed; keep silent for now
     } finally {
       setRequestDeciding((s) => ({ ...s, [requestId]: false }));
+    }
+  };
+
+  const refreshInvites = () =>
+    api.get<CommunityInvite[]>(`/api/communities/${communityId}/invites`)
+      .then((r) => setInvites(r.data))
+      .catch(() => setInvites([]));
+
+  useEffect(() => {
+    if (!communityId || !canManageSettingsLive) return;
+    refreshInvites();
+  }, [communityId, canManageSettingsLive, members]);
+
+  // A targeted invitee may never open the notification, so the community page
+  // itself offers the invitation waiting for them.
+  useEffect(() => {
+    if (!communityId || !user || isMember) { setMyInvite(null); return; }
+    api.get<{ token: string } | null>(`/api/communities/${communityId}/my-invite`)
+      .then((r) => setMyInvite(r.data))
+      .catch(() => setMyInvite(null));
+  }, [communityId, user?.id, isMember]);
+
+  const createInvite = async (kind: 'user' | 'link') => {
+    if (!communityId) return;
+    setInviteBusy(true);
+    setInviteError(null);
+    try {
+      const res = await api.post<CommunityInvite>(`/api/communities/${communityId}/invites`, {
+        username: kind === 'user' ? inviteUsername.trim() : undefined,
+        // A shareable link is worth little if it dies after one person; the
+        // admin can still revoke it at any time.
+        maxUses: kind === 'link' ? -1 : undefined,
+        role: inviteRole,
+        message: inviteMessage.trim() || undefined,
+      });
+      setInviteUsername('');
+      setInviteMessage('');
+      await refreshInvites();
+      if (kind === 'link') {
+        await copyInviteLink(res.data.token);
+      }
+    } catch (e: any) {
+      setInviteError(e?.message || t('community.invite_failed') || 'Η πρόσκληση απέτυχε.');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const copyInviteLink = async (token: string) => {
+    const url = `${window.location.origin}/invite/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(token);
+      setTimeout(() => setCopiedToken((c) => (c === token ? null : c)), 2000);
+    } catch {
+      // Clipboard is blocked in some webviews — show the link so it can be
+      // copied by hand rather than failing silently.
+      window.prompt(t('community.invite_copy_manual') || 'Αντιγράψτε τον σύνδεσμο:', url);
+    }
+  };
+
+  const revokeInvite = async (inviteId: number) => {
+    if (!communityId) return;
+    try {
+      await api.delete(`/api/communities/${communityId}/invites/${inviteId}`);
+      setInvites((rows) => rows.filter((r) => r.id !== inviteId));
+    } catch (e: any) {
+      setInviteError(e?.message || t('community.invite_revoke_failed') || 'Η ανάκληση απέτυχε.');
     }
   };
 
@@ -229,7 +321,13 @@ export default function CommunityDashboardPage() {
                     : (t('community.join') || 'Join')}
                 </Button>
               )}
-              {user && !isMember && community.joinPolicy === 'invite_only' && (
+              {user && !isMember && myInvite && (
+                <Button size="sm" onClick={() => setLocation(`/invite/${myInvite.token}`)} data-testid="community-accept-invite">
+                  <MailOpen className="w-4 h-4 mr-2" />
+                  {t('community.invite_accept') || 'Αποδοχή πρόσκλησης'}
+                </Button>
+              )}
+              {user && !isMember && !myInvite && community.joinPolicy === 'invite_only' && (
                 <Badge variant="outline">{t('community.invite_only') || 'Invite only'}</Badge>
               )}
               {user && !isMember && joinState === 'pending' && (
@@ -401,6 +499,97 @@ export default function CommunityDashboardPage() {
         </TabsContent>
         
         <TabsContent value="members">
+          {canManageSettings && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle>{t('community.invites_title') || 'Προσκλήσεις'}</CardTitle>
+                <CardDescription>
+                  {t('community.invites_help') || 'Πρόσκληση συγκεκριμένου χρήστη (λαμβάνει ειδοποίηση) ή σύνδεσμος που μπορείς να μοιραστείς.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                  <Input
+                    value={inviteUsername}
+                    onChange={(e) => setInviteUsername(e.target.value)}
+                    placeholder={t('community.invite_username_placeholder') || 'όνομα χρήστη'}
+                    className="sm:max-w-[220px]"
+                    data-testid="invite-username"
+                  />
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'member' | 'admin')}>
+                    <SelectTrigger className="sm:max-w-[180px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">{t('community.role.member') || 'Μέλος'}</SelectItem>
+                      <SelectItem value="admin">{t('community.role.admin') || 'Διαχειριστής'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={inviteBusy || !inviteUsername.trim()}
+                      onClick={() => createInvite('user')}
+                      data-testid="invite-user"
+                    >
+                      <MailOpen className="w-4 h-4 mr-2" />
+                      {t('community.invite_send') || 'Πρόσκληση'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={inviteBusy}
+                      onClick={() => createInvite('link')}
+                      data-testid="invite-link"
+                    >
+                      <Link2 className="w-4 h-4 mr-2" />
+                      {t('community.invite_create_link') || 'Σύνδεσμος'}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  placeholder={t('community.invite_message_placeholder') || 'Προαιρετικό μήνυμα προς τον προσκεκλημένο'}
+                  rows={2}
+                />
+                {inviteError && <p className="text-sm text-destructive" data-testid="invite-error">{inviteError}</p>}
+
+                {invites.length > 0 && (
+                  <ul className="divide-y border-t pt-1">
+                    {invites.map((i) => (
+                      <li key={i.id} className="flex flex-wrap items-center gap-2 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {i.invitedUser
+                              ? (i.invitedUser.name || `@${i.invitedUser.username}`)
+                              : (t('community.invite_link_row') || 'Σύνδεσμος πρόσκλησης')}
+                            {i.role === 'admin' && (
+                              <Badge variant="secondary" className="ml-2">{t('community.role.admin') || 'Διαχειριστής'}</Badge>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {i.maxUses === -1
+                              ? `${i.useCount} ${t('community.invite_uses') || 'χρήσεις'}`
+                              : `${i.useCount}/${i.maxUses}`}
+                            {i.expiresAt ? ` · ${t('community.invite_until') || 'έως'} ${new Date(i.expiresAt).toLocaleDateString()}` : ''}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => copyInviteLink(i.token)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          {copiedToken === i.token
+                            ? (t('community.invite_copied') || 'Αντιγράφηκε')
+                            : (t('community.invite_copy') || 'Αντιγραφή')}
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => revokeInvite(i.id)}>
+                          <X className="w-4 h-4 mr-1" />
+                          {t('community.invite_revoke') || 'Ανάκληση'}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {canManageSettings && pendingRequests.length > 0 && (
             <Card className="mb-4 border-amber-300/40">
               <CardHeader>

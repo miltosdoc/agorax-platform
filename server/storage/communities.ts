@@ -6,8 +6,9 @@
  */
 
 import { db } from '../db';
-import { communities, communityMembers, communityJoinRequests, communitySettingVotes, type Community, type InsertCommunity, type CommunityMember, type CommunityJoinRequest, type CommunitySettingVote } from '../../shared/schema';
+import { communities, communityMembers, communityJoinRequests, communityInvites, communitySettingVotes, type Community, type InsertCommunity, type CommunityMember, type CommunityJoinRequest, type CommunityInvite, type CommunitySettingVote } from '../../shared/schema';
 import { eq, and, inArray, desc, sql } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
 import {
   GOVERNABLE_SETTING_KEYS,
   isGovernableSettingKey,
@@ -207,6 +208,113 @@ export class CommunityRepository {
       .where(and(
         eq(communityJoinRequests.id, requestId),
         eq(communityJoinRequests.status, 'pending'),
+      ))
+      .returning();
+    return row;
+  }
+
+  // ─── Invitations ───────────────────────────────────────────────────────────
+
+  /**
+   * Issue an invitation. A targeted invite names invitedUserId and is single
+   * use; a link invite leaves it null and is redeemable maxUses times (-1 for
+   * unlimited) until expiresAt.
+   */
+  async createInvite(params: {
+    communityId: number;
+    createdByUserId: number;
+    invitedUserId?: number | null;
+    role?: string;
+    maxUses?: number;
+    message?: string | null;
+    expiresAt?: Date | null;
+  }): Promise<CommunityInvite> {
+    const [row] = await db
+      .insert(communityInvites)
+      .values({
+        communityId: params.communityId,
+        token: randomBytes(24).toString('base64url'),
+        invitedUserId: params.invitedUserId ?? null,
+        createdByUserId: params.createdByUserId,
+        role: params.role ?? 'member',
+        maxUses: params.maxUses ?? 1,
+        message: params.message ?? null,
+        expiresAt: params.expiresAt ?? null,
+      })
+      .returning();
+    return row;
+  }
+
+  async getInviteByToken(token: string): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityInvites)
+      .where(eq(communityInvites.token, token));
+    return row;
+  }
+
+  async listPendingInvites(communityId: number): Promise<CommunityInvite[]> {
+    return await db
+      .select()
+      .from(communityInvites)
+      .where(and(
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.status, 'pending'),
+      ))
+      .orderBy(desc(communityInvites.createdAt));
+  }
+
+  /** The live invite waiting for this user, so the community page can offer it. */
+  async getPendingInviteForUser(communityId: number, userId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityInvites)
+      .where(and(
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.invitedUserId, userId),
+        eq(communityInvites.status, 'pending'),
+        sql`(${communityInvites.expiresAt} IS NULL OR ${communityInvites.expiresAt} > NOW())`,
+      ))
+      .orderBy(desc(communityInvites.createdAt));
+    return row;
+  }
+
+  async revokeInvite(inviteId: number, communityId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .update(communityInvites)
+      .set({ status: 'revoked' })
+      .where(and(
+        eq(communityInvites.id, inviteId),
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.status, 'pending'),
+      ))
+      .returning();
+    return row;
+  }
+
+  /**
+   * Redeem a token for a user, atomically.
+   *
+   * Every condition that makes an invite usable lives in the WHERE clause of a
+   * single UPDATE, so two people racing on the last use of a link cannot both
+   * win — the loser's statement matches no row and returns undefined. Callers
+   * must treat undefined as "not redeemable" without inspecting the row first,
+   * because a check-then-act would reopen exactly that race.
+   */
+  async redeemInvite(token: string, userId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .update(communityInvites)
+      .set({
+        useCount: sql`${communityInvites.useCount} + 1`,
+        acceptedAt: new Date(),
+        status: sql`CASE WHEN ${communityInvites.maxUses} <> -1 AND ${communityInvites.useCount} + 1 >= ${communityInvites.maxUses} THEN 'accepted' ELSE ${communityInvites.status} END`,
+      })
+      .where(and(
+        eq(communityInvites.token, token),
+        eq(communityInvites.status, 'pending'),
+        sql`(${communityInvites.expiresAt} IS NULL OR ${communityInvites.expiresAt} > NOW())`,
+        sql`(${communityInvites.maxUses} = -1 OR ${communityInvites.useCount} < ${communityInvites.maxUses})`,
+        sql`(${communityInvites.invitedUserId} IS NULL OR ${communityInvites.invitedUserId} = ${userId})`,
       ))
       .returning();
     return row;

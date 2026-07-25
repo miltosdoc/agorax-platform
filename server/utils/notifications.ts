@@ -31,7 +31,8 @@ export type NotificationType =
   | 'new_proposal'
   | 'new_media'
   | 'file_lost'
-  | 'deliberation_reminder';
+  | 'deliberation_reminder'
+  | 'community_invite';
 
 interface CreateNotificationParams {
   userId: number;
