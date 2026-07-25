@@ -241,6 +241,8 @@ const el: TranslationDictionary = {
   'notification.all': 'Όλες',
   'notification.unread': 'Μη αναγνωσμένες',
   'notification.browseProposals': 'Προβολή προτάσεων',
+  'notification.showMore': 'Περισσότερα',
+  'notification.showLess': 'Λιγότερα',
   'notification.markAllRead': 'Όλες ως αναγνωσμένες',
   'notification.loading': 'Φόρτωση ειδοποιήσεων...',
 
