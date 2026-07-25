@@ -74,6 +74,23 @@ export default function SurveysPage() {
         <HowPollsWork />
       </div>
 
+      {/* "Panel" is jargon on first contact, and the full explanation was
+          buried behind the dialog above. Say the essential part in place. */}
+      <div
+        className="mb-6 rounded-lg border bg-sunken/50 p-4"
+        data-testid="panel-explainer"
+      >
+        <div className="flex items-start gap-3">
+          <Users className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{t('surveys.panelExplainer.title')}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t('surveys.panelExplainer.body')}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {isPanelist === false && (
         <Card className="mb-6 border-primary/40">
           <CardContent className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

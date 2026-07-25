@@ -177,9 +177,12 @@ function GreekContent() {
             <strong className="text-foreground">Καμία μεταφορά εκτός ΕΟΧ.</strong>
           </li>
           <li>
-            <strong className="text-foreground">Καμία αποστολή σε εξωτερική υπηρεσία τεχνητής
-            νοημοσύνης</strong> — το προηγούμενο σύστημα ποιοτικού ελέγχου που έστελνε προτάσεις σε
-            OpenRouter αφαιρέθηκε ως μέρος της παρούσας αναθεώρησης.
+            <strong className="text-foreground">Πάροχος τεχνητής νοημοσύνης:</strong> ως εκτελών την
+            επεξεργασία, υπό σύμβαση Άρθρου 28 ΓΚΠΔ, σε ιδιωτικό endpoint εντός ΕΟΧ. Στέλνεται το
+            κείμενο της πρότασης ή της τροπολογίας για έλεγχο ποιότητας και σύνθεση του τελικού
+            κειμένου, καθώς και οι περιγραφές δημοσκοπήσεων για τη σύνταξη ερωτηματολογίου — ποτέ
+            το όνομά σας, το email σας ή οι ψήφοι σας. Η χρήση δημόσιων υπηρεσιών AI (π.χ.
+            OpenRouter) παραμένει απαγορευμένη από τον κώδικα.
           </li>
         </ul>
       </section>
@@ -395,9 +398,11 @@ function EnglishContent() {
             <strong className="text-foreground">No transfers outside the EEA.</strong>
           </li>
           <li>
-            <strong className="text-foreground">No external AI processing.</strong> The previous AI
-            quality-gate that forwarded proposal text to OpenRouter has been removed as part of this
-            audit.
+            <strong className="text-foreground">AI provider:</strong> as a data processor under an
+            Art. 28 GDPR agreement, on a private endpoint inside the EEA. What is sent is the text of
+            a proposal or amendment (quality check, final-text synthesis) and poll descriptions
+            (questionnaire drafting) — never your name, your email, or your votes. Use of public AI
+            services (e.g. OpenRouter) remains blocked in code.
           </li>
         </ul>
       </section>
