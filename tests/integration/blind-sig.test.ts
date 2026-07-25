@@ -256,7 +256,9 @@ describe('T5: Unlinkability — signer cannot map issuance to spend', () => {
     const shuffledIndices = results.map(r => r.originalIndex);
     const originalIndices = Array.from({ length: N }, (_, i) => i);
     expect(shuffledIndices.join(',')).not.toBe(originalIndices.join(','));
-  });
+    // An RSA keygen plus N blind/sign/unblind rounds does not fit vitest's 5s
+    // default — it was timing out before reaching a single assertion above.
+  }, 60_000);
 });
 
 // ─── Test 6: RNG sourcing ───────────────────────────────────────────────────
@@ -284,5 +286,6 @@ describe('T6: RNG sourcing — no Math.random in crypto path', () => {
       tokens.add(tokenStr);
     }
     expect(tokens.size).toBe(100);
-  });
+    // 100 blind operations after a keygen — same reason as T5.
+  }, 60_000);
 });
