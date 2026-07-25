@@ -113,6 +113,7 @@ export async function transitionProposal(
 
   // Compute phase deadline when entering a time-limited phase. final_review
   // reuses the community's authorReviewHours budget.
+  const DEFAULT_PHASE_HOURS = 48;
   const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'votingHours'> = {
     author_review: 'authorReviewHours',
     community_signal: 'communitySignalHours',
@@ -121,18 +122,29 @@ export async function transitionProposal(
   };
   let phaseDeadline: Date | null = null;
   if (TIMED_PHASES[newState]) {
+    let hours = 0;
     try {
       const { communityRepo } = await import('../storage');
       const community = await communityRepo.getCommunity(proposal.communityId);
-      let hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
+      hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
       // The author's own duration wins for the vote they configured.
       if (newState === 'voting' && (proposal as any).votingDurationHours > 0) {
         hours = (proposal as any).votingDurationHours;
       }
-      phaseDeadline = hours > 0 ? new Date(Date.now() + hours * 3600 * 1000) : null;
-    } catch {
-      // Best-effort — missing deadline is non-fatal.
+    } catch (err: any) {
+      console.warn(`[phase-deadline] lookup failed for proposal ${proposal.id}: ${err?.message}`);
     }
+    // A timed phase MUST carry a deadline: the auto-advance sweep selects on
+    // `phaseDeadline IS NOT NULL`, so a null one strands the proposal in that
+    // phase forever with nothing to move it on. Fall back rather than skip.
+    if (!(hours > 0)) {
+      console.warn(
+        `[phase-deadline] proposal ${proposal.id}: no ${TIMED_PHASES[newState]} configured for `
+        + `community ${proposal.communityId}; defaulting ${newState} to ${DEFAULT_PHASE_HOURS}h`,
+      );
+      hours = DEFAULT_PHASE_HOURS;
+    }
+    phaseDeadline = new Date(Date.now() + hours * 3600 * 1000);
   }
 
   const updated = await storage.updateProposal(proposal.id, { status: newState, phaseDeadline });

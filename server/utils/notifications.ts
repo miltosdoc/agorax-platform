@@ -30,7 +30,8 @@ export type NotificationType =
   | 'sortition_room_opened'
   | 'new_proposal'
   | 'new_media'
-  | 'file_lost';
+  | 'file_lost'
+  | 'deliberation_reminder';
 
 interface CreateNotificationParams {
   userId: number;
@@ -319,7 +320,76 @@ export async function notifyVoteStarted(
 
 // ─── Deadline Reminder ──────────────────────────────────────────────────────
 
+/**
+ * True if this user already got this notification type for this subject.
+ * The sweep runs on a timer, so without this every pass would re-notify —
+ * one reminder per deadline, not one every ten minutes.
+ */
+async function alreadyReminded(
+  userId: number,
+  type: NotificationType,
+  subject: { proposalId?: number; sortitionBodyId?: number },
+): Promise<boolean> {
+  const scope = subject.proposalId != null
+    ? sql`proposal_id = ${subject.proposalId}`
+    : sql`sortition_body_id = ${subject.sortitionBodyId}`;
+  const existing = await db.execute(sql`
+    SELECT 1 FROM sortition_notifications
+    WHERE user_id = ${userId} AND type = ${type} AND ${scope}
+      AND created_at > NOW() - INTERVAL '24 hours'
+    LIMIT 1
+  `);
+  return existing.rows.length > 0;
+}
+
+/**
+ * Remind proposal authors who still have amendments they have not judged.
+ * An unjudged amendment is dropped by the merge, so silence here means the
+ * vote opens on text the deliberation never touched — the failure is silent
+ * unless we say something before the deadline.
+ */
+async function remindAuthorsOfPendingAmendments(): Promise<number> {
+  const rows = await db.execute(sql`
+    SELECT p.id, p.author_id, p.question, p.community_id, p.phase_deadline,
+           count(a.id) AS pending
+    FROM proposals p
+    JOIN proposal_amendments a
+      ON a.proposal_id = p.id
+     AND a.parent_amendment_id IS NULL
+     AND a.author_decision IS NULL
+    WHERE p.status = 'community_signal'
+      AND p.phase_deadline IS NOT NULL
+      AND p.phase_deadline > NOW()
+      AND p.phase_deadline < NOW() + INTERVAL '12 hours'
+    GROUP BY p.id
+  `);
+
+  let reminded = 0;
+  for (const row of rows.rows) {
+    const proposalId = row.id as number;
+    const authorId = row.author_id as number;
+    if (await alreadyReminded(authorId, 'deliberation_reminder', { proposalId })) continue;
+    const pending = Number(row.pending);
+    await createNotification({
+      userId: authorId,
+      type: 'deliberation_reminder',
+      title: 'Εκκρεμούν τροπολογίες στην πρότασή σας',
+      message:
+        `${pending} ${pending === 1 ? 'τροπολογία δεν έχει κριθεί' : 'τροπολογίες δεν έχουν κριθεί'}. `
+        + 'Όσες δεν αποδεχτείτε δεν θα ενσωματωθούν στο τελικό κείμενο. '
+        + 'Η διαβούλευση κλείνει σε λιγότερο από 12 ώρες.',
+      proposalId,
+      communityId: (row.community_id as number) || undefined,
+      actionUrl: `/proposals/${proposalId}/amendments/review`,
+    });
+    reminded++;
+  }
+  return reminded;
+}
+
 export async function sendDeadlineReminders(): Promise<number> {
+  const authorReminders = await remindAuthorsOfPendingAmendments();
+
   // Find sortition bodies that are active and approaching deadline
   const bodies = await db.execute(sql`
     SELECT sb.id, sb.response_hours, sb.selected_at, sb.proposal_id, sb.community_id
@@ -340,6 +410,8 @@ export async function sendDeadlineReminders(): Promise<number> {
 
     for (const member of unresponsive.rows) {
       const userId = member.user_id as number;
+      const bodyId = body.id as number;
+      if (await alreadyReminded(userId, 'sortition_reminder', { sortitionBodyId: bodyId })) continue;
       await createNotification({
         userId,
         type: 'sortition_reminder',

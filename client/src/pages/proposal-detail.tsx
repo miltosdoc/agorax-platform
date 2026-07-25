@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, MessageSquare, FileText, Trash2, Mic, Pencil, Loader2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, Trash2, Mic, Pencil, Loader2, ChevronDown, AlertTriangle } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
@@ -99,6 +99,7 @@ export default function ProposalDetailPage() {
   const [revalidating, setRevalidating] = useState(false);
   const [revalidateError, setRevalidateError] = useState<string | null>(null);
   const [initialSolutionOpen, setInitialSolutionOpen] = useState<boolean | null>(null);
+  const [pendingAmendments, setPendingAmendments] = useState(0);
   const [sortitionRevisions, setSortitionRevisions] = useState<
     Array<{ id: number; text: string; authorName: string }>
   >([]);
@@ -138,6 +139,28 @@ export default function ProposalDetailPage() {
   useEffect(() => {
     setInitialSolutionOpen(null);
   }, [proposalId, proposal?.status]);
+
+  // An amendment the author never judges is dropped by the merge, so the
+  // author needs to see the count without opening the tab.
+  const userIsProposalAuthor = !!user && !!proposal && user.id === proposal.authorId;
+  useEffect(() => {
+    if (!proposalId || !userIsProposalAuthor || proposal?.status !== 'community_signal') {
+      setPendingAmendments(0);
+      return;
+    }
+    let cancelled = false;
+    api.get<Array<{ parentAmendmentId?: number | null; authorDecision?: string | null }>>(
+      `/api/proposals/${proposalId}/amendments`,
+    )
+      .then((resp) => {
+        if (cancelled) return;
+        setPendingAmendments(
+          resp.data.filter((a) => a.parentAmendmentId == null && !a.authorDecision).length,
+        );
+      })
+      .catch(() => { if (!cancelled) setPendingAmendments(0); });
+    return () => { cancelled = true; };
+  }, [proposalId, userIsProposalAuthor, proposal?.status]);
 
   // While LLM validation is in flight the proposal sits in 'review' for
   // ~10–15s. Poll every 3s so the page reflects the post-validation status
@@ -430,6 +453,27 @@ export default function ProposalDetailPage() {
               {proposal.category && <Badge variant="secondary">{proposal.category}</Badge>}
             </div>
           </header>
+
+          {/* Unjudged amendments are silently dropped from the merge — the
+              one failure in this flow that a user cannot see coming. */}
+          {pendingAmendments > 0 && (
+            <div
+              className="mb-6 flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+              data-testid="pending-amendments-banner"
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+                <p className="text-sm text-amber-900">
+                  {t('proposal.pendingAmendmentsWarning', { count: pendingAmendments })}
+                </p>
+              </div>
+              <Button size="sm" className="shrink-0" asChild>
+                <a href={`/proposals/${proposal.id}/amendments/review`}>
+                  {t('proposal.pendingAmendmentsAction')}
+                </a>
+              </Button>
+            </div>
+          )}
 
           {/* During an active vote, the distinct final text is primary. */}
           <section className="mb-8">

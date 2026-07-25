@@ -215,6 +215,47 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
       console.error(`[phase_auto_advance] failed for proposal ${proposal.id}:`, err);
     }
   }
+
+  await rescueStalledReviews(now);
+}
+
+/**
+ * `review` is the one lifecycle phase with no deadline of its own, so the
+ * sweep above cannot see it. Validation normally takes ~10–15s; if the
+ * process dies mid-flight (or the submit route's LLM catch fires, which
+ * leaves the row in `review` for a "manual handling" path that does not
+ * exist), the proposal sits there forever.
+ *
+ * Fail open, consistently with an unavailable quality gate: after the grace
+ * window, send it into deliberation and let members judge it.
+ */
+const REVIEW_GRACE_MS = 15 * 60_000;
+
+async function rescueStalledReviews(now: Date): Promise<void> {
+  const cutoff = new Date(now.getTime() - REVIEW_GRACE_MS);
+  const stalled = await db
+    .select()
+    .from(proposals)
+    .where(and(eq(proposals.status, 'review'), lt(proposals.updatedAt, cutoff)));
+
+  for (const proposal of stalled) {
+    try {
+      const { transitionProposal, triggerSideEffects } = await import('./proposal-state-machine');
+      const { storage } = await import('../storage');
+      if (!proposal.llmFeedback) {
+        await storage.updateProposal(proposal.id, {
+          llmFeedback:
+            'Ο αυτόματος έλεγχος ποιότητας δεν ολοκληρώθηκε. Η πρόταση προωθήθηκε σε διαβούλευση '
+            + 'για ανθρώπινη αξιολόγηση.',
+        });
+      }
+      const updated = await transitionProposal(proposal as any, 'community_signal', storage);
+      await triggerSideEffects('review', 'community_signal', updated);
+      console.warn(`[phase_auto_advance] rescued proposal ${proposal.id} stalled in review`);
+    } catch (err) {
+      console.error(`[phase_auto_advance] review rescue failed for proposal ${proposal.id}:`, err);
+    }
+  }
 }
 
 // ─── Register all handlers ──────────────────────────────────────────────────
@@ -257,9 +298,20 @@ export function startJobQueue(): () => void {
     enqueueSortitionTimeout().catch(() => {});
   }, 5 * 60_000);
 
+  // Deadline reminders. sendDeadlineReminders() existed but nothing ever
+  // called it, so neither sortition members nor proposal authors were ever
+  // reminded of anything. It is idempotent per subject per 24h, so a
+  // 10-minute cadence sends one reminder, not one every sweep.
+  const reminderSweepId = setInterval(() => {
+    import('./notifications')
+      .then(({ sendDeadlineReminders }) => sendDeadlineReminders())
+      .catch((err) => console.error('[reminders] sweep failed:', err));
+  }, 10 * 60_000);
+
   return () => {
     stopWorker();
     clearInterval(autoAdvanceId);
     clearInterval(sortitionSweepId);
+    clearInterval(reminderSweepId);
   };
 }
