@@ -129,25 +129,34 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
     }
   };
 
+  // Amendment phases during which a decision can still be recorded. The
+  // deliberation track never enters 'author_review', so it cannot be the gate.
+  const reviewablePhase = ['review', 'author_review', 'community_signal'].includes(proposalStatus);
+
+  // The proposal author judges the top-level amendments, inline — an accepted
+  // amendment is what pulls the text into the AI merge, so this decision must
+  // be reachable from the amendment itself, not only from a separate page.
+  const canReviewTopLevel = (a: Amendment) =>
+    !!user && !!userIsAuthor && a.parentAmendmentId == null && !a.authorDecision && reviewablePhase;
+
   // The counter-proposal's author judges the amendments on their counter.
   const canReviewChild = (child: Amendment, parent: Amendment | undefined) =>
-    !!user && !!parent && parent.authorId === user.id && !child.authorDecision
-    && ['author_review', 'community_signal'].includes(proposalStatus);
+    !!user && !!parent && parent.authorId === user.id && !child.authorDecision && reviewablePhase;
 
-  async function reviewChild(child: Amendment, decision: 'accepted' | 'rejected') {
-    if (reviewing[child.id]) return;
+  async function reviewAmendment(a: Amendment, decision: 'accepted' | 'rejected') {
+    if (reviewing[a.id]) return;
     let reason = '';
     if (decision === 'rejected') {
       reason = window.prompt(t('workspace.amendments.rejectReasonPrompt') || 'Αιτιολογία απόρριψης (προαιρετική):') ?? '';
     }
-    setReviewing(prev => ({ ...prev, [child.id]: true }));
+    setReviewing(prev => ({ ...prev, [a.id]: true }));
     try {
-      await api.post(`/api/amendments/${child.id}/review`, { decision, reason });
+      await api.post(`/api/amendments/${a.id}/review`, { decision, reason });
       await refresh();
     } catch {
       // server message surfacing is not critical here — state stays pending
     } finally {
-      setReviewing(prev => ({ ...prev, [child.id]: false }));
+      setReviewing(prev => ({ ...prev, [a.id]: false }));
     }
   }
 
@@ -250,15 +259,11 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
           {amendments.filter(a => a.status === 'pending').length}{' '}
           {t('workspace.amendments.statusPending').toLowerCase()}
         </CardDescription>
-        {(proposalStatus === 'author_review' || proposalStatus === 'community_signal') && (
-          <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
-            proposalStatus === 'author_review'
-              ? 'border-indigo-200 bg-indigo-50/60 text-indigo-900'
-              : 'border-amber-200 bg-amber-50/60 text-amber-900'
-          }`}>
-            {proposalStatus === 'author_review'
-              ? (t('workspace.amendments.phaseHint.author_review') || 'Φάση: Κρίση συγγραφέα. Αποδέχεται ή απορρίπτει τις τροπολογίες· οι απορριφθείσες προχωρούν στο Σήμα Κοινότητας.')
-              : (t('workspace.amendments.phaseHint.community_signal') || 'Φάση: Σήμα Κοινότητας. Η κοινότητα ψηφίζει ⬆/⬇ στις απορριφθείσες τροπολογίες· όσες ξεπερνούν το όριο της κοινότητας προχωρούν στο κληρωτό σώμα.')}
+        {/* One hint for the one amendment phase the deliberation track uses.
+            The old 'author_review' copy described a phase that never runs. */}
+        {proposalStatus === 'community_signal' && (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+            {t('workspace.amendments.phaseHint.community_signal')}
           </div>
         )}
       </CardHeader>
@@ -308,6 +313,32 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                       {amendment.authorName || t('proposal.userWithId', { id: amendment.authorId })}
                     </span>
                     <div className="flex items-center gap-2">
+                      {canReviewTopLevel(amendment) && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-green-700 border-green-300 hover:bg-green-50"
+                            onClick={() => reviewAmendment(amendment, 'accepted')}
+                            disabled={!!reviewing[amendment.id]}
+                            data-testid={`amendment-accept-${amendment.id}`}
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            {t('workspace.amendments.accept') || 'Αποδοχή'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-red-700 border-red-300 hover:bg-red-50"
+                            onClick={() => reviewAmendment(amendment, 'rejected')}
+                            disabled={!!reviewing[amendment.id]}
+                            data-testid={`amendment-reject-${amendment.id}`}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            {t('workspace.amendments.reject') || 'Απόρριψη'}
+                          </Button>
+                        </div>
+                      )}
                       {user && (
                         <div className="flex items-center gap-1">
                           <Button
@@ -387,7 +418,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                                       size="sm"
                                       variant="outline"
                                       className="h-7 px-2 text-green-700 border-green-300 hover:bg-green-50"
-                                      onClick={() => reviewChild(child, 'accepted')}
+                                      onClick={() => reviewAmendment(child, 'accepted')}
                                       disabled={!!reviewing[child.id]}
                                     >
                                       <CheckCircle className="w-3 h-3 mr-1" />
@@ -397,7 +428,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                                       size="sm"
                                       variant="outline"
                                       className="h-7 px-2 text-red-700 border-red-300 hover:bg-red-50"
-                                      onClick={() => reviewChild(child, 'rejected')}
+                                      onClick={() => reviewAmendment(child, 'rejected')}
                                       disabled={!!reviewing[child.id]}
                                     >
                                       <XCircle className="w-3 h-3 mr-1" />

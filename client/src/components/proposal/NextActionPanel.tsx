@@ -79,7 +79,10 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
               {submitError && <p className="text-xs text-red-600">{submitError}</p>}
             </div>
           )}
-          {status === 'author_review' && userIsAuthor && (
+          {/* The author judges amendments throughout the amendment phase.
+              The deliberation track skips 'author_review' entirely, so gating
+              this link on that state alone left the author with no way in. */}
+          {(status === 'author_review' || status === 'community_signal') && userIsAuthor && (
             <Button size="sm" className="w-full" asChild>
               <a href={`/proposals/${proposalId}/amendments/review`}>
                 {t('workspace.action.authorReviewButton')}
@@ -87,7 +90,7 @@ export default function NextActionPanel({ status, proposalId, userIsAuthor }: Ne
             </Button>
           )}
           {status === 'community_signal' && (
-            <Button size="sm" className="w-full" asChild>
+            <Button size="sm" variant={userIsAuthor ? 'outline' : 'default'} className="w-full" asChild>
               <a href={`/proposals/${proposalId}/amendments/signals`}>
                 {t('workspace.action.communitySignalButton')}
               </a>

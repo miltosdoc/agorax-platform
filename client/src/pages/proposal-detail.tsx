@@ -642,7 +642,7 @@ export default function ProposalDetailPage() {
               </TabsList>
 
               <TabsContent value="debate">
-                <DebatePanel proposalId={proposal.id} />
+                <DebatePanel proposalId={proposal.id} proposalStatus={proposal.status} />
               </TabsContent>
 
               {!isDirectVote && (

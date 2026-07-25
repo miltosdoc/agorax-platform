@@ -68,6 +68,22 @@ export const PROPOSAL_STATE_DESCRIPTIONS: Record<ProposalState, string> = {
   archived: 'Closed without decision',
 };
 
+/**
+ * Lifecycle states during which debate threads may be opened or replied to.
+ * The schema stays permissive (so historical threads survive once voting
+ * begins); this list is the gate enforced by the route + service layer — and,
+ * so the UI cannot offer an action the server will refuse, by the composer.
+ */
+export const DEBATE_ACTIVE_STATES: readonly ProposalState[] = [
+  'author_review',
+  'community_signal',
+  'sortition_synthesis',
+];
+
+export function isDebateOpen(status: string): boolean {
+  return (DEBATE_ACTIVE_STATES as readonly string[]).includes(status);
+}
+
 export function isProposalState(value: unknown): value is ProposalState {
   return typeof value === 'string' && (PROPOSAL_STATES as readonly string[]).includes(value);
 }

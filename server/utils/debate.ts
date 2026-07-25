@@ -20,20 +20,11 @@ import {
   type DebateThread,
 } from '@shared/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { isProposalState, type ProposalState } from '@shared/proposal-lifecycle';
+import { DEBATE_ACTIVE_STATES, isProposalState } from '@shared/proposal-lifecycle';
 
 export type VoteDirection = 'up' | 'down';
 
-/**
- * Lifecycle states during which threads may be opened or replied to.
- * The schema stays permissive (so historical threads survive once voting
- * begins); this list is the gate enforced by the route + service layer.
- */
-export const DEBATE_ACTIVE_STATES: readonly ProposalState[] = [
-  'author_review',
-  'community_signal',
-  'sortition_synthesis',
-];
+export { DEBATE_ACTIVE_STATES };
 
 /**
  * Threaded view of a proposal's discussion. `replies` is recursive so the

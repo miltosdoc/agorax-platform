@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
+import { isDebateOpen } from '@shared/proposal-lifecycle';
 
 interface ThreadNode {
   id: number;
@@ -41,6 +42,8 @@ interface DebateStats {
 
 interface DebatePanelProps {
   proposalId: number;
+  /** Omit to leave the composer open — callers that know the phase pass it. */
+  proposalStatus?: string;
 }
 
 const EMPTY_STATS: DebateStats = {
@@ -56,10 +59,16 @@ function formatTimestamp(value: string): string {
   return d.toLocaleString();
 }
 
-export function DebatePanel({ proposalId }: DebatePanelProps) {
+export function DebatePanel({ proposalId, proposalStatus }: DebatePanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [, navigate] = useLocation();
+
+  // Mirror the server's gate: once the proposal leaves the deliberation
+  // states, posting 409s. Offering an enabled composer that always fails is
+  // worse than showing none.
+  const debateOpen = proposalStatus == null || isDebateOpen(proposalStatus);
+  const canParticipate = !!user && debateOpen;
 
   const [threads, setThreads] = useState<ThreadNode[]>([]);
   const [stats, setStats] = useState<DebateStats>(EMPTY_STATS);
@@ -148,14 +157,23 @@ export function DebatePanel({ proposalId }: DebatePanelProps) {
           </span>
         </div>
         {user ? (
-          <Button
-            variant={composerOpen ? 'outline' : 'default'}
-            size="sm"
-            onClick={() => setComposerOpen((v) => !v)}
-            data-testid="debate-new-thread-toggle"
-          >
-            {composerOpen ? t('debate.cancel') : t('debate.newThread')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {!debateOpen && (
+              <span className="text-xs text-muted-foreground" data-testid="debate-closed-notice">
+                {t('debate.closedNotice')}
+              </span>
+            )}
+            <Button
+              variant={composerOpen ? 'outline' : 'default'}
+              size="sm"
+              onClick={() => setComposerOpen((v) => !v)}
+              disabled={!debateOpen}
+              title={debateOpen ? undefined : t('debate.closedNotice')}
+              data-testid="debate-new-thread-toggle"
+            >
+              {composerOpen ? t('debate.cancel') : t('debate.newThread')}
+            </Button>
+          </div>
         ) : (
           <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>
             {t('debate.loginToParticipate')}
@@ -226,7 +244,7 @@ export function DebatePanel({ proposalId }: DebatePanelProps) {
             <ThreadCard
               key={thread.id}
               thread={thread}
-              canParticipate={!!user}
+              canParticipate={canParticipate}
               onVote={handleVote}
               onReply={handleReply}
             />

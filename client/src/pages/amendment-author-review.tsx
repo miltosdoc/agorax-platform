@@ -31,6 +31,7 @@ interface Amendment {
 }
 
 interface ProposalMeta {
+  status?: string;
   phaseDeadline?: string | null;
 }
 
@@ -47,6 +48,11 @@ export default function AmendmentAuthorReview() {
   const [error, setError] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState<string | null>(null);
+
+  // Only the legacy 'author_review' phase is advanced by hand. On the
+  // deliberation track the proposal is already in 'community_signal' and the
+  // deadline job opens the vote, so asking for that transition would 409.
+  const needsManualAdvance = proposal?.status === 'author_review';
 
   async function advanceToCommunitySignal() {
     setAdvancing(true);
@@ -140,7 +146,9 @@ export default function AmendmentAuthorReview() {
           <PhaseCountdown
             deadline={proposal.phaseDeadline}
             label="Χρόνος φάσης αξιολόγησης:"
-            onExpired={advanceToCommunitySignal}
+            onExpired={needsManualAdvance
+              ? advanceToCommunitySignal
+              : () => { window.location.href = `/proposals/${proposalId}`; }}
           />
         </div>
       )}
@@ -256,15 +264,30 @@ export default function AmendmentAuthorReview() {
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-center space-y-3">
               <CheckCircle className="w-6 h-6 text-green-600 mx-auto" />
               <p className="font-medium text-green-700">{t('amendment.authorReview.reviewComplete')}</p>
-              <p className="text-sm text-green-600">
-                {t('amendment.authorReview.rejectedGoToCommunity')}
-              </p>
-              <Button onClick={advanceToCommunitySignal} disabled={advancing}>
-                {advancing
-                  ? (t('amendment.authorReview.advancing') || 'Μετάβαση…')
-                  : (t('amendment.authorReview.advanceButton') || 'Μετάβαση στην επόμενη φάση')}
-              </Button>
-              {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+              {needsManualAdvance ? (
+                <>
+                  <p className="text-sm text-green-600">
+                    {t('amendment.authorReview.rejectedGoToCommunity')}
+                  </p>
+                  <Button onClick={advanceToCommunitySignal} disabled={advancing}>
+                    {advancing
+                      ? t('amendment.authorReview.advancing')
+                      : t('amendment.authorReview.advanceButton')}
+                  </Button>
+                  {advanceError && <p className="text-sm text-red-600">{advanceError}</p>}
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-green-600">
+                    {t('amendment.authorReview.mergeLiveNote')}
+                  </p>
+                  <Button variant="outline" asChild>
+                    <a href={`/proposals/${proposalId}`}>
+                      {t('amendment.authorReview.backToProposal')}
+                    </a>
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </div>
