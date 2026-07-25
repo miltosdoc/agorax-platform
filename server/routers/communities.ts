@@ -20,7 +20,7 @@ import {
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
-import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput } from '@shared/community-settings';
+import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommunityRanges } from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
 import {
   GOVERNABLE_SETTING_KEYS,
@@ -178,7 +178,13 @@ export function registerCommunitiesRoutes(app: Express): void {
       if (!role || (role !== 'admin' && role !== 'founder')) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      const communitySettings = sanitizeCommunityUpdateInput(req.body);
+      let communitySettings;
+      try {
+        communitySettings = sanitizeCommunityUpdateInput(req.body);
+      } catch (validationError: any) {
+        // A rejected setting is the caller's mistake, not a server fault.
+        return res.status(400).json({ message: validationError?.message || "Invalid community settings" });
+      }
 
       // Autonomous communities decide governable settings by liquid majority
       // vote. Direct admin edits to those keys are not allowed; only identity
@@ -198,6 +204,14 @@ export function registerCommunitiesRoutes(app: Express): void {
         if (communitySettings.type && communitySettings.type !== existing.type && role !== 'founder') {
           return res.status(403).json({ message: "Only the founder can switch community type" });
         }
+      }
+
+      // A PATCH may carry only one half of a min/max pair, so the range has
+      // to be judged against what the row will hold afterwards.
+      try {
+        assertCommunityRanges({ ...(existing as any), ...communitySettings });
+      } catch (rangeError: any) {
+        return res.status(400).json({ message: rangeError?.message || "Invalid setting range" });
       }
 
       const community = await communityRepo.updateCommunity(communityId, communitySettings);

@@ -40,6 +40,11 @@ export interface CommunitySettingsInput {
   authorReviewHours?: unknown;
   communitySignalHours?: unknown;
   votingHours?: unknown;
+  finalReviewHours?: unknown;
+  deliberationMinHours?: unknown;
+  deliberationMaxHours?: unknown;
+  votingMinHours?: unknown;
+  votingMaxHours?: unknown;
 }
 
 // Sanitized community settings — narrow literal types instead of the wide
@@ -66,6 +71,11 @@ export interface CommunityCreateSettings {
   authorReviewHours: number;
   communitySignalHours: number;
   votingHours: number;
+  finalReviewHours: number;
+  deliberationMinHours: number;
+  deliberationMaxHours: number;
+  votingMinHours: number;
+  votingMaxHours: number;
 }
 
 export type CommunityUpdateSettings = Partial<CommunityCreateSettings>;
@@ -80,7 +90,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   sortitionResponseHours: 72,
   synthesisMode: 'ai',
   amendmentThreshold: '0.5',
-  amendmentInclusionThreshold: '1',
+  amendmentInclusionThreshold: '0.6',
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
   joinPolicy: 'open',
@@ -89,7 +99,45 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   authorReviewHours: 72,
   communitySignalHours: 48,
   votingHours: 168,
+  finalReviewHours: 24,
+  deliberationMinHours: 24,
+  deliberationMaxHours: 336,
+  votingMinHours: 24,
+  votingMaxHours: 720,
 } as const;
+
+/**
+ * Fallback for a community row that predates the column or stores NULL.
+ * Kept in step with the column default in `communities`.
+ */
+export const DEFAULT_AMENDMENT_INCLUSION_THRESHOLD = Number(DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold);
+
+/**
+ * Resolve the duration of a phase the author is allowed to configure.
+ *
+ * The community owns the range and the fallback; the author's choice only
+ * counts when it lands inside that range. Bounds can be edited after a
+ * proposal is created, so this is applied at transition time as well as on
+ * write — a stored value that has since fallen out of range is clamped, not
+ * honoured. A community that has switched the phase off (0 = unlimited) keeps
+ * that: no deadline is derived from an author's preference.
+ */
+export function resolveAuthoredPhaseHours(opts: {
+  requested?: number | null;
+  min?: number | null;
+  max?: number | null;
+  communityDefault?: number | null;
+}): number {
+  const communityDefault = Number(opts.communityDefault ?? 0);
+  const requested = Number(opts.requested ?? 0);
+  if (!(requested > 0)) return communityDefault;
+  if (!(communityDefault > 0)) return communityDefault;
+
+  const min = Number(opts.min ?? 0) > 0 ? Number(opts.min) : 1;
+  const max = Number(opts.max ?? 0) > 0 ? Number(opts.max) : 8760;
+  if (min > max) return communityDefault;
+  return Math.min(Math.max(requested, min), max);
+}
 
 function optionalString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -185,7 +233,7 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     sortitionResponseHours: integerValue(input.sortitionResponseHours, DEFAULT_COMMUNITY_SETTINGS.sortitionResponseHours ?? 72, 1, 720, 'sortitionResponseHours must be between 1 and 720'),
     synthesisMode: enumValue(input.synthesisMode, COMMUNITY_SYNTHESIS_MODES, DEFAULT_COMMUNITY_SETTINGS.synthesisMode, 'Invalid synthesis mode'),
     amendmentThreshold: decimalString(input.amendmentThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentThreshold ?? '0.5', 0, 1, 'amendmentThreshold must be between 0 and 1'),
-    amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold ?? '1', 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
+    amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold, 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
     joinPolicy: enumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, DEFAULT_COMMUNITY_SETTINGS.joinPolicy, 'Invalid join policy'),
@@ -194,7 +242,32 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     authorReviewHours: integerValue(input.authorReviewHours, DEFAULT_COMMUNITY_SETTINGS.authorReviewHours, 0, 8760, 'authorReviewHours must be 0–8760'),
     communitySignalHours: integerValue(input.communitySignalHours, DEFAULT_COMMUNITY_SETTINGS.communitySignalHours, 0, 8760, 'communitySignalHours must be 0–8760'),
     votingHours: integerValue(input.votingHours, DEFAULT_COMMUNITY_SETTINGS.votingHours, 0, 8760, 'votingHours must be 0–8760'),
+    finalReviewHours: integerValue(input.finalReviewHours, DEFAULT_COMMUNITY_SETTINGS.finalReviewHours, 0, 8760, 'finalReviewHours must be 0–8760'),
+    ...assertAuthoredRanges({
+      deliberationMinHours: integerValue(input.deliberationMinHours, DEFAULT_COMMUNITY_SETTINGS.deliberationMinHours, 1, 8760, 'deliberationMinHours must be 1–8760'),
+      deliberationMaxHours: integerValue(input.deliberationMaxHours, DEFAULT_COMMUNITY_SETTINGS.deliberationMaxHours, 1, 8760, 'deliberationMaxHours must be 1–8760'),
+      votingMinHours: integerValue(input.votingMinHours, DEFAULT_COMMUNITY_SETTINGS.votingMinHours, 1, 8760, 'votingMinHours must be 1–8760'),
+      votingMaxHours: integerValue(input.votingMaxHours, DEFAULT_COMMUNITY_SETTINGS.votingMaxHours, 1, 8760, 'votingMaxHours must be 1–8760'),
+    }),
   };
+}
+
+/**
+ * A range whose minimum exceeds its maximum admits no valid author choice, so
+ * it is rejected at the edge rather than silently ignored later.
+ */
+function assertAuthoredRanges<T extends Partial<Record<
+  'deliberationMinHours' | 'deliberationMaxHours' | 'votingMinHours' | 'votingMaxHours', number
+>>>(values: T): T {
+  if (values.deliberationMinHours !== undefined && values.deliberationMaxHours !== undefined
+    && values.deliberationMinHours > values.deliberationMaxHours) {
+    throw new Error('deliberationMinHours cannot exceed deliberationMaxHours');
+  }
+  if (values.votingMinHours !== undefined && values.votingMaxHours !== undefined
+    && values.votingMinHours > values.votingMaxHours) {
+    throw new Error('votingMinHours cannot exceed votingMaxHours');
+  }
+  return values;
 }
 
 export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): CommunityUpdateSettings {
@@ -258,5 +331,45 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
   const votingHours = optionalIntegerValue(input.votingHours, 0, 8760, 'votingHours must be 0–8760');
   if (votingHours !== undefined) updates.votingHours = votingHours;
 
+  const finalReviewHours = optionalIntegerValue(input.finalReviewHours, 0, 8760, 'finalReviewHours must be 0–8760');
+  if (finalReviewHours !== undefined) updates.finalReviewHours = finalReviewHours;
+
+  const deliberationMinHours = optionalIntegerValue(input.deliberationMinHours, 1, 8760, 'deliberationMinHours must be 1–8760');
+  if (deliberationMinHours !== undefined) updates.deliberationMinHours = deliberationMinHours;
+
+  const deliberationMaxHours = optionalIntegerValue(input.deliberationMaxHours, 1, 8760, 'deliberationMaxHours must be 1–8760');
+  if (deliberationMaxHours !== undefined) updates.deliberationMaxHours = deliberationMaxHours;
+
+  const votingMinHours = optionalIntegerValue(input.votingMinHours, 1, 8760, 'votingMinHours must be 1–8760');
+  if (votingMinHours !== undefined) updates.votingMinHours = votingMinHours;
+
+  const votingMaxHours = optionalIntegerValue(input.votingMaxHours, 1, 8760, 'votingMaxHours must be 1–8760');
+  if (votingMaxHours !== undefined) updates.votingMaxHours = votingMaxHours;
+
+  // Only catches a self-contradictory pair sent together. A partial update
+  // that crosses the *stored* bound is caught by assertCommunityRanges(),
+  // which the route runs against the merged result.
+  assertAuthoredRanges(updates);
+
   return updates;
+}
+
+/**
+ * Cross-field check against the settings a community will actually hold once
+ * an update is applied. The update sanitizer only sees the keys that were
+ * sent, so a PATCH of one half of a range has to be judged against the other
+ * half as stored.
+ */
+export function assertCommunityRanges(merged: {
+  deliberationMinHours?: number | null;
+  deliberationMaxHours?: number | null;
+  votingMinHours?: number | null;
+  votingMaxHours?: number | null;
+}): void {
+  assertAuthoredRanges({
+    deliberationMinHours: merged.deliberationMinHours ?? undefined,
+    deliberationMaxHours: merged.deliberationMaxHours ?? undefined,
+    votingMinHours: merged.votingMinHours ?? undefined,
+    votingMaxHours: merged.votingMaxHours ?? undefined,
+  });
 }

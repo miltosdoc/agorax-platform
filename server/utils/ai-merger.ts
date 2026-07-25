@@ -18,6 +18,7 @@
 
 import { db } from '../db';
 import { proposalAmendments, proposals, communities } from '../../shared/schema';
+import { DEFAULT_AMENDMENT_INCLUSION_THRESHOLD } from '../../shared/community-settings';
 import { eq } from 'drizzle-orm';
 import { chatCompletion, isLlmConfigured, LlmUnavailableError } from './llm-client';
 
@@ -160,7 +161,7 @@ export async function aiMergeAmendments(
       .select({ t: communities.amendmentInclusionThreshold })
       .from(communities)
       .where(eq(communities.id, proposal.communityId));
-    threshold = community?.t != null ? Number(community.t) : 1;
+    threshold = community?.t != null ? Number(community.t) : DEFAULT_AMENDMENT_INCLUSION_THRESHOLD;
   }
 
   const included: Array<{ id: number; type: string; text: string; reason: string }> = [];
@@ -338,7 +339,7 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
     .select({ t: communities.amendmentInclusionThreshold })
     .from(communities)
     .where(eq(communities.id, proposal.communityId));
-  const threshold = community?.t != null ? Number(community.t) : 1;
+  const threshold = community?.t != null ? Number(community.t) : DEFAULT_AMENDMENT_INCLUSION_THRESHOLD;
 
   const amendments = await db
     .select()
@@ -468,7 +469,7 @@ export async function refineFinalText(proposalId: number, instruction: string): 
     .select({ t: communities.amendmentInclusionThreshold })
     .from(communities)
     .where(eq(communities.id, proposal.communityId));
-  const threshold = community?.t != null ? Number(community.t) : 1;
+  const threshold = community?.t != null ? Number(community.t) : DEFAULT_AMENDMENT_INCLUSION_THRESHOLD;
   const amendments = await db
     .select()
     .from(proposalAmendments)
@@ -498,7 +499,7 @@ export async function buildBallotOptions(proposalId: number): Promise<Array<{ id
     .select({ t: communities.amendmentInclusionThreshold })
     .from(communities)
     .where(eq(communities.id, proposal.communityId));
-  const threshold = community?.t != null ? Number(community.t) : 1;
+  const threshold = community?.t != null ? Number(community.t) : DEFAULT_AMENDMENT_INCLUSION_THRESHOLD;
   const amendments = await db
     .select()
     .from(proposalAmendments)

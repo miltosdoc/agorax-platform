@@ -46,6 +46,11 @@ interface CommunitySettingsForm {
   authorReviewHours: number;
   communitySignalHours: number;
   votingHours: number;
+  finalReviewHours: number;
+  deliberationMinHours: number;
+  deliberationMaxHours: number;
+  votingMinHours: number;
+  votingMaxHours: number;
 }
 
 function toForm(community: Community): CommunitySettingsForm {
@@ -61,7 +66,7 @@ function toForm(community: Community): CommunitySettingsForm {
     sortitionResponseHours: community.sortitionResponseHours ?? 72,
     synthesisMode: ((community as any).synthesisMode as CommunitySynthesisMode) || 'ai',
     amendmentThreshold: String(community.amendmentThreshold ?? '0.5'),
-    amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '1'),
+    amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '0.6'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
     requireGovgrVerification: community.requireGovgrVerification ?? false,
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
@@ -70,6 +75,11 @@ function toForm(community: Community): CommunitySettingsForm {
     authorReviewHours: (community as any).authorReviewHours ?? 72,
     communitySignalHours: (community as any).communitySignalHours ?? 48,
     votingHours: (community as any).votingHours ?? 168,
+    finalReviewHours: (community as any).finalReviewHours ?? 24,
+    deliberationMinHours: (community as any).deliberationMinHours ?? 24,
+    deliberationMaxHours: (community as any).deliberationMaxHours ?? 336,
+    votingMinHours: (community as any).votingMinHours ?? 24,
+    votingMaxHours: (community as any).votingMaxHours ?? 720,
   };
 }
 
@@ -391,6 +401,77 @@ export default function CommunitySettingsPage() {
                         onChange={(e) => update('votingHours', Number(e.target.value))}
                       />
                       <p className="text-xs text-muted-foreground">Προεπιλογή: 168 ώρες (7 ημέρες). 0 = χωρίς όριο.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="finalReviewHours">Κρίση τροπολογιών πριν την ψηφοφορία (ώρες)</Label>
+                      <Input
+                        id="finalReviewHours"
+                        type="number"
+                        min="0"
+                        max="8760"
+                        value={form.finalReviewHours}
+                        onChange={(e) => update('finalReviewHours', Number(e.target.value))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Μετά τη λήξη της διαβούλευσης ο συγγραφέας βλέπει το συγχωνευμένο κείμενο και προλαβαίνει να κρίνει
+                        ό,τι εκκρεμεί. Η σιωπή αποδέχεται το κείμενο. Προεπιλογή: 24 ώρες.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <h3 className="text-sm font-medium">Όρια που μπορεί να επιλέξει ο συγγραφέας</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Ο συγγραφέας κάθε πρότασης μπορεί να ορίσει τη δική του διάρκεια, αλλά μόνο μέσα σε αυτό το εύρος.
+                        Το ρολόι καθορίζει ποιος προλαβαίνει να συμμετάσχει, γι' αυτό το εύρος το ορίζει η κοινότητα.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="deliberationMinHours">Διαβούλευση: ελάχιστο</Label>
+                        <Input
+                          id="deliberationMinHours"
+                          type="number"
+                          min="1"
+                          max="8760"
+                          value={form.deliberationMinHours}
+                          onChange={(e) => update('deliberationMinHours', Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="deliberationMaxHours">Διαβούλευση: μέγιστο</Label>
+                        <Input
+                          id="deliberationMaxHours"
+                          type="number"
+                          min="1"
+                          max="8760"
+                          value={form.deliberationMaxHours}
+                          onChange={(e) => update('deliberationMaxHours', Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="votingMinHours">Ψηφοφορία: ελάχιστο</Label>
+                        <Input
+                          id="votingMinHours"
+                          type="number"
+                          min="1"
+                          max="8760"
+                          value={form.votingMinHours}
+                          onChange={(e) => update('votingMinHours', Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="votingMaxHours">Ψηφοφορία: μέγιστο</Label>
+                        <Input
+                          id="votingMaxHours"
+                          type="number"
+                          min="1"
+                          max="8760"
+                          value={form.votingMaxHours}
+                          onChange={(e) => update('votingMaxHours', Number(e.target.value))}
+                        />
+                      </div>
                     </div>
                   </div>
                 </section>

@@ -111,14 +111,19 @@ export async function transitionProposal(
     throw new Error('Direct-vote proposals have no final_review phase');
   }
 
-  // Compute phase deadline when entering a time-limited phase. final_review
-  // reuses the community's authorReviewHours budget.
+  // Compute phase deadline when entering a time-limited phase.
   const DEFAULT_PHASE_HOURS = 48;
-  const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'votingHours'> = {
+  const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'finalReviewHours' | 'votingHours'> = {
     author_review: 'authorReviewHours',
     community_signal: 'communitySignalHours',
-    final_review: 'authorReviewHours',
+    final_review: 'finalReviewHours',
     voting: 'votingHours',
+  };
+  // Phases whose length the author may set on their own proposal, each with
+  // the community bounds that constrain the choice.
+  const AUTHORED_PHASES: Record<string, { field: string; min: string; max: string }> = {
+    community_signal: { field: 'deliberationDurationHours', min: 'deliberationMinHours', max: 'deliberationMaxHours' },
+    voting: { field: 'votingDurationHours', min: 'votingMinHours', max: 'votingMaxHours' },
   };
   let phaseDeadline: Date | null = null;
   if (TIMED_PHASES[newState]) {
@@ -127,9 +132,19 @@ export async function transitionProposal(
       const { communityRepo } = await import('../storage');
       const community = await communityRepo.getCommunity(proposal.communityId);
       hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
-      // The author's own duration wins for the vote they configured.
-      if (newState === 'voting' && (proposal as any).votingDurationHours > 0) {
-        hours = (proposal as any).votingDurationHours;
+      // The author's own duration wins for the phase they configured, but
+      // only inside the range the community set. Bounds can change after the
+      // proposal was created, so the stored value is re-clamped here rather
+      // than trusted from write time.
+      const authored = AUTHORED_PHASES[newState];
+      if (authored) {
+        const { resolveAuthoredPhaseHours } = await import('@shared/community-settings');
+        hours = resolveAuthoredPhaseHours({
+          requested: (proposal as any)[authored.field],
+          min: (community as any)?.[authored.min],
+          max: (community as any)?.[authored.max],
+          communityDefault: hours,
+        });
       }
     } catch (err: any) {
       console.warn(`[phase-deadline] lookup failed for proposal ${proposal.id}: ${err?.message}`);

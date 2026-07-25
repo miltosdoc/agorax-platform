@@ -162,7 +162,12 @@ async function handleRefreshFinalText(payload: JobPayload): Promise<void> {
   const { proposalId } = payload.data as { proposalId: number };
   if (typeof proposalId !== 'number') return;
   const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
-  if (!proposal || proposal.status !== 'community_signal') return;
+  // final_review is included: judging an amendment there has to move the
+  // merged text, or the decision would be recorded and never reach the
+  // ballot — final_review->voting only freezes the options, it does not
+  // re-merge. Acceptance in final_review opens the vote, so there is no
+  // window where a re-merge can rewrite text the author already signed off.
+  if (!proposal || !['community_signal', 'final_review'].includes(proposal.status)) return;
   if ((proposal as any).track === 'vote') return;
   const { prepareFinalReview } = await import('./ai-merger');
   await prepareFinalReview(proposalId);
@@ -199,14 +204,16 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
         await triggerSideEffects('author_review', 'community_signal', updated);
 
       } else if (proposal.status === 'community_signal') {
-        // 3-step flow: the final text has been merging LIVE throughout the
-        // phase (refresh_final_text jobs), so the deadline freezes it and
-        // opens the vote immediately — no waiting room. The freeze itself
-        // happens in the community_signal->voting side effect. (Sortition
-        // synthesis remains reachable via the manual /transition endpoint;
-        // final_review below only serves proposals already in it.)
-        const updated = await transitionProposal(proposal as any, 'voting', storage);
-        await triggerSideEffects('community_signal', 'voting', updated);
+        // The final text merges LIVE throughout the phase (refresh_final_text
+        // jobs), but the deadline used to open the vote the same second it
+        // passed. An author who had not finished judging amendments lost them
+        // all, so the ballot carried text the deliberation never touched —
+        // reported by three users, and the reason final_review is back in the
+        // flow: a short window where the merged text is visible, amendments
+        // can still be judged, and silence accepts what the merge produced.
+        // (Sortition synthesis remains reachable via manual /transition.)
+        const updated = await transitionProposal(proposal as any, 'final_review', storage);
+        await triggerSideEffects('community_signal', 'final_review', updated);
 
       } else if (proposal.status === 'final_review') {
         // Author silence = acceptance of the AI-merged text as-is.

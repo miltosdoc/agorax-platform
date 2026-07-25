@@ -131,7 +131,9 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
 
   // Amendment phases during which a decision can still be recorded. The
   // deliberation track never enters 'author_review', so it cannot be the gate.
-  const reviewablePhase = ['review', 'author_review', 'community_signal'].includes(proposalStatus);
+  // 'final_review' is the grace window after the deliberation deadline: the
+  // merged text is on screen and the author can still judge what is left.
+  const reviewablePhase = ['review', 'author_review', 'community_signal', 'final_review'].includes(proposalStatus);
 
   // The proposal author judges the top-level amendments, inline — an accepted
   // amendment is what pulls the text into the AI merge, so this decision must

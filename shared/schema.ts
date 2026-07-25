@@ -226,8 +226,11 @@ export const communities = pgTable("communities", {
   // Amendment parameters (per-community config)
   amendmentThreshold: numeric("amendment_threshold").default("0.5"), // upvote ratio to flag rejected amendments
   // Popularity ratio (0..1) above which the AI merge will include an
-  // amendment the author did NOT explicitly accept. 1 = author-only.
-  amendmentInclusionThreshold: numeric("amendment_inclusion_threshold").default("1"),
+  // amendment the author did NOT explicitly accept. 1 = author-only, which
+  // makes an inattentive author a single point of failure: everything the
+  // community deliberated is dropped and the vote opens on untouched text.
+  // The default lets clear community support carry an amendment on its own.
+  amendmentInclusionThreshold: numeric("amendment_inclusion_threshold").default("0.6"),
   maxAmendmentsPerProposal: integer("max_amendments_per_proposal").default(-1), // -1 = unlimited
 
   // Merge tracking (self-reference — defined without FK to avoid circular init)
@@ -240,6 +243,19 @@ export const communities = pgTable("communities", {
   authorReviewHours: integer("author_review_hours").default(72),
   communitySignalHours: integer("community_signal_hours").default(48),
   votingHours: integer("voting_hours").default(168),
+  // Grace window between the deliberation deadline and the ballot opening:
+  // the merged text is ready and the author can still judge amendments.
+  // Silence accepts the merged text, so this is short by design.
+  finalReviewHours: integer("final_review_hours").default(24),
+
+  // Bounds on the durations a proposal author may choose for their own
+  // proposal. The community owns the range; the author picks inside it. The
+  // clock is a governance lever — an unbounded author could run a two-hour
+  // deliberation nobody sees, or park a proposal for six months.
+  deliberationMinHours: integer("deliberation_min_hours").default(24),
+  deliberationMaxHours: integer("deliberation_max_hours").default(336),
+  votingMinHours: integer("voting_min_hours").default(24),
+  votingMaxHours: integer("voting_max_hours").default(720),
 
   // Democracy score (computed, shows how democratic the community governance is)
   democracyScore: numeric("democracy_score"),
@@ -344,7 +360,12 @@ export const proposals = pgTable("proposals", {
   track: text("track").notNull().default("deliberation"),
   // Author-chosen voting duration (hours) — overrides the community's
   // votingHours when this proposal enters voting. null = community default.
+  // Clamped to the community's votingMin/MaxHours at transition time.
   votingDurationHours: integer("voting_duration_hours"),
+  // Author-chosen deliberation duration (hours) — overrides the community's
+  // communitySignalHours. null = community default. Clamped to the
+  // community's deliberationMin/MaxHours at transition time.
+  deliberationDurationHours: integer("deliberation_duration_hours"),
   // Option ballot for deliberation-track final votes: array of
   // { id: 'final' | 'counter_<amendmentId>' | 'status_quo', label: string }.
   // null = classic yes/no/abstain ballot (all legacy proposals).

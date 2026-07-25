@@ -32,6 +32,12 @@ interface MemberCommunity {
   id: number;
   name: string;
   isGeneral?: boolean;
+  // Bounds the community sets on the durations an author may choose.
+  deliberationMinHours?: number | null;
+  deliberationMaxHours?: number | null;
+  votingMinHours?: number | null;
+  votingMaxHours?: number | null;
+  communitySignalHours?: number | null;
 }
 
 export function ProposalForm({ communityId, editProposalId }: ProposalFormProps) {
@@ -61,6 +67,13 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
   const lockedCommunity = communityId
     ? memberCommunities.find((c) => c.id === communityId)
     : null;
+  // Duration bounds come from the community the proposal is being filed in.
+  // The server re-checks them; these only keep the picker honest.
+  const targetCommunity = memberCommunities.find((c) => c.id === targetCommunityId);
+  const deliberationMin = targetCommunity?.deliberationMinHours ?? 24;
+  const deliberationMax = targetCommunity?.deliberationMaxHours ?? 336;
+  const votingMin = targetCommunity?.votingMinHours ?? 24;
+  const votingMax = targetCommunity?.votingMaxHours ?? 720;
   const [formData, setFormData] = useState({
     question: '',
     solution: '',
@@ -71,6 +84,9 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
   // changes its track, so the selector is hidden in edit mode.
   const [track, setTrack] = useState<'deliberation' | 'vote'>('deliberation');
   const [votingDurationHours, setVotingDurationHours] = useState('72');
+  // Empty = use the community's own deliberation length. The author only
+  // overrides it deliberately, and only inside the community's range.
+  const [deliberationDurationHours, setDeliberationDurationHours] = useState('');
   // Optional author-defined multiple choice (vote track). Empty = Ναι/Όχι.
   const [voteOptions, setVoteOptions] = useState<string[]>([]);
 
@@ -191,7 +207,9 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                   votingDurationHours: parseInt(votingDurationHours, 10),
                   ballotOptions: voteOptions.map(o => o.trim()).filter(Boolean),
                 }
-              : {}),
+              : deliberationDurationHours.trim() !== ''
+                ? { deliberationDurationHours: parseInt(deliberationDurationHours, 10) }
+                : {}),
           });
 
       if (!res.ok) {
@@ -378,6 +396,30 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                 </RadioGroup>
               </div>
 
+              {track === 'deliberation' && !editProposalId && (
+                <div className="space-y-2">
+                  <Label htmlFor="deliberationDurationHours">
+                    {t('proposal.deliberation_duration_label') || 'Διάρκεια διαβούλευσης (ώρες)'}
+                  </Label>
+                  <Input
+                    id="deliberationDurationHours"
+                    type="number"
+                    min={deliberationMin}
+                    max={deliberationMax}
+                    step={1}
+                    value={deliberationDurationHours}
+                    onChange={(e) => setDeliberationDurationHours(e.target.value)}
+                    placeholder={String(targetCommunity?.communitySignalHours ?? 48)}
+                    className="max-w-[10rem]"
+                    data-testid="proposal-deliberation-duration"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('proposal.deliberation_duration_hint')
+                      || `Η κοινότητα επιτρέπει ${deliberationMin}–${deliberationMax} ώρες. Κενό = η προεπιλογή της κοινότητας.`}
+                  </p>
+                </div>
+              )}
+
               {track === 'vote' && (
                 <div className="space-y-2">
                   <Label htmlFor="votingDurationHours">
@@ -386,8 +428,8 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                   <Input
                     id="votingDurationHours"
                     type="number"
-                    min={1}
-                    max={8760}
+                    min={votingMin}
+                    max={votingMax}
                     step={1}
                     required
                     value={votingDurationHours}
@@ -397,6 +439,7 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                   />
                   <p className="text-xs text-muted-foreground">
                     {t('proposal.track_vote_duration_hint') || '72 = 3 ημέρες, 168 = 1 εβδομάδα'}
+                    {` — ${votingMin}–${votingMax}`}
                   </p>
 
                   <div className="space-y-2 pt-2">

@@ -149,19 +149,42 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member to submit proposals" });
       }
-      const { question, solution, category, track, votingDurationHours, ballotOptions } = req.body;
+      const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions } = req.body;
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
       }
       if (track !== undefined && !PROPOSAL_TRACKS.includes(track)) {
         return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
       }
+      // The community owns the range an author may choose within. Rejecting
+      // out-of-range values here rather than clamping silently is what makes
+      // the bound visible: the author learns the community's rule instead of
+      // watching their number change without explanation.
+      const community = await communityRepo.getCommunity(communityId);
+      const inRange = (value: number, min: number | null | undefined, max: number | null | undefined) =>
+        value >= (min ?? 1) && value <= (max ?? 8760);
+
       let durationHours: number | null = null;
+      let deliberationHours: number | null = null;
       let customBallot: Array<{ id: string; label: string }> | null = null;
+      if (track !== 'vote' && deliberationDurationHours !== undefined && deliberationDurationHours !== null && deliberationDurationHours !== '') {
+        deliberationHours = Number(deliberationDurationHours);
+        const min = (community as any)?.deliberationMinHours;
+        const max = (community as any)?.deliberationMaxHours;
+        if (!Number.isInteger(deliberationHours) || !inRange(deliberationHours, min, max)) {
+          return res.status(400).json({
+            message: `deliberationDurationHours must be ${min ?? 1}–${max ?? 8760} in this community`,
+          });
+        }
+      }
       if (track === 'vote') {
         durationHours = Number(votingDurationHours);
-        if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 8760) {
-          return res.status(400).json({ message: "votingDurationHours must be 1–8760 for direct-vote proposals" });
+        const min = (community as any)?.votingMinHours;
+        const max = (community as any)?.votingMaxHours;
+        if (!Number.isInteger(durationHours) || !inRange(durationHours, min, max)) {
+          return res.status(400).json({
+            message: `votingDurationHours must be ${min ?? 1}–${max ?? 8760} in this community`,
+          });
         }
         // Optional author-defined multiple choice. Empty/absent = classic
         // yes/no/abstain. «Καμία αλλαγή» is always appended so voters can
@@ -207,6 +230,7 @@ export function registerProposalsRoutes(app: Express): void {
         status: INITIAL_PROPOSAL_STATE,
         track: track ?? 'deliberation',
         votingDurationHours: durationHours,
+        deliberationDurationHours: deliberationHours,
         ballotOptions: customBallot,
       });
       // Members are notified on submit (draft → deliberation), not here —
