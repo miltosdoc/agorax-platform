@@ -10,7 +10,7 @@ import { handleSortitionCompletion, transitionToValidation } from './proposal-st
 import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembers } from './sortition-timeout';
 import { db } from '../db';
 import { sortitionBodies, proposals, proposalAmendments } from '@shared/schema';
-import { and, eq, lt, isNotNull, inArray } from 'drizzle-orm';
+import { and, eq, lt, isNotNull, inArray, sql } from 'drizzle-orm';
 
 // ─── Handler: structure_proposal ────────────────────────────────────────────
 
@@ -94,8 +94,27 @@ async function handleRecalculateScore(payload: JobPayload): Promise<void> {
 
 // ─── Handler: cleanup_expired ───────────────────────────────────────────────
 
-async function handleCleanupExpired(payload: JobPayload): Promise<void> {
-  // TODO: Implement cleanup logic
+const NOTIFICATION_RETENTION_DAYS = 30;
+
+/**
+ * Nothing ever deleted a notification, so every account accumulated them
+ * without bound — 3,450 rows across 103 users before this landed. Read
+ * notifications past the retention window carry no remaining value: the
+ * user has seen them and the list only gets harder to scan.
+ *
+ * Unread ones are left alone at any age; deleting something a user has not
+ * seen would hide it rather than tidy it.
+ */
+async function handleCleanupExpired(_payload: JobPayload): Promise<void> {
+  const deleted = await db.execute(sql`
+    DELETE FROM sortition_notifications
+    WHERE read = true
+      AND created_at < NOW() - (${NOTIFICATION_RETENTION_DAYS} || ' days')::interval
+    RETURNING id
+  `);
+  if (deleted.rows.length > 0) {
+    console.log(`[cleanup] removed ${deleted.rows.length} read notifications older than ${NOTIFICATION_RETENTION_DAYS}d`);
+  }
 }
 
 // ─── Handler: sortition_timeout ─────────────────────────────────────────────
@@ -308,10 +327,22 @@ export function startJobQueue(): () => void {
       .catch((err) => console.error('[reminders] sweep failed:', err));
   }, 10 * 60_000);
 
+  // Retention sweep. Like the reminders, the handler was registered but
+  // never fed, so it had never run once. Daily is ample for a 30-day window;
+  // the first pass runs a minute after boot so a restart is enough to see it.
+  const cleanupId = setInterval(() => {
+    enqueueJob({ type: 'cleanup_expired', data: {}, priority: 'low' }).catch(() => {});
+  }, 24 * 60 * 60_000);
+  const firstCleanupId = setTimeout(() => {
+    enqueueJob({ type: 'cleanup_expired', data: {}, priority: 'low' }).catch(() => {});
+  }, 60_000);
+
   return () => {
     stopWorker();
     clearInterval(autoAdvanceId);
     clearInterval(sortitionSweepId);
     clearInterval(reminderSweepId);
+    clearInterval(cleanupId);
+    clearTimeout(firstCleanupId);
   };
 }

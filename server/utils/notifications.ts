@@ -272,16 +272,63 @@ export async function notifyNewAmendment(
   const short = proposalQuestion.length > 100
     ? proposalQuestion.slice(0, 97) + '…'
     : proposalQuestion;
+
+  // One row per member per proposal per day, not one per amendment. A single
+  // busy proposal used to emit a notification to every member for every
+  // amendment — 409 of them in one morning here — which buries everything
+  // else in the bell and trains people to ignore it.
+  const counted = await db.execute(sql`
+    SELECT count(*)::int AS n FROM proposal_amendments
+    WHERE proposal_id = ${proposalId} AND created_at > NOW() - INTERVAL '24 hours'
+  `);
+  const n = Number((counted.rows[0] as any)?.n ?? 1);
+  const title = n > 1
+    ? `${n} νέες τροπολογίες σε πρόταση`
+    : 'Νέα τροπολογία σε πρόταση';
+  const actionUrl = `/proposals/${proposalId}`;
+
   for (const member of members.rows) {
     const userId = member.user_id as number;
+    const existing = await db.execute(sql`
+      SELECT id FROM sortition_notifications
+      WHERE user_id = ${userId} AND type = 'amendment_ready'
+        AND proposal_id = ${proposalId}
+        AND created_at > NOW() - INTERVAL '24 hours'
+      ORDER BY created_at DESC LIMIT 1
+    `);
+
+    if (existing.rows.length > 0) {
+      // Roll the existing entry forward instead of stacking a new one.
+      const id = Number((existing.rows[0] as any).id);
+      await db.execute(sql`
+        UPDATE sortition_notifications
+        SET title = ${title}, message = ${short}, read = false, read_at = NULL,
+            created_at = NOW()
+        WHERE id = ${id}
+      `);
+      notificationBus.publish({
+        userId,
+        type: 'amendment_ready',
+        title,
+        message: short,
+        sortitionBodyId: null,
+        proposalId,
+        communityId,
+        actionUrl,
+        createdAt: new Date().toISOString(),
+      });
+      notified++;
+      continue;
+    }
+
     await createNotification({
       userId,
       type: 'amendment_ready',
-      title: 'Νέα τροπολογία σε πρόταση',
+      title,
       message: short,
       proposalId,
       communityId,
-      actionUrl: `/proposals/${proposalId}`,
+      actionUrl,
     });
     notified++;
   }

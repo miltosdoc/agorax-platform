@@ -175,6 +175,50 @@ export function registerNotificationsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to mark all as read" });
     }
   });
+  // Until now a notification could only ever be marked read — never removed —
+  // so a list only ever grew. Both routes scope the delete to the caller's own
+  // rows; the id is never trusted on its own.
+  app.delete("/api/sortition-notifications/:id", requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ message: "Invalid notification id" });
+      }
+      const removed = await db
+        .delete(sortitionNotifications)
+        .where(and(
+          eq(sortitionNotifications.id, id),
+          eq(sortitionNotifications.userId, req.user!.id),
+        ))
+        .returning({ id: sortitionNotifications.id });
+      if (removed.length === 0) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      res.json({ success: true, deleted: removed.length });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
+  // ?readOnly=true clears only what the user has already seen, so a sweep
+  // cannot silently discard something still unread.
+  app.delete("/api/sortition-notifications", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user!.id;
+      const readOnly = req.query.readOnly === 'true';
+      const scope = readOnly
+        ? and(eq(sortitionNotifications.userId, userId), eq(sortitionNotifications.read, true))
+        : eq(sortitionNotifications.userId, userId);
+      const removed = await db
+        .delete(sortitionNotifications)
+        .where(scope)
+        .returning({ id: sortitionNotifications.id });
+      res.json({ success: true, deleted: removed.length });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear notifications" });
+    }
+  });
+
   app.get("/api/notification-preferences", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user!.id;

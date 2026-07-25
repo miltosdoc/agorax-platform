@@ -244,6 +244,9 @@ const en: TranslationDictionary = {
   'notification.showMore': 'Show more',
   'notification.showLess': 'Show less',
   'notification.open': 'Open',
+  'notification.delete': 'Delete',
+  'notification.clearRead': 'Clear read',
+  'notification.clearReadConfirm': 'Delete every notification you have already read? Unread ones are kept.',
   'notification.markAllRead': 'Mark all as read',
   'notification.loading': 'Loading notifications...',
 

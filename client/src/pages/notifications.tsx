@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useNotifications, useMarkAllAsRead } from "@/hooks/use-notifications";
+import { useNotifications, useMarkAllAsRead, useClearNotifications } from "@/hooks/use-notifications";
 import { NotificationItem } from "@/components/notifications/notification-item";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, CheckCheck, FileText } from "lucide-react";
+import { Bell, CheckCheck, FileText, Trash2 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
@@ -17,6 +17,7 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const markAllAsRead = useMarkAllAsRead();
+  const clearNotifications = useClearNotifications();
   
   const { data, isLoading } = useNotifications({ 
     unreadOnly: filter === "unread",
@@ -30,18 +31,37 @@ export default function NotificationsPage() {
     <AppShell
       title={t('notification.title')}
       actions={
-        unreadCount > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => markAllAsRead.mutate()}
-            disabled={markAllAsRead.isPending}
-            data-testid="button-mark-all-read"
-          >
-            <CheckCheck className="mr-1 h-4 w-4" />
-            {t('notification.markAllRead')}
-          </Button>
-        )
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllAsRead.mutate()}
+              disabled={markAllAsRead.isPending}
+              data-testid="button-mark-all-read"
+            >
+              <CheckCheck className="mr-1 h-4 w-4" />
+              {t('notification.markAllRead')}
+            </Button>
+          )}
+          {/* Clears only what has been read, so nothing unseen disappears. */}
+          {notifications.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (window.confirm(t('notification.clearReadConfirm'))) {
+                  clearNotifications.mutate(true);
+                }
+              }}
+              disabled={clearNotifications.isPending}
+              data-testid="button-clear-read"
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              {t('notification.clearRead')}
+            </Button>
+          )}
+        </div>
       }
     >
       <div className="mb-4">

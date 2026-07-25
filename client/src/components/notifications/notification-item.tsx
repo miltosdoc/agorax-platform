@@ -2,9 +2,10 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { el as dateFnsEl, enUS as dateFnsEn } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
+import { X } from "lucide-react";
 import { notificationTypeConfig } from "@/types/notifications";
 import type { SortitionNotification } from "@/types/notifications";
-import { useMarkAsRead } from "@/hooks/use-notifications";
+import { useDeleteNotification, useMarkAsRead } from "@/hooks/use-notifications";
 
 interface NotificationItemProps {
   notification: SortitionNotification;
@@ -14,6 +15,7 @@ interface NotificationItemProps {
 export function NotificationItem({ notification, onClick }: NotificationItemProps) {
   const { t, locale } = useTranslation();
   const markAsRead = useMarkAsRead();
+  const deleteNotification = useDeleteNotification();
   const dateFnsLocale = locale === 'el' ? dateFnsEl : dateFnsEn;
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -68,6 +70,17 @@ export function NotificationItem({ notification, onClick }: NotificationItemProp
           {!notification.read && (
             <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
           )}
+          <button
+            type="button"
+            className="ml-auto -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={(e) => { e.stopPropagation(); deleteNotification.mutate(notification.id); }}
+            disabled={deleteNotification.isPending}
+            aria-label={t('notification.delete')}
+            title={t('notification.delete')}
+            data-testid={`notification-delete-${notification.id}`}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
         {notification.message && (
           <>

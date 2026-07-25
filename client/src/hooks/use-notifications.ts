@@ -96,3 +96,28 @@ export function useMarkAllAsRead() {
     },
   });
 }
+
+export function useDeleteNotification() {
+  return useMutation({
+    mutationFn: async (notificationId: number) => {
+      return await apiRequest("DELETE", `/api/sortition-notifications/${notificationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
+    },
+  });
+}
+
+/** Clears read notifications by default; pass false to clear everything. */
+export function useClearNotifications() {
+  return useMutation({
+    mutationFn: async (readOnly: boolean = true) => {
+      return await apiRequest("DELETE", `/api/sortition-notifications?readOnly=${readOnly}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
+    },
+  });
+}

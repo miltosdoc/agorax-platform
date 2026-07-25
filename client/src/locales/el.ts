@@ -244,6 +244,9 @@ const el: TranslationDictionary = {
   'notification.showMore': 'Περισσότερα',
   'notification.showLess': 'Λιγότερα',
   'notification.open': 'Άνοιγμα',
+  'notification.delete': 'Διαγραφή',
+  'notification.clearRead': 'Εκκαθάριση διαβασμένων',
+  'notification.clearReadConfirm': 'Να διαγραφούν όλες οι ειδοποιήσεις που έχετε ήδη διαβάσει; Οι αδιάβαστες παραμένουν.',
   'notification.markAllRead': 'Όλες ως αναγνωσμένες',
   'notification.loading': 'Φόρτωση ειδοποιήσεων...',
 
