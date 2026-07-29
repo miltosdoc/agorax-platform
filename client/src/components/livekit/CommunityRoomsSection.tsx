@@ -47,6 +47,18 @@ function formatDuration(seconds: number | null): string {
   return rem ? `${h}h ${rem}m` : `${h}h`;
 }
 
+/**
+ * `min` for the datetime-local picker: local wall-clock now, to the minute.
+ * toISOString is UTC, so we shift by the zone offset first — otherwise the
+ * floor lands hours off for anyone outside UTC.
+ */
+function localNowValue(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 interface Props {
   communityId: number;
   viewerIsAdmin: boolean;
@@ -65,6 +77,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [newWhen, setNewWhen] = useState('');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [ending, setEnding] = useState<Record<number, boolean>>({});
@@ -96,11 +109,31 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
 
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
+    // datetime-local hands us wall-clock text with no zone; new Date()
+    // reads it in the browser's zone and toISOString turns it into the
+    // real instant the server stores. Empty means "start now".
+    let scheduledAt: string | undefined;
+    if (newWhen) {
+      const when = new Date(newWhen);
+      if (Number.isNaN(when.getTime())) {
+        errorToast(t('livekit.createFailed'), t('livekit.badDate'));
+        return;
+      }
+      if (when.getTime() <= Date.now()) {
+        errorToast(t('livekit.createFailed'), t('livekit.pastDate'));
+        return;
+      }
+      scheduledAt = when.toISOString();
+    }
     setCreating(true);
     try {
-      await api.post<LivekitRoom>(`/api/communities/${communityId}/rooms`, { title: newTitle.trim() });
-      toast({ title: t('livekit.created') });
+      await api.post<LivekitRoom>(`/api/communities/${communityId}/rooms`, {
+        title: newTitle.trim(),
+        ...(scheduledAt ? { scheduledAt } : {}),
+      });
+      toast({ title: scheduledAt ? t('livekit.scheduledCreated') : t('livekit.created') });
       setNewTitle('');
+      setNewWhen('');
       setShowCreate(false);
       await refresh();
     } catch (err: any) {
@@ -154,18 +187,31 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
 
         {/* Inline create */}
         {showCreate && (
-          <div className="flex flex-wrap gap-2">
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder={t('livekit.titlePlaceholder')}
-              className="flex-1 min-w-[200px]"
-              data-testid="livekit-new-title"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
-            />
-            <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
-              {t('livekit.createButton')}
-            </Button>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder={t('livekit.titlePlaceholder')}
+                className="flex-1 min-w-[200px]"
+                data-testid="livekit-new-title"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+              />
+              <Input
+                type="datetime-local"
+                value={newWhen}
+                min={localNowValue()}
+                onChange={(e) => setNewWhen(e.target.value)}
+                aria-label={t('livekit.whenLabel')}
+                className="w-[210px]"
+                data-testid="livekit-new-when"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
+              />
+              <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
+                {newWhen ? t('livekit.scheduleButton') : t('livekit.createButton')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('livekit.whenHint')}</p>
           </div>
         )}
 

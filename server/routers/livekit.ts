@@ -225,6 +225,11 @@ export function registerLivekitRoutes(app: Express): void {
       if (!title) return res.status(400).json({ message: 'title is required' });
       const scheduledAtRaw = req.body?.scheduledAt;
       const scheduledAt = scheduledAtRaw ? new Date(scheduledAtRaw) : null;
+      // An unparseable date would reach the driver as Invalid Date and blow
+      // up mid-insert; reject it up front instead.
+      if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
+        return res.status(400).json({ message: 'invalid scheduledAt' });
+      }
       const recordingEnabled = !!req.body?.recordingEnabled;
 
       const room = await livekitRepo.create({
