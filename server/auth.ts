@@ -9,7 +9,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { DatabaseStorage } from "./storage";
 export const storage = new DatabaseStorage();
-import { User as SelectUser } from "@shared/schema";
+import { User as SelectUser, registerUserSchema } from "@shared/schema";
 import { db } from "./db";
 import { users, User, SafeUser } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -355,19 +355,55 @@ export function setupAuth(app: Express) {
         }
       }
 
-      // Check for existing user
-      const existingUsername = await storage.getUserByUsername(req.body.username);
-      const existingEmail = await storage.getUserByEmail(req.body.email);
-      if (existingUsername || existingEmail) {
-        return res.status(400).send("Invalid registration data");
+      // Shape and length checks. Until now nothing validated the body on this
+      // side at all — the client's zod resolver was the only gate, which a
+      // direct POST simply skips.
+      const parsed = registerUserSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const errors: Record<string, string> = {};
+        for (const issue of parsed.error.issues) {
+          const field = issue.path[0];
+          if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
+        }
+        return res.status(400).json({ message: "Ελέγξτε τα στοιχεία σας", errors });
       }
 
-      // Remove non-user fields from the data saved to the database
-      const { returnTo: _, deviceFingerprint: __, consent: ___, ...userData } = req.body;
+      // Duplicate checks, reported separately. "Invalid registration data" for
+      // both was unactionable: a real person had no idea what to change, and
+      // no way to find out.
+      //
+      // Usernames are public on the platform, so saying one is taken discloses
+      // nothing new. The email branch deliberately does NOT confirm that an
+      // account exists — it tells the owner what to do without answering the
+      // question for a stranger probing addresses.
+      const existingUsername = await storage.getUserByUsername(parsed.data.username);
+      if (existingUsername) {
+        return res.status(400).json({
+          message: "Το όνομα χρήστη χρησιμοποιείται ήδη",
+          errors: { username: "Αυτό το όνομα χρήστη χρησιμοποιείται ήδη. Δοκιμάστε άλλο." },
+        });
+      }
+      const existingEmail = await storage.getUserByEmail(parsed.data.email);
+      if (existingEmail) {
+        return res.status(400).json({
+          message: "Δεν ολοκληρώθηκε η εγγραφή",
+          errors: {
+            email: "Δεν μπορούμε να χρησιμοποιήσουμε αυτή τη διεύθυνση. "
+              + "Αν έχετε ήδη λογαριασμό, δοκιμάστε σύνδεση· διαφορετικά χρησιμοποιήστε άλλη διεύθυνση.",
+          },
+        });
+      }
 
+      // Explicit whitelist. Spreading the request body let a caller set ANY
+      // users column that this handler didn't happen to override — verified:
+      // a plain POST with govgrVerified:true produced an identity-verified
+      // account, and isAdmin sits on the same path. Never spread req.body
+      // into an insert.
       const user = await storage.createUser({
-        ...userData,
-        password: await hashPassword(req.body.password),
+        username: parsed.data.username,
+        email: parsed.data.email,
+        name: parsed.data.name,
+        password: await hashPassword(parsed.data.password),
         deviceFingerprint: deviceFingerprint || null,
         registrationIp: clientIp || null,
         lastLoginIp: clientIp || null,
@@ -375,7 +411,7 @@ export function setupAuth(app: Express) {
         // Member came through the consent gate at registration — clear the
         // default-true flag set by the column default.
         requiresConsent: false,
-      });
+      } as any);
 
       // Record the consent acceptance against the freshly created user.
       // Failure here must roll back: a registered user with no consent row

@@ -13,6 +13,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
+import { ContactDialog } from "@/components/ContactDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { loginUserSchema, registerUserSchema } from "@shared/schema";
 import { CURRENT_CONSENT_VERSION } from "@shared/consent";
@@ -115,7 +117,12 @@ export default function AuthPage() {
               AgoraX
             </span>
           </a>
-          <LanguageSwitcher />
+          <div className="flex items-center gap-4">
+            {/* Reachable before you have an account — the people who need help
+                most are the ones who can't get in. */}
+            <ContactDialog triggerClassName="font-mono text-xs uppercase tracking-wide text-ink-soft underline underline-offset-4 hover:text-ink" />
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
 
@@ -263,7 +270,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input className={INPUT_CLASS} type="password" placeholder="••••••••" {...field} />
+                <PasswordInput className={INPUT_CLASS} placeholder="••••••••" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -302,28 +309,51 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
   const { registerMutation } = useAuth();
   const [acceptTerms, setAcceptTerms] = useState(false);
 
-  const form = useForm<z.infer<typeof registerUserSchema>>({
-    resolver: zodResolver(registerUserSchema),
+  // confirmPassword is a form-only field — it must not reach the server, and
+  // the shared schema is now enforced server-side, so it can't live there.
+  const registerFormSchema = registerUserSchema
+    .extend({ confirmPassword: z.string().min(1, { message: t('auth.confirmPasswordRequired') }) })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('auth.passwordsDoNotMatch'),
+      path: ['confirmPassword'],
+    });
+
+  const form = useForm<z.infer<typeof registerFormSchema>>({
+    resolver: zodResolver(registerFormSchema),
     defaultValues: {
       username: "",
       password: "",
+      confirmPassword: "",
       name: "",
       email: "",
     },
   });
 
-  const handleSubmit = async (values: z.infer<typeof registerUserSchema>) => {
+  const handleSubmit = async (values: z.infer<typeof registerFormSchema>) => {
     if (!acceptTerms) return;
     const deviceFingerprint = await getFingerprint();
     const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/feed';
     const consentLocale: 'el' | 'en' = locale === 'en' ? 'en' : 'el';
+    const { confirmPassword: _drop, ...payload } = values;
     registerMutation.mutate({
-      ...values,
+      ...payload,
       deviceFingerprint,
       consent: { version: CURRENT_CONSENT_VERSION, locale: consentLocale },
       returnTo: urlReturnTo
     }, {
       onSuccess: onSubmit,
+      // The server reports which field it rejected. Without this the only
+      // signal was a toast reading "Invalid registration data", which told
+      // nobody what to change.
+      onError: (error: any) => {
+        const fieldErrors = error?.errors as Record<string, string> | undefined;
+        if (!fieldErrors) return;
+        for (const [field, message] of Object.entries(fieldErrors)) {
+          if (field in values) {
+            form.setError(field as keyof z.infer<typeof registerFormSchema>, { type: 'server', message });
+          }
+        }
+      },
     });
   };
 
@@ -376,11 +406,24 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <Input className={INPUT_CLASS} type="password" placeholder="••••••••" {...field} />
+                <PasswordInput className={INPUT_CLASS} placeholder="••••••••" {...field} />
               </FormControl>
               <FormMessage className="text-xs">
                 {t('auth.passwordMinLength')}
               </FormMessage>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t('auth.confirmPassword')}</FormLabel>
+              <FormControl>
+                <PasswordInput className={INPUT_CLASS} placeholder="••••••••" {...field} data-testid="register-confirm-password" />
+              </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />

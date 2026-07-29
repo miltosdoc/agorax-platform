@@ -6,6 +6,7 @@
 
 import type { Express, Request, Response } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { votingRepo, proposalRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { db } from '../db';
@@ -287,6 +288,52 @@ export function registerMiscRoutes(app: Express): void {
     storage: multer.memoryStorage(),
     limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB screenshot cap
   });
+  // ── Contact from the login page (no account required) ──────────────────
+  // Someone who can't finish registering has no way to say so: the feedback
+  // widget is logged-in only, and privacy.tsx / terms.tsx tell people to
+  // "contact the administration through the platform" — a channel that did
+  // not exist. Same filesystem drop as feedback, reviewed the same way.
+  //
+  // No auth means no CSRF pairing to lean on, so this is deliberately thin:
+  // rate-limited, size-capped, plain text, no uploads.
+  const contactLimiter = rateLimit({
+    windowMs: 60 * 60_000,
+    max: 5,                       // per IP per hour
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Πολλά μηνύματα. Δοκιμάστε ξανά αργότερα." },
+  });
+  app.post("/api/contact", contactLimiter, async (req: any, res) => {
+    try {
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+      if (message.length < 10 || message.length > 3000) {
+        return res.status(400).json({ message: "Το μήνυμα πρέπει να έχει 10–3000 χαρακτήρες." });
+      }
+      // Optional: how to reply. Not verified — it's a string someone typed.
+      const replyTo = typeof req.body?.replyTo === 'string' ? req.body.replyTo.trim().slice(0, 200) : '';
+
+      const fs = await import('fs');
+      const path = await import('path');
+      const dir = path.resolve(process.cwd(), 'feedback');
+      fs.mkdirSync(dir, { recursive: true });
+
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      fs.writeFileSync(path.join(dir, `contact-${stamp}.json`), JSON.stringify({
+        kind: 'contact',
+        replyTo: replyTo || null,
+        message,
+        userId: req.user?.id ?? null,
+        ip: req.ip ?? null,
+        userAgent: req.get('user-agent') ?? null,
+        createdAt: new Date().toISOString(),
+      }, null, 2));
+
+      res.status(201).json({ ok: true });
+    } catch {
+      res.status(500).json({ message: "Το μήνυμα δεν στάλθηκε. Δοκιμάστε ξανά." });
+    }
+  });
+
   app.post("/api/feedback", requireAuth, feedbackUpload.single('screenshot'), async (req: any, res) => {
     try {
       const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
