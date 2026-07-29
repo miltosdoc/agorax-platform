@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Ban, CheckCircle } from "lucide-react";
+import { Eye, Ban, CheckCircle, KeyRound } from "lucide-react";
 import { format } from "date-fns";
 import { el } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
@@ -46,6 +46,8 @@ export default function AdminAccountsPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [resettingId, setResettingId] = useState<number | null>(null);
+  const [resetLink, setResetLink] = useState<{ url: string; username: string; expiresAt: string } | null>(null);
 
   const { data: users, isLoading: usersLoading } = useQuery<UserWithActivity[]>({
     queryKey: ['/api/admin/accounts', { status: statusFilter !== 'all' ? statusFilter : undefined, search: searchQuery || undefined }],
@@ -99,6 +101,28 @@ export default function AdminAccountsPage() {
   const handleViewActivity = (userId: number) => {
     setSelectedUserId(userId);
     setActivityModalOpen(true);
+  };
+
+  /**
+   * Mint a single-use reset link. The URL is returned once and never stored
+   * in readable form, so it goes straight into a dialog to be copied — if
+   * this is dismissed without copying, the only option is minting another.
+   */
+  const handleResetLink = async (userId: number, username: string) => {
+    setResettingId(userId);
+    try {
+      const res = await apiRequest("POST", `/api/admin/accounts/${userId}/reset-link`);
+      const data = await res.json();
+      setResetLink({ url: data.url, username, expiresAt: data.expiresAt });
+    } catch {
+      toast({
+        title: t('general.error'),
+        description: t('admin.resetLinkFailed'),
+        variant: "destructive",
+      });
+    } finally {
+      setResettingId(null);
+    }
   };
 
   const handleBan = (userId: number) => {
@@ -226,6 +250,16 @@ export default function AdminAccountsPage() {
                             <Eye className="h-4 w-4 mr-1" />
                             {t('admin.viewActivity')}
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetLink(user.id, user.username)}
+                            disabled={resettingId === user.id}
+                            data-testid={`button-reset-link-${user.id}`}
+                          >
+                            <KeyRound className="h-4 w-4 mr-1" />
+                            {t('admin.resetLink')}
+                          </Button>
                           {user.accountStatus !== "banned" ? (
                             <Button
                               variant="destructive"
@@ -268,6 +302,46 @@ export default function AdminAccountsPage() {
       </main>
 
       <Footer />
+
+      {/* Reset link — shown once. The server stores only a hash of the token,
+          so closing this without copying means minting a new link. */}
+      <Dialog open={!!resetLink} onOpenChange={(o) => { if (!o) setResetLink(null); }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-reset-link">
+          <DialogHeader>
+            <DialogTitle>{t('admin.resetLinkTitle')}</DialogTitle>
+          </DialogHeader>
+          {resetLink && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t('admin.resetLinkBody').replace('{username}', resetLink.username)}
+              </p>
+              <Input
+                readOnly
+                value={resetLink.url}
+                onFocus={(e) => e.currentTarget.select()}
+                className="font-mono text-xs"
+                data-testid="reset-link-url"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(resetLink.url);
+                    toast({ title: t('admin.resetLinkCopied') });
+                  }}
+                  data-testid="reset-link-copy"
+                >
+                  {t('admin.resetLinkCopy')}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {t('admin.resetLinkExpires')} {new Date(resetLink.expiresAt).toLocaleString()}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('admin.resetLinkWarning')}</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={activityModalOpen} onOpenChange={setActivityModalOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="dialog-activity">

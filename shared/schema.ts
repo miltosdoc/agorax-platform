@@ -911,6 +911,23 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 
 // ─── Job Queue ──────────────────────────────────────────────────────────────
 
+// ─── Admin-issued password reset ────────────────────────────────────────────
+// No mail service is configured, so there is no self-service "forgot my
+// password" flow. An admin mints a single-use link here and hands it over
+// out of band. Only the SHA-256 of the token is stored — a database reader
+// cannot replay a link, same rule as the panel tokens and claim codes.
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  issuedById: integer("issued_by_id").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  passwordResetUserIdx: index('password_reset_tokens_user_idx').on(table.userId),
+}));
+
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   type: text("type").notNull(), // 'structure_proposal' | 'send_notification' | 'create_sortition' | 'recalculate_score' | 'cleanup_expired'

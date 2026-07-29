@@ -18,6 +18,7 @@ import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminAccountsPage from "@/pages/admin-accounts";
 import CommunityDashboardPage from "@/pages/community-dashboard";
 import ConferenceRoomPage from "@/pages/conference-room";
+import ResetPasswordPage from "@/pages/reset-password";
 import VerifyBallotPage from "@/pages/verify-ballot";
 import InviteAcceptPage from "@/pages/invite-accept";
 import CommunitySettingsPage from "@/pages/community-settings";
@@ -116,6 +117,7 @@ function AppRouter() {
       <Switch>
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <ProtectedRoute path="/home" component={HomePage} />
         <Route path="/my-polls">
           <Redirect to="/home" />

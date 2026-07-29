@@ -5,14 +5,14 @@ import { Express } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, createHash } from "crypto";
 import { promisify } from "util";
 import { DatabaseStorage } from "./storage";
 export const storage = new DatabaseStorage();
 import { User as SelectUser, registerUserSchema } from "@shared/schema";
 import { db } from "./db";
-import { users, User, SafeUser } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, passwordResetTokens, User, SafeUser } from "@shared/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
 import { addMember as addCommunityMember, getGeneralCommunity } from "./utils/community-manager";
 import {
@@ -463,6 +463,128 @@ export function setupAuth(app: Express) {
       });
     } catch (error) {
       next(error);
+    }
+  });
+
+  // ── Admin-issued password reset ──────────────────────────────────────
+  // No mail service exists on this deployment, so there is no self-service
+  // "forgot my password". An admin mints a single-use link and delivers it
+  // out of band. Until this existed, a forgotten password meant a lost
+  // account: nothing in the UI or the API could set a new one.
+
+  const RESET_TTL_MS = 24 * 60 * 60_000;
+
+  const hashResetToken = (token: string) =>
+    createHash('sha256').update(token).digest('hex');
+
+  app.post("/api/admin/accounts/:userId/reset-link", requireAdmin, async (req: any, res) => {
+    try {
+      const userId = parseInt(req.params.userId, 10);
+      if (!Number.isFinite(userId)) {
+        return res.status(400).json({ message: "Μη έγκυρο αναγνωριστικό χρήστη" });
+      }
+      const [target] = await db.select().from(users).where(eq(users.id, userId));
+      if (!target) return res.status(404).json({ message: "Ο χρήστης δεν βρέθηκε" });
+
+      // One live link per account: minting a new one retires any outstanding
+      // link, so a stale message can't be used later to take the account.
+      await db.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)));
+
+      const token = randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+      await db.insert(passwordResetTokens).values({
+        userId,
+        tokenHash: hashResetToken(token),
+        issuedById: req.user.id,
+        expiresAt,
+      });
+
+      await storage.createAccountActivity({
+        userId,
+        deviceFingerprint: null,
+        ipAddress: (req.ip as string) || null,
+        action: 'password_reset_link_issued',
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      const proto = (req.headers['x-forwarded-proto'] as string | undefined) || req.protocol;
+      const host = req.get('host');
+      // Returned exactly once — only the hash is stored, so this response is
+      // the only copy. Losing it means minting another link.
+      res.json({
+        url: `${proto}://${host}/reset-password?token=${encodeURIComponent(token)}`,
+        expiresAt: expiresAt.toISOString(),
+        username: target.username,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Δεν δημιουργήθηκε σύνδεσμος επαναφοράς" });
+    }
+  });
+
+  /** Look up a live token. Returns null for missing, used, or expired. */
+  async function findLiveResetToken(token: string) {
+    if (typeof token !== 'string' || !token) return null;
+    const [row] = await db.select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.tokenHash, hashResetToken(token)));
+    if (!row) return null;
+    if (row.usedAt) return null;
+    if (new Date(row.expiresAt).getTime() <= Date.now()) return null;
+    return row;
+  }
+
+  // Lets the page say "this link is expired" before someone types a new
+  // password twice for nothing.
+  app.post("/api/password-reset/check", authLimiter, async (req, res) => {
+    const row = await findLiveResetToken(req.body?.token);
+    res.json({ valid: !!row });
+  });
+
+  app.post("/api/password-reset", authLimiter, async (req, res) => {
+    try {
+      const password = typeof req.body?.password === 'string' ? req.body.password : '';
+      if (password.length < 8) {
+        return res.status(400).json({
+          message: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες",
+          errors: { password: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" },
+        });
+      }
+      const row = await findLiveResetToken(req.body?.token);
+      if (!row) {
+        return res.status(400).json({ message: "Ο σύνδεσμος δεν ισχύει ή έχει λήξει." });
+      }
+
+      await db.update(users)
+        .set({ password: await hashPassword(password) })
+        .where(eq(users.id, row.userId));
+
+      // Burn the token before anything else can go wrong with the response.
+      await db.update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, row.id));
+
+      // Drop every existing session for this account. Whoever the password
+      // was being taken back from must not stay signed in on their device.
+      try {
+        await pool.query(
+          `DELETE FROM user_sessions WHERE (sess->'passport'->>'user')::int = $1`,
+          [row.userId],
+        );
+      } catch { /* store shape differs — the password change still stands */ }
+
+      await storage.createAccountActivity({
+        userId: row.userId,
+        deviceFingerprint: null,
+        ipAddress: (req.ip as string) || null,
+        action: 'password_reset_completed',
+        userAgent: req.headers['user-agent'] || null,
+      });
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ message: "Η επαναφορά απέτυχε. Δοκιμάστε ξανά." });
     }
   });
 
