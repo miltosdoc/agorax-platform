@@ -359,23 +359,18 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
         ) : (
           <div
             key={room.id}
-            className="flex items-start justify-between gap-3 rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
+            className="rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
             data-testid={`live-room-${room.id}`}
           >
+            <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex items-start gap-3 min-w-0">
               <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-teal-500/20 text-teal-700 shrink-0">
                 <Video className="w-4 h-4" />
                 <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
               </span>
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{room.title}</div>
+                <div className="text-sm font-medium break-words">{room.title}</div>
                 <div className="text-xs text-teal-700">{t('livekit.liveNow')}</div>
-                {room.description && (
-                  <LinkedText
-                    text={room.description}
-                    className="block text-xs text-teal-900/80 mt-1"
-                  />
-                )}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -394,6 +389,13 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
                 {t('livekit.join')}
               </Button>
             </div>
+            </div>
+            {room.description && (
+              <LinkedText
+                text={room.description}
+                className="block text-sm mt-2 pl-12 text-teal-950/80"
+              />
+            )}
           </div>
         ))}
 
@@ -412,20 +414,15 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
             onCancel={() => setEditingId(null)}
           />
         ) : (
-          <div key={room.id} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
+          <div key={room.id} className="rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0 flex items-start gap-3">
               <Clock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{room.title}</div>
+                <div className="text-sm font-medium break-words">{room.title}</div>
                 <div className="text-xs text-muted-foreground">
                   {room.scheduledAt ? new Date(room.scheduledAt).toLocaleString() : t('livekit.scheduled')}
                 </div>
-                {room.description && (
-                  <LinkedText
-                    text={room.description}
-                    className="block text-xs text-muted-foreground mt-1"
-                  />
-                )}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -452,6 +449,16 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
                 {t('conference.open_room') || 'Είσοδος'}
               </Button>
             </div>
+            </div>
+            {/* Agenda on its own full-width line: beside the buttons it wrapped
+                into a ribbon a few characters wide, and in the metadata's own
+                text-xs muted style it read as part of the timestamp. */}
+            {room.description && (
+              <LinkedText
+                text={room.description}
+                className="block text-sm mt-2 pl-7 text-foreground/80"
+              />
+            )}
           </div>
         ))}
 
