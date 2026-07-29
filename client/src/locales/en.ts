@@ -1494,6 +1494,8 @@ const en: TranslationDictionary = {
   'livekit.endCall': 'End call',
   'livekit.historyTitle': 'Recent calls',
   'livekit.endConfirm': 'End the call for all participants? This cannot be undone.',
+  'livekit.cancelMeeting': 'Cancel meeting',
+  'livekit.cancelConfirm': 'Cancel this scheduled meeting? It stops showing to members and cannot be undone.',
   'livekit.endFailed': 'Could not end the call',
   'conference.title': 'Conference',
   'conference.open_room': 'Enter the conference',

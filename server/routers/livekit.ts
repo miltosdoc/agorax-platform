@@ -11,10 +11,14 @@
  *   PATCH  /api/livekit/rooms/:id                         — toggle recording / close (host-only)
  *
  * Access gates:
- *   • community room — must be a member of `communityId` to join; only
- *     admins/founders can schedule or close.
+ *   • community room — must be a member of `communityId` to join; any member
+ *     can schedule one.
  *   • sortition room — must be a member of `sortitionBodyId` to join.
- *     Admin = the proposal author (so they can host/end the call).
+ *
+ * Managing a room (edit, close, moderate in the SFU) goes through the single
+ * canManageRoom predicate: the organiser who called it, the community's
+ * founder/admins, or a platform admin — and for sortition rooms, the author
+ * of the proposal the body was drawn for.
  */
 
 import type { Express } from 'express';
@@ -67,6 +71,40 @@ async function isCommunityHost(communityId: number, userId: number, isAdmin: boo
   if (c.creatorId === userId) return true;
   const adminIds = Array.isArray(c.adminIds) ? c.adminIds as number[] : [];
   return adminIds.includes(userId);
+}
+
+/**
+ * Who may manage a room: end it for everyone, edit its details, and hold
+ * moderator rights inside the SFU.
+ *
+ * Whoever called the meeting counts, alongside the community's founder/admins
+ * and platform admins. Three call sites used to disagree — PATCH accepted the
+ * organiser, while the room page's "end for all" button and the LiveKit
+ * moderator grant recognised only founders. A member who called a meeting
+ * could therefore not end their own call from anywhere in the UI.
+ */
+async function canManageRoom(
+  room: { kind: string; communityId: number; sortitionBodyId: number | null; createdById: number },
+  userId: number,
+  isAdmin: boolean,
+): Promise<boolean> {
+  if (isAdmin) return true;
+  if (room.createdById === userId) return true;
+  if (room.kind === 'community') {
+    return await isCommunityHost(room.communityId, userId, isAdmin);
+  }
+  // Sortition rooms answer to the proposal the body was drawn for.
+  if (room.sortitionBodyId) {
+    const [body] = await db
+      .select({ proposalId: sortitionBodies.proposalId })
+      .from(sortitionBodies)
+      .where(eq(sortitionBodies.id, room.sortitionBodyId));
+    if (body?.proposalId) {
+      const proposal = await proposalRepo.getProposal(body.proposalId);
+      return proposal?.authorId === userId;
+    }
+  }
+  return false;
 }
 
 async function isSortitionMember(bodyId: number, userId: number): Promise<boolean> {
@@ -163,24 +201,9 @@ export function registerLivekitRoutes(app: Express): void {
       const isMember = room.kind === 'community'
         ? (isAdmin || await communityRepo.isCommunityMember(room.communityId, userId))
         : allowed;
-      // Host mirrors the token-issue logic: community founder/admin, or the
-      // proposal author for sortition rooms.
-      let isHost = false;
-      if (room.kind === 'community') {
-        isHost = await isCommunityHost(room.communityId, userId, isAdmin);
-      } else {
-        isHost = isAdmin;
-        if (!isHost && room.sortitionBodyId) {
-          const [body] = await db
-            .select({ proposalId: sortitionBodies.proposalId })
-            .from(sortitionBodies)
-            .where(eq(sortitionBodies.id, room.sortitionBodyId));
-          if (body?.proposalId) {
-            const proposal = await proposalRepo.getProposal(body.proposalId);
-            isHost = proposal?.authorId === userId;
-          }
-        }
-      }
+      // Drives the "end for all" button. Same predicate as PATCH and the SFU
+      // moderator grant, so what the button offers is what the server accepts.
+      const isHost = await canManageRoom(room, userId, isAdmin);
       const [community] = await db
         .select({ name: communities.name })
         .from(communities)
@@ -359,26 +382,17 @@ export function registerLivekitRoutes(app: Express): void {
       const isAdmin = !!req.user.isAdmin;
 
       let allowed = false;
-      let isHost = false;
       if (room.kind === 'community') {
         allowed = await communityRepo.isCommunityMember(room.communityId, userId) || isAdmin;
-        isHost = await isCommunityHost(room.communityId, userId, isAdmin);
       } else {
         if (!room.sortitionBodyId) return res.status(500).json({ message: 'malformed sortition room' });
         allowed = await isSortitionMember(room.sortitionBodyId, userId) || isAdmin;
-        // Host of a sortition room = the proposal author (if any) or admin.
-        if (room.sortitionBodyId) {
-          const [body] = await db
-            .select({ proposalId: sortitionBodies.proposalId })
-            .from(sortitionBodies)
-            .where(eq(sortitionBodies.id, room.sortitionBodyId));
-          if (body?.proposalId) {
-            const proposal = await proposalRepo.getProposal(body.proposalId);
-            isHost = proposal?.authorId === userId || isAdmin;
-          }
-        }
       }
       if (!allowed) return res.status(403).json({ message: 'not allowed in this room' });
+
+      // Moderator rights in the SFU (mute, remove) go to whoever can end the
+      // call — the same predicate, so the two can't drift apart again.
+      const isHost = await canManageRoom(room, userId, isAdmin);
 
       // First join flips a 'scheduled' room into 'active' — but only once the
       // meeting is actually near. A member who opened Thursday's link on
@@ -476,21 +490,7 @@ export function registerLivekitRoutes(app: Express): void {
 
       const userId: number = req.user.id;
       const isAdmin = !!req.user.isAdmin;
-      let isHost = isAdmin || room.createdById === userId;
-      if (!isHost) {
-        if (room.kind === 'community') {
-          isHost = await isCommunityHost(room.communityId, userId, isAdmin);
-        } else if (room.sortitionBodyId) {
-          const [body] = await db
-            .select({ proposalId: sortitionBodies.proposalId })
-            .from(sortitionBodies)
-            .where(eq(sortitionBodies.id, room.sortitionBodyId));
-          if (body?.proposalId) {
-            const proposal = await proposalRepo.getProposal(body.proposalId);
-            isHost = proposal?.authorId === userId;
-          }
-        }
-      }
+      const isHost = await canManageRoom(room, userId, isAdmin);
       if (!isHost) return res.status(403).json({ message: 'host only' });
 
       const body = req.body ?? {};

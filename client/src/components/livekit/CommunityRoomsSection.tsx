@@ -3,7 +3,9 @@
  *
  * Always visible directly under the community header (no longer buried in a
  * tab): live rooms pulse with a join button, scheduled rooms show with their
- * calendar link, admins create inline, and past calls collapse underneath.
+ * calendar link, any member creates inline, and past calls collapse
+ * underneath. Whoever called a meeting can edit or cancel it from its row —
+ * see canManage, which mirrors the server's canManageRoom.
  * The actual call experience lives on /conference/:roomId.
  */
 
@@ -177,10 +179,11 @@ interface Props {
 export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMember = false }: Props) {
   const canCreate = viewerIsAdmin || viewerIsMember;
   const { user } = useAuth();
-  // Mirrors the server's host check for PATCH: admin, or whoever called the
-  // meeting. Community founders also pass server-side; the client can't see
-  // that, so they get the button only via viewerIsAdmin.
-  const canEdit = (room: LivekitRoom) => viewerIsAdmin || room.createdById === user?.id;
+  // Mirrors the server's canManageRoom: admin, or whoever called the meeting.
+  // Community founders also pass server-side; the client can't see that, so
+  // they get the buttons here via viewerIsAdmin (which the dashboard sets
+  // from the same founder/admin check).
+  const canManage = (room: LivekitRoom) => viewerIsAdmin || room.createdById === user?.id;
   const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
@@ -287,8 +290,11 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
     }
   };
 
-  const handleEnd = async (roomId: number) => {
-    if (!window.confirm(t('livekit.endConfirm') || 'Τερματισμός της κλήσης για όλους;')) return;
+  // Closing a live call and cancelling a meeting that hasn't started are the
+  // same status change, but they read very differently to the person clicking.
+  const handleEnd = async (roomId: number, scheduledNotStarted = false) => {
+    const prompt = scheduledNotStarted ? t('livekit.cancelConfirm') : t('livekit.endConfirm');
+    if (!window.confirm(prompt)) return;
     setEnding(s => ({ ...s, [roomId]: true }));
     try {
       await api.patch(`/api/livekit/rooms/${roomId}`, { status: 'closed' });
@@ -374,13 +380,13 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
-              {canEdit(room) && (
+              {canManage(room) && (
                 <Button size="sm" variant="ghost" title={t('livekit.edit')} onClick={() => setEditingId(room.id)} data-testid={`livekit-edit-${room.id}`}>
                   <Pencil className="w-4 h-4 text-muted-foreground" />
                 </Button>
               )}
-              {viewerIsAdmin && (
-                <Button size="sm" variant="ghost" className="text-red-600" disabled={!!ending[room.id]} onClick={() => handleEnd(room.id)} data-testid={`livekit-end-${room.id}`}>
+              {canManage(room) && (
+                <Button size="sm" variant="ghost" className="text-red-600" title={t('livekit.endCall')} disabled={!!ending[room.id]} onClick={() => handleEnd(room.id)} data-testid={`livekit-end-${room.id}`}>
                   <XCircle className="w-4 h-4" />
                 </Button>
               )}
@@ -424,10 +430,15 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
-              {canEdit(room) && (
-                <Button size="sm" variant="ghost" title={t('livekit.edit')} onClick={() => setEditingId(room.id)} data-testid={`livekit-edit-${room.id}`}>
-                  <Pencil className="w-4 h-4 text-muted-foreground" />
-                </Button>
+              {canManage(room) && (
+                <>
+                  <Button size="sm" variant="ghost" title={t('livekit.edit')} onClick={() => setEditingId(room.id)} data-testid={`livekit-edit-${room.id}`}>
+                    <Pencil className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-red-600" title={t('livekit.cancelMeeting')} disabled={!!ending[room.id]} onClick={() => handleEnd(room.id, true)} data-testid={`livekit-cancel-${room.id}`}>
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                </>
               )}
               <a
                 href={`/api/livekit/rooms/${room.id}/ics`}

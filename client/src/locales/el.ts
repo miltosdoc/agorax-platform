@@ -1494,6 +1494,8 @@ const el: TranslationDictionary = {
   'livekit.endCall': 'Τερματισμός κλήσης',
   'livekit.historyTitle': 'Πρόσφατες κλήσεις',
   'livekit.endConfirm': 'Τερματισμός της κλήσης για όλους τους συμμετέχοντες; Η ενέργεια δεν αναιρείται.',
+  'livekit.cancelMeeting': 'Ακύρωση συνάντησης',
+  'livekit.cancelConfirm': 'Ακύρωση της προγραμματισμένης συνάντησης; Θα πάψει να εμφανίζεται στα μέλη και η ενέργεια δεν αναιρείται.',
   'livekit.endFailed': 'Ο τερματισμός απέτυχε',
   'conference.title': 'Συνάντηση',
   'conference.open_room': 'Είσοδος στη συνάντηση',
