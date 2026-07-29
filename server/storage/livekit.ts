@@ -66,6 +66,58 @@ export class LivekitRepository {
       .orderBy(desc(livekitRooms.createdAt));
   }
 
+  /**
+   * Organiser edits: title, agenda, and the scheduled time. Only the keys
+   * present are written, so a title-only edit leaves the date alone.
+   *
+   * Moving the date clears reminderSentAt — the old time's reminder must not
+   * count for the new one, or a meeting pushed back a week goes unannounced.
+   */
+  async updateDetails(
+    id: number,
+    fields: { title?: string; description?: string | null; scheduledAt?: Date | null },
+  ): Promise<LivekitRoom> {
+    const update: Partial<LivekitRoom> = {};
+    if (fields.title !== undefined) update.title = fields.title;
+    if (fields.description !== undefined) update.description = fields.description;
+    if (fields.scheduledAt !== undefined) {
+      update.scheduledAt = fields.scheduledAt;
+      update.reminderSentAt = null;
+    }
+    const [row] = await db
+      .update(livekitRooms)
+      .set(update)
+      .where(eq(livekitRooms.id, id))
+      .returning();
+    return row;
+  }
+
+  /**
+   * Scheduled rooms whose start is inside the reminder window and that have
+   * not been reminded yet. The lower bound keeps a room nobody ever opened
+   * from firing a "starts soon" days after the fact.
+   */
+  async listDueForReminder(windowMs: number, staleAfterMs: number): Promise<LivekitRoom[]> {
+    const now = Date.now();
+    return await db
+      .select()
+      .from(livekitRooms)
+      .where(and(
+        eq(livekitRooms.status, 'scheduled'),
+        isNull(livekitRooms.reminderSentAt),
+        sql`${livekitRooms.scheduledAt} IS NOT NULL`,
+        sql`${livekitRooms.scheduledAt} <= ${new Date(now + windowMs)}`,
+        sql`${livekitRooms.scheduledAt} > ${new Date(now - staleAfterMs)}`,
+      ));
+  }
+
+  async markReminderSent(id: number): Promise<void> {
+    await db
+      .update(livekitRooms)
+      .set({ reminderSentAt: new Date() })
+      .where(eq(livekitRooms.id, id));
+  }
+
   async setStatus(id: number, status: 'scheduled' | 'active' | 'closed'): Promise<LivekitRoom> {
     const update: Partial<LivekitRoom> = { status };
     if (status === 'closed') update.closedAt = new Date();

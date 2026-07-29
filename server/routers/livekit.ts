@@ -39,6 +39,13 @@ import {
 import { canViewCommunityContentById } from '../utils/community-visibility';
 import { logger } from '../utils/logger';
 
+/**
+ * How early a non-organiser's join promotes a scheduled meeting to live.
+ * Matches the reminder window in job-handlers, so the meeting turns "live"
+ * around the same time members are told it's about to start.
+ */
+const EARLY_START_WINDOW_MS = 15 * 60_000;
+
 function unavailable(res: any): void {
   res.status(503).json({
     code: 'livekit_unavailable',
@@ -373,9 +380,17 @@ export function registerLivekitRoutes(app: Express): void {
       }
       if (!allowed) return res.status(403).json({ message: 'not allowed in this room' });
 
-      // First join flips a 'scheduled' room into 'active'.
+      // First join flips a 'scheduled' room into 'active' — but only once the
+      // meeting is actually near. A member who opened Thursday's link on
+      // Monday and clicked join used to relabel it "live now" for the whole
+      // community and drop it out of the scheduled list. They still get in
+      // (checking your camera early is fair); the announcement just survives.
+      // The organiser can always start early — that's a decision, not a slip.
       if (room.status === 'scheduled') {
-        await livekitRepo.setStatus(room.id, 'active');
+        const startsAt = room.scheduledAt ? new Date(room.scheduledAt).getTime() : 0;
+        if (isHost || Date.now() >= startsAt - EARLY_START_WINDOW_MS) {
+          await livekitRepo.setStatus(room.id, 'active');
+        }
       }
 
       const displayName = (req.user.name || req.user.username || `user-${userId}`).toString();
@@ -480,6 +495,60 @@ export function registerLivekitRoutes(app: Express): void {
 
       const body = req.body ?? {};
       let updated = room;
+
+      // ── Organiser edits: title / agenda / time ──────────────────────
+      // Until now a typo or a moved meeting could only be fixed by closing
+      // the room and creating another, which re-notified the whole community.
+      const edits: { title?: string; description?: string | null; scheduledAt?: Date | null } = {};
+      if (typeof body.title === 'string') {
+        const trimmed = body.title.trim();
+        if (!trimmed) return res.status(400).json({ message: 'title cannot be empty' });
+        edits.title = trimmed.slice(0, 200);
+      }
+      if (typeof body.description === 'string') {
+        const trimmed = body.description.trim();
+        edits.description = trimmed ? trimmed.slice(0, 2000) : null;
+      } else if (body.description === null) {
+        edits.description = null;
+      }
+      let dateMoved = false;
+      if (body.scheduledAt !== undefined) {
+        // Rescheduling only makes sense while the meeting hasn't started.
+        // Once it's live or closed the time is history, not a plan.
+        if (room.status !== 'scheduled') {
+          return res.status(409).json({ message: 'cannot reschedule a meeting that has already started' });
+        }
+        if (body.scheduledAt === null) {
+          return res.status(400).json({ message: 'scheduledAt cannot be cleared' });
+        }
+        const when = new Date(body.scheduledAt);
+        if (Number.isNaN(when.getTime())) {
+          return res.status(400).json({ message: 'invalid scheduledAt' });
+        }
+        if (when.getTime() <= Date.now()) {
+          return res.status(400).json({ message: 'scheduledAt must be in the future' });
+        }
+        dateMoved = when.getTime() !== (room.scheduledAt ? new Date(room.scheduledAt).getTime() : 0);
+        edits.scheduledAt = when;
+      }
+      if (Object.keys(edits).length > 0) {
+        if (room.status === 'closed') {
+          return res.status(409).json({ message: 'cannot edit a closed meeting' });
+        }
+        updated = await livekitRepo.updateDetails(room.id, edits);
+        // A moved meeting is news — everyone who planned around the old time
+        // needs telling. Silent edits (typo fixes) stay silent.
+        if (dateMoved && updated.scheduledAt) {
+          void notifyConferenceScheduled({
+            roomId: updated.id,
+            communityId: updated.communityId,
+            title: updated.title,
+            scheduledAt: new Date(updated.scheduledAt),
+            actionUrl: `/conference/${updated.id}`,
+          }, userId, 'conference_scheduled');
+        }
+      }
+
       if (typeof body.recordingEnabled === 'boolean') {
         updated = await livekitRepo.setRecordingEnabled(room.id, body.recordingEnabled);
       }

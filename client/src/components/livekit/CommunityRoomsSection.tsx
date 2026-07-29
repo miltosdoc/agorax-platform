@@ -18,8 +18,9 @@ import { LinkedText } from '@/components/ui/linked-text';
 import ShareButton from '@/components/ShareButton';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Mic, Plus, Clock, Users as UsersIcon, Video, CalendarPlus, ChevronDown, XCircle } from 'lucide-react';
+import { Mic, Plus, Clock, Users as UsersIcon, Video, CalendarPlus, ChevronDown, XCircle, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
@@ -30,6 +31,7 @@ interface LivekitRoom {
   kind: 'community' | 'sortition';
   title: string;
   description: string | null;
+  createdById: number;
   status: 'scheduled' | 'active' | 'closed';
   recordingEnabled: boolean;
   scheduledAt: string | null;
@@ -64,6 +66,107 @@ function localNowValue(): string {
     .slice(0, 16);
 }
 
+/** `scheduledAt` (UTC ISO) → the wall-clock string datetime-local expects. */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+export interface RoomFormValues {
+  title: string;
+  description: string;
+  when: string;
+}
+
+/**
+ * The create and edit forms are the same three fields, so they're the same
+ * component. `idPrefix` keeps label/input pairs unique when an edit form is
+ * open next to the create form.
+ */
+function RoomForm({
+  idPrefix,
+  initial,
+  busy,
+  lockWhen = false,
+  onSubmit,
+  onCancel,
+}: {
+  idPrefix: string;
+  initial?: RoomFormValues;
+  busy: boolean;
+  /** Live meetings can still be retitled, but the start time is history. */
+  lockWhen?: boolean;
+  onSubmit: (values: RoomFormValues) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [when, setWhen] = useState(initial?.when ?? '');
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-title`}>{t('livekit.titleLabel')}</Label>
+        <Input
+          id={`${idPrefix}-title`}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={t('livekit.titlePlaceholder')}
+          maxLength={200}
+          data-testid="livekit-new-title"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-description`}>{t('livekit.descriptionLabel')}</Label>
+        <Textarea
+          id={`${idPrefix}-description`}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t('livekit.descriptionPlaceholder')}
+          maxLength={2000}
+          rows={4}
+          data-testid="livekit-new-description"
+        />
+        <p className="text-xs text-muted-foreground">{t('livekit.descriptionHint')}</p>
+      </div>
+
+      {!lockWhen && (
+        <div className="space-y-1.5">
+          <Label htmlFor={`${idPrefix}-when`}>{t('livekit.whenLabel')}</Label>
+          <Input
+            id={`${idPrefix}-when`}
+            type="datetime-local"
+            value={when}
+            min={localNowValue()}
+            onChange={(e) => setWhen(e.target.value)}
+            className="w-full sm:w-[240px]"
+            data-testid="livekit-new-when"
+          />
+          <p className="text-xs text-muted-foreground">{t('livekit.whenHint')}</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <Button
+          type="button"
+          onClick={() => onSubmit({ title, description, when })}
+          disabled={busy || !title.trim()}
+          data-testid="livekit-create"
+        >
+          {initial ? t('livekit.save') : when ? t('livekit.scheduleButton') : t('livekit.createButton')}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   communityId: number;
   viewerIsAdmin: boolean;
@@ -73,6 +176,11 @@ interface Props {
 
 export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMember = false }: Props) {
   const canCreate = viewerIsAdmin || viewerIsMember;
+  const { user } = useAuth();
+  // Mirrors the server's host check for PATCH: admin, or whoever called the
+  // meeting. Community founders also pass server-side; the client can't see
+  // that, so they get the button only via viewerIsAdmin.
+  const canEdit = (room: LivekitRoom) => viewerIsAdmin || room.createdById === user?.id;
   const { t } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
@@ -81,9 +189,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
   const [loaded, setLoaded] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newWhen, setNewWhen] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [ending, setEnding] = useState<Record<number, boolean>>({});
@@ -113,39 +219,69 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
     return () => clearInterval(interval);
   }, [refresh]);
 
-  const handleCreate = async () => {
-    if (!newTitle.trim()) return;
-    // datetime-local hands us wall-clock text with no zone; new Date()
-    // reads it in the browser's zone and toISOString turns it into the
-    // real instant the server stores. Empty means "start now".
-    let scheduledAt: string | undefined;
-    if (newWhen) {
-      const when = new Date(newWhen);
-      if (Number.isNaN(when.getTime())) {
-        errorToast(t('livekit.createFailed'), t('livekit.badDate'));
-        return;
-      }
-      if (when.getTime() <= Date.now()) {
-        errorToast(t('livekit.createFailed'), t('livekit.pastDate'));
-        return;
-      }
-      scheduledAt = when.toISOString();
+  /**
+   * datetime-local hands us wall-clock text with no zone; new Date() reads it
+   * in the browser's zone and toISOString turns it into the real instant the
+   * server stores. Returns undefined for an empty field ("start now"), or
+   * null if the value is unusable — the caller has already been told why.
+   */
+  const parseWhen = (when: string, failTitle: string): string | undefined | null => {
+    if (!when) return undefined;
+    const parsed = new Date(when);
+    if (Number.isNaN(parsed.getTime())) {
+      errorToast(failTitle, t('livekit.badDate'));
+      return null;
     }
+    if (parsed.getTime() <= Date.now()) {
+      errorToast(failTitle, t('livekit.pastDate'));
+      return null;
+    }
+    return parsed.toISOString();
+  };
+
+  const handleCreate = async (values: RoomFormValues) => {
+    if (!values.title.trim()) return;
+    const scheduledAt = parseWhen(values.when, t('livekit.createFailed'));
+    if (scheduledAt === null) return;
     setCreating(true);
     try {
       await api.post<LivekitRoom>(`/api/communities/${communityId}/rooms`, {
-        title: newTitle.trim(),
-        ...(newDescription.trim() ? { description: newDescription.trim() } : {}),
+        title: values.title.trim(),
+        ...(values.description.trim() ? { description: values.description.trim() } : {}),
         ...(scheduledAt ? { scheduledAt } : {}),
       });
       toast({ title: scheduledAt ? t('livekit.scheduledCreated') : t('livekit.created') });
-      setNewTitle('');
-      setNewDescription('');
-      setNewWhen('');
       setShowCreate(false);
       await refresh();
     } catch (err: any) {
       errorToast(t('livekit.createFailed'), err?.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEdit = async (room: LivekitRoom, values: RoomFormValues) => {
+    if (!values.title.trim()) return;
+    // Send description even when emptied — that's how the agenda gets removed.
+    const body: Record<string, unknown> = {
+      title: values.title.trim(),
+      description: values.description.trim(),
+    };
+    // Only scheduled meetings can move, and only if the time actually changed
+    // — resending an unchanged date would re-notify the community for nothing.
+    if (room.status === 'scheduled' && values.when !== toLocalInput(room.scheduledAt)) {
+      const scheduledAt = parseWhen(values.when, t('livekit.editFailed'));
+      if (scheduledAt === null) return;
+      if (scheduledAt) body.scheduledAt = scheduledAt;
+    }
+    setCreating(true);
+    try {
+      await api.patch(`/api/livekit/rooms/${room.id}`, body);
+      toast({ title: t('livekit.edited') });
+      setEditingId(null);
+      await refresh();
+    } catch (err: any) {
+      errorToast(t('livekit.editFailed'), err?.message);
     } finally {
       setCreating(false);
     }
@@ -195,60 +331,26 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
 
         {/* Inline create */}
         {showCreate && (
-          <div className="rounded-md border bg-muted/30 p-3 space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="livekit-title">{t('livekit.titleLabel')}</Label>
-              <Input
-                id="livekit-title"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder={t('livekit.titlePlaceholder')}
-                maxLength={200}
-                data-testid="livekit-new-title"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="livekit-description">{t('livekit.descriptionLabel')}</Label>
-              <Textarea
-                id="livekit-description"
-                value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
-                placeholder={t('livekit.descriptionPlaceholder')}
-                maxLength={2000}
-                rows={4}
-                data-testid="livekit-new-description"
-              />
-              <p className="text-xs text-muted-foreground">{t('livekit.descriptionHint')}</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="livekit-when">{t('livekit.whenLabel')}</Label>
-              <Input
-                id="livekit-when"
-                type="datetime-local"
-                value={newWhen}
-                min={localNowValue()}
-                onChange={(e) => setNewWhen(e.target.value)}
-                className="w-full sm:w-[240px]"
-                data-testid="livekit-new-when"
-              />
-              <p className="text-xs text-muted-foreground">{t('livekit.whenHint')}</p>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
-                {newWhen ? t('livekit.scheduleButton') : t('livekit.createButton')}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setShowCreate(false)} disabled={creating}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          </div>
+          <RoomForm
+            idPrefix="livekit-create"
+            busy={creating}
+            onSubmit={handleCreate}
+            onCancel={() => setShowCreate(false)}
+          />
         )}
 
         {/* Live rooms — the loudest thing in the strip */}
-        {live.map(room => (
+        {live.map(room => editingId === room.id ? (
+          <RoomForm
+            key={room.id}
+            idPrefix={`livekit-edit-${room.id}`}
+            initial={{ title: room.title, description: room.description ?? '', when: '' }}
+            busy={creating}
+            lockWhen
+            onSubmit={(values) => handleEdit(room, values)}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : (
           <div
             key={room.id}
             className="flex items-start justify-between gap-3 rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
@@ -272,6 +374,11 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
+              {canEdit(room) && (
+                <Button size="sm" variant="ghost" title={t('livekit.edit')} onClick={() => setEditingId(room.id)} data-testid={`livekit-edit-${room.id}`}>
+                  <Pencil className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              )}
               {viewerIsAdmin && (
                 <Button size="sm" variant="ghost" className="text-red-600" disabled={!!ending[room.id]} onClick={() => handleEnd(room.id)} data-testid={`livekit-end-${room.id}`}>
                   <XCircle className="w-4 h-4" />
@@ -285,7 +392,20 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
         ))}
 
         {/* Scheduled rooms — quiet rows */}
-        {scheduled.map(room => (
+        {scheduled.map(room => editingId === room.id ? (
+          <RoomForm
+            key={room.id}
+            idPrefix={`livekit-edit-${room.id}`}
+            initial={{
+              title: room.title,
+              description: room.description ?? '',
+              when: toLocalInput(room.scheduledAt),
+            }}
+            busy={creating}
+            onSubmit={(values) => handleEdit(room, values)}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : (
           <div key={room.id} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
             <div className="min-w-0 flex items-start gap-3">
               <Clock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -304,6 +424,11 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
+              {canEdit(room) && (
+                <Button size="sm" variant="ghost" title={t('livekit.edit')} onClick={() => setEditingId(room.id)} data-testid={`livekit-edit-${room.id}`}>
+                  <Pencil className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              )}
               <a
                 href={`/api/livekit/rooms/${room.id}/ics`}
                 download={`agorax-room-${room.id}.ics`}

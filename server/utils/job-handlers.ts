@@ -284,6 +284,55 @@ async function rescueStalledReviews(now: Date): Promise<void> {
   }
 }
 
+// ─── Handler: conference_reminder ───────────────────────────────────────────
+
+/**
+ * How far ahead of a scheduled meeting the "starts soon" notice goes out.
+ * Mirrors EARLY_START_WINDOW_MS in routers/livekit — the meeting becomes
+ * joinable-as-live at roughly the moment members are told it's starting.
+ */
+const CONFERENCE_REMINDER_WINDOW_MS = 15 * 60_000;
+/**
+ * Past this much overdue we stop reminding. A meeting nobody ever opened
+ * shouldn't page the community days later when the sweep finally notices.
+ */
+const CONFERENCE_REMINDER_STALE_MS = 60 * 60_000;
+
+/**
+ * Members were told once, at creation. A meeting announced two weeks out had
+ * long scrolled past by the day it ran. Sweep the scheduled rooms coming due
+ * and fan out a second notice.
+ */
+async function handleConferenceReminder(_payload: JobPayload): Promise<void> {
+  const { livekitRepo } = await import('../storage');
+  const { notifyConferenceScheduled } = await import('./conference-notify');
+
+  const due = await livekitRepo.listDueForReminder(
+    CONFERENCE_REMINDER_WINDOW_MS,
+    CONFERENCE_REMINDER_STALE_MS,
+  );
+
+  for (const room of due) {
+    try {
+      // Mark first. A duplicate reminder is worse than a missed one, and a
+      // crash mid-fan-out would otherwise re-notify everyone on the next pass.
+      await livekitRepo.markReminderSent(room.id);
+      await notifyConferenceScheduled({
+        roomId: room.id,
+        communityId: room.communityId,
+        sortitionBodyId: room.sortitionBodyId,
+        title: room.title,
+        scheduledAt: room.scheduledAt ? new Date(room.scheduledAt) : null,
+        actionUrl: `/conference/${room.id}`,
+        // -1 excludes nobody: unlike the creation notice, the organiser wants
+        // reminding about their own meeting too.
+      }, -1, 'conference_starting');
+    } catch (err) {
+      console.error(`[conference_reminder] fan-out failed for room ${room.id}:`, err);
+    }
+  }
+}
+
 // ─── Register all handlers ──────────────────────────────────────────────────
 
 export function registerAllHandlers(): void {
@@ -295,6 +344,7 @@ export function registerAllHandlers(): void {
   registerHandler('cleanup_expired', handleCleanupExpired);
   registerHandler('sortition_timeout', handleSortitionTimeout);
   registerHandler('phase_auto_advance', handlePhaseAutoAdvance);
+  registerHandler('conference_reminder', handleConferenceReminder);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────
@@ -334,6 +384,13 @@ export function startJobQueue(): () => void {
       .catch((err) => console.error('[reminders] sweep failed:', err));
   }, 10 * 60_000);
 
+  // Conference reminders. The window is 15 minutes, so a 5-minute cadence
+  // gives every scheduled meeting at least two chances to be caught before
+  // it starts — one missed sweep (restart, slow job) doesn't lose the notice.
+  const conferenceReminderId = setInterval(() => {
+    enqueueJob({ type: 'conference_reminder', data: {} }).catch(() => {});
+  }, 5 * 60_000);
+
   // Retention sweep. Like the reminders, the handler was registered but
   // never fed, so it had never run once. Daily is ample for a 30-day window;
   // the first pass runs a minute after boot so a restart is enough to see it.
@@ -349,6 +406,7 @@ export function startJobQueue(): () => void {
     clearInterval(autoAdvanceId);
     clearInterval(sortitionSweepId);
     clearInterval(reminderSweepId);
+    clearInterval(conferenceReminderId);
     clearInterval(cleanupId);
     clearTimeout(firstCleanupId);
   };

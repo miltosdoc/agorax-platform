@@ -859,6 +859,10 @@ export const livekitRooms = pgTable("livekit_rooms", {
   status: text("status").notNull().default("active"),    // 'scheduled' | 'active' | 'closed'
   recordingEnabled: boolean("recording_enabled").notNull().default(false),
   recordingPath: text("recording_path"),
+  // Set when the "starts soon" reminder fan-out has gone out, so the sweep
+  // is idempotent. Cleared whenever the organiser moves the meeting, which
+  // is what makes the new time get its own reminder.
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   closedAt: timestamp("closed_at"),
 }, (table) => ({
