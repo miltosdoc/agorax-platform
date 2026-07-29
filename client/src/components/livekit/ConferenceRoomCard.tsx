@@ -15,6 +15,7 @@ import { api } from '@/lib/api';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import ShareButton from '@/components/ShareButton';
+import { LinkedText } from '@/components/ui/linked-text';
 
 interface Props {
   roomId: number;
@@ -65,7 +66,11 @@ export function ConferenceRoomCard({
           </CardTitle>
           {badge && <Badge variant="outline">{badge}</Badge>}
         </div>
-        {description && <CardDescription>{description}</CardDescription>}
+        {description && (
+          <CardDescription>
+            <LinkedText text={description} />
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2">

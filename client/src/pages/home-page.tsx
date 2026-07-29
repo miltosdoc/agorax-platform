@@ -83,6 +83,7 @@ interface LivekitJoinable {
   id: number;
   kind: 'community' | 'sortition';
   title: string;
+  description: string | null;
   status: 'scheduled' | 'active' | 'closed';
 }
 
@@ -119,6 +120,7 @@ function DashboardActiveRoomsSection() {
             key={room.id}
             roomId={room.id}
             title={room.title}
+            description={room.description ?? undefined}
             badge={room.status === 'active' ? t('livekit.liveNow') : t('livekit.scheduled')}
           />
         ))}

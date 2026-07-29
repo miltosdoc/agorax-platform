@@ -848,6 +848,10 @@ export const livekitRooms = pgTable("livekit_rooms", {
   roomName: text("room_name").notNull().unique(),       // LiveKit room identifier
   kind: text("kind").notNull(),                          // 'community' | 'sortition'
   title: text("title").notNull(),
+  // Free text: agenda, dial-in notes, links. Stored and rendered as PLAIN
+  // TEXT — the client linkifies URLs into anchors itself and never injects
+  // HTML, since any community member can write this.
+  description: text("description"),
   communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
   sortitionBodyId: integer("sortition_body_id").references(() => sortitionBodies.id, { onDelete: "cascade" }),
   createdById: integer("created_by_id").notNull().references(() => users.id),

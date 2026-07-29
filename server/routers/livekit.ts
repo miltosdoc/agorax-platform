@@ -231,11 +231,16 @@ export function registerLivekitRoutes(app: Express): void {
         return res.status(400).json({ message: 'invalid scheduledAt' });
       }
       const recordingEnabled = !!req.body?.recordingEnabled;
+      // Agenda / links. Plain text — never rendered as HTML (see the client's
+      // LinkedText), so no markup stripping is needed here.
+      const descriptionRaw = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+      const description = descriptionRaw ? descriptionRaw.slice(0, 2000) : null;
 
       const room = await livekitRepo.create({
         roomName: newRoomName(`c${communityId}`),
         kind: 'community',
         title: title.slice(0, 200),
+        description,
         communityId,
         sortitionBodyId: null,
         createdById: userId,
@@ -426,9 +431,12 @@ export function registerLivekitRoutes(app: Express): void {
       const ics = buildIcs({
         uid: `agorax-room-${room.id}@${host}`,
         title: room.title,
-        description: room.kind === 'sortition'
-          ? 'Σύσκεψη κληρωτού σώματος στο AgoraX'
-          : 'Συνάντηση κοινότητας στο AgoraX',
+        // The organiser's own agenda if they wrote one — that's what people
+        // want in the calendar entry — otherwise the generic label.
+        description: room.description?.trim()
+          || (room.kind === 'sortition'
+            ? 'Σύσκεψη κληρωτού σώματος στο AgoraX'
+            : 'Συνάντηση κοινότητας στο AgoraX'),
         url: landingUrl,
         start: start ? new Date(start) : new Date(),
         durationMinutes: 60,

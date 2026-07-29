@@ -12,6 +12,10 @@ import { useLocation } from 'wouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { LinkedText } from '@/components/ui/linked-text';
+import ShareButton from '@/components/ShareButton';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Mic, Plus, Clock, Users as UsersIcon, Video, CalendarPlus, ChevronDown, XCircle } from 'lucide-react';
@@ -25,6 +29,7 @@ interface LivekitRoom {
   roomName: string;
   kind: 'community' | 'sortition';
   title: string;
+  description: string | null;
   status: 'scheduled' | 'active' | 'closed';
   recordingEnabled: boolean;
   scheduledAt: string | null;
@@ -77,6 +82,7 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [newWhen, setNewWhen] = useState('');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -129,10 +135,12 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
     try {
       await api.post<LivekitRoom>(`/api/communities/${communityId}/rooms`, {
         title: newTitle.trim(),
+        ...(newDescription.trim() ? { description: newDescription.trim() } : {}),
         ...(scheduledAt ? { scheduledAt } : {}),
       });
       toast({ title: scheduledAt ? t('livekit.scheduledCreated') : t('livekit.created') });
       setNewTitle('');
+      setNewDescription('');
       setNewWhen('');
       setShowCreate(false);
       await refresh();
@@ -187,31 +195,55 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
 
         {/* Inline create */}
         {showCreate && (
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap gap-2">
+          <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="livekit-title">{t('livekit.titleLabel')}</Label>
               <Input
+                id="livekit-title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder={t('livekit.titlePlaceholder')}
-                className="flex-1 min-w-[200px]"
+                maxLength={200}
                 data-testid="livekit-new-title"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="livekit-description">{t('livekit.descriptionLabel')}</Label>
+              <Textarea
+                id="livekit-description"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                placeholder={t('livekit.descriptionPlaceholder')}
+                maxLength={2000}
+                rows={4}
+                data-testid="livekit-new-description"
+              />
+              <p className="text-xs text-muted-foreground">{t('livekit.descriptionHint')}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="livekit-when">{t('livekit.whenLabel')}</Label>
               <Input
+                id="livekit-when"
                 type="datetime-local"
                 value={newWhen}
                 min={localNowValue()}
                 onChange={(e) => setNewWhen(e.target.value)}
-                aria-label={t('livekit.whenLabel')}
-                className="w-[210px]"
+                className="w-full sm:w-[240px]"
                 data-testid="livekit-new-when"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
               />
+              <p className="text-xs text-muted-foreground">{t('livekit.whenHint')}</p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
               <Button type="button" onClick={handleCreate} disabled={creating || !newTitle.trim()} data-testid="livekit-create">
                 {newWhen ? t('livekit.scheduleButton') : t('livekit.createButton')}
               </Button>
+              <Button type="button" variant="ghost" onClick={() => setShowCreate(false)} disabled={creating}>
+                {t('common.cancel')}
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{t('livekit.whenHint')}</p>
           </div>
         )}
 
@@ -219,10 +251,10 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
         {live.map(room => (
           <div
             key={room.id}
-            className="flex items-center justify-between gap-3 rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
+            className="flex items-start justify-between gap-3 rounded-md border border-teal-300 bg-teal-50 px-3 py-2.5"
             data-testid={`live-room-${room.id}`}
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-start gap-3 min-w-0">
               <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-teal-500/20 text-teal-700 shrink-0">
                 <Video className="w-4 h-4" />
                 <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
@@ -230,9 +262,16 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{room.title}</div>
                 <div className="text-xs text-teal-700">{t('livekit.liveNow')}</div>
+                {room.description && (
+                  <LinkedText
+                    text={room.description}
+                    className="block text-xs text-teal-900/80 mt-1"
+                  />
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
+              <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
               {viewerIsAdmin && (
                 <Button size="sm" variant="ghost" className="text-red-600" disabled={!!ending[room.id]} onClick={() => handleEnd(room.id)} data-testid={`livekit-end-${room.id}`}>
                   <XCircle className="w-4 h-4" />
@@ -247,17 +286,24 @@ export function CommunityRoomsSection({ communityId, viewerIsAdmin, viewerIsMemb
 
         {/* Scheduled rooms — quiet rows */}
         {scheduled.map(room => (
-          <div key={room.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
-            <div className="min-w-0 flex items-center gap-3">
-              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div key={room.id} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2.5" data-testid={`scheduled-room-${room.id}`}>
+            <div className="min-w-0 flex items-start gap-3">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{room.title}</div>
                 <div className="text-xs text-muted-foreground">
                   {room.scheduledAt ? new Date(room.scheduledAt).toLocaleString() : t('livekit.scheduled')}
                 </div>
+                {room.description && (
+                  <LinkedText
+                    text={room.description}
+                    className="block text-xs text-muted-foreground mt-1"
+                  />
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <ShareButton url={`/conference/${room.id}`} title={room.title} size="sm" variant="ghost" iconOnly />
               <a
                 href={`/api/livekit/rooms/${room.id}/ics`}
                 download={`agorax-room-${room.id}.ics`}

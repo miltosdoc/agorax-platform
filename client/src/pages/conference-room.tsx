@@ -24,6 +24,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
 import ShareButton from '@/components/ShareButton';
+import { LinkedText } from '@/components/ui/linked-text';
 import {
   LiveKitRoom,
   PreJoin,
@@ -37,6 +38,7 @@ interface RoomInfo {
   roomName: string;
   kind: 'community' | 'sortition';
   title: string;
+  description: string | null;
   status: 'scheduled' | 'active' | 'closed';
   communityId: number;
   sortitionBodyId: number | null;
@@ -289,6 +291,12 @@ export default function ConferenceRoomPage() {
               <h1 className="text-2xl font-serif">{room.title}</h1>
               {room.communityName && (
                 <p className="text-sm text-muted-foreground mt-1">{room.communityName}</p>
+              )}
+              {room.description && (
+                <LinkedText
+                  text={room.description}
+                  className="block text-sm mt-3 max-w-prose"
+                />
               )}
             </div>
             <div className="flex items-center gap-2">
