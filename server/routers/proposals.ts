@@ -368,7 +368,23 @@ export function registerProposalsRoutes(app: Express): void {
         // - return: review → draft (author revises)
         // - sortition / auto_approve: review → community_signal (the single
         //   amendments phase: members amend + vote, author accepts/rejects)
+        //   A top score does not skip deliberation — see targetStateFor().
         nextStatus = result.category === 'return' ? 'draft' : 'community_signal';
+        // Full result to the audit table. This used to be the background
+        // validation job's job; it is this route's now that it is the only
+        // validator on the submit path.
+        try {
+          const { validationResults } = await import('@shared/schema');
+          await db.insert(validationResults).values({
+            proposalId,
+            score: Math.round(result.score),
+            feedback: result.feedback,
+            details: result.details,
+            category: result.category,
+          });
+        } catch (histErr: any) {
+          console.warn(`[validation] history insert failed for proposal ${proposalId}: ${histErr?.message}`);
+        }
       } catch (llmError) {
         // Persist the failure on the row but leave it in `review` for manual handling.
         llmFeedback = 'Το σύστημα αξιολόγησης δεν ήταν διαθέσιμο. Η πρόταση θα εξεταστεί χειροκίνητα.';

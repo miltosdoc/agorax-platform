@@ -22,7 +22,7 @@ import {
   isTerminalProposalState,
   type ProposalState,
 } from '@shared/proposal-lifecycle';
-import { enqueueStructureProposal, enqueueNotification, enqueueCreateSortition, enqueueRecalculateScore, enqueueSortitionTimeout } from './job-queue';
+import { enqueueNotification, enqueueCreateSortition, enqueueRecalculateScore, enqueueSortitionTimeout } from './job-queue';
 import { completeSortitionBody } from './sortition-timeout';
 import { storage } from '../storage';
 // Direct import — every other server util that touches the DB does this, and
@@ -80,8 +80,67 @@ export function getNextStates(current: ProposalState): ProposalState[] {
 }
 
 /**
+ * Deadline for entering `newState`, or null when the phase is untimed.
+ *
+ * Every writer that moves a proposal into a timed phase must set this: the
+ * auto-advance sweep selects on `phaseDeadline IS NOT NULL`, so a phase
+ * entered without one is a phase nothing will ever move the proposal out of.
+ */
+export async function computePhaseDeadline(
+  proposal: Proposal,
+  newState: ProposalState,
+): Promise<Date | null> {
+  const DEFAULT_PHASE_HOURS = 48;
+  const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'finalReviewHours' | 'votingHours'> = {
+    author_review: 'authorReviewHours',
+    community_signal: 'communitySignalHours',
+    final_review: 'finalReviewHours',
+    voting: 'votingHours',
+  };
+  // Phases whose length the author may set on their own proposal, each with
+  // the community bounds that constrain the choice.
+  const AUTHORED_PHASES: Record<string, { field: string; min: string; max: string }> = {
+    community_signal: { field: 'deliberationDurationHours', min: 'deliberationMinHours', max: 'deliberationMaxHours' },
+    voting: { field: 'votingDurationHours', min: 'votingMinHours', max: 'votingMaxHours' },
+  };
+  if (!TIMED_PHASES[newState]) return null;
+
+  let hours = 0;
+  try {
+    const { communityRepo } = await import('../storage');
+    const community = await communityRepo.getCommunity(proposal.communityId);
+    hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
+    // The author's own duration wins for the phase they configured, but
+    // only inside the range the community set. Bounds can change after the
+    // proposal was created, so the stored value is re-clamped here rather
+    // than trusted from write time.
+    const authored = AUTHORED_PHASES[newState];
+    if (authored) {
+      const { resolveAuthoredPhaseHours } = await import('@shared/community-settings');
+      hours = resolveAuthoredPhaseHours({
+        requested: (proposal as any)[authored.field],
+        min: (community as any)?.[authored.min],
+        max: (community as any)?.[authored.max],
+        communityDefault: hours,
+      });
+    }
+  } catch (err: any) {
+    console.warn(`[phase-deadline] lookup failed for proposal ${proposal.id}: ${err?.message}`);
+  }
+  // Fall back rather than skip — see the note above about stranded phases.
+  if (!(hours > 0)) {
+    console.warn(
+      `[phase-deadline] proposal ${proposal.id}: no ${TIMED_PHASES[newState]} configured for `
+      + `community ${proposal.communityId}; defaulting ${newState} to ${DEFAULT_PHASE_HOURS}h`,
+    );
+    hours = DEFAULT_PHASE_HOURS;
+  }
+  return new Date(Date.now() + hours * 3600 * 1000);
+}
+
+/**
  * Validate and execute a state transition.
- * 
+ *
  * Throws an error if the transition is invalid.
  * Returns the updated proposal on success.
  */
@@ -111,56 +170,7 @@ export async function transitionProposal(
     throw new Error('Direct-vote proposals have no final_review phase');
   }
 
-  // Compute phase deadline when entering a time-limited phase.
-  const DEFAULT_PHASE_HOURS = 48;
-  const TIMED_PHASES: Record<string, 'authorReviewHours' | 'communitySignalHours' | 'finalReviewHours' | 'votingHours'> = {
-    author_review: 'authorReviewHours',
-    community_signal: 'communitySignalHours',
-    final_review: 'finalReviewHours',
-    voting: 'votingHours',
-  };
-  // Phases whose length the author may set on their own proposal, each with
-  // the community bounds that constrain the choice.
-  const AUTHORED_PHASES: Record<string, { field: string; min: string; max: string }> = {
-    community_signal: { field: 'deliberationDurationHours', min: 'deliberationMinHours', max: 'deliberationMaxHours' },
-    voting: { field: 'votingDurationHours', min: 'votingMinHours', max: 'votingMaxHours' },
-  };
-  let phaseDeadline: Date | null = null;
-  if (TIMED_PHASES[newState]) {
-    let hours = 0;
-    try {
-      const { communityRepo } = await import('../storage');
-      const community = await communityRepo.getCommunity(proposal.communityId);
-      hours = (community as any)?.[TIMED_PHASES[newState]] ?? 0;
-      // The author's own duration wins for the phase they configured, but
-      // only inside the range the community set. Bounds can change after the
-      // proposal was created, so the stored value is re-clamped here rather
-      // than trusted from write time.
-      const authored = AUTHORED_PHASES[newState];
-      if (authored) {
-        const { resolveAuthoredPhaseHours } = await import('@shared/community-settings');
-        hours = resolveAuthoredPhaseHours({
-          requested: (proposal as any)[authored.field],
-          min: (community as any)?.[authored.min],
-          max: (community as any)?.[authored.max],
-          communityDefault: hours,
-        });
-      }
-    } catch (err: any) {
-      console.warn(`[phase-deadline] lookup failed for proposal ${proposal.id}: ${err?.message}`);
-    }
-    // A timed phase MUST carry a deadline: the auto-advance sweep selects on
-    // `phaseDeadline IS NOT NULL`, so a null one strands the proposal in that
-    // phase forever with nothing to move it on. Fall back rather than skip.
-    if (!(hours > 0)) {
-      console.warn(
-        `[phase-deadline] proposal ${proposal.id}: no ${TIMED_PHASES[newState]} configured for `
-        + `community ${proposal.communityId}; defaulting ${newState} to ${DEFAULT_PHASE_HOURS}h`,
-      );
-      hours = DEFAULT_PHASE_HOURS;
-    }
-    phaseDeadline = new Date(Date.now() + hours * 3600 * 1000);
-  }
+  const phaseDeadline = await computePhaseDeadline(proposal, newState);
 
   const updated = await storage.updateProposal(proposal.id, { status: newState, phaseDeadline });
 
@@ -274,8 +284,15 @@ export async function triggerSideEffects(
 
   switch (transition) {
     case 'draft->review':
-      // Queue LLM validation job
-      await enqueueStructureProposal(proposal.id, proposal.question, proposal.solution);
+      // No validation job here — deliberately. /api/proposals/:id/submit runs
+      // the LLM inline and routes the proposal itself. A background
+      // `structure_proposal` job racing it read the status *before* its own
+      // ~10s LLM call and then wrote its own outcome over whatever the inline
+      // path had decided in the meantime; since that job mapped auto_approve
+      // straight to `voting`, every deliberation proposal scoring >90 skipped
+      // deliberation entirely. `rescueStalledReviews` in job-handlers covers
+      // the only case the job was still earning its keep: a submit that dies
+      // before it routes.
       break;
     
     case 'review->author_review':
@@ -525,19 +542,24 @@ export interface ValidationTransitionOutcome {
 /**
  * Map a tiered LLM validation outcome to the appropriate canonical state.
  *
- * - `return`     → `draft`        (low confidence: send back for author revision)
- * - `sortition`  → `author_review` (mid confidence: open deliberation, sortition body
- *                                   created as a side effect for additional scoring)
- * - `auto_approve` → `voting`     (high confidence: skip deliberation, ratify directly)
+ * - `return`       → `draft`            (low confidence: send back for author revision)
+ * - `sortition`    → `community_signal` (mid confidence: open deliberation)
+ * - `auto_approve` → `community_signal` (high confidence: still deliberated)
+ *
+ * A high LLM score is not a mandate to skip the community. The deliberation
+ * track promises members an amendments phase, and a well-written proposal is
+ * exactly the kind worth amending — so auto_approve buys a clean pass through
+ * the quality gate, not a shortcut past the people. This matches what the
+ * submit route does inline; the two paths must agree or whichever finishes
+ * last decides the proposal's fate.
  */
 function targetStateFor(category: LLMValidationResult['category']): ProposalState {
   switch (category) {
     case 'return':
       return 'draft';
     case 'sortition':
-      return 'community_signal';
     case 'auto_approve':
-      return 'voting';
+      return 'community_signal';
   }
 }
 
@@ -548,13 +570,14 @@ function targetStateFor(category: LLMValidationResult['category']): ProposalStat
  * mirrors the latest score/feedback onto the proposal row for fast list
  * rendering. Side effects:
  *  - `return`       → notifies the author that their proposal was returned
- *  - `sortition`    → enqueues a sortition body for proposal scoring
- *  - `auto_approve` → recalculates the community democracy score
+ *  - `sortition`    → notifies the author that deliberation opened
+ *  - `auto_approve` → same, plus a democracy-score recalculation
  *
- * The proposal must currently be in the `review` state — calling this from
- * any other state throws to keep the lifecycle honest.
+ * Returns `null` — without touching the proposal — when the row is no longer
+ * in `review`, either on entry or by the time the model answers. Routing is
+ * first-writer-wins, and the loser discards its result.
  */
-export async function transitionToValidation(proposalId: number): Promise<ValidationTransitionOutcome> {
+export async function transitionToValidation(proposalId: number): Promise<ValidationTransitionOutcome | null> {
   const proposal = await storage.getProposal(proposalId);
   if (!proposal) {
     throw new Error(`transitionToValidation: proposal ${proposalId} not found`);
@@ -562,10 +585,10 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
 
   const fromState = assertProposalState(proposal.status);
   if (fromState !== 'review') {
-    throw new Error(
-      `transitionToValidation: proposal ${proposalId} must be in 'review' state ` +
-      `(current: ${fromState})`
+    console.warn(
+      `[validation] proposal ${proposalId} is ${fromState}, not 'review' — someone else already routed it, skipping`,
     );
+    return null;
   }
 
   const result = await validateProposal(proposal.question, proposal.solution);
@@ -576,6 +599,19 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
       `transitionToValidation: cannot route ${fromState} → ${toState} ` +
       `for category ${result.category}`
     );
+  }
+
+  // Validation takes ~10s, and the write below is a blind `set status`. Re-read
+  // before committing: if anything moved the proposal on while the model was
+  // thinking, that decision is the current one and this result is stale. Losing
+  // this check is what let a background job overwrite `community_signal` with
+  // `voting` seconds after the submit route had opened deliberation.
+  const current = await storage.getProposal(proposalId);
+  if (!current || current.status !== 'review') {
+    console.warn(
+      `[validation] proposal ${proposalId} moved to ${current?.status ?? 'gone'} while validating — discarding stale ${result.category} result`,
+    );
+    return null;
   }
 
   // Persist the full structured result for history and audit.
@@ -592,17 +628,27 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
     .returning();
 
   // Mirror the latest scalar score onto the proposal row + advance state.
-  await db
+  // The `status = 'review'` predicate makes the re-read above atomic: a racing
+  // writer that lands between the two matches zero rows here instead of having
+  // its decision silently replaced.
+  const advanced = await db
     .update(proposals)
     .set({
       status: toState,
+      phaseDeadline: await computePhaseDeadline(current, toState),
       llmScore: String(result.score),
       llmFeedback: result.feedback,
       llmValidatedAt: new Date(),
       llmValidationRound: (proposal.llmValidationRound ?? 0) + 1,
       updatedAt: new Date(),
     })
-    .where(eq(proposals.id, proposalId));
+    .where(and(eq(proposals.id, proposalId), eq(proposals.status, 'review')))
+    .returning({ id: proposals.id });
+
+  if (advanced.length === 0) {
+    console.warn(`[validation] proposal ${proposalId} was routed by another writer — stale result discarded`);
+    return null;
+  }
 
   // Side effects per category. We do not reuse `triggerSideEffects` here
   // because the natural transition map (e.g. `review->author_review`) already
@@ -631,20 +677,16 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
       );
       break;
     case 'auto_approve':
+      // High score, same destination as `sortition`: deliberation. The score
+      // is worth telling the author about, but it does not buy a bypass of
+      // the amendments phase their track promised the community.
       await enqueueRecalculateScore(proposal.communityId);
       await enqueueNotification(
         proposal.authorId,
-        'proposal_auto_approved',
-        `Η πρόταση εγκρίθηκε αυτόματα (βαθμός ${Math.round(result.score)}/100) και πέρασε σε ψηφοφορία.`,
+        'proposal_validated',
+        `Η πρόταση πέρασε τον έλεγχο ποιότητας με βαθμό ${Math.round(result.score)}/100 και άνοιξε σε κοινοτική διαβούλευση.`,
         { proposalId, score: result.score },
       );
-      // This path skips triggerSideEffects, so announce the vote here.
-      try {
-        const { notifyVoteStarted } = await import('./notifications');
-        await notifyVoteStarted(proposalId, proposal.communityId, proposal.question);
-      } catch (err: any) {
-        console.warn(`[notify] vote_started fan-out failed for proposal ${proposalId}: ${err?.message}`);
-      }
       break;
   }
 

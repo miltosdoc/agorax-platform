@@ -17,12 +17,12 @@ import { and, eq, lt, isNotNull, inArray, sql } from 'drizzle-orm';
 /**
  * Handle the `structure_proposal` job.
  *
- * Drives the proposal through LLM validation: scores it, persists the full
- * result to `validation_results`, and routes to the next canonical state
- * (`draft` for return, `author_review` for sortition, `voting` for auto-
- * approve). Notifications and follow-up jobs (sortition body, score recalc)
- * are queued by `transitionToValidation`. Errors propagate so the job queue
- * can retry — failure here leaves the proposal in `review`.
+ * Nothing enqueues this any more: /api/proposals/:id/submit validates inline
+ * so it can hand the score back in its own response, and a second validator
+ * racing it was overwriting the route's routing decision. The handler stays
+ * registered so any job still sitting in the queue from before that change
+ * drains instead of erroring — `transitionToValidation` returns null without
+ * touching a proposal that has already been routed.
  */
 async function handleStructureProposal(payload: JobPayload): Promise<void> {
   const { proposalId } = payload.data as { proposalId: number };
@@ -30,7 +30,7 @@ async function handleStructureProposal(payload: JobPayload): Promise<void> {
     throw new Error(`structure_proposal: missing or invalid proposalId in payload`);
   }
 
-  const outcome = await transitionToValidation(proposalId);
+  await transitionToValidation(proposalId);
 }
 
 // ─── Handler: send_notification ─────────────────────────────────────────────
