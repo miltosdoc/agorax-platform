@@ -32,7 +32,10 @@ export type NotificationType =
   | 'new_media'
   | 'file_lost'
   | 'deliberation_reminder'
-  | 'community_invite';
+  | 'community_invite'
+  // Platform-wide announcement: a change to how the platform itself works,
+  // addressed to every member rather than to a proposal or a body.
+  | 'platform_update';
 
 interface CreateNotificationParams {
   userId: number;
