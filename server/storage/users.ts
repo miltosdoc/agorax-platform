@@ -25,6 +25,8 @@ import {
   pollUserResponses,
   votes,
   comments,
+  communityMembers,
+  communities,
   type User,
   type InsertUser,
   type InsertAccountActivity,
@@ -300,6 +302,7 @@ export class UserRepository {
       pointRedemptions: number;
       pointBalanceDeleted: boolean;
     };
+    membershipsEnded: number;
     deferredVoteIds: number[];
   }> {
       // 1. Find which proposal_votes rows belong to closed proposals (eligible
@@ -410,6 +413,33 @@ export class UserRepository {
         .set({ withdrawnAt: now })
         .where(and(eq(userConsents.userId, targetUserId), isNull(userConsents.withdrawnAt)));
 
+      // 7. End every community membership, and any admin rights that hung off
+      //    the community row rather than the membership row.
+      //
+      //    Not cosmetic: quorum is `ballots / count(community_members)`
+      //    (routers/proposals computeVoteResults), so an erased account left
+      //    in place permanently raises the bar for every future vote in that
+      //    community while being unable to ever vote again. The member list
+      //    would also keep showing "Erased Member" alongside real people.
+      const memberships = await tx
+        .delete(communityMembers)
+        .where(eq(communityMembers.userId, targetUserId))
+        .returning({ communityId: communityMembers.communityId });
+
+      for (const { communityId } of memberships) {
+        const [community] = await tx
+          .select({ adminIds: communities.adminIds })
+          .from(communities)
+          .where(eq(communities.id, communityId));
+        const adminIds = Array.isArray(community?.adminIds) ? community.adminIds as number[] : [];
+        if (adminIds.includes(targetUserId)) {
+          await tx
+            .update(communities)
+            .set({ adminIds: adminIds.filter(id => id !== targetUserId) })
+            .where(eq(communities.id, communityId));
+        }
+      }
+
       return {
         now,
         cryptoShredded: {
@@ -419,6 +449,7 @@ export class UserRepository {
           pointRedemptions: redUpdated.length,
           pointBalanceDeleted: balDeleted.length > 0,
         },
+        membershipsEnded: memberships.length,
         deferredVoteIds,
       };
   }
