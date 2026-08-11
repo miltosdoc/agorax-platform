@@ -457,6 +457,25 @@ export const amendmentRejectionVotes = pgTable("amendment_rejection_votes", {
   amendmentVoteUnique: uniqueIndex('amendment_vote_unique').on(table.amendmentId, table.userId),
 }));
 
+// ─── Amendment Comments (Σχόλια επί τροπολογίας) ──────────────────
+// Discussion attached to one amendment rather than to the proposal as a
+// whole. The proposal-wide debate threads sat in their own tab and drew a
+// fraction of the traffic amendments did, because a remark about a specific
+// proposed change had nowhere to live next to the change itself. Flat by
+// design: replies-to-replies belong in the debate tab, a comment here is a
+// remark about this one amendment.
+
+export const amendmentComments = pgTable("amendment_comments", {
+  id: serial("id").primaryKey(),
+  amendmentId: integer("amendment_id").notNull().references(() => proposalAmendments.id, { onDelete: "cascade" }),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // The panel loads every comment for a proposal's amendments at once.
+  amendmentCommentByAmendment: index('amendment_comment_by_amendment').on(table.amendmentId, table.createdAt),
+}));
+
 // ─── LLM Validation Results (Αξιολογήσεις LLM) ────────────────────
 // Persists the structured output of `validateProposal` so the score, the
 // freeform feedback, the per-criterion breakdown, and the routing category
@@ -1460,6 +1479,7 @@ export type SortitionNotification = typeof sortitionNotifications.$inferSelect;
 export type DebateArgument = typeof debateArguments.$inferSelect;
 export type DebateThread = typeof debateThreads.$inferSelect;
 export type DebateVote = typeof debateVotes.$inferSelect;
+export type AmendmentComment = typeof amendmentComments.$inferSelect;
 export type ProposalSupport = typeof proposalSupport.$inferSelect;
 export type ProposalVote = typeof proposalVotes.$inferSelect;
 export type ProposalMedia = typeof proposalMedia.$inferSelect;

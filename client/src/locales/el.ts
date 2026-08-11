@@ -227,6 +227,13 @@ const el: TranslationDictionary = {
   'amendment.listView': 'Προβολή λίστας',
   'amendment.originalProposal': 'Αρχική Πρόταση',
   'amendment.noAmendments': 'Δεν υπάρχουν τροπολογίες ακόμη',
+  'amendment.comments.count': '{count} σχόλια',
+  'amendment.comments.none': 'Σχολιάστε',
+  'amendment.comments.placeholder': 'Τι λέτε γι’ αυτή την τροπολογία;',
+  'amendment.comments.post': 'Δημοσίευση',
+  'amendment.comments.postFailed': 'Αποτυχία δημοσίευσης σχολίου.',
+  'amendment.comments.closed': 'Η συζήτηση έχει κλείσει για αυτή την πρόταση.',
+  'amendment.comments.someone': 'Μέλος',
   'amendment.communityOverride': 'Η κοινότητα μπορεί να ανατρέψει με όριο 30%',
 
   // Sortition

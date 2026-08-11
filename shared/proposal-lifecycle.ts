@@ -73,11 +73,23 @@ export const PROPOSAL_STATE_DESCRIPTIONS: Record<ProposalState, string> = {
  * The schema stays permissive (so historical threads survive once voting
  * begins); this list is the gate enforced by the route + service layer — and,
  * so the UI cannot offer an action the server will refuse, by the composer.
+ *
+ * Voting is included deliberately. What locks when the vote opens is the
+ * *text* — no more amendments, nothing can change what is on the ballot. The
+ * argument about how to vote on it is exactly the conversation a member needs
+ * while deciding, and cutting it off at the moment of decision was the single
+ * most counter-productive silence in the lifecycle. Reported independently by
+ * two members (26/7, 20/7).
+ *
+ * `decided` and `archived` stay out: once the outcome is recorded the thread
+ * is a historical record, not a live discussion.
  */
 export const DEBATE_ACTIVE_STATES: readonly ProposalState[] = [
   'author_review',
   'community_signal',
   'sortition_synthesis',
+  'final_review',
+  'voting',
 ];
 
 export function isDebateOpen(status: string): boolean {

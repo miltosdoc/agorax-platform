@@ -227,6 +227,13 @@ const en: TranslationDictionary = {
   'amendment.listView': 'List view',
   'amendment.originalProposal': 'Original Proposal',
   'amendment.noAmendments': 'No amendments yet',
+  'amendment.comments.count': '{count} comments',
+  'amendment.comments.none': 'Comment',
+  'amendment.comments.placeholder': 'What do you make of this amendment?',
+  'amendment.comments.post': 'Post',
+  'amendment.comments.postFailed': 'Failed to post comment.',
+  'amendment.comments.closed': 'Discussion has closed for this proposal.',
+  'amendment.comments.someone': 'Member',
   'amendment.communityOverride': 'Community can override with 30% threshold',
 
   // Sortition

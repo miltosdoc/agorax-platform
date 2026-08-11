@@ -14,6 +14,8 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { AmendmentTree } from '@/components/proposal/AmendmentTree';
+import { AmendmentComments, type AmendmentComment } from '@/components/proposal/AmendmentComments';
+import { isDebateOpen } from '@shared/proposal-lifecycle';
 import {
   FileText,
   Plus,
@@ -80,15 +82,32 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
   // When set, the form submits an amendment ON this counter-proposal.
   const [amendTarget, setAmendTarget] = useState<Amendment | null>(null);
   const [reviewing, setReviewing] = useState<Record<number, boolean>>({});
+  // Every comment on every amendment of this proposal, keyed by amendment id.
+  const [comments, setComments] = useState<Record<number, AmendmentComment[]>>({});
+  // Discussion outlives the amendment phase — it stays open through the vote.
+  const canComment = isDebateOpen(proposalStatus);
 
   const refresh = () =>
     api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`)
       .then(resp => setAmendments(resp.data))
       .catch(() => setAmendments([]));
 
+  const refreshComments = () =>
+    api.get<Record<number, AmendmentComment[]>>(`/api/proposals/${proposalId}/amendment-comments`)
+      .then(resp => setComments(resp.data ?? {}))
+      .catch(() => setComments({}));
+
   useEffect(() => {
     refresh().finally(() => setLoading(false));
+    refreshComments();
   }, [proposalId]);
+
+  function addComment(comment: AmendmentComment) {
+    setComments(prev => ({
+      ...prev,
+      [comment.amendmentId]: [...(prev[comment.amendmentId] ?? []), comment],
+    }));
+  }
 
   async function castVote(amendmentId: number, vote: 1 | -1, current: number) {
     if (!user || voting[amendmentId]) return;
@@ -397,6 +416,12 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                       </Button>
                     </div>
                   )}
+                  <AmendmentComments
+                    amendmentId={amendment.id}
+                    comments={comments[amendment.id] ?? []}
+                    canComment={canComment}
+                    onPosted={addComment}
+                  />
                   {children.length > 0 && (
                     <div className="mt-3 space-y-2 border-l-2 border-antip/30 pl-3">
                       {children.map((child) => {
@@ -473,6 +498,12 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                                 )}
                               </div>
                             </div>
+                            <AmendmentComments
+                              amendmentId={child.id}
+                              comments={comments[child.id] ?? []}
+                              canComment={canComment}
+                              onPosted={addComment}
+                            />
                           </div>
                         );
                       })}

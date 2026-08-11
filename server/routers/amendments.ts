@@ -222,6 +222,91 @@ export function registerAmendmentsRoutes(app: Express): void {
   };
   app.post("/api/amendments/:id/vote", requireAuth, requireConsent, handleAmendmentVote);
   app.post("/api/amendments/:id/rejection-vote", requireAuth, requireConsent, handleAmendmentVote);
+
+  // ─── Amendment Comments: discussion attached to one proposed change ─────────
+
+  /**
+   * Every comment on every amendment of a proposal, in one request. The panel
+   * renders all amendments at once, so per-amendment fetches would mean one
+   * round trip per card. Grouped by amendment id for direct lookup.
+   */
+  app.get("/api/proposals/:id/amendment-comments", requireProposalContentAccess(), async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const { db } = await import('../db');
+      const { amendmentComments, proposalAmendments, users } = await import('@shared/schema');
+      const { eq, asc } = await import('drizzle-orm');
+      const rows = await db
+        .select({
+          id: amendmentComments.id,
+          amendmentId: amendmentComments.amendmentId,
+          authorId: amendmentComments.authorId,
+          authorName: users.name,
+          content: amendmentComments.content,
+          createdAt: amendmentComments.createdAt,
+        })
+        .from(amendmentComments)
+        .innerJoin(proposalAmendments, eq(proposalAmendments.id, amendmentComments.amendmentId))
+        .innerJoin(users, eq(users.id, amendmentComments.authorId))
+        .where(eq(proposalAmendments.proposalId, proposalId))
+        .orderBy(asc(amendmentComments.createdAt));
+
+      const grouped: Record<number, typeof rows> = {};
+      for (const row of rows) {
+        (grouped[row.amendmentId] ??= []).push(row);
+      }
+      res.json(grouped);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch amendment comments" });
+    }
+  });
+
+  app.post("/api/amendments/:id/comments", requireAuth, requireConsent, async (req: any, res) => {
+    try {
+      const amendmentId = parseInt(req.params.id, 10);
+      if (!Number.isInteger(amendmentId)) {
+        return res.status(400).json({ message: "Invalid amendment id" });
+      }
+      const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+      if (!content) return res.status(400).json({ message: "Το σχόλιο δεν μπορεί να είναι κενό." });
+      if (content.length > 2000) {
+        return res.status(400).json({ message: "Το σχόλιο δεν μπορεί να ξεπερνά τους 2000 χαρακτήρες." });
+      }
+
+      const { db } = await import('../db');
+      const { amendmentComments, proposalAmendments } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      const [amendment] = await db
+        .select({ proposalId: proposalAmendments.proposalId })
+        .from(proposalAmendments)
+        .where(eq(proposalAmendments.id, amendmentId));
+      if (!amendment) return res.status(404).json({ message: "Amendment not found" });
+
+      const proposal = await proposalRepo.getProposal(amendment.proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user!.id);
+      if (!isMember) return res.status(403).json({ message: "Must be a community member" });
+
+      // Commenting follows the debate gate, not the amendment gate: the text
+      // freezes when the vote opens, the conversation about it does not.
+      const { isDebateOpen } = await import('@shared/proposal-lifecycle');
+      if (!isDebateOpen(proposal.status)) {
+        return res.status(409).json({
+          message: "Η συζήτηση έχει κλείσει για αυτή την πρόταση.",
+          current_status: proposal.status,
+        });
+      }
+
+      const [created] = await db
+        .insert(amendmentComments)
+        .values({ amendmentId, authorId: req.user!.id, content })
+        .returning();
+      res.status(201).json({ ...created, authorName: req.user!.name });
+    } catch (error) {
+      console.error('amendment comment failed:', error);
+      res.status(500).json({ message: "Failed to post comment" });
+    }
+  });
   // ─── Amendment Duplicates: Flag overlapping amendments for author review ────
   app.get("/api/proposals/:id/amendments/duplicates", requireProposalContentAccess(), async (req, res) => {
     try {
