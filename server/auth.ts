@@ -303,9 +303,15 @@ export function setupAuth(app: Express) {
               const general = await getGeneralCommunity();
               if (general) {
                 await addCommunityMember(general.id, newUser.id);
+              } else {
+                console.warn(`[enrol] no General community exists — user ${newUser.id} signed up with no community`);
               }
-            } catch (enrolErr) {
-              }
+            } catch (enrolErr: any) {
+              // Swallowed on purpose, but never silently: a user outside the
+              // General community sees an empty platform, and the only clue
+              // this happened is the log line.
+              console.error(`[enrol] General-community enrolment failed for Google user ${newUser.id}: ${enrolErr?.message}`);
+            }
 
             return done(null, newUser);
           } catch (error) {
@@ -445,9 +451,12 @@ export function setupAuth(app: Express) {
         const general = await getGeneralCommunity();
         if (general) {
           await addCommunityMember(general.id, user.id);
+        } else {
+          console.warn(`[enrol] no General community exists — user ${user.id} registered with no community`);
         }
-      } catch (enrolErr) {
-        }
+      } catch (enrolErr: any) {
+        console.error(`[enrol] General-community enrolment failed for user ${user.id}: ${enrolErr?.message}`);
+      }
 
       req.login(user, (err) => {
         if (err) return next(err);

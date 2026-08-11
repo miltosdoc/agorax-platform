@@ -114,6 +114,24 @@ export class CommunityRepository {
         eq(communityMembers.communityId, communityId),
         eq(communityMembers.userId, userId)
       ));
+
+    // Admin power lives on the community row, not the membership row, so
+    // deleting the membership alone leaves a departed admin holding rights
+    // the UI no longer shows them — conference hosting reads adminIds
+    // directly (routers/livekit isCommunityHost), and rejoining would
+    // silently restore the admin role. Leaving has to mean leaving.
+    const [community] = await db
+      .select({ adminIds: communities.adminIds })
+      .from(communities)
+      .where(eq(communities.id, communityId));
+    const adminIds = Array.isArray(community?.adminIds) ? community.adminIds as number[] : [];
+    if (adminIds.includes(userId)) {
+      await db
+        .update(communities)
+        .set({ adminIds: adminIds.filter(id => id !== userId) })
+        .where(eq(communities.id, communityId));
+    }
+
     return true;
   }
 
