@@ -360,7 +360,7 @@ const el: TranslationDictionary = {
   'proposal.participation_no_quorum': 'Συμμετοχή: {{pct}}%',
   'vote.noQuorumRequired': 'Δεν απαιτείται απαρτία',
   'vote.phaseHint': 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).',
-  'workspace.amendments.phaseHint.community_signal': 'Φάση: Τροπολογίες. Ο συγγραφέας αποδέχεται ή απορρίπτει κάθε τροπολογία με τα κουμπιά «Αποδοχή»/«Απόρριψη»· η κοινότητα ψηφίζει ⬆/⬇. Οι αποδεκτές —και όσες προωθήσει η κοινότητα— ενσωματώνονται στο τελικό κείμενο που θα τεθεί σε ψηφοφορία.',
+  'workspace.amendments.phaseHint.community_signal': 'Φάση: Διαβούλευση. Ο συγγραφέας αποδέχεται ή απορρίπτει κάθε τροπολογία με τα κουμπιά «Αποδοχή»/«Απόρριψη»· η κοινότητα ψηφίζει ⬆/⬇. Οι αποδεκτές —και όσες προωθήσει η κοινότητα— ενσωματώνονται στο τελικό κείμενο που θα τεθεί σε ψηφοφορία.',
   'community.tab_merge': 'Ενσωμάτωση',
   'community.tab_library': 'Βιβλιοθήκη',
   // Βιβλιοθήκη κοινότητας (υλικό μέσα στην κοινότητα, όχι στη ροή)
@@ -739,7 +739,7 @@ const el: TranslationDictionary = {
   'nav.proposals': 'Προτάσεις',
 
   // Debate
-  'debate.title': 'Διάλογος',
+  'debate.title': 'Συζήτηση',
   'debate.threadCount': '{count} νήματα',
   'debate.newThread': 'Νέο νήμα',
   'debate.closedNotice': 'Η συζήτηση έχει κλείσει για αυτή τη φάση.',
@@ -828,8 +828,8 @@ const el: TranslationDictionary = {
   'workspace.action.communitySignalButton': 'Δείτε τις τροπολογίες',
   'workspace.action.sortitionSynthesisButton': 'Άνοιγμα χώρου εργασίας κλήρωσης',
   'workspace.tabs.overview': 'Επισκόπηση',
-  'workspace.tabs.debate': 'Διαβούλευση',
-  'workspace.tabs.amendments': 'Τροπολογίες',
+  'workspace.tabs.debate': 'Συζήτηση',
+  'workspace.tabs.amendments': 'Διαβούλευση',
   'workspace.tabs.sortition': 'Κλήρωση',
   'workspace.tabs.votes': 'Ψήφους',
   'workspace.amendments.empty': 'Δεν έχουν υποβληθεί ακόμη τροπολογίες.',

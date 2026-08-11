@@ -360,7 +360,7 @@ const en: TranslationDictionary = {
   'proposal.participation_no_quorum': 'Participation: {{pct}}%',
   'vote.noQuorumRequired': 'No quorum required',
   'vote.phaseHint': 'Phase: Voting. The binding vote is on the final text. When the author or a community admin finalizes, the proposal moves to "Decided" or "Archived" (if quorum is not met or there is no decisive vote).',
-  'workspace.amendments.phaseHint.community_signal': 'Phase: Amendments. The author accepts or rejects each amendment with the Accept/Reject buttons; the community votes ⬆/⬇. Accepted amendments — and those the community promotes — are merged into the final text that goes to the vote.',
+  'workspace.amendments.phaseHint.community_signal': 'Phase: Deliberation. The author accepts or rejects each amendment with the Accept/Reject buttons; the community votes ⬆/⬇. Accepted amendments — and those the community promotes — are merged into the final text that goes to the vote.',
   'community.tab_merge': 'Merge',
   'community.tab_library': 'Library',
   // Community library (media posted inside a community, not in the feed)
@@ -739,7 +739,7 @@ const en: TranslationDictionary = {
   'nav.proposals': 'Proposals',
 
   // Debate
-  'debate.title': 'Debate',
+  'debate.title': 'Discussion',
   'debate.threadCount': '{count} threads',
   'debate.newThread': 'New thread',
   'debate.closedNotice': 'Discussion is closed for this phase.',
@@ -826,8 +826,8 @@ const en: TranslationDictionary = {
   'workspace.action.communitySignalButton': 'See the amendments',
   'workspace.action.sortitionSynthesisButton': 'Open sortition workspace',
   'workspace.tabs.overview': 'Overview',
-  'workspace.tabs.debate': 'Debate',
-  'workspace.tabs.amendments': 'Amendments',
+  'workspace.tabs.debate': 'Discussion',
+  'workspace.tabs.amendments': 'Deliberation',
   'workspace.tabs.sortition': 'Sortition',
   'workspace.tabs.votes': 'Votes',
   'workspace.amendments.empty': 'No amendments have been submitted yet.',
