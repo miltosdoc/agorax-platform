@@ -39,7 +39,6 @@ interface CommunitySettingsForm {
   amendmentThreshold: string;
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
-  requireGovgrVerification: boolean;
   joinPolicy: CommunityJoinPolicy;
   memberListVisibility: CommunityVisibilityLevel;
   contentVisibility: CommunityVisibilityLevel;
@@ -68,7 +67,6 @@ function toForm(community: Community): CommunitySettingsForm {
     amendmentThreshold: String(community.amendmentThreshold ?? '0.5'),
     amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '0.6'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
-    requireGovgrVerification: community.requireGovgrVerification ?? false,
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
     memberListVisibility: ((community as any).memberListVisibility as CommunityVisibilityLevel) || 'public',
     contentVisibility: ((community as any).contentVisibility as CommunityVisibilityLevel) || 'public',
@@ -240,13 +238,6 @@ export default function CommunitySettingsPage() {
                     <div className="space-y-2">
                       <Label htmlFor="minParticipationPct">{t('community.min_participation_pct')}</Label>
                       <Input id="minParticipationPct" type="number" min="0" max="100" value={form.minParticipationPct} onChange={(e) => update('minParticipationPct', e.target.value)} />
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="requireGovgrVerification">{t('community.require_govgr')}</Label>
-                        <p className="text-xs text-muted-foreground">{t('community.require_govgr_help')}</p>
-                      </div>
-                      <Switch id="requireGovgrVerification" checked={form.requireGovgrVerification} onCheckedChange={(checked) => update('requireGovgrVerification', checked)} />
                     </div>
                   </div>
 

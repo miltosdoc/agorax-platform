@@ -21,10 +21,16 @@ describe('profile/settings page contract', () => {
   it('renders a visible account settings page shell', () => {
     expect(profileSource).toContain('data-testid="page-profile-settings"');
     expect(profileSource).toContain("t('profile.accountSettings')");
-    expect(profileSource).toContain("t('profile.identityVerification')");
     // Note: the "participationSettings" card was removed in the GDPR data-
     // minimisation pass — it only held a no-op "Update Location" button
     // after the user-location vertical was dropped (migration 0014).
+  });
+
+  it('offers no Gov.gr identity verification surface', () => {
+    // The verification flow was withdrawn from the product; the profile page
+    // must not advertise a status members can no longer change.
+    expect(profileSource).not.toMatch(/govgr/i);
+    expect(profileSource).not.toMatch(/verifyIdentity|identityVerification/);
   });
 
   it('does not use legacy poll language or old admin-account framing', () => {

@@ -15,10 +15,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, Shield, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
+import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../../assets/logo.png";
-import { VerifyGovgrModal } from "../user/verify-govgr-modal";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 import { useUnreadCount, useNotifications } from "@/hooks/use-notifications";
@@ -34,7 +33,6 @@ export default function Header() {
   const [location, navigate] = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [feedbackOn, setFeedbackOn] = useState(isFeedbackWidgetEnabled);
   useEffect(() => {
     const sync = () => setFeedbackOn(isFeedbackWidgetEnabled());
@@ -234,49 +232,15 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border px-2 text-sm text-ink transition-colors duration-[120ms] sm:px-3 ${
-                      user.govgrVerified
-                        ? "border-yper bg-yper-wash"
-                        : "border-line hover:border-line-strong hover:bg-sunken"
-                    }`}
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border border-line px-2 text-sm text-ink transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken sm:px-3"
                     data-testid="button-user-menu"
                   >
-                    {user.govgrVerified ? (
-                      <Shield className="h-4 w-4 flex-shrink-0 text-yper" />
-                    ) : (
-                      <UserCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
-                    )}
+                    <UserCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
                     <span className="hidden max-w-[120px] truncate sm:inline md:max-w-[150px]">{user.name}</span>
                     <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-ink-faint" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
-                  <div className="px-2 py-1.5 text-xs">
-                    {user.govgrVerified ? (
-                      <div className="flex items-center font-medium text-yper">
-                        <Shield className="mr-1 h-3 w-3" />
-                        {t('ballot.verified')}
-                      </div>
-                    ) : (
-                      <span className="text-warn">{t('ballot.unverified')}</span>
-                    )}
-                  </div>
-                  <DropdownMenuSeparator />
-
-                  {!user.govgrVerified && (
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setIsVerifyModalOpen(true);
-                        setIsMenuOpen(false);
-                      }}
-                      className="cursor-pointer bg-kyanos-wash text-kyanos-deep focus:bg-kyanos-wash focus:text-kyanos-deep"
-                      data-testid="menu-verify"
-                    >
-                      <Shield className="mr-2 h-4 w-4" />
-                      {t('ballot.verify')}
-                    </DropdownMenuItem>
-                  )}
-
                   <DropdownMenuItem
                     onClick={() => navigate("/home")}
                     className="cursor-pointer"
@@ -441,10 +405,6 @@ export default function Header() {
         </nav>
       )}
 
-      <VerifyGovgrModal
-        isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
-      />
     </header>
   );
 }

@@ -10,7 +10,6 @@ import { useLocation } from "wouter";
 import { ArrowLeft, BadgeCheck, Download, Fingerprint, KeyRound, Loader2, Shield, Smartphone, Trash2, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { anonInventory, exportAnonData, importAnonData } from "@/lib/anon-transfer";
-import { VerifyGovgrModal } from "@/components/user/verify-govgr-modal";
 import { DeleteAccount } from "@/components/user/delete-account";
 import { useToast } from "@/hooks/use-toast";
 import { downloadApk } from "@/lib/download-apk";
@@ -22,29 +21,11 @@ export default function ProfilePage() {
   const { t } = useTranslation();
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
-  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [apkDownloading, setApkDownloading] = useState(false);
   const [inventory, setInventory] = useState(anonInventory);
   const [exportCode, setExportCode] = useState<string | null>(null);
   const [importCode, setImportCode] = useState('');
   const [importing, setImporting] = useState(false);
-  const [unverifying, setUnverifying] = useState(false);
-
-  async function handleRemoveVerification() {
-    setUnverifying(true);
-    try {
-      await api.delete('/api/user/verify-govgr');
-      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      toast({ title: t('profile.removeVerificationDone') });
-    } catch (error) {
-      toast({
-        title: error instanceof ApiError ? error.message : t('profile.removeVerificationFailed'),
-        variant: "destructive",
-      });
-    } finally {
-      setUnverifying(false);
-    }
-  }
 
   async function handleAnonImport() {
     setImporting(true);
@@ -91,12 +72,6 @@ export default function ProfilePage() {
     profilePicture: null,
     isAdmin: false,
     accountStatus: "active",
-    govgrVerified: false,
-    govgrVerifiedAt: null,
-    govgrFirstName: null,
-    govgrLastName: null,
-    govgrMunicipality: null,
-    govgrPostcode: null,
   };
 
   if (isLoading) {
@@ -111,10 +86,6 @@ export default function ProfilePage() {
 
   const headerActions = (
     <div className="flex flex-wrap gap-2">
-      <Badge variant={effectiveUser.govgrVerified ? "default" : "secondary"} className="min-h-8 px-3">
-        <BadgeCheck className="mr-1.5 h-4 w-4" />
-        {effectiveUser.govgrVerified ? t('ballot.verified') : t('ballot.unverified')}
-      </Badge>
       {effectiveUser.isAdmin && (
         <Badge variant="outline" className="min-h-8 px-3">
           <Shield className="mr-1.5 h-4 w-4" />
@@ -177,83 +148,6 @@ export default function ProfilePage() {
           </Card>
 
           <div className="space-y-6 lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Fingerprint className="h-5 w-5 text-primary" />
-                  {t('profile.identityVerification')}
-                </CardTitle>
-                <CardDescription>{t('profile.identityVerificationDescription')}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border p-4 space-y-1.5 text-sm">
-                  <p className="font-semibold text-base">
-                    {effectiveUser.govgrVerified ? t('profile.verified') : t('profile.notVerified')}
-                  </p>
-                  {(effectiveUser.govgrFirstName || effectiveUser.govgrLastName) && (
-                    <p>
-                      <span className="text-muted-foreground">{t('profile.verifiedName')}:</span>{' '}
-                      {[effectiveUser.govgrFirstName, effectiveUser.govgrLastName]
-                        .filter(Boolean)
-                        .join(' ')}
-                    </p>
-                  )}
-                  {(effectiveUser.govgrMunicipality || effectiveUser.govgrPostcode) && (
-                    <p>
-                      <span className="text-muted-foreground">
-                        {t('profile.verifiedResidence')}:
-                      </span>{' '}
-                      {[effectiveUser.govgrMunicipality, effectiveUser.govgrPostcode]
-                        .filter(Boolean)
-                        .join(' ')}
-                    </p>
-                  )}
-                </div>
-                {!effectiveUser.govgrVerified && (
-                  <>
-                    <p className="text-sm text-muted-foreground">{t('profile.identityActionUnavailable')}</p>
-                    <Button
-                      onClick={() => setIsVerifyModalOpen(true)}
-                      data-testid="button-verify-identity"
-                      className="gap-2"
-                    >
-                      <Shield className="h-4 w-4" />
-                      {t('profile.verifyIdentity')}
-                    </Button>
-                  </>
-                )}
-                {effectiveUser.govgrVerified && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        disabled={unverifying}
-                        data-testid="button-remove-verification"
-                        className="gap-2 text-destructive"
-                      >
-                        {unverifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        {t('profile.removeVerification')}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t('profile.removeVerificationConfirmTitle')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('profile.removeVerificationConfirmBody')}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t('general.cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRemoveVerification}>
-                          {t('profile.removeVerification')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </CardContent>
-            </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -363,10 +257,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-      <VerifyGovgrModal
-        isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
-      />
     </AppShell>
   );
 }

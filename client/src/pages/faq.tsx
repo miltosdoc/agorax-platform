@@ -104,15 +104,6 @@ export default function FAQPage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-9" className="border rounded-lg px-4">
-              <AccordionTrigger className="text-left font-medium text-base">
-                {t('faq.q9_title')}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground pb-4">
-                {t('faq.q9_answer')}
-              </AccordionContent>
-            </AccordionItem>
-
             <AccordionItem value="item-10" className="border rounded-lg px-4">
               <AccordionTrigger className="text-left font-medium text-base">
                 {t('faq.q10_title')}
@@ -164,15 +155,6 @@ export default function FAQPage() {
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground pb-4">
                 {t('faq.q15_answer')}
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-16" className="border rounded-lg px-4">
-              <AccordionTrigger className="text-left font-medium text-base">
-                {t('faq.q16_title')}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground pb-4">
-                {t('faq.q16_answer')}
               </AccordionContent>
             </AccordionItem>
 
