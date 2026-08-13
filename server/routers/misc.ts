@@ -391,6 +391,44 @@ export function registerMiscRoutes(app: Express): void {
       });
     }
   });
+  // ── Feedback triage report (admins only) ───────────────────────────────
+  // The feedback/ folder is an append-only pile of JSON drops;
+  // scripts/feedback-report.mjs turns it into a browsable page grouped by
+  // topic. Serving it from inside the app means it inherits the session
+  // cookie and admin check that already guard /admin/accounts — the report
+  // quotes users by name, so it must never be world-readable.
+  //
+  // Registered here rather than as a static file because registerRoutes()
+  // runs before serveStatic(), so this wins over the SPA catch-all.
+  // Same rule as requireAdmin, but this is a page a person opens in a tab,
+  // so a refused visit answers in HTML instead of a bare JSON blob.
+  const requireAdminPage = (req: any, res: Response, next: () => void) => {
+    if (req.isAuthenticated?.() && req.user?.isAdmin) return next();
+    res.status(403).type('html').send(
+      '<!doctype html><meta charset="utf-8">'
+      + '<title>Χωρίς πρόσβαση</title>'
+      + '<body style="font:16px/1.6 system-ui;max-width:34rem;margin:15vh auto;padding:0 1.5rem;color:#14212E">'
+      + '<h1 style="font:400 1.6rem Georgia,serif">Χωρίς πρόσβαση</h1>'
+      + '<p>Η αναφορά ανατροφοδότησης είναι διαθέσιμη μόνο σε διαχειριστές.</p>'
+      + '<p><a href="/" style="color:#0B4C8C">Επιστροφή στο AgoraX</a></p>',
+    );
+  };
+
+  app.get('/admin/feedback-review', requireAdminPage, async (_req, res) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const file = path.resolve(process.cwd(), 'feedback', 'review.html');
+    if (!fs.existsSync(file)) {
+      return res.status(404).type('html').send(
+        '<p>Η αναφορά δεν έχει παραχθεί ακόμη. Τρέξτε <code>node scripts/feedback-report.mjs</code>.</p>',
+      );
+    }
+    // Regenerated on every run, and it quotes real people: never cache it.
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.type('html').sendFile(file);
+  });
+
   // Legacy poll/survey HTTP routes have been retired — proposals are the
   // canonical civic surface. The poll storage methods remain because the
   // social-bot HTML preview route above still resolves poll metadata for

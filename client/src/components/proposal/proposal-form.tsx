@@ -399,7 +399,7 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
               {track === 'deliberation' && !editProposalId && (
                 <div className="space-y-2">
                   <Label htmlFor="deliberationDurationHours">
-                    {t('proposal.deliberation_duration_label') || 'Διάρκεια διαβούλευσης (ώρες)'}
+                    {t('proposal.deliberation_duration_label')}
                   </Label>
                   <Input
                     id="deliberationDurationHours"
@@ -414,8 +414,7 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
                     data-testid="proposal-deliberation-duration"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t('proposal.deliberation_duration_hint')
-                      || `Η κοινότητα επιτρέπει ${deliberationMin}–${deliberationMax} ώρες. Κενό = η προεπιλογή της κοινότητας.`}
+                    {t('proposal.deliberation_duration_hint', { min: deliberationMin, max: deliberationMax })}
                   </p>
                 </div>
               )}

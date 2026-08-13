@@ -27,6 +27,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "check:i18n": "node scripts/check-i18n-keys.mjs",
+    "feedback:report": "node scripts/feedback-report.mjs",
     "test": "npm run test:unit",
     "test:unit": "vitest run --root . tests/integration/*.test.ts",
     "test:all": "scripts/run_tests.sh",

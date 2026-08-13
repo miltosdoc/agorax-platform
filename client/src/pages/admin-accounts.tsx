@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Ban, CheckCircle, KeyRound } from "lucide-react";
+import { Eye, Ban, CheckCircle, KeyRound, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { el } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
@@ -174,6 +174,17 @@ export default function AdminAccountsPage() {
           <p className="text-muted-foreground" data-testid="text-page-description">
             {t('admin.manageAccountsDesc')}
           </p>
+          {/* Server-rendered report, not a SPA route — plain anchor, new tab. */}
+          <a
+            href="/admin/feedback-review"
+            target="_blank"
+            rel="noopener"
+            className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-accent hover:underline"
+            data-testid="link-feedback-review"
+          >
+            <MessageSquare className="w-4 h-4" />
+            {t('admin.feedbackReview')}
+          </a>
         </div>
 
         <div className="mb-6 flex flex-col sm:flex-row gap-4">

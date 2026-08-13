@@ -79,8 +79,8 @@ const TOPICS = {
   'basic-advanced': ['Δύο είδη διαβούλευσης: basic μόνο βελτιώσεις, advanced και αντιπροτάσεις', 'TALK', 'open'],
 
   // PHASE
-  'author-sets-duration': ['Ο συγγραφέας να ορίζει τη διάρκεια διαβούλευσης και ψηφοφορίας', 'PHASE', 'open',
-    'Το πιο πολυζητημένο αίτημα του αρχείου.'],
+  'author-sets-duration': ['Ο συγγραφέας να ορίζει τη διάρκεια διαβούλευσης και ψηφοφορίας', 'PHASE', 'partial',
+    'Το πεδίο υπάρχει από τις 25/07 στη φόρμα πρότασης, με όρια που θέτει η κοινότητα. Η τελευταία αναφορά όμως είναι της 06/08 και ζητάει να ορίζεται «σε ελληνικά και αγγλικά»: οι ετικέτες του πεδίου δεν είχαν μεταφραστεί ποτέ και έβγαιναν πάντα στα ελληνικά. Διορθώθηκε. Μένει η διάρκεια της ίδιας της ψηφοφορίας, που ορίζεται μόνο στο vote track.'],
   'phase-time-visible': ['Ο χρόνος και η φάση να φαίνονται δίπλα στην πρόταση', 'PHASE', 'partial'],
   'phase-explanations': ['Επεξήγηση κάθε βήματος όταν κλικάρεις τα σήματα φάσης', 'PHASE', 'open'],
   'stuck-proposal': ['Πρόταση κολλημένη στη διαβούλευση χωρίς αντίστροφη μέτρηση', 'PHASE', 'partial',
@@ -415,3 +415,319 @@ if (staleKeys.length) {
 fs.writeFileSync(OUT, L.join('\n'));
 console.log(`Γράφτηκε ${path.relative(ROOT, OUT)}`);
 console.log(`  ${entries.length} καταχωρήσεις · ${slugs.length} θέματα · ${untriaged.length} αδιαλογάριαστα · ${staleKeys.length} ξεκρέμαστα`);
+
+// ── HTML ─────────────────────────────────────────────────────────────────────
+// Ίδια δεδομένα, μορφή για ανάγνωση στον browser. Τα στιγμιότυπα μπαίνουν
+// σμικρυμένα μέσα στη σελίδα ώστε να είναι αυτοτελής (τα πρωτότυπα ξεπερνούν
+// τα 15MB και δεν χωράνε).
+const OUT_HTML = path.join(DIR, 'review.html');
+const sharp = (await import(path.join(ROOT, 'node_modules/sharp/lib/index.js'))).default;
+
+// Ο πίνακας «ποιος μιλάει» δημοσιεύεται· ένας αναφέρων ταυτοποιείται μόνο από
+// το email του, οπότε δεν το τυπώνουμε.
+const whoPublic = e => (e.username || '').trim() || 'χρήστης χωρίς λογαριασμό';
+
+const thumbs = {};
+for (const e of entries) {
+  if (!e.screenshot) continue;
+  const src = path.join(DIR, e.screenshot);
+  if (!fs.existsSync(src)) { console.warn(`  ! λείπει στιγμιότυπο: ${e.screenshot}`); continue; }
+  const buf = await sharp(src).rotate().resize({ width: 1000, withoutEnlargement: true })
+    .jpeg({ quality: 68, mozjpeg: true }).toBuffer();
+  thumbs[e.screenshot] = `data:image/jpeg;base64,${buf.toString('base64')}`;
+}
+const shotBytes = Object.values(thumbs).reduce((n, s) => n + s.length, 0);
+
+const payload = {
+  meta: {
+    total: entries.length, users: users.length, span,
+    shots: entries.filter(e => e.screenshot).length,
+    done: countBy('done'), partial: countBy('partial'), open: countBy('open'), decision: countBy('decision'),
+  },
+  themes: THEMES,
+  themeOrder: THEME_ORDER,
+  statuses: Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])),
+  reporters: perUser.map(([u, n]) => ({ name: u === '«<redacted-email>»' ? 'χρήστης χωρίς λογαριασμό' : u, n })),
+  topics: ranked.concat(slugs.filter(s => TOPICS[s][2] === 'noise')).map(s => ({
+    slug: s, label: TOPICS[s][0], theme: TOPICS[s][1], status: TOPICS[s][2], note: TOPICS[s][3] || '',
+    reporters: [...new Set(byTopic.get(s).map(whoPublic))],
+    entries: byTopic.get(s).map(e => ({
+      date: when(e), who: whoPublic(e), page: e.page || '', shot: e.screenshot || '',
+      message: (e.message || '').trim(),
+    })),
+  })),
+  thumbs,
+};
+
+const html = `<!doctype html>
+<html lang="el"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Ανατροφοδότηση AgoraX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Χρώματα και τυπογραφία από τα tokens του AgoraX (client/src/index.css).
+   Καμία νέα παλέτα: το ίδιο kyanós, οι ίδιες πολιτειακές σημασιολογίες,
+   και η ίδια μέγιστη καμπυλότητα των 4px. */
+:root{
+  --paper:#FAFAF7; --surface:#FFFFFF; --sunken:#F1F2ED;
+  --line:#D9DCD4; --line-strong:#9AA096;
+  --ink:#14212E; --ink-soft:#4A5561; --ink-faint:#6B7480;
+  --kyanos:#0B4C8C; --kyanos-deep:#093A6B; --kyanos-wash:#EDF2F8;
+  --s-done:#2F6B3F; --s-partial:#8A5A00; --s-open:#5B6470; --s-decision:#0B4C8C; --s-noise:#9AA096;
+  --radius:0.25rem;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    /* Το σκούρο έδαφος του AgoraX — τα broadcast tokens. */
+    --paper:#0C1B2A; --surface:#12253A; --sunken:#16293F;
+    --line:#27405C; --line-strong:#3A5875;
+    --ink:#F2F6FA; --ink-soft:#93A6BA; --ink-faint:#7D91A6;
+    --kyanos:#6E9FD4; --kyanos-deep:#8FB6E0; --kyanos-wash:#16293F;
+    --s-done:#56A96E; --s-partial:#C9A14A; --s-open:#66788C; --s-decision:#6E9FD4; --s-noise:#5B6E82;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0C1B2A; --surface:#12253A; --sunken:#16293F;
+  --line:#27405C; --line-strong:#3A5875;
+  --ink:#F2F6FA; --ink-soft:#93A6BA; --ink-faint:#7D91A6;
+  --kyanos:#6E9FD4; --kyanos-deep:#8FB6E0; --kyanos-wash:#16293F;
+  --s-done:#56A96E; --s-partial:#C9A14A; --s-open:#66788C; --s-decision:#6E9FD4; --s-noise:#5B6E82;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px; margin:0 auto; padding:0 24px}
+h1,h2,h3{font-family:"GFS Didot",Georgia,"Times New Roman",serif; font-weight:400; text-wrap:balance}
+.mono{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
+
+header.top{border-bottom:1px solid var(--line); background:var(--surface)}
+.head-inner{display:flex; flex-direction:column; gap:10px; padding:40px 0 30px}
+h1{font-size:clamp(1.9rem,4vw,2.7rem); line-height:1.15; margin:0}
+.lede{margin:0; color:var(--ink-soft); max-width:62ch}
+.eyebrow{
+  margin:0; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--kyanos); font-weight:600;
+}
+.back{color:var(--kyanos); text-decoration:none; font-size:.82rem; font-weight:500}
+.back:hover{text-decoration:underline}
+.back:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
+
+.stats{display:flex; flex-wrap:wrap; margin-top:22px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
+.stat{flex:1 1 130px; padding:12px 16px; background:var(--sunken); border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block; font-size:1.5rem; line-height:1.2; font-weight:600}
+.stat span{font-size:.76rem; color:var(--ink-soft)}
+
+section{padding:36px 0}
+h2{font-size:1.4rem; margin:0 0 6px}
+.sub{color:var(--ink-soft); font-size:.9rem; margin:0 0 18px; max-width:62ch}
+
+.voices{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px}
+.bar{display:flex; height:26px; border-radius:var(--radius); overflow:hidden; margin:14px 0 12px; background:var(--sunken)}
+.seg:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
+.legend{display:flex; flex-wrap:wrap; gap:6px 18px; font-size:.8rem; color:var(--ink-soft)}
+.legend i{display:inline-block; width:9px; height:9px; margin-right:6px}
+.pull{
+  margin:16px 0 0; padding:12px 16px; border-left:3px solid var(--kyanos);
+  background:var(--kyanos-wash); border-radius:0 var(--radius) var(--radius) 0; font-size:.92rem;
+}
+
+.controls{
+  position:sticky; top:0; z-index:20; background:var(--paper);
+  border-bottom:1px solid var(--line); padding:12px 0;
+}
+.ctl-inner{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+input[type=search],select{
+  font:inherit; font-size:.9rem; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--radius); padding:7px 11px;
+}
+input[type=search]{flex:1 1 220px; min-width:180px}
+input[type=search]:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--kyanos); outline-offset:1px}
+.pills{display:flex; flex-wrap:wrap; gap:6px}
+.pill{
+  font:inherit; font-size:.8rem; cursor:pointer; padding:6px 12px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
+  border-radius:var(--radius); transition:background 120ms ease-out;
+}
+.pill:hover{background:var(--sunken)}
+.pill[aria-pressed=true]{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.count{margin-left:auto; font-size:.82rem; color:var(--ink-soft); white-space:nowrap}
+
+.theme-h{
+  display:flex; align-items:baseline; gap:12px; margin:34px 0 12px;
+  padding-bottom:8px; border-bottom:1px solid var(--line);
+}
+.theme-h h3{font-size:1.1rem; margin:0}
+.theme-h span{font-size:.78rem; color:var(--ink-faint)}
+.cards{display:flex; flex-direction:column; gap:10px}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  border-left:3px solid var(--sc); overflow:hidden;
+}
+.card summary{
+  cursor:pointer; padding:14px 16px; display:flex; flex-wrap:wrap;
+  gap:6px 14px; align-items:baseline; list-style:none;
+}
+.card summary::-webkit-details-marker{display:none}
+.card summary:hover{background:var(--sunken)}
+.card summary:focus-visible{outline:2px solid var(--kyanos); outline-offset:-2px}
+.t-label{font-weight:600; flex:1 1 320px; min-width:0}
+.t-status{font-size:.75rem; color:var(--sc); font-weight:600; white-space:nowrap}
+.t-meta{font-size:.78rem; color:var(--ink-faint); white-space:nowrap}
+.card[open] summary{border-bottom:1px solid var(--line)}
+.body{padding:4px 16px 16px}
+.note{
+  margin:12px 0 4px; padding:10px 14px; background:var(--sunken);
+  border:1px solid var(--line); border-radius:var(--radius); font-size:.88rem; color:var(--ink-soft);
+}
+.note b{color:var(--ink)}
+.entry{padding:14px 0; border-top:1px solid var(--line)}
+.entry:first-of-type{border-top:0}
+.ehead{display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; font-size:.78rem; color:var(--ink-faint); margin-bottom:6px}
+.ehead b{color:var(--ink); font-weight:600; font-size:.84rem}
+.quote{
+  margin:0; padding-left:14px; border-left:2px solid var(--line);
+  white-space:pre-wrap; overflow-wrap:break-word; font-size:.94rem;
+}
+.shot{margin:10px 0 0}
+.shot img{max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius); display:block}
+.shot figcaption{font-size:.74rem; color:var(--ink-faint); margin-top:5px}
+.empty{padding:50px 0; text-align:center; color:var(--ink-soft)}
+footer{border-top:1px solid var(--line); margin-top:40px; padding:24px 0 44px; font-size:.82rem; color:var(--ink-faint)}
+code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; background:var(--sunken); padding:1px 5px; border-radius:var(--radius); border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+@media (max-width:640px){.head-inner{padding:28px 0 22px} .count{margin-left:0; width:100%}}
+</style></head><body>
+
+<header class="top"><div class="wrap head-inner">
+  <p class="eyebrow">AgoraX &middot; διαλογή ανατροφοδότησης</p>
+  <a class="back" href="/admin/accounts">&larr; Πίσω στη διαχείριση</a>
+  <h1>Τι μας είπαν οι πρώτοι χρήστες</h1>
+  <p class="lede">Κάθε υποβολή από το widget της πλατφόρμας, ομαδοποιημένη κατά θέμα αντί για ημερομηνία. Ανοίξτε ένα θέμα για να δείτε τα αυτούσια λόγια.</p>
+  <div class="stats" id="stats"></div>
+</div></header>
+
+<div class="wrap">
+  <section>
+    <h2>Ποιος μιλάει</h2>
+    <p class="sub">Πριν διαβάσετε τι ζητήθηκε, δείτε από ποιους. Η κατανομή αλλάζει τον τρόπο που μετράμε τη ζήτηση.</p>
+    <div class="voices">
+      <div class="bar" id="bar"></div>
+      <div class="legend" id="legend"></div>
+      <p class="pull">Οι μισές καταχωρήσεις είναι ενός ανθρώπου. Γι' αυτό η κατάταξη μετράει <b>πόσοι διαφορετικοί άνθρωποι</b> ζήτησαν κάτι, όχι πόσες φορές γράφτηκε.</p>
+    </div>
+  </section>
+</div>
+
+<div class="controls"><div class="wrap ctl-inner">
+  <input type="search" id="q" placeholder="Αναζήτηση στα λόγια των χρηστών…" aria-label="Αναζήτηση">
+  <div class="pills" id="statusPills"></div>
+  <select id="reporter" aria-label="Φίλτρο αναφέροντα"></select>
+  <span class="count" id="count"></span>
+</div></div>
+
+<div class="wrap"><main id="list"></main></div>
+
+<footer><div class="wrap">
+  Παράγεται από <code>scripts/feedback-report.mjs</code>. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.
+</div></footer>
+
+<script>
+const D = ${JSON.stringify(payload).replace(/</g, '\\u003c')};
+const SC = {done:'--s-done', partial:'--s-partial', open:'--s-open', decision:'--s-decision', noise:'--s-noise'};
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+document.getElementById('stats').innerHTML = [
+  [D.meta.total, 'καταχωρήσεις'], [D.topics.length, 'θέματα'], [D.meta.users, 'χρήστες'],
+  [D.meta.open, 'ανοιχτά'], [D.meta.done, 'έγιναν'], [D.meta.shots, 'στιγμιότυπα'],
+].map(([n, l]) => '<div class="stat"><b class="mono">' + n + '</b><span>' + l + '</span></div>').join('');
+
+// Μονοχρωματική κλίμακα του kyanós: η ένταση δείχνει όγκο, χωρίς να
+// εισάγει χρώματα εκτός του συστήματος.
+const palette = ['#0B4C8C','#2F6FA8','#5B90C2','#8FB3D6','#B9CFE4','#D9E3EE'];
+document.getElementById('bar').innerHTML = D.reporters.map((r, i) => {
+  const pct = r.n / D.meta.total * 100;
+  return '<div class="seg" tabindex="0" style="width:' + pct + '%;background:' + palette[Math.min(i, palette.length - 1)] +
+    '" title="' + esc(r.name) + ' — ' + r.n + '"></div>';
+}).join('');
+document.getElementById('legend').innerHTML = D.reporters.slice(0, 6).map((r, i) =>
+  '<span><i style="background:' + palette[Math.min(i, palette.length - 1)] + '"></i>' + esc(r.name) +
+  ' <span class="mono">' + r.n + '</span></span>').join('') +
+  (D.reporters.length > 6 ? '<span><i style="background:' + palette[5] + '"></i>λοιποί <span class="mono">' +
+    D.reporters.slice(6).reduce((n, r) => n + r.n, 0) + '</span></span>' : '');
+
+let fStatus = 'all', fReporter = 'all', fQuery = '';
+const STATUS_ORDER = ['all','decision','open','partial','done','noise'];
+document.getElementById('statusPills').innerHTML = STATUS_ORDER.map(s =>
+  '<button class="pill" data-s="' + s + '" aria-pressed="' + (s === 'all') + '">' +
+  (s === 'all' ? 'Όλα' : esc(D.statuses[s])) + '</button>').join('');
+document.getElementById('statusPills').addEventListener('click', ev => {
+  const b = ev.target.closest('.pill'); if (!b) return;
+  fStatus = b.dataset.s;
+  document.querySelectorAll('#statusPills .pill').forEach(p => p.setAttribute('aria-pressed', String(p === b)));
+  render();
+});
+
+const names = [...new Set(D.topics.flatMap(t => t.reporters))].sort((a, b) => a.localeCompare(b, 'el'));
+document.getElementById('reporter').innerHTML = '<option value="all">Όλοι οι αναφέροντες</option>' +
+  names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+document.getElementById('reporter').addEventListener('change', e => { fReporter = e.target.value; render(); });
+document.getElementById('q').addEventListener('input', e => { fQuery = e.target.value.trim().toLowerCase(); render(); });
+
+function match(t) {
+  if (fStatus !== 'all' && t.status !== fStatus) return false;
+  if (fReporter !== 'all' && !t.reporters.includes(fReporter)) return false;
+  if (fQuery) {
+    const hay = (t.label + ' ' + t.note + ' ' + t.entries.map(e => e.message + ' ' + e.who + ' ' + e.page).join(' ')).toLowerCase();
+    if (!hay.includes(fQuery)) return false;
+  }
+  return true;
+}
+
+function render() {
+  const shown = D.topics.filter(match);
+  document.getElementById('count').textContent =
+    shown.length + (shown.length === 1 ? ' θέμα' : ' θέματα') + ' · ' +
+    shown.reduce((n, t) => n + t.entries.length, 0) + ' αναφορές';
+  const out = [];
+  for (const th of D.themeOrder) {
+    const ts = shown.filter(t => t.theme === th);
+    if (!ts.length) continue;
+    out.push('<div class="theme-h"><h3>' + esc(D.themes[th]) + '</h3><span class="mono">' + ts.length + '</span></div><div class="cards">');
+    for (const t of ts) {
+      const open = fQuery && t.entries.length <= 4;
+      out.push('<details class="card" style="--sc:var(' + SC[t.status] + ')"' + (open ? ' open' : '') + '><summary>' +
+        '<span class="t-label">' + esc(t.label) + '</span>' +
+        '<span class="t-status">' + esc(D.statuses[t.status]) + '</span>' +
+        '<span class="t-meta mono">' + t.reporters.length + ' άτομα · ' + t.entries.length + ' αναφ.</span>' +
+        '</summary><div class="body">');
+      if (t.note) out.push('<p class="note"><b>Σημείωση:</b> ' + esc(t.note) + '</p>');
+      for (const e of t.entries) {
+        out.push('<div class="entry"><div class="ehead"><b>' + esc(e.who) + '</b>' +
+          '<span class="mono">' + esc(e.date) + '</span>' +
+          (e.page ? '<span class="mono">' + esc(e.page) + '</span>' : '') + '</div>' +
+          '<p class="quote">' + esc(e.message) + '</p>' +
+          (e.shot && D.thumbs[e.shot]
+            ? '<figure class="shot"><img loading="lazy" alt="Στιγμιότυπο από ' + esc(e.who) + '" src="' + D.thumbs[e.shot] + '"><figcaption>Στιγμιότυπο που επισύναψε ο χρήστης</figcaption></figure>'
+            : '') + '</div>');
+      }
+      out.push('</div></details>');
+    }
+    out.push('</div>');
+  }
+  document.getElementById('list').innerHTML = out.join('') ||
+    '<p class="empty">Κανένα θέμα δεν ταιριάζει με αυτά τα φίλτρα.</p>';
+}
+render();
+</script></body></html>`;
+
+fs.writeFileSync(OUT_HTML, html);
+console.log(`Γράφτηκε ${path.relative(ROOT, OUT_HTML)}`);
+console.log(`  ${(html.length / 1024 / 1024).toFixed(1)}MB συνολικά, εκ των οποίων ${(shotBytes / 1024 / 1024).toFixed(1)}MB στιγμιότυπα`);
