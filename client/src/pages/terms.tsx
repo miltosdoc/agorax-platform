@@ -8,13 +8,15 @@ import { Separator } from "@/components/ui/separator";
  *
  * Bilingual (el / en). Aligned with the current implementation:
  *  - Proposal flow goes draft → review → ... → voting → decided/archived.
- *  - LLM quality gate is local-only (was external OpenRouter, removed in
- *    the GDPR pass — proposals now always route to sortition human review).
+ *  - The submit gate is local-only and checks §6 abuse, not proposal
+ *    quality; the quality score is advisory and never blocks. §3 and §6
+ *    must keep matching server/utils/llm-validation.ts — the gate may only
+ *    block on grounds stated here.
  *  - Source is CC-BY-NC-4.0 (see LICENSE) — non-commercial reuse.
  *  - Privacy details live in /privacy, not here.
  */
 
-const LAST_UPDATED = "2026-05-25";
+const LAST_UPDATED = "2026-08-18";
 
 export default function TermsPage() {
   const { locale } = useTranslation();
@@ -85,13 +87,22 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">3. Υποβολή προτάσεων και τροπολογιών</h2>
         <p className="mb-3">
-          Οι προτάσεις ακολουθούν τη δομή <em>ερώτημα + λύση</em>. Κάθε πρόταση περνά από έλεγχο
-          ποιότητας πριν προχωρήσει στη φάση τροπολογιών και ψηφοφορίας.
+          Οι προτάσεις ακολουθούν τη δομή <em>ερώτημα + λύση</em>. Το πεδίο της λύσης μπορεί να
+          μείνει ανοιχτό: μια πρόταση που θέτει ερώτημα και αφήνει την απάντηση στη διαβούλευση
+          είναι πλήρως αποδεκτή.
+        </p>
+        <p className="mb-3">
+          Κάθε πρόταση περνά από αυτόματο έλεγχο πριν δημοσιευθεί. Ο έλεγχος αυτός μπορεί να
+          σταματήσει μια πρόταση <strong className="text-foreground">μόνο</strong> για παραβίαση της
+          παραγράφου 6 παρακάτω. Δεν κρίνει αν μια πρόταση είναι ρεαλιστική, ολοκληρωμένη,
+          τεκμηριωμένη ή πολιτικά ορθή — αυτά τα κρίνει η κοινότητα στη διαβούλευση και στην κάλπη.
         </p>
         <p>
-          <strong className="text-foreground">Σημείωση:</strong> ο αυτόματος έλεγχος AI είναι προσωρινά
-          ανενεργός — όλες οι προτάσεις δρομολογούνται σε κληρωτό σώμα για ανθρώπινη αξιολόγηση. Καμία
-          πρόταση ή κείμενο δεν αποστέλλεται σε εξωτερική υπηρεσία τεχνητής νοημοσύνης.
+          Ο έλεγχος αποδίδει και μια συμβουλευτική βαθμολογία σαφήνειας, ορατή σε εσάς και στην
+          κοινότητα. <strong className="text-foreground">Η βαθμολογία δεν εμποδίζει ποτέ τη
+          δημοσίευση</strong>, με μοναδική εξαίρεση κείμενο που δεν διαβάζεται καθόλου. Αν διαφωνείτε
+          με μια απόφαση, μπορείτε να ζητήσετε επαναξιολόγηση από τη σελίδα της πρότασης. Καμία
+          πρόταση δεν αποστέλλεται σε εξωτερική υπηρεσία τεχνητής νοημοσύνης.
         </p>
       </section>
 
@@ -125,9 +136,21 @@ function GreekTerms() {
           <li>Δημιουργία πολλαπλών λογαριασμών (ένα μέλος = ένας λογαριασμός).</li>
           <li>Παράκαμψη του rate limiting ή των ελέγχων ασφαλείας.</li>
           <li>Υποβολή προτάσεων που υποκινούν βία, μίσος ή παράνομες πράξεις.</li>
+          <li>
+            Δημοσίευση προσωπικών δεδομένων τρίτου προσώπου (τηλέφωνο, διεύθυνση, ΑΦΜ, ΑΜΚΑ,
+            προσωπικό e-mail) χωρίς τη συγκατάθεσή του.
+          </li>
+          <li>Διαφημιστικό, ασύνδετο ή ακατάληπτο περιεχόμενο.</li>
           <li>Μηχανική παρέμβαση (bots, scraping χωρίς άδεια).</li>
           <li>Προσπάθεια επαναπροσδιορισμού (re-identification) ψηφοφόρων.</li>
         </ul>
+        <p className="mt-4">
+          Ο κατάλογος αυτός είναι <strong className="text-foreground">εξαντλητικός</strong> ως προς το
+          περιεχόμενο των προτάσεων: ο αυτόματος έλεγχος της παραγράφου 3 δεν επιτρέπεται να
+          μπλοκάρει πρόταση για λόγο που δεν αναφέρεται εδώ. Η άσκηση κριτικής — και οξείας — σε
+          πρόσωπα με δημόσιο αξίωμα, σε κόμματα, στον δήμο ή σε οποιονδήποτε θεσμό δεν συνιστά
+          απαγορευμένη πράξη.
+        </p>
       </section>
 
       <Separator />
@@ -221,13 +244,22 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">3. Proposals and amendments</h2>
         <p className="mb-3">
-          Proposals follow a <em>question + solution</em> structure. Each proposal passes a quality check
-          before moving to the amendment phase and the vote.
+          Proposals follow a <em>question + solution</em> structure. The solution field may be left
+          open: a proposal that poses a question and leaves the answer to deliberation is entirely
+          acceptable.
+        </p>
+        <p className="mb-3">
+          Every proposal passes an automated check before publication. That check may stop a proposal
+          <strong className="text-foreground"> only</strong> for a breach of section 6 below. It does
+          not judge whether a proposal is realistic, complete, well-argued or politically sound —
+          the community judges those, in deliberation and at the ballot.
         </p>
         <p>
-          <strong className="text-foreground">Note:</strong> the automated AI quality check is
-          temporarily disabled — all proposals route to a sortition body for human review. No proposal
-          text leaves the instance to any external AI service.
+          The check also produces an advisory clarity score, visible to you and to the community.
+          <strong className="text-foreground"> The score never blocks publication</strong>, with the
+          single exception of text that cannot be read at all. If you disagree with a decision you may
+          request re-evaluation from the proposal page. No proposal text is sent to any external AI
+          service.
         </p>
       </section>
 
@@ -261,9 +293,21 @@ function EnglishTerms() {
           <li>Creating multiple accounts (one member = one account).</li>
           <li>Bypassing rate limiting or security controls.</li>
           <li>Submitting proposals that incite violence, hate, or illegal acts.</li>
+          <li>
+            Publishing a third party's personal data (phone number, address, tax or social-security
+            number, private e-mail) without their consent.
+          </li>
+          <li>Advertising, disconnected or unintelligible content.</li>
           <li>Automated interaction (bots, unauthorised scraping).</li>
           <li>Attempting to re-identify other voters.</li>
         </ul>
+        <p className="mt-4">
+          As regards the content of proposals this list is
+          <strong className="text-foreground"> exhaustive</strong>: the automated check described in
+          section 3 may not block a proposal on any ground not stated here. Criticism — including
+          harsh criticism — of public office holders, parties, the municipality or any institution is
+          not a prohibited act.
+        </p>
       </section>
 
       <Separator />
