@@ -113,8 +113,18 @@ export default function AuthPage() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <a href="/" className="flex items-center gap-3">
             <img src={logoImage} alt="AgoraX Logo" className="h-9 w-auto" />
-            <span className="font-serif text-xl font-normal leading-none text-ink">
-              AgoraX
+            <span className="flex items-baseline gap-1.5 leading-none">
+              <span className="font-serif text-xl font-normal text-ink">
+                AgoraX
+              </span>
+              {/* Shown before sign-up too: people deciding whether to join
+                  should know the platform is still under construction. */}
+              <span
+                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos"
+                data-testid="badge-beta"
+              >
+                Beta
+              </span>
             </span>
           </a>
           <div className="flex items-center gap-4">

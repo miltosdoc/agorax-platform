@@ -111,8 +111,18 @@ export default function Header() {
             className="h-8 w-auto flex-shrink-0 sm:h-9"
           />
           <span className="min-w-0">
-            <span className="block font-serif text-xl leading-none text-ink sm:text-2xl">
-              AgoraX
+            <span className="flex items-baseline gap-1.5 leading-none">
+              <span className="font-serif text-xl text-ink sm:text-2xl">
+                AgoraX
+              </span>
+              {/* The platform is not finished and should never pretend to be:
+                  votes are advisory (Terms §7) and the rules still move. */}
+              <span
+                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos sm:text-[10px]"
+                data-testid="badge-beta"
+              >
+                Beta
+              </span>
             </span>
             <span className="mt-1 hidden font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-ink-faint sm:block">
               {t('general.digitalDemocracy')}
