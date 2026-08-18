@@ -569,7 +569,7 @@ function targetStateFor(category: LLMValidationResult['category']): ProposalStat
  * Persists the full structured result to `validation_results` (history), and
  * mirrors the latest score/feedback onto the proposal row for fast list
  * rendering. Side effects:
- *  - `return`       → notifies the author that their proposal was returned
+ *  - `return`       → notifies the author (Terms §6 breach, or unreadable text)
  *  - `sortition`    → notifies the author that deliberation opened
  *  - `auto_approve` → same, plus a democracy-score recalculation
  *
@@ -656,11 +656,15 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
   // misleading for a freshly-validated proposal.
   switch (result.category) {
     case 'return':
+      // A return is now almost always a Terms §6 breach, not a low mark. The
+      // score is meaningless in that case, so lead with the rule instead.
       await enqueueNotification(
         proposal.authorId,
         'proposal_returned',
-        `Η πρόταση επιστράφηκε για αναθεώρηση (βαθμός ${Math.round(result.score)}/100): ${result.feedback}`,
-        { proposalId, score: result.score, feedback: result.feedback },
+        result.abuse
+          ? `Η πρόταση δεν δημοσιεύτηκε: ${result.feedback}`
+          : `Η πρόταση επιστράφηκε για αναθεώρηση (βαθμός ${Math.round(result.score)}/100): ${result.feedback}`,
+        { proposalId, score: result.score, feedback: result.feedback, abuse: result.abuse?.kind ?? null },
       );
       break;
     case 'sortition':

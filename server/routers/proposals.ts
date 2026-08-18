@@ -357,6 +357,7 @@ export function registerProposalsRoutes(app: Express): void {
       let llmValidatedAt: Date | undefined;
       let nextStatus: 'community_signal' | 'draft' | 'review' = 'review';
       let category: 'return' | 'sortition' | 'auto_approve' | null = null;
+      let abuseKind: string | null = null;
       try {
         const { validateProposal } = await import('../utils/llm-validation');
         const result = await validateProposal(proposal.question, proposal.solution);
@@ -364,8 +365,12 @@ export function registerProposalsRoutes(app: Express): void {
         llmFeedback = result.feedback;
         llmValidatedAt = new Date();
         category = result.category;
+        abuseKind = result.abuse?.kind ?? null;
         // Short deliberation flow mapping from review:
-        // - return: review → draft (author revises)
+        // - return: review → draft. Only two things land here now: a Terms §6
+        //   breach, or text the model could not read at all. Being incomplete,
+        //   unproven or "just a question" is not grounds — the community
+        //   answers those in deliberation, which is what deliberation is for.
         // - sortition / auto_approve: review → community_signal (the single
         //   amendments phase: members amend + vote, author accepts/rejects)
         //   A top score does not skip deliberation — see targetStateFor().
@@ -418,6 +423,7 @@ export function registerProposalsRoutes(app: Express): void {
           score: llmScore ? Number(llmScore) : null,
           feedback: llmFeedback,
           category,
+          abuse: abuseKind,
         },
       });
     } catch (error) {
@@ -1345,6 +1351,7 @@ export function registerProposalsRoutes(app: Express): void {
           score: result.score,
           feedback: result.feedback,
           category: result.category,
+          abuse: result.abuse?.kind ?? null,
           details: result.details,
         },
       });

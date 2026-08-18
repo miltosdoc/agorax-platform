@@ -489,7 +489,7 @@ export const validationResults = pgTable("validation_results", {
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
   score: integer("score").notNull(),                    // 0-100
   feedback: text("feedback"),                            // Λεκτικό σχόλιο LLM
-  details: jsonb("details"),                             // { structure, specificity, feasibility, completeness, clarity }
+  details: jsonb("details"),                             // { clarity, structure, civic } — older rows: { structure, specificity, feasibility, completeness, clarity }
   category: text("category").notNull(),                  // 'return' | 'sortition' | 'auto_approve'
   validatedAt: timestamp("validated_at").notNull().defaultNow(),
 });
