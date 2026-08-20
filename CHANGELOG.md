@@ -182,6 +182,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Initial bug fixes and improvements
 
-[Unreleased]: https://github.com/miltosdoc/agoraxdemocracy/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/miltosdoc/agoraxdemocracy/compare/v0.0.1...v0.1.0
-[0.0.1]: https://github.com/miltosdoc/agoraxdemocracy/releases/tag/v0.0.1
+[Unreleased]: https://github.com/miltosdoc/agorax-platform/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/miltosdoc/agorax-platform/compare/v0.0.1...v0.1.0
+[0.0.1]: https://github.com/miltosdoc/agorax-platform/releases/tag/v0.0.1

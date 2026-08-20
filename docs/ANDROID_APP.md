@@ -40,7 +40,7 @@ All notifications respect the per-type opt-outs at
 ## Install on a phone (sideload)
 
 1. Grab the latest `agorax-*.apk` from
-   [Releases](https://github.com/miltosdoc/agoraxdemocracy/releases) on the
+   [Releases](https://github.com/miltosdoc/agorax-platform/releases) on the
    GitHub repo.
 2. On the phone, open the .apk from Files or your browser.
 3. Android will ask to allow "Install unknown apps" for the source — confirm.
@@ -99,7 +99,7 @@ git push origin v0.1.0-mobile
 ```
 
 The workflow takes ~5 minutes; the APK shows up at
-`https://github.com/miltosdoc/agoraxdemocracy/releases/tag/v0.1.0-mobile`.
+`https://github.com/miltosdoc/agorax-platform/releases/tag/v0.1.0-mobile`.
 
 ## Local debugging
 
