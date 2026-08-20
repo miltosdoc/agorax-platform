@@ -11,8 +11,12 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  ACTIVE_GOVERNABLE_SETTING_KEYS,
   GOVERNABLE_SETTING_KEYS,
   GOVERNABLE_SETTING_DESCRIPTORS,
+  RETIRED_GOVERNABLE_SETTING_KEYS,
+  isActiveGovernableSettingKey,
+  isGovernableSettingKey,
 } from '../../shared/governable-settings';
 import {
   RATIO_SETTINGS,
@@ -33,13 +37,13 @@ describe('governable settings i18n', () => {
 
   for (const [name, dict] of Object.entries(LOCALES)) {
     it(`has a ${name} label for every setting`, () => {
-      const missing = GOVERNABLE_SETTING_KEYS.filter((key) => !dict[SETTING_LABEL_KEYS[key]]);
+      const missing = ACTIVE_GOVERNABLE_SETTING_KEYS.filter((key) => !dict[SETTING_LABEL_KEYS[key]]);
       expect(missing).toEqual([]);
     });
 
     it(`has a ${name} label for every allowed enum value`, () => {
       const missing: string[] = [];
-      for (const key of GOVERNABLE_SETTING_KEYS) {
+      for (const key of ACTIVE_GOVERNABLE_SETTING_KEYS) {
         const prefix = SETTING_VALUE_KEY_PREFIXES[key];
         if (!prefix) continue;
         for (const value of GOVERNABLE_SETTING_DESCRIPTORS[key].allowed ?? []) {
@@ -50,7 +54,7 @@ describe('governable settings i18n', () => {
     });
 
     it(`explains every setting in ${name}`, () => {
-      const missing = GOVERNABLE_SETTING_KEYS.filter((key) => !dict[SETTING_HELP_KEYS[key]]);
+      const missing = ACTIVE_GOVERNABLE_SETTING_KEYS.filter((key) => !dict[SETTING_HELP_KEYS[key]]);
       expect(missing).toEqual([]);
     });
 
@@ -78,8 +82,31 @@ describe('governable settings i18n', () => {
     }
   });
 
+  describe('retired settings', () => {
+    it('keeps every retired key inside the known set', () => {
+      // Dropping it from the union instead would strand the stored column and
+      // let PATCH edit it behind the community's back.
+      for (const key of RETIRED_GOVERNABLE_SETTING_KEYS) {
+        expect(isGovernableSettingKey(key)).toBe(true);
+        expect(isActiveGovernableSettingKey(key)).toBe(false);
+      }
+    });
+
+    it('offers members every key that is not retired, and no other', () => {
+      expect([...ACTIVE_GOVERNABLE_SETTING_KEYS].sort()).toEqual(
+        GOVERNABLE_SETTING_KEYS
+          .filter((key) => !(RETIRED_GOVERNABLE_SETTING_KEYS as readonly string[]).includes(key))
+          .sort(),
+      );
+    });
+
+    it('keeps gov.gr verification off the ballot while nothing enforces it', () => {
+      expect(ACTIVE_GOVERNABLE_SETTING_KEYS).not.toContain('requireGovgrVerification');
+    });
+  });
+
   it('gives every enum setting a value prefix', () => {
-    const enumsWithoutPrefix = GOVERNABLE_SETTING_KEYS.filter(
+    const enumsWithoutPrefix = ACTIVE_GOVERNABLE_SETTING_KEYS.filter(
       (key) => GOVERNABLE_SETTING_DESCRIPTORS[key].type === 'enum' && !SETTING_VALUE_KEY_PREFIXES[key],
     );
     expect(enumsWithoutPrefix).toEqual([]);

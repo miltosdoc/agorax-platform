@@ -23,7 +23,7 @@ import {
 import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommunityRanges } from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
 import {
-  GOVERNABLE_SETTING_KEYS,
+  isActiveGovernableSettingKey,
   isGovernableSettingKey,
   parseGovernableSetting,
 } from '@shared/governable-settings';
@@ -238,7 +238,9 @@ export function registerCommunitiesRoutes(app: Express): void {
     try {
       const communityId = parseInt(req.params.id);
       const settingKey = req.params.settingKey;
-      if (!isGovernableSettingKey(settingKey)) {
+      // Retired keys stay known (PATCH still blocks admin edits to them) but
+      // are off the ballot, so no new vote may be cast on one.
+      if (!isActiveGovernableSettingKey(settingKey)) {
         return res.status(400).json({ message: "Unknown setting key" });
       }
       const isMember = await communityRepo.isCommunityMember(communityId, req.user.id);
@@ -264,6 +266,8 @@ export function registerCommunitiesRoutes(app: Express): void {
     try {
       const communityId = parseInt(req.params.id);
       const settingKey = req.params.settingKey;
+      // Deliberately accepts retired keys too, so a vote cast before a setting
+      // left the ballot can still be withdrawn.
       if (!isGovernableSettingKey(settingKey)) {
         return res.status(400).json({ message: "Unknown setting key" });
       }

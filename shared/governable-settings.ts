@@ -67,8 +67,35 @@ export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, Govern
   maxAmendmentsPerProposal:      { key: 'maxAmendmentsPerProposal',      type: 'unlimited_or_positive_integer' },
 };
 
+/**
+ * Governable settings withdrawn from the ballot.
+ *
+ * The key stays in the union above on purpose: existing vote rows and the
+ * stored community column keep their meaning, admins still cannot edit it
+ * behind the community's back through PATCH, and restoring it is a one-line
+ * change. It is simply not offered, not shown and not votable.
+ *
+ * requireGovgrVerification: nothing in the codebase reads it — no route, no
+ * guard, no screen. gov.gr verification is not part of the product today, so
+ * putting an inert flag on the ballot asks members to decide something that
+ * has no effect. Take it off this list the day something enforces it.
+ */
+export const RETIRED_GOVERNABLE_SETTING_KEYS = ['requireGovgrVerification'] as const;
+
+/** The settings members actually vote on. */
+export const ACTIVE_GOVERNABLE_SETTING_KEYS: readonly GovernableSettingKey[] =
+  GOVERNABLE_SETTING_KEYS.filter(
+    (key) => !(RETIRED_GOVERNABLE_SETTING_KEYS as readonly string[]).includes(key),
+  );
+
 export function isGovernableSettingKey(value: unknown): value is GovernableSettingKey {
   return typeof value === 'string' && (GOVERNABLE_SETTING_KEYS as readonly string[]).includes(value);
+}
+
+/** A retired key is still a known key, but no new vote may be cast on it. */
+export function isActiveGovernableSettingKey(value: unknown): value is GovernableSettingKey {
+  return isGovernableSettingKey(value)
+    && !(RETIRED_GOVERNABLE_SETTING_KEYS as readonly string[]).includes(value);
 }
 
 /**

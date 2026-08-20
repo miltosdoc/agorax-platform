@@ -10,7 +10,7 @@ import { communities, communityMembers, communityJoinRequests, communityInvites,
 import { eq, and, inArray, desc, sql } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import {
-  GOVERNABLE_SETTING_KEYS,
+  ACTIVE_GOVERNABLE_SETTING_KEYS,
   isGovernableSettingKey,
   readCurrentSetting,
   unparseGovernableSetting,
@@ -457,7 +457,7 @@ export class CommunityRepository {
       tally: Array<{ value: string; count: number }>;
       yourVote: string | null;
     }> = [];
-    for (const key of GOVERNABLE_SETTING_KEYS) {
+    for (const key of ACTIVE_GOVERNABLE_SETTING_KEYS) {
       const tally = await this.tallySettingVotes(communityId, key);
       const yourVote = userId
         ? (await this.getMemberSettingVote(communityId, key, userId))?.choiceValue ?? null

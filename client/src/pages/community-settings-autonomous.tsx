@@ -18,8 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
 import {
+  ACTIVE_GOVERNABLE_SETTING_KEYS,
   GOVERNABLE_SETTING_DESCRIPTORS,
-  GOVERNABLE_SETTING_KEYS,
   type GovernableSettingKey,
 } from '@shared/governable-settings';
 import { RATIO_SETTINGS, settingHelp, settingLabel, settingValueLabel } from '@/lib/governable-setting-labels';
@@ -96,7 +96,7 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
         </CardHeader>
       </Card>
 
-      {GOVERNABLE_SETTING_KEYS.map((key) => {
+      {ACTIVE_GOVERNABLE_SETTING_KEYS.map((key) => {
         const row = rows.find((r) => r.key === key);
         if (!row) return null;
         const desc = GOVERNABLE_SETTING_DESCRIPTORS[key];
