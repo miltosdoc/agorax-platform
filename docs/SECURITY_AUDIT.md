@@ -17,6 +17,8 @@ Last verified: 2026-08-20.
 | Session cookie flags | `httpOnly`, `sameSite: lax`, `secure` in production | `server/auth.ts` |
 | Login rate limiting | `express-rate-limit`, 10 attempts / 15 min per client | `server/auth.ts` |
 | Password minimum length | 8 characters, enforced by Zod at the schema | `shared/schema.ts` |
+| Breached-password rejection | Passwords found in known breach corpora are refused at registration and reset (HIBP range API, k-anonymity — the password never leaves the server; fails open) | `server/utils/password-breach.ts` |
+| Per-account login throttling | Failed logins counted per username, not just per IP; a success clears the counter | `server/utils/login-throttle.ts` |
 | Boot-time secret strength | `SESSION_SECRET` and `SIGNING_MASTER_KEY` required; rejected if short or a known default | `server/config.ts` |
 
 > Note: scrypt is used rather than bcrypt. Both are acceptable memory-hard
@@ -62,16 +64,33 @@ alone does not arm them. When armed, the process fails fast on:
 Operators: set `APP_ENV=production`. See
 [`docs/compliance/DEPLOYMENT_HARDENING.md`](compliance/DEPLOYMENT_HARDENING.md).
 
+## Response headers
+
+`helmet` sets HSTS (production only), `X-Content-Type-Options`,
+`X-Frame-Options`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+See `server/utils/security-headers.ts`.
+
+A Content-Security-Policy is defined and ships **Report-Only** by default:
+`script-src 'self'` with no `unsafe-inline` or `unsafe-eval` — the app carries
+no inline scripts and loads nothing from a CDN. `style-src` does allow
+`'unsafe-inline'`, which React inline style props make unavoidable.
+
+Operators: watch the violation reports on a real deployment (conference rooms
+especially — `connect-src` must cover the LiveKit socket, which is derived from
+`LIVEKIT_URL`), then set `CSP_ENFORCE=true`. Shipping it enforcing by default
+would risk silently breaking a live deliberation.
+
 ## Known gaps
 
 Listed because an accurate short list is worth more than a long list of ticks.
 
-- **No CSP / security headers.** `helmet` is not installed and no
-  Content-Security-Policy is set. This is the most significant open item.
-- **No account lockout.** Rate limiting slows credential stuffing but repeated
-  attempts against one account are not locked out.
-- **Password policy is length-only** (8 characters, no complexity or
-  breach-list check).
+- **CSP is not enforced by default.** It ships Report-Only; each deployment
+  has to confirm its reports and flip `CSP_ENFORCE=true`.
+- **No hard account lockout**, by choice — lockout is a denial-of-service
+  primitive against voters. Per-account throttling is used instead, which
+  slows guessing without letting an attacker freeze a member out permanently.
+- **Login throttle state is per-process and in memory.** A restart clears it,
+  and a multi-process deployment throttles per process.
 - **HSTS and TLS termination are left to the reverse proxy** and are not
   asserted by the application.
 - **Dependency and container scanning are not wired into CI.**

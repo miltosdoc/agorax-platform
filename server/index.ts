@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { apiLimit, authLimit } from './utils/rate-limiter';
 import { logger } from './utils/logger';
 import { csrfBootstrap, csrfMiddleware } from './utils/csrf';
+import { securityHeaders } from './utils/security-headers';
 import { initSentry } from './utils/sentry';
 import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./static";
@@ -24,6 +25,10 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
+
+// Security response headers. CSP ships Report-Only until an operator sets
+// CSP_ENFORCE=true — see server/utils/security-headers.ts.
+app.use(securityHeaders());
 
 // Inline CORS middleware (replaces the 'cors' package for dev)
 const corsAllowlist = (process.env.CORS_ALLOWED_ORIGINS ?? '')

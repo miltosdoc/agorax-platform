@@ -14,6 +14,8 @@ import { db } from "./db";
 import { users, passwordResetTokens, User, SafeUser } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
+import { throttledFor, recordLoginFailure, clearLoginFailures } from "./utils/login-throttle";
+import { isPasswordBreached } from "./utils/password-breach";
 import { addMember as addCommunityMember, getGeneralCommunity } from "./utils/community-manager";
 import {
   CURRENT_CONSENT_VERSION,
@@ -374,6 +376,20 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Ελέγξτε τα στοιχεία σας", errors });
       }
 
+      // Length alone lets `Password123456` through. Reject passwords already
+      // known from breach corpora — see utils/password-breach.ts for the
+      // k-anonymity lookup (the password never leaves this server) and for why
+      // this fails open on error.
+      if (await isPasswordBreached(parsed.data.password)) {
+        return res.status(400).json({
+          message: "Ελέγξτε τα στοιχεία σας",
+          errors: {
+            password:
+              "Αυτός ο κωδικός εμφανίζεται σε γνωστές διαρροές δεδομένων και δεν είναι ασφαλής. Επιλέξτε άλλον.",
+          },
+        });
+      }
+
       // Duplicate checks, reported separately. "Invalid registration data" for
       // both was unactionable: a real person had no idea what to change, and
       // no way to find out.
@@ -560,6 +576,16 @@ export function setupAuth(app: Express) {
           errors: { password: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" },
         });
       }
+      if (await isPasswordBreached(password)) {
+        return res.status(400).json({
+          message: "Επιλέξτε άλλον κωδικό",
+          errors: {
+            password:
+              "Αυτός ο κωδικός εμφανίζεται σε γνωστές διαρροές δεδομένων και δεν είναι ασφαλής. Επιλέξτε άλλον.",
+          },
+        });
+      }
+
       const row = await findLiveResetToken(req.body?.token);
       if (!row) {
         return res.status(400).json({ message: "Ο σύνδεσμος δεν ισχύει ή έχει λήξει." });
@@ -601,13 +627,31 @@ export function setupAuth(app: Express) {
     // Store any returnTo info from the session or request body
     const returnTo = req.body.returnTo || '/feed';
 
+    // Per-account throttle: the IP limiter above does nothing against a botnet
+    // trying one password per address against the same account.
+    const attemptedUsername = typeof req.body?.username === 'string' ? req.body.username : '';
+    const retryAfter = throttledFor(attemptedUsername);
+    if (retryAfter !== null) {
+      res.setHeader('Retry-After', String(retryAfter));
+      return res.status(429).json({
+        message: 'Πολλές αποτυχημένες προσπάθειες για αυτόν τον λογαριασμό. Δοκιμάστε ξανά αργότερα.',
+        retryAfter,
+      });
+    }
+
     // Extract client IP and device fingerprint
     const clientIp = (req.ip || req.headers['x-forwarded-for'] || (req.connection as any).remoteAddress) as string;
     const deviceFingerprint = req.body.deviceFingerprint;
 
     passport.authenticate("local", async (err: Error | null, user: User | false, info: any) => {
       if (err) return next(err);
-      if (!user) return res.status(401).json({ message: "Authentication failed" });
+      if (!user) {
+        recordLoginFailure(attemptedUsername);
+        return res.status(401).json({ message: "Authentication failed" });
+      }
+      // Correct credentials clear the account's failure history immediately,
+      // so an attacker's noise never keeps the real member out.
+      clearLoginFailures(attemptedUsername);
 
       // Check if account is banned
       if (user.accountStatus === 'banned') {
