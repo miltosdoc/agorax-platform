@@ -1305,6 +1305,26 @@ const en: TranslationDictionary = {
   'community.update_vote': 'Update vote',
   'community.clear_vote': 'Clear',
   'community.no_votes_yet': 'No votes yet.',
+
+  // Labels for the governable settings themselves. The liquid-settings view
+  // builds these keys from the setting name at runtime, so scripts/check-i18n
+  // cannot see them — tests/unit/governable-settings-i18n.test.ts does.
+  'community.governance_model': 'Governance model',
+  'community.join_policy': 'Join policy',
+  'community.require_govgr_verification': 'Require gov.gr verification',
+  'community.max_amendments_per_proposal': 'Maximum amendments per proposal',
+  'community.value_unlimited': 'Unlimited',
+  'community.value_true': 'Yes',
+  'community.value_false': 'No',
+  'community.governance_model_help': 'How much administrative structure the community has: no admins, an admin team, or hybrid.',
+  'community.sortition_mode_help': 'Whether the sortition body is a fixed number of members ("absolute") or a share of the community.',
+  'community.require_govgr_verification_help': 'Recorded as a community decision, but the platform does not enforce it yet: no member is currently kept out for not having verified through gov.gr.',
+  'community.max_concurrent_votes_help': 'How many proposals may be in voting at the same time. Use -1 for unlimited.',
+  'community.min_participation_pct_help': 'Quorum: the minimum share of members that must vote for the result to count. Use 0 for no quorum requirement.',
+  'community.sortition_size_help': 'How many members are drawn to synthesise the final text (3 to 500).',
+  'community.sortition_response_hours_help': 'How many hours the drawn body has to respond. If it runs out, the AI synthesises instead so the proposal never stalls.',
+  'community.max_amendments_per_proposal_help': 'How many amendments each proposal accepts. Use -1 for unlimited.',
+  'community.ratio_input_hint': 'Enter a number between 0 and 1 — e.g. 0.5 means 50%, 0.6 means 60%.',
   'community.settings_read_only': 'Read-only view — only admins and the founder can change settings here.',
 
   'workspace.action.draft': 'This proposal is still a draft, visible only to you. Submit it to start AI validation and make it visible to the community.',

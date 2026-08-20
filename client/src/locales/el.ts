@@ -1305,6 +1305,26 @@ const el: TranslationDictionary = {
   'community.update_vote': 'Ενημέρωση ψήφου',
   'community.clear_vote': 'Καθαρισμός',
   'community.no_votes_yet': 'Δεν έχουν δοθεί ψήφοι ακόμη.',
+
+  // Labels for the governable settings themselves. The liquid-settings view
+  // builds these keys from the setting name at runtime, so scripts/check-i18n
+  // cannot see them — tests/unit/governable-settings-i18n.test.ts does.
+  'community.governance_model': 'Μοντέλο διακυβέρνησης',
+  'community.join_policy': 'Πολιτική εγγραφής',
+  'community.require_govgr_verification': 'Υποχρεωτική επαλήθευση gov.gr',
+  'community.max_amendments_per_proposal': 'Μέγιστες τροπολογίες ανά πρόταση',
+  'community.value_unlimited': 'Απεριόριστο',
+  'community.value_true': 'Ναι',
+  'community.value_false': 'Όχι',
+  'community.governance_model_help': 'Πόση διοικητική δομή έχει η κοινότητα: χωρίς διαχειριστές, με ομάδα διαχειριστών, ή υβριδικό.',
+  'community.sortition_mode_help': 'Αν το κληρωτό σώμα έχει σταθερό αριθμό μελών («απόλυτος αριθμός») ή ποσοστό επί των μελών της κοινότητας.',
+  'community.require_govgr_verification_help': 'Καταγράφεται ως απόφαση της κοινότητας, αλλά δεν εφαρμόζεται ακόμη από την πλατφόρμα: προς το παρόν κανένα μέλος δεν αποκλείεται επειδή δεν έχει επαληθευτεί μέσω gov.gr.',
+  'community.max_concurrent_votes_help': 'Πόσες προτάσεις μπορούν να βρίσκονται ταυτόχρονα σε ψηφοφορία. Δώσε -1 για απεριόριστες.',
+  'community.min_participation_pct_help': 'Απαρτία: το ελάχιστο ποσοστό των μελών που πρέπει να ψηφίσει για να μετρήσει το αποτέλεσμα. Δώσε 0 για καμία απαίτηση απαρτίας.',
+  'community.sortition_size_help': 'Πόσα μέλη κληρώνονται για τη σύνθεση του τελικού κειμένου (από 3 έως 500).',
+  'community.sortition_response_hours_help': 'Πόσες ώρες έχει το κληρωτό σώμα να απαντήσει. Αν περάσουν χωρίς απάντηση, τη σύνθεση αναλαμβάνει το AI ώστε η πρόταση να μην κολλήσει.',
+  'community.max_amendments_per_proposal_help': 'Πόσες τροπολογίες δέχεται κάθε πρόταση. Δώσε -1 για απεριόριστες.',
+  'community.ratio_input_hint': 'Δώσε αριθμό από 0 έως 1 — π.χ. 0,5 σημαίνει 50%, 0,6 σημαίνει 60%.',
   'community.settings_read_only': 'Προβολή μόνο — μόνο διαχειριστές και ιδρυτές μπορούν να αλλάξουν ρυθμίσεις.',
 
   'workspace.action.draft': 'Αυτή η πρόταση είναι ακόμη προσχέδιο, ορατό μόνο σε εσάς. Υποβάλετέ την για να ξεκινήσει ο έλεγχος από ΤΝ και να τη δει η κοινότητα.',

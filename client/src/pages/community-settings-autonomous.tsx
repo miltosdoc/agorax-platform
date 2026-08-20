@@ -22,6 +22,7 @@ import {
   GOVERNABLE_SETTING_KEYS,
   type GovernableSettingKey,
 } from '@shared/governable-settings';
+import { RATIO_SETTINGS, settingHelp, settingLabel, settingValueLabel } from '@/lib/governable-setting-labels';
 
 interface SettingRow {
   key: GovernableSettingKey;
@@ -99,22 +100,27 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
         const row = rows.find((r) => r.key === key);
         if (!row) return null;
         const desc = GOVERNABLE_SETTING_DESCRIPTORS[key];
-        const total = row.tally.reduce((sum, t) => sum + t.count, 0);
-        const labelKey = `community.${key.replace(/([A-Z])/g, '_$1').toLowerCase()}`;
+        const total = row.tally.reduce((sum, entry) => sum + entry.count, 0);
         const draft = drafts[key] ?? row.yourVote ?? row.currentValue;
+        const help = settingHelp(t, key);
 
         return (
           <Card key={key}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-base">{t(labelKey) || key}</CardTitle>
+                  <CardTitle className="text-base">{settingLabel(t, key)}</CardTitle>
                   <CardDescription className="mt-1">
-                    {t('community.current_value') || 'Current'}: <span className="font-mono">{row.currentValue || '—'}</span>
+                    {t('community.current_value') || 'Current'}:{' '}
+                    <span className="font-medium">{settingValueLabel(t, key, row.currentValue)}</span>
                   </CardDescription>
+                  {help && <p className="mt-2 text-sm text-muted-foreground">{help}</p>}
                 </div>
                 {row.yourVote !== null && (
-                  <Badge variant="secondary">{t('community.you_voted') || 'You voted'}: <span className="ml-1 font-mono">{row.yourVote}</span></Badge>
+                  <Badge variant="secondary">
+                    {t('community.you_voted') || 'You voted'}:{' '}
+                    <span className="ml-1 font-medium">{settingValueLabel(t, key, row.yourVote)}</span>
+                  </Badge>
                 )}
               </div>
             </CardHeader>
@@ -126,7 +132,9 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
                     const isWinner = tallyRow.value === row.currentValue;
                     return (
                       <li key={tallyRow.value} className="flex items-center gap-2 text-sm">
-                        <span className="font-mono w-24 truncate" title={tallyRow.value}>{tallyRow.value}</span>
+                        <span className="w-40 shrink-0 truncate" title={settingValueLabel(t, key, tallyRow.value)}>
+                          {settingValueLabel(t, key, tallyRow.value)}
+                        </span>
                         <div className="flex-1 h-2 bg-muted rounded">
                           <div className={`h-full rounded ${isWinner ? 'bg-primary' : 'bg-muted-foreground/40'}`} style={{ width: `${pct}%` }} />
                         </div>
@@ -149,7 +157,7 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
                         <SelectTrigger id={`vote-${key}`}><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
                           {(desc.allowed || []).map((opt) => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            <SelectItem key={opt} value={opt}>{settingValueLabel(t, key, opt)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -161,7 +169,7 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
                           checked={draft === 'true'}
                           onCheckedChange={(checked) => setDrafts((d) => ({ ...d, [key]: checked ? 'true' : 'false' }))}
                         />
-                        <span className="text-sm font-mono">{draft || 'false'}</span>
+                        <span className="text-sm">{settingValueLabel(t, key, draft || 'false')}</span>
                       </div>
                     )}
                     {(desc.type === 'integer' || desc.type === 'unlimited_or_positive_integer' || desc.type === 'decimal') && (
@@ -174,6 +182,11 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
                         min={desc.min}
                         max={desc.max}
                       />
+                    )}
+                    {RATIO_SETTINGS.includes(key) && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('community.ratio_input_hint')}
+                      </p>
                     )}
                   </div>
                   <Button
