@@ -1,0 +1,509 @@
+/**
+ * Community Repository
+ *
+ * Handles community lifecycle: create, read, update, delete, member management,
+ * settings, governance model transitions, and community merging.
+ */
+
+import { db } from '../db';
+import { communities, communityMembers, communityJoinRequests, communityInvites, communitySettingVotes, type Community, type InsertCommunity, type CommunityMember, type CommunityJoinRequest, type CommunityInvite, type CommunitySettingVote } from '../../shared/schema';
+import { eq, and, inArray, desc, sql } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import {
+  GOVERNABLE_SETTING_KEYS,
+  isGovernableSettingKey,
+  readCurrentSetting,
+  unparseGovernableSetting,
+  type GovernableSettingKey,
+} from '../../shared/governable-settings';
+
+export class CommunityRepository {
+
+  /**
+   * Create a new community.
+   * @returns The created community.
+   */
+  async createCommunity(insertCommunity: InsertCommunity): Promise<Community> {
+    const [community] = await db
+      .insert(communities)
+      .values(insertCommunity)
+      .returning();
+    return community;
+  }
+
+  /**
+   * Get a community by ID.
+   * @returns The community or undefined if not found.
+   */
+  async getCommunity(id: number): Promise<Community | undefined> {
+    const [community] = await db
+      .select()
+      .from(communities)
+      .where(eq(communities.id, id));
+    return community;
+  }
+
+  /**
+   * List every community for discovery. Membership and approval state are
+   * surfaced through the join-request flow, not by hiding rows here.
+   * The userId argument is accepted for callers that still pass it.
+   */
+  async getCommunities(_userId?: number): Promise<Community[]> {
+    return await db
+      .select()
+      .from(communities)
+      .orderBy(desc(communities.createdAt));
+  }
+
+  /**
+   * Update a community.
+   * @returns The updated community.
+   */
+  async updateCommunity(id: number, updates: Partial<Community>): Promise<Community> {
+    const [community] = await db
+      .update(communities)
+      .set(updates)
+      .where(eq(communities.id, id))
+      .returning();
+    if (!community) throw new Error("Community not found");
+    return community;
+  }
+
+  /**
+   * Delete a community.
+   * @returns True if deleted, false if not found.
+   */
+  async deleteCommunity(id: number): Promise<boolean> {
+    const result = await db
+      .delete(communities)
+      .where(eq(communities.id, id));
+    return true; // TODO: Check if row was actually deleted
+  }
+
+  /**
+   * Get all members of a community.
+   * @returns Array of community members.
+   */
+  async getCommunityMembers(communityId: number): Promise<CommunityMember[]> {
+    return await db
+      .select()
+      .from(communityMembers)
+      .where(eq(communityMembers.communityId, communityId));
+  }
+
+  /**
+   * Add a member to a community.
+   * @returns The created community member.
+   */
+  async addCommunityMember(communityId: number, userId: number, role?: string): Promise<CommunityMember> {
+    const [member] = await db
+      .insert(communityMembers)
+      .values({ communityId, userId, role: role || 'member' })
+      .returning();
+    return member;
+  }
+
+  /**
+   * Remove a member from a community.
+   * @returns True if removed, false if not found.
+   */
+  async removeCommunityMember(communityId: number, userId: number): Promise<boolean> {
+    await db
+      .delete(communityMembers)
+      .where(and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, userId)
+      ));
+
+    // Admin power lives on the community row, not the membership row, so
+    // deleting the membership alone leaves a departed admin holding rights
+    // the UI no longer shows them — conference hosting reads adminIds
+    // directly (routers/livekit isCommunityHost), and rejoining would
+    // silently restore the admin role. Leaving has to mean leaving.
+    const [community] = await db
+      .select({ adminIds: communities.adminIds })
+      .from(communities)
+      .where(eq(communities.id, communityId));
+    const adminIds = Array.isArray(community?.adminIds) ? community.adminIds as number[] : [];
+    if (adminIds.includes(userId)) {
+      await db
+        .update(communities)
+        .set({ adminIds: adminIds.filter(id => id !== userId) })
+        .where(eq(communities.id, communityId));
+    }
+
+    return true;
+  }
+
+  /**
+   * Update a member's role in a community.
+   * @returns The updated community member.
+   */
+  async updateMemberRole(communityId: number, userId: number, role: string): Promise<CommunityMember> {
+    const [member] = await db
+      .update(communityMembers)
+      .set({ role })
+      .where(and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, userId)
+      ))
+      .returning();
+    if (!member) throw new Error("Member not found");
+    return member;
+  }
+
+  /**
+   * Check if a user is a member of a community.
+   * @returns True if member, false otherwise.
+   */
+  async isCommunityMember(communityId: number, userId: number): Promise<boolean> {
+    const [member] = await db
+      .select()
+      .from(communityMembers)
+      .where(and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, userId)
+      ));
+    return !!member;
+  }
+
+  /**
+   * Get a member's role in a community.
+   * @returns The role string or undefined if not a member.
+   */
+  async getCommunityMemberRole(communityId: number, userId: number): Promise<string | undefined> {
+    const [member] = await db
+      .select()
+      .from(communityMembers)
+      .where(and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.userId, userId)
+      ));
+    return member?.role ?? undefined;
+  }
+
+  // ─── Join requests ─────────────────────────────────────────────────────────
+
+  async getPendingJoinRequest(communityId: number, userId: number): Promise<CommunityJoinRequest | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityJoinRequests)
+      .where(and(
+        eq(communityJoinRequests.communityId, communityId),
+        eq(communityJoinRequests.userId, userId),
+        eq(communityJoinRequests.status, 'pending'),
+      ));
+    return row;
+  }
+
+  async createJoinRequest(communityId: number, userId: number, message?: string): Promise<CommunityJoinRequest> {
+    const [row] = await db
+      .insert(communityJoinRequests)
+      .values({ communityId, userId, message: message ?? null })
+      .returning();
+    return row;
+  }
+
+  async listPendingJoinRequests(communityId: number): Promise<CommunityJoinRequest[]> {
+    return await db
+      .select()
+      .from(communityJoinRequests)
+      .where(and(
+        eq(communityJoinRequests.communityId, communityId),
+        eq(communityJoinRequests.status, 'pending'),
+      ))
+      .orderBy(desc(communityJoinRequests.createdAt));
+  }
+
+  async decideJoinRequest(
+    requestId: number,
+    decision: 'approved' | 'rejected',
+    decidedByUserId: number,
+  ): Promise<CommunityJoinRequest | undefined> {
+    const [row] = await db
+      .update(communityJoinRequests)
+      .set({ status: decision, decidedAt: new Date(), decidedByUserId })
+      .where(and(
+        eq(communityJoinRequests.id, requestId),
+        eq(communityJoinRequests.status, 'pending'),
+      ))
+      .returning();
+    return row;
+  }
+
+  // ─── Invitations ───────────────────────────────────────────────────────────
+
+  /**
+   * Issue an invitation. A targeted invite names invitedUserId and is single
+   * use; a link invite leaves it null and is redeemable maxUses times (-1 for
+   * unlimited) until expiresAt.
+   */
+  async createInvite(params: {
+    communityId: number;
+    createdByUserId: number;
+    invitedUserId?: number | null;
+    role?: string;
+    maxUses?: number;
+    message?: string | null;
+    expiresAt?: Date | null;
+  }): Promise<CommunityInvite> {
+    const [row] = await db
+      .insert(communityInvites)
+      .values({
+        communityId: params.communityId,
+        token: randomBytes(24).toString('base64url'),
+        invitedUserId: params.invitedUserId ?? null,
+        createdByUserId: params.createdByUserId,
+        role: params.role ?? 'member',
+        maxUses: params.maxUses ?? 1,
+        message: params.message ?? null,
+        expiresAt: params.expiresAt ?? null,
+      })
+      .returning();
+    return row;
+  }
+
+  async getInviteByToken(token: string): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityInvites)
+      .where(eq(communityInvites.token, token));
+    return row;
+  }
+
+  async listPendingInvites(communityId: number): Promise<CommunityInvite[]> {
+    return await db
+      .select()
+      .from(communityInvites)
+      .where(and(
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.status, 'pending'),
+      ))
+      .orderBy(desc(communityInvites.createdAt));
+  }
+
+  /** The live invite waiting for this user, so the community page can offer it. */
+  async getPendingInviteForUser(communityId: number, userId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .select()
+      .from(communityInvites)
+      .where(and(
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.invitedUserId, userId),
+        eq(communityInvites.status, 'pending'),
+        sql`(${communityInvites.expiresAt} IS NULL OR ${communityInvites.expiresAt} > NOW())`,
+      ))
+      .orderBy(desc(communityInvites.createdAt));
+    return row;
+  }
+
+  async revokeInvite(inviteId: number, communityId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .update(communityInvites)
+      .set({ status: 'revoked' })
+      .where(and(
+        eq(communityInvites.id, inviteId),
+        eq(communityInvites.communityId, communityId),
+        eq(communityInvites.status, 'pending'),
+      ))
+      .returning();
+    return row;
+  }
+
+  /**
+   * Redeem a token for a user, atomically.
+   *
+   * Every condition that makes an invite usable lives in the WHERE clause of a
+   * single UPDATE, so two people racing on the last use of a link cannot both
+   * win — the loser's statement matches no row and returns undefined. Callers
+   * must treat undefined as "not redeemable" without inspecting the row first,
+   * because a check-then-act would reopen exactly that race.
+   */
+  async redeemInvite(token: string, userId: number): Promise<CommunityInvite | undefined> {
+    const [row] = await db
+      .update(communityInvites)
+      .set({
+        useCount: sql`${communityInvites.useCount} + 1`,
+        acceptedAt: new Date(),
+        status: sql`CASE WHEN ${communityInvites.maxUses} <> -1 AND ${communityInvites.useCount} + 1 >= ${communityInvites.maxUses} THEN 'accepted' ELSE ${communityInvites.status} END`,
+      })
+      .where(and(
+        eq(communityInvites.token, token),
+        eq(communityInvites.status, 'pending'),
+        sql`(${communityInvites.expiresAt} IS NULL OR ${communityInvites.expiresAt} > NOW())`,
+        sql`(${communityInvites.maxUses} = -1 OR ${communityInvites.useCount} < ${communityInvites.maxUses})`,
+        sql`(${communityInvites.invitedUserId} IS NULL OR ${communityInvites.invitedUserId} = ${userId})`,
+      ))
+      .returning();
+    return row;
+  }
+
+  // ─── Liquid setting votes (autonomous communities) ─────────────────────────
+
+  async upsertSettingVote(
+    communityId: number,
+    settingKey: GovernableSettingKey,
+    userId: number,
+    canonicalValue: string,
+  ): Promise<CommunitySettingVote> {
+    const now = new Date();
+    const [row] = await db
+      .insert(communitySettingVotes)
+      .values({ communityId, settingKey, userId, choiceValue: canonicalValue })
+      .onConflictDoUpdate({
+        target: [communitySettingVotes.communityId, communitySettingVotes.settingKey, communitySettingVotes.userId],
+        set: { choiceValue: canonicalValue, updatedAt: now },
+      })
+      .returning();
+    return row;
+  }
+
+  async removeSettingVote(communityId: number, settingKey: GovernableSettingKey, userId: number): Promise<boolean> {
+    const result = await db
+      .delete(communitySettingVotes)
+      .where(and(
+        eq(communitySettingVotes.communityId, communityId),
+        eq(communitySettingVotes.settingKey, settingKey),
+        eq(communitySettingVotes.userId, userId),
+      ));
+    return (result as any).rowCount > 0;
+  }
+
+  async getMemberSettingVote(
+    communityId: number,
+    settingKey: GovernableSettingKey,
+    userId: number,
+  ): Promise<CommunitySettingVote | undefined> {
+    const [row] = await db
+      .select()
+      .from(communitySettingVotes)
+      .where(and(
+        eq(communitySettingVotes.communityId, communityId),
+        eq(communitySettingVotes.settingKey, settingKey),
+        eq(communitySettingVotes.userId, userId),
+      ));
+    return row;
+  }
+
+  async tallySettingVotes(
+    communityId: number,
+    settingKey: GovernableSettingKey,
+  ): Promise<Array<{ value: string; count: number }>> {
+    const rows = await db
+      .select({
+        value: communitySettingVotes.choiceValue,
+        count: sql<number>`cast(count(*) as int)`,
+      })
+      .from(communitySettingVotes)
+      .where(and(
+        eq(communitySettingVotes.communityId, communityId),
+        eq(communitySettingVotes.settingKey, settingKey),
+      ))
+      .groupBy(communitySettingVotes.choiceValue);
+    return rows.map(r => ({ value: r.value, count: r.count }));
+  }
+
+  /**
+   * Recompute the plurality winner for one setting and write it back to the
+   * community row if it changed. Ties keep the existing value. Returns the
+   * resulting value (whether changed or not).
+   */
+  async recomputeAutonomousSetting(
+    communityId: number,
+    settingKey: GovernableSettingKey,
+  ): Promise<string | null> {
+    const community = await this.getCommunity(communityId);
+    if (!community) return null;
+    const current = readCurrentSetting(community as unknown as Record<string, unknown>, settingKey);
+    const tally = await this.tallySettingVotes(communityId, settingKey);
+    if (tally.length === 0) return current;
+
+    let topCount = 0;
+    let topValues: string[] = [];
+    for (const row of tally) {
+      if (row.count > topCount) {
+        topCount = row.count;
+        topValues = [row.value];
+      } else if (row.count === topCount) {
+        topValues.push(row.value);
+      }
+    }
+    const winner = topValues.length === 1 ? topValues[0] : (topValues.includes(current) ? current : current);
+    if (winner === current) return current;
+
+    await db
+      .update(communities)
+      .set({ [settingKey]: unparseGovernableSetting(settingKey, winner) as any })
+      .where(eq(communities.id, communityId));
+    return winner;
+  }
+
+  /**
+   * Tallies + current value for every governable setting at once. Used by
+   * the autonomous-community settings page.
+   */
+  async listAllSettingTallies(communityId: number, userId?: number): Promise<Array<{
+    key: GovernableSettingKey;
+    currentValue: string;
+    tally: Array<{ value: string; count: number }>;
+    yourVote: string | null;
+  }>> {
+    const community = await this.getCommunity(communityId);
+    if (!community) return [];
+
+    const out: Array<{
+      key: GovernableSettingKey;
+      currentValue: string;
+      tally: Array<{ value: string; count: number }>;
+      yourVote: string | null;
+    }> = [];
+    for (const key of GOVERNABLE_SETTING_KEYS) {
+      const tally = await this.tallySettingVotes(communityId, key);
+      const yourVote = userId
+        ? (await this.getMemberSettingVote(communityId, key, userId))?.choiceValue ?? null
+        : null;
+      out.push({
+        key,
+        currentValue: readCurrentSetting(community as unknown as Record<string, unknown>, key),
+        tally,
+        yourVote,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Merge two communities.
+   * @returns Merge result with statistics.
+   */
+  async mergeCommunities(sourceId: number, targetId: number): Promise<{
+    success: boolean;
+    sourceId: number;
+    targetId: number;
+    membersTransferred: number;
+    proposalsTransferred: number;
+    errors: string[];
+  }> {
+    // TODO: Implement community merging logic
+    // This requires transferring members and proposals from source to target
+    return {
+      success: false,
+      sourceId,
+      targetId,
+      membersTransferred: 0,
+      proposalsTransferred: 0,
+      errors: ['Merge not yet implemented']
+    };
+  }
+
+  /**
+   * Get communities that have been merged into a target community.
+   * @returns Array of merged communities.
+   */
+  async getMergedCommunities(targetId: number): Promise<Community[]> {
+    // TODO: Implement merged communities query
+    return [];
+  }
+
+}
+

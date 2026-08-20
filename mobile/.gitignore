@@ -1,0 +1,10 @@
+node_modules/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/app/release/
+*.iml
+.idea/
+.DS_Store

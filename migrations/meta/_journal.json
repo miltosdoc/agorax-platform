@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1776947046191,
+      "tag": "0000_daffy_invisible_woman",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776947046192,
+      "tag": "0001_add_jobs_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776947046193,
+      "tag": "0002_amendment_flow_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776947046194,
+      "tag": "0003a_canonical_proposal_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776947046195,
+      "tag": "0003b_sortition_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776947046196,
+      "tag": "0004_proposal_final_votes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776947046197,
+      "tag": "0005_sortition_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776947046198,
+      "tag": "0006_validation_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776947046199,
+      "tag": "0007_debate_threads",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776947046200,
+      "tag": "0008_community_governance_and_platform_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776947046201,
+      "tag": "0009_sortition_attendance",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1779148800000,
+      "tag": "0010_vote_hash_chain",
+      "breakpoints": true
+    }
+  ]
+}

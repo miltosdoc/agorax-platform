@@ -1,0 +1,25 @@
+# AgoraX Code Owners
+
+# This file defines who is responsible for code in this repository.
+# It is used by GitHub to request code reviews from specific people.
+
+# Core team
+* @miltosdoc
+
+# Documentation
+/docs/ @miltosdoc
+
+# Tests
+/tests/ @miltosdoc
+
+# Server code
+/server/ @miltosdoc
+
+# Client code
+/client/ @miltosdoc
+
+# CI/CD
+/.github/ @miltosdoc
+
+# Scripts
+/scripts/ @miltosdoc

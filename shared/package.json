@@ -1,0 +1,11 @@
+{
+  "name": "@shared/schema",
+  "type": "module",
+  "main": "./schema.ts",
+  "exports": {
+    ".": "./schema.ts",
+    "./community-settings": "./community-settings.ts",
+    "./community-summary": "./community-summary.ts",
+    "./proposal-lifecycle": "./proposal-lifecycle.ts"
+  }
+}

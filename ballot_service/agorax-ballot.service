@@ -1,0 +1,22 @@
+[Unit]
+Description=AgoraX Ballot Validation Service (gov.gr declaration verification)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/agorax/ballot_service
+ExecStart=/opt/agorax/ballot_service/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Hardening — the service only needs to read its own directory and talk to
+# localhost PostgreSQL; it never writes files.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/agorax/ballot_service
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,122 @@
+# AgoraX - Docker Compose Configuration
+# Services: PostgreSQL, Node.js API, React frontend, Python ballot service
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: agorax_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-agorax}
+      POSTGRES_USER: ${POSTGRES_USER:-agorax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agorax} -d ${POSTGRES_DB:-agorax}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Node.js API Server ────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agorax_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agorax}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/${POSTGRES_DB:-agorax}
+      VOTE_DATABASE_URL: postgresql://agorax_vote@db:5432/${POSTGRES_DB:-agorax}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET is required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_API_URL: ${LLM_API_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      APP_ENV: ${APP_ENV:-local}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      BALLOT_SERVICE_URL: http://ballot-service:8000
+    ports:
+      - "0.0.0.0:3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+ # ─── Python Ballot Validation Service ──────────────────────────────────────
+  ballot-service:
+    build:
+      context: ballot_service
+      dockerfile: Dockerfile
+    container_name: agorax_ballot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agorax}:${POSTGRES_PASSWORD:-agorax}@db:5432/${POSTGRES_DB:-agorax}
+      SALT_KEY: ${SALT_KEY:?SALT_KEY is required}
+      DEBUG: ${DEBUG:-False}
+      HOST: "0.0.0.0"
+      PORT: 8000
+    ports:
+      - "${BALLOT_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # The Python economy-service has been retired. Democracy Points are now
+  # implemented natively in the Node app (server/economy/) — see
+  # economy_service/DEPRECATED.md.
+
+  # ─── LiveKit SFU (real-time video/audio) ───────────────────────────────────
+  # Self-hosted WebRTC selective-forwarding unit. Issues join tokens out of
+  # the Node API (`server/utils/livekit-client.ts`) — only that token is
+  # ever shipped to the browser. The container also speaks TURN on UDP/TCP
+  # 7881-7882 so users behind strict NATs can still relay through it.
+  #
+  # Required env: LIVEKIT_KEYS="<api_key>: <api_secret>"  (yes, with the space)
+  # The Node app reads LIVEKIT_API_KEY + LIVEKIT_API_SECRET — keep them in
+  # sync. Generate with `openssl rand -hex 32` for each.
+  livekit:
+    image: livekit/livekit-server:v1.7
+    container_name: agorax_livekit
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0
+    environment:
+      LIVEKIT_KEYS: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY is required}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET is required}
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"     # signalling (HTTP/WS)
+      - "${LIVEKIT_TLS_PORT:-7881}:7881" # TURN over TCP
+      - "50000-50100:50000-50100/udp"    # WebRTC media (UDP); narrow as needed
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+# ─── Networks (optional - uncomment for isolation) ──────────────────────────
+# networks:
+#   agorax:
+#     driver: bridge

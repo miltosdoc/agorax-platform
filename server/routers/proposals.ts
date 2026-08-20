@@ -1,0 +1,1364 @@
+/**
+ * Proposals Router
+ *
+ * Handles proposals routes.
+ */
+
+import type { Express, Request, Response } from 'express';
+import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
+import { requireAuth, requireConsent } from '../auth';
+import { db, voteDb } from '../db';
+import { awardPoints } from '../economy/points';
+import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
+import {
+  sortitionMembers,
+  sortitionBodies,
+  sortitionNotifications,
+  communityMembers,
+  communities,
+  proposals,
+  proposalAmendments,
+  proposalSupport,
+  proposalVotes,
+  debateThreads,
+  debateArguments,
+  users,
+  castProposalVoteSchema,
+} from '@shared/schema';
+import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
+import { validBallotChoices } from '@shared/schema';
+import {
+  canViewCommunityContentById,
+  requireProposalContentAccess,
+  visibleCommunityIdSet,
+} from '../utils/community-visibility';
+import { compileProposal } from '../utils/proposal-compiler';
+import { isLlmConfigured } from '../utils/llm-client';
+import type { VoterView } from '../voting';
+import { createServer, type Server } from 'http';
+
+/**
+ * Build the vote-results payload the client expects from a backend-provided
+ * VoterView plus the community's quorum config. Works for any VotingBackend:
+ * private backends seal the tally (yes/no/abstain are 0 and `sealed` is true)
+ * until the election closes.
+ */
+export async function computeVoteResults(
+  proposal: { communityId: number; ballotOptions?: unknown },
+  view: VoterView,
+) {
+  const [community] = await db
+    .select({ minParticipationPct: communities.minParticipationPct, votePassThreshold: communities.votePassThreshold })
+    .from(communities)
+    .where(eq(communities.id, proposal.communityId));
+  const minParticipationPct = Number(community?.minParticipationPct ?? 0);
+  const votePassThreshold = Number(community?.votePassThreshold ?? 0.5);
+
+  const [memberRow] = await db
+    .select({ c: count() })
+    .from(communityMembers)
+    .where(eq(communityMembers.communityId, proposal.communityId));
+  const memberCount = memberRow?.c ?? 0;
+
+  const participants = view.ballotCount;
+  const participationPct = memberCount > 0 ? participants / memberCount : 0;
+  const meetsQuorum = participationPct >= minParticipationPct;
+
+  const tally = view.tally;
+  const yes = tally?.yes ?? 0;
+  const no = tally?.no ?? 0;
+  const abstain = tally?.abstain ?? 0;
+  const total = tally?.total ?? view.ballotCount;
+
+  // Option ballots (deliberation track with counter-proposal alternatives):
+  // plurality wins; ties keep the earlier-listed option (final text first).
+  const ballotOptions = Array.isArray((proposal as any).ballotOptions) && (proposal as any).ballotOptions.length > 0
+    ? (proposal as any).ballotOptions as Array<{ id: string; label: string }>
+    : null;
+  let winner: string | null = null;
+  let counts: Record<string, number> | null = null;
+  let passes: boolean;
+  let hasDecisive: boolean;
+  if (ballotOptions) {
+    counts = {};
+    for (const opt of ballotOptions) counts[opt.id] = tally?.counts?.[opt.id] ?? 0;
+    for (const opt of ballotOptions) {
+      if (winner === null || (counts[opt.id] ?? 0) > (counts[winner] ?? 0)) winner = opt.id;
+    }
+    hasDecisive = total > 0;
+    // "Passes" = a change wins: any option other than the status quo.
+    passes = !!tally && meetsQuorum && hasDecisive && winner !== 'status_quo';
+  } else {
+    const yesRatio = yes + no > 0 ? yes / (yes + no) : 0;
+    hasDecisive = yes + no > 0;
+    passes = !!tally && meetsQuorum && hasDecisive && yesRatio > votePassThreshold;
+    winner = passes ? 'yes' : null;
+  }
+
+  return {
+    yes, no, abstain, total,
+    ballotOptions, counts, winner, hasDecisive,
+    sealed: view.tallySealed || !tally,
+    hasVoted: view.hasVoted,
+    ballotCount: view.ballotCount,
+    participants, participationPct, meetsQuorum, passes, minParticipationPct, votePassThreshold,
+    userVote: view.userChoice,
+  };
+}
+
+export function registerProposalsRoutes(app: Express): void {
+  // Drafts are private to their author until submitted for review — every
+  // public read surface filters them out for other users.
+  const visibleTo = (userId: number | undefined) =>
+    (p: { status: string; authorId: number }) => p.status !== 'draft' || p.authorId === userId;
+
+  app.get("/api/proposals", async (req: any, res) => {
+    try {
+      const { limit } = req.query;
+      const all = await proposalRepo.getAllProposals(limit ? parseInt(limit as string) : undefined);
+      // Global list respects per-community content visibility (public
+      // communities plus the viewer's own memberships) and draft privacy.
+      const visible = await visibleCommunityIdSet(all.map((p) => p.communityId), req.user?.id);
+      res.json(all.filter((p) => visible.has(p.communityId)).filter(visibleTo(req.user?.id)));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch proposals" });
+    }
+  });
+  app.get("/api/communities/:communityId/proposals", async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.communityId);
+      if (!(await canViewCommunityContentById(communityId, req.user?.id))) {
+        return res.status(403).json({ message: "Members only", contentHidden: true });
+      }
+      const { status, category } = req.query;
+      const proposals = await proposalRepo.getProposals(communityId, {
+        status: status as string,
+        category: category as string,
+      });
+      res.json(proposals.filter(visibleTo(req.user?.id)));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch proposals" });
+    }
+  });
+  app.post("/api/communities/:communityId/proposals", requireAuth, requireConsent, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.communityId);
+      const userId = req.user!.id;
+      // Check membership
+      const isMember = await communityRepo.isCommunityMember(communityId, userId);
+      if (!isMember) {
+        return res.status(403).json({ message: "Must be a community member to submit proposals" });
+      }
+      const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions } = req.body;
+      if (!question || !solution) {
+        return res.status(400).json({ message: "Question and solution are required" });
+      }
+      if (track !== undefined && !PROPOSAL_TRACKS.includes(track)) {
+        return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
+      }
+      // The community owns the range an author may choose within. Rejecting
+      // out-of-range values here rather than clamping silently is what makes
+      // the bound visible: the author learns the community's rule instead of
+      // watching their number change without explanation.
+      const community = await communityRepo.getCommunity(communityId);
+      const inRange = (value: number, min: number | null | undefined, max: number | null | undefined) =>
+        value >= (min ?? 1) && value <= (max ?? 8760);
+
+      let durationHours: number | null = null;
+      let deliberationHours: number | null = null;
+      let customBallot: Array<{ id: string; label: string }> | null = null;
+      if (track !== 'vote' && deliberationDurationHours !== undefined && deliberationDurationHours !== null && deliberationDurationHours !== '') {
+        deliberationHours = Number(deliberationDurationHours);
+        const min = (community as any)?.deliberationMinHours;
+        const max = (community as any)?.deliberationMaxHours;
+        if (!Number.isInteger(deliberationHours) || !inRange(deliberationHours, min, max)) {
+          return res.status(400).json({
+            message: `deliberationDurationHours must be ${min ?? 1}–${max ?? 8760} in this community`,
+          });
+        }
+      }
+      if (track === 'vote') {
+        durationHours = Number(votingDurationHours);
+        const min = (community as any)?.votingMinHours;
+        const max = (community as any)?.votingMaxHours;
+        if (!Number.isInteger(durationHours) || !inRange(durationHours, min, max)) {
+          return res.status(400).json({
+            message: `votingDurationHours must be ${min ?? 1}–${max ?? 8760} in this community`,
+          });
+        }
+        // Optional author-defined multiple choice. Empty/absent = classic
+        // yes/no/abstain. «Καμία αλλαγή» is always appended so voters can
+        // reject every option — no forced-choice ballots.
+        if (ballotOptions !== undefined && ballotOptions !== null) {
+          if (!Array.isArray(ballotOptions)) {
+            return res.status(400).json({ message: "ballotOptions must be an array of option labels" });
+          }
+          const labels = ballotOptions
+            .map((o: unknown) => (typeof o === 'string' ? o.trim() : ''))
+            .filter((o: string) => o.length > 0);
+          if (labels.length > 0) {
+            if (labels.length < 2 || labels.length > 10) {
+              return res.status(400).json({ message: "Provide 2–10 ballot options" });
+            }
+            if (labels.some((o: string) => o.length > 200)) {
+              return res.status(400).json({ message: "Each ballot option must be at most 200 characters" });
+            }
+            if (new Set(labels.map((o: string) => o.toLowerCase())).size !== labels.length) {
+              return res.status(400).json({ message: "Ballot options must be distinct" });
+            }
+            customBallot = [
+              ...labels.map((label: string, i: number) => ({ id: `opt_${i + 1}`, label })),
+              { id: 'status_quo', label: 'Καμία αλλαγή' },
+            ];
+          }
+        }
+      }
+      if (typeof question !== "string" || typeof solution !== "string") {
+        return res.status(400).json({ message: "Question and solution must be strings" });
+      }
+      // Solution ceiling matches the AI-drafting paste limit (12k) so a
+      // verbatim pass-through draft can always be submitted.
+      if (question.length > 2000 || solution.length > 12000) {
+        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
+      }
+      const proposal = await proposalRepo.createProposal({
+        communityId,
+        authorId: userId,
+        question,
+        solution,
+        category,
+        status: INITIAL_PROPOSAL_STATE,
+        track: track ?? 'deliberation',
+        votingDurationHours: durationHours,
+        deliberationDurationHours: deliberationHours,
+        ballotOptions: customBallot,
+      });
+      // Members are notified on submit (draft → deliberation), not here —
+      // a draft is private to its author and shouldn't be announced.
+      res.status(201).json(proposal);
+    } catch (error) {
+      console.error("create-proposal failed:", error);
+      res.status(500).json({ message: "Failed to create proposal" });
+    }
+  });
+  app.get("/api/proposals/:id", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposal = await proposalRepo.getProposal(parseInt(req.params.id));
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      // A draft only exists for its author (and admins) — 404, not 403, so
+      // the URL doesn't confirm the draft exists.
+      if (proposal.status === 'draft' && proposal.authorId !== req.user?.id && !req.user?.isAdmin) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      res.json(proposal);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch proposal" });
+    }
+  });
+  app.patch("/api/proposals/:id", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) return res.status(403).json({ message: "Not the author" });
+      if (proposal.status !== 'draft') return res.status(409).json({ message: "Can only edit drafts" });
+      // Only content fields are author-editable; same limits as create.
+      const { question, solution, category } = req.body ?? {};
+      const updates: Record<string, string> = {};
+      if (question !== undefined) {
+        if (typeof question !== "string" || question.length === 0) {
+          return res.status(400).json({ message: "Question must be a non-empty string" });
+        }
+        updates.question = question;
+      }
+      if (solution !== undefined) {
+        if (typeof solution !== "string" || solution.length === 0) {
+          return res.status(400).json({ message: "Solution must be a non-empty string" });
+        }
+        updates.solution = solution;
+      }
+      if ((updates.question ?? '').length > 2000 || (updates.solution ?? '').length > 12000) {
+        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
+      }
+      if (category !== undefined) {
+        if (typeof category !== "string") {
+          return res.status(400).json({ message: "Category must be a string" });
+        }
+        updates.category = category;
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "Nothing to update" });
+      }
+      const updated = await proposalRepo.updateProposal(proposalId, updates);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update proposal" });
+    }
+  });
+  // AI-assisted drafting: natural-language intent → editable form fields.
+  // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
+  // author edits before submitting — the validation gate still runs on submit.
+  app.post("/api/proposals/compile", requireAuth, async (req: any, res) => {
+    // Generous ceiling so users can paste a full pre-written document —
+    // the compiler is instructed to keep pasted text verbatim.
+    const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
+    if (intent.length < 10 || intent.length > 12000) {
+      return res.status(400).json({ message: 'intent must be 10–12000 characters' });
+    }
+    if (!isLlmConfigured()) {
+      return res.status(503).json({ message: 'AI drafting is not available' });
+    }
+    try {
+      const draft = await compileProposal(intent);
+      res.json(draft);
+    } catch (err: any) {
+      res.status(502).json({ message: 'AI drafting failed, please try again' });
+    }
+  });
+
+  app.post("/api/proposals/:id/submit", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) return res.status(403).json({ message: "Not the author" });
+      if (proposal.status !== 'draft') return res.status(409).json({ message: "Already submitted" });
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      const { storage: storageInstance } = await import('../storage');
+
+      // Direct-vote track: no deliberation — straight to the ballot with the
+      // author's chosen duration. Mirrors /transition's concurrent-votes cap.
+      if ((proposal as any).track === 'vote') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        const cap = community?.maxConcurrentVotes ?? -1;
+        if (cap > 0) {
+          const active = await proposalRepo.getProposals(proposal.communityId, { status: 'voting' });
+          if (active.length >= cap) {
+            return res.status(409).json({
+              message: `Community has reached its concurrent-votes cap (${cap}). Wait for an existing vote to finalize.`,
+            });
+          }
+        }
+        const live = await transitionProposal(proposal, 'voting', storage);
+        await triggerSideEffects('draft', 'voting', live);
+        try {
+          const { notifyNewProposal } = await import('../utils/notifications');
+          await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId);
+        } catch (notifyErr) {
+          console.error('notifyNewProposal failed:', notifyErr);
+        }
+        return res.json({ ...live, validation: null });
+      }
+      // draft → review (validated by the state machine; archived states blocked).
+      const inReview = await transitionProposal(proposal, 'review', storage);      await triggerSideEffects(proposal.status, 'review', inReview);
+      // ─── LLM Validation while the proposal sits in `review` ───────────────
+      let llmScore: string | undefined;
+      let llmFeedback: string | undefined;
+      let llmValidatedAt: Date | undefined;
+      let nextStatus: 'community_signal' | 'draft' | 'review' = 'review';
+      let category: 'return' | 'sortition' | 'auto_approve' | null = null;
+      let abuseKind: string | null = null;
+      try {
+        const { validateProposal } = await import('../utils/llm-validation');
+        const result = await validateProposal(proposal.question, proposal.solution);
+        llmScore = String(result.score);
+        llmFeedback = result.feedback;
+        llmValidatedAt = new Date();
+        category = result.category;
+        abuseKind = result.abuse?.kind ?? null;
+        // Short deliberation flow mapping from review:
+        // - return: review → draft. Only two things land here now: a Terms §6
+        //   breach, or text the model could not read at all. Being incomplete,
+        //   unproven or "just a question" is not grounds — the community
+        //   answers those in deliberation, which is what deliberation is for.
+        // - sortition / auto_approve: review → community_signal (the single
+        //   amendments phase: members amend + vote, author accepts/rejects)
+        //   A top score does not skip deliberation — see targetStateFor().
+        nextStatus = result.category === 'return' ? 'draft' : 'community_signal';
+        // Full result to the audit table. This used to be the background
+        // validation job's job; it is this route's now that it is the only
+        // validator on the submit path.
+        try {
+          const { validationResults } = await import('@shared/schema');
+          await db.insert(validationResults).values({
+            proposalId,
+            score: Math.round(result.score),
+            feedback: result.feedback,
+            details: result.details,
+            category: result.category,
+          });
+        } catch (histErr: any) {
+          console.warn(`[validation] history insert failed for proposal ${proposalId}: ${histErr?.message}`);
+        }
+      } catch (llmError) {
+        // Persist the failure on the row but leave it in `review` for manual handling.
+        llmFeedback = 'Το σύστημα αξιολόγησης δεν ήταν διαθέσιμο. Η πρόταση θα εξεταστεί χειροκίνητα.';
+        llmValidatedAt = new Date();
+      }
+      // Persist the LLM scoring on the in-review row first so the columns stay
+      // populated even if the follow-up transition is skipped.
+      const scored = await storageInstance.updateProposal(proposalId, {
+        llmScore,
+        llmFeedback,
+        llmValidatedAt,
+      });
+      let updated = scored;
+      if (nextStatus !== 'review') {
+        updated = await transitionProposal(scored, nextStatus, storage);
+        await triggerSideEffects('review', nextStatus, updated);
+      }
+      // The proposal became visible to the community just now (not at draft
+      // creation) — announce it once it actually enters deliberation.
+      if (nextStatus === 'community_signal') {
+        try {
+          const { notifyNewProposal } = await import('../utils/notifications');
+          await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId);
+        } catch (notifyErr) {
+          console.error('notifyNewProposal failed:', notifyErr);
+        }
+      }
+      res.json({
+        ...updated,
+        validation: {
+          score: llmScore ? Number(llmScore) : null,
+          feedback: llmFeedback,
+          category,
+          abuse: abuseKind,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to submit proposal" });
+    }
+  });
+  // ─── Final review (short deliberation track) ─────────────────────────
+  // The author accepts the AI-merged text (→ voting), or refines it through
+  // a constrained AI edit that cannot dilute the incorporated amendments.
+
+  app.post("/api/proposals/:id/final-review/accept", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Only the author can accept the final text" });
+      }
+      // 3-step flow: during deliberation, acceptance is a recorded signal
+      // (the phase still runs its course so amendment rights stay intact).
+      if (proposal.status === 'community_signal') {
+        const accepted = await storage.updateProposal(proposal.id, { authorAcceptedFinalAt: new Date() });
+        return res.json(accepted);
+      }
+      if (proposal.status !== 'final_review') {
+        return res.status(409).json({ message: "Proposal is not in final review" });
+      }
+      // Self-heal: if the merge crashed on phase entry, run it now so the
+      // vote never opens on a null final text.
+      if (!proposal.finalText) {
+        try {
+          const { prepareFinalReview } = await import('../utils/ai-merger');
+          await prepareFinalReview(proposal.id);
+        } catch (mergeErr: any) {
+          console.warn(`[final-review] self-heal merge failed for ${proposal.id}: ${mergeErr?.message}`);
+        }
+      }
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      const updated = await transitionProposal(proposal, 'voting', storage);
+      await triggerSideEffects('final_review', 'voting', updated);
+      res.json(updated);
+    } catch (error) {
+      console.error('final-review accept failed:', error);
+      res.status(500).json({ message: "Failed to accept final text" });
+    }
+  });
+
+  app.post("/api/proposals/:id/final-review/refine", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        return res.status(403).json({ message: "Only the author can refine the final text" });
+      }
+      if (proposal.status !== 'final_review' && proposal.status !== 'community_signal') {
+        return res.status(409).json({ message: "Refinement is only available during deliberation or final review" });
+      }
+      const instruction = typeof req.body?.instruction === 'string' ? req.body.instruction.trim() : '';
+      if (instruction.length < 3 || instruction.length > 500) {
+        return res.status(400).json({ message: "instruction must be 3–500 characters" });
+      }
+      const { refineFinalText, prepareFinalReview } = await import('../utils/ai-merger');
+      const { isLlmConfigured: llmUp } = await import('../utils/llm-client');
+      if (!llmUp()) {
+        return res.status(503).json({ message: "Η βελτίωση μέσω AI δεν είναι διαθέσιμη αυτή τη στιγμή." });
+      }
+      if (!proposal.finalText) {
+        // First refine can land before any amendment triggered a merge.
+        await prepareFinalReview(proposalId);
+      }
+      const finalText = await refineFinalText(proposalId, instruction);
+      res.json({ finalText });
+    } catch (error: any) {
+      console.error('final-review refine failed:', error);
+      res.status(500).json({ message: "Failed to refine final text" });
+    }
+  });
+
+  // Read model for the final-review screen: merged text, what was
+  // incorporated, and the alternatives that will stand on the ballot.
+  app.get("/api/proposals/:id/final-review", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { proposalAmendments: pa } = await import('@shared/schema');
+      const rows = await db.select().from(pa).where(eq(pa.proposalId, proposalId));
+      const alternatives = rows
+        .filter(a => a.type === 'counter_proposal' && a.restyledText)
+        .map(a => ({ id: a.id, optionId: `counter_${a.id}`, text: a.restyledText }));
+      res.json({
+        proposalId,
+        status: proposal.status,
+        finalText: proposal.finalText,
+        ballotOptions: proposal.ballotOptions ?? null,
+        alternatives,
+        authorAcceptedFinalAt: (proposal as any).authorAcceptedFinalAt ?? null,
+        authorRefineInstruction: (proposal as any).authorRefineInstruction ?? null,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load final review" });
+    }
+  });
+
+  // ─── Amendment Routes ───────────────────────────────────────────
+  app.post("/api/proposals/:id/support", requireAuth, requireConsent, requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const { type } = req.body; // 'support' or 'oppose'
+      if (!type || !['support', 'oppose'].includes(type)) {
+        return res.status(400).json({ message: "Type must be 'support' or 'oppose'" });
+      }
+      const support = await proposalRepo.getProposalSupport(proposalId);
+      res.status(201).json(support);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create support" });
+    }
+  });
+  app.get("/api/proposals/:id/support", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const userId = (req.user as any)?.id;
+      const support = await proposalRepo.getProposalSupport(parseInt(req.params.id), userId);
+      res.json(support);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch support" });
+    }
+  });
+  // ─── Proposal Final Ratification Vote Routes ────────────────────
+  // Cast a final ratification vote. Routed through the configured
+  // VotingBackend (see server/voting/) — today's hash-chain backend records
+  // an append-only SHA-256 chain; a future Helios backend would encrypt the
+  // ballot and decrypt only the aggregate tally. The receipt shape is
+  // backend-specific, but every backend returns one.
+  app.post("/api/proposals/:id/vote", requireAuth, requireConsent, requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const parsed = castProposalVoteSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid ballot choice",
+          errors: parsed.error.flatten(),
+        });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const validChoices = validBallotChoices(proposal);
+      if (!validChoices.includes(parsed.data.choice)) {
+        return res.status(400).json({ message: `Choice must be one of: ${validChoices.join(', ')}` });
+      }
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({
+          message: "Proposal is not currently in the voting phase",
+          current_status: proposal.status,
+        });
+      }
+      // Anonymous-mode proposals MUST use the /blind-sign + /anonymous-vote
+      // pair so the user_id never gets bound to the vote row.
+      if (proposal.votingMode === 'anonymous') {
+        return res.status(409).json({
+          message: "This proposal uses anonymous voting — use /blind-sign + /anonymous-vote",
+          voting_mode: 'anonymous',
+        });
+      }
+      const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
+      if (!isMember) {
+        return res.status(403).json({ message: "Only community members may cast a final vote" });
+      }
+      const { getVotingBackend } = await import('../voting');
+      const backend = getVotingBackend();
+      const receipt = await backend.castSignedBallot({
+        proposalId,
+        userId: req.user.id,
+        choice: parsed.data.choice,
+        signature: req.body.signature,
+      });
+      // Democracy Points: award one ballot's worth, once per (proposal, voter).
+      await awardPoints({
+        userId: req.user.id,
+        actionKey: 'ratification_vote',
+        refType: 'proposal',
+        refId: proposalId,
+      });
+      res.status(201).json(receipt);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cast vote" });
+    }
+  });
+
+  // ─── Anonymous voting (blind-signed tokens, malicious-operator unlinkable) ──
+  // See docs/compliance/04_ANONYMOUS_VOTING_DESIGN.md. Two-step flow:
+  //   1. Authenticated voter requests a blind signature on a token they
+  //      generated client-side. We record THAT they got a signature.
+  //   2. Anyone (no auth) presents (token, signature, choice) to cast.
+  //      We verify the signature, store (token, choice), no user_id.
+
+  // Step 0: fetch the proposal's blind-signing public key. Idempotent —
+  // generates the key on first call, returns it on every subsequent one.
+  // Voter calls this before blind() so the math is well-defined; calling
+  // it does NOT burn the one-blind-sig-per-voter quota.
+  app.get("/api/proposals/:id/blind-key", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+      const { ensureKey } = await import('../utils/blind-sig-vault');
+      const pub = await ensureKey(proposalId);
+      res.json(pub);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch blind key" });
+    }
+  });
+
+  // Step 1: blind-sign a voter-provided blinded value.
+  app.post("/api/proposals/:id/blind-sign", requireAuth, requireConsent, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const blinded: unknown = req.body?.blindedToken;
+      if (typeof blinded !== 'string' || blinded.length === 0) {
+        return res.status(400).json({ message: "blindedToken (base64) required" });
+      }
+
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({ message: "Proposal is not in the voting phase" });
+      }
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+      const isMember = await communityRepo.isCommunityMember(proposal.communityId, req.user.id);
+      if (!isMember) {
+        return res.status(403).json({ message: "Only community members may vote" });
+      }
+
+      // Validate the blinded value LOOKS like base64 of a positive bigint
+      // before we touch the DB — saves a wasted issuance burn on garbage.
+      let blindedBytes: Uint8Array;
+      try {
+        const { base64ToBytes } = await import('@shared/blind-sig');
+        blindedBytes = base64ToBytes(blinded);
+      } catch {
+        return res.status(400).json({ message: "blindedToken must be valid base64" });
+      }
+      if (blindedBytes.length < 16 || blindedBytes.every(b => b === 0)) {
+        return res.status(400).json({ message: "blindedToken is malformed" });
+      }
+
+      // Ensure key exists FIRST (outside the tx). Then in a single tx:
+      // claim issuance + sign. If signing throws, the tx rolls back and
+      // the user keeps their one-shot.
+      const { blindSigIssuance } = await import('@shared/schema');
+      const { ensureKey, loadPrivateKey } = await import('../utils/blind-sig-vault');
+      const { signBlinded } = await import('@shared/blind-sig');
+      const pub = await ensureKey(proposalId);
+
+      let signature: string;
+      try {
+        signature = await db.transaction(async (tx) => {
+          await tx.insert(blindSigIssuance).values({ proposalId, userId: req.user.id });
+          const priv = await loadPrivateKey(proposalId);
+          return signBlinded(blinded, priv);
+        });
+      } catch (err: any) {
+        const msg = String(err?.message ?? err);
+        if (/duplicate key|unique/i.test(msg)) {
+          return res.status(409).json({ message: "You have already requested a signature for this proposal" });
+        }
+        if (/out of range/i.test(msg)) {
+          return res.status(400).json({ message: "blindedToken is out of valid RSA range for this key" });
+        }
+        throw err;
+      }
+      res.json({ signature, publicKey: pub });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to issue blind signature" });
+    }
+  });
+
+  // Step 2: cast an anonymous vote. NO AUTH — would correlate with the
+  // blind-sign request and defeat the property. Rate-limited per-IP by the
+  // global /api/ limiter; the unique (proposal_id, vote_token) index is
+  // the double-spend guard.
+  app.post("/api/proposals/:id/anonymous-vote", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const { token, preparedMsg, signature, choice } = req.body ?? {};
+      if (typeof token !== 'string' || typeof preparedMsg !== 'string' || typeof signature !== 'string') {
+        return res.status(400).json({ message: "token + preparedMsg + signature (base64) required" });
+      }
+      if (typeof choice !== 'string' || !/^[a-z0-9_]{1,64}$/.test(choice)) {
+        return res.status(400).json({ message: "invalid ballot choice" });
+      }
+
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const validAnonChoices = validBallotChoices(proposal);
+      if (!validAnonChoices.includes(choice)) {
+        return res.status(400).json({ message: `choice must be one of: ${validAnonChoices.join(', ')}` });
+      }
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({ message: "Proposal is not in the voting phase" });
+      }
+      if (proposal.votingMode !== 'anonymous') {
+        return res.status(409).json({ message: "Proposal does not use anonymous voting" });
+      }
+
+      const { ensureKey } = await import('../utils/blind-sig-vault');
+      const { verify, base64ToBytes } = await import('@shared/blind-sig');
+      const pub = await ensureKey(proposalId);
+      const tokenBytes = base64ToBytes(token);
+      const preparedMsgBytes = base64ToBytes(preparedMsg);
+      const ok = await verify(tokenBytes, preparedMsgBytes, signature, pub);
+      if (!ok) return res.status(400).json({ message: "Invalid signature on token" });
+
+      // GDPR: Enforce time decoupling — reject votes cast before the
+      // minimum cast time embedded in the token. The token is 40 bytes:
+      // 32 random + 8 bytes of big-endian epoch milliseconds.
+      // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G2
+      if (tokenBytes.length < 40) {
+        return res.status(400).json({ message: "Token too short — missing expiry" });
+      }
+      const minCastTime = Number(new DataView(tokenBytes.buffer, tokenBytes.byteOffset + 32, 8).getBigUint64(0, false));
+      if (Date.now() < minCastTime) {
+        return res.status(409).json({
+          message: "Token not yet valid — please wait before casting your vote",
+          minCastTime,
+        });
+      }
+
+      const { castAnonymousVoteWithChain } = await import('../utils/vote-chain');
+      try {
+        // B3: Use the vote-path DB connection (agorax_vote role) that
+        // physically cannot read identity tables. Separation enforced by
+        // PostgreSQL grants, not code convention.
+        const result = await castAnonymousVoteWithChain({
+          proposalId,
+          voteToken: token,
+          choice,
+          database: voteDb,
+        });
+        res.status(201).json({
+          voteId: result.id,
+          rowHash: result.receipt.rowHash,
+          prevHash: result.receipt.prevHash,
+          castAt: result.receipt.castAt,
+          backend: 'hash-chain',
+          mode: 'anonymous',
+        });
+      } catch (err: any) {
+        const msg = String(err?.message ?? err);
+        // Postgres unique-violation on (proposal_id, vote_token) → double-spend.
+        if (/duplicate key|unique/i.test(msg)) {
+          return res.status(409).json({ message: "This token has already been used" });
+        }
+        throw err;
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to cast anonymous vote" });
+    }
+  });
+
+  // Step 3 (optional): verify your own vote landed. Deniable receipt —
+  // anyone holding a token can do this lookup, so a third party cannot
+  // use the result to prove how you voted.
+  // Choice-blind inclusion check: confirms a ballot fingerprint exists in
+  // this proposal's chain WITHOUT revealing the choice. This is what the
+  // downloadable receipt uses — a portable proof of "my ballot was counted"
+  // that cannot double as proof of HOW someone voted (receipt-freeness:
+  // choice-revealing artifacts enable coercion and vote-buying).
+  app.get("/api/proposals/:id/receipt-inclusion", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const rowHash = typeof req.query?.rowHash === 'string' ? req.query.rowHash : '';
+      if (!Number.isFinite(proposalId) || !/^[0-9a-f]{16,128}$/i.test(rowHash)) {
+        return res.status(400).json({ message: "proposal id + rowHash required" });
+      }
+      const { proposalVotes: pvTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [row] = await db
+        .select({ castAt: pvTable.castAt })
+        .from(pvTable)
+        .where(and(eq(pvTable.proposalId, proposalId), eq(pvTable.rowHash, rowHash)))
+        .limit(1);
+      res.json(row ? { found: true, castAt: row.castAt } : { found: false });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check inclusion" });
+    }
+  });
+
+  app.get("/api/proposals/:id/verify-receipt", async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id, 10);
+      const token = typeof req.query?.token === 'string' ? req.query.token : '';
+      if (!Number.isFinite(proposalId) || !token) {
+        return res.status(400).json({ message: "proposal id + token required" });
+      }
+      const { proposalVotes: pvTable } = await import('@shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+      const [row] = await db
+        .select({ choice: pvTable.choice, castAt: pvTable.castAt, rowHash: pvTable.rowHash })
+        .from(pvTable)
+        .where(and(eq(pvTable.proposalId, proposalId), eq(pvTable.voteToken, token)))
+        .limit(1);
+      if (!row) return res.json({ found: false });
+      res.json({ found: true, choice: row.choice, castAt: row.castAt, rowHash: row.rowHash });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify receipt" });
+    }
+  });
+  // Public election proof — backend-specific artifact a third party can
+  // pin periodically to anchor the election externally.
+  app.get("/api/proposals/:id/election/proof", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { getVotingBackend } = await import('../voting');
+      const proof = await getVotingBackend().getProof({ proposalId });
+      res.json(proof);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch election proof" });
+    }
+  });
+  // Backend-internal consistency check. Returns ok=false with the first
+  // inconsistency if tampering is detected.
+  app.get("/api/proposals/:id/election/verify", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { getVotingBackend } = await import('../voting');
+      const result = await getVotingBackend().verify({ proposalId });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify election" });
+    }
+  });
+  // Get aggregated final-vote results for a proposal.
+  app.get("/api/proposals/:id/vote-results", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      // Source the tally from the active voting backend, not the hash-chain
+      // table directly — so a private backend can seal it until close.
+      const { getVotingBackend } = await import('../voting');
+      const view = await getVotingBackend().getVoterView({
+        proposalId,
+        userId: (req.user as any)?.id,
+      });
+      res.json(await computeVoteResults(proposal, view));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch vote results" });
+    }
+  });
+  // Finalize the ratification vote and transition the proposal to `decided`
+  app.post("/api/proposals/:id/finalize", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.status !== 'voting') {
+        return res.status(409).json({
+          message: "Only proposals in the voting phase can be finalized",
+          current_status: proposal.status,
+        });
+      }
+      if (proposal.authorId !== req.user.id) {
+        const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
+        if (role !== 'admin' && role !== 'founder') {
+          return res.status(403).json({ message: "Not authorized to finalize this proposal" });
+        }
+      }
+      // Close the election with the active backend first: this triggers
+      // trustee decryption + seals the published record for ElectionGuard,
+      // and is a head read for the hash chain. The final tally then comes
+      // from the backend, so finalize works the same for any backend.
+      const { getVotingBackend } = await import('../voting');
+      const backend = getVotingBackend();
+      await backend.closeAndTally({ proposalId });
+      const view = await backend.getVoterView({ proposalId });
+      const results = await computeVoteResults(proposal, view);
+      // Use the community's minParticipationPct + decisive-vote check.
+      // Archive if quorum was not met, or if there are zero yes/no votes
+      // (only abstains can't decide a yes/no outcome).
+      const nextState = results.meetsQuorum && results.hasDecisive ? 'decided' : 'archived';
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      let updated = await transitionProposal(proposal, nextState, storage);
+      if (results.ballotOptions && nextState === 'decided' && results.winner) {
+        updated = await storage.updateProposal(proposalId, { winningOption: results.winner });
+      }
+      await triggerSideEffects(proposal.status, nextState, updated);
+      res.json({ proposal: updated, results });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to finalize proposal" });
+    }
+  });
+  // ─── State Machine Routes ───────────────────────────────────────
+  app.post("/api/proposals/:id/transition", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      let { newState } = req.body;
+      if (!isProposalState(newState)) {
+        return res.status(400).json({ message: "A valid canonical proposal state is required" });
+      }
+      if (!isProposalState(proposal.status)) {
+        return res.status(409).json({
+          message: `Proposal has legacy or invalid status: ${proposal.status}`,
+          current_status: proposal.status,
+        });
+      }
+      // Synthesis mode: a sortition jury only convenes in communities that
+      // opted into it — everywhere else the AI merge synthesizes and the
+      // vote opens directly. (AI is also the automatic fallback when a jury
+      // cannot form or does not respond; see job-handlers.)
+      if (newState === 'sortition_synthesis') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        if ((community as any)?.synthesisMode !== 'sortition') {
+          newState = 'voting';
+        }
+      }
+      // Import state machine
+      const { transitionProposal, canTransition, getNextStates, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      // Validate transition
+      if (!canTransition(proposal.status, newState)) {
+        const valid = getNextStates(proposal.status);
+        return res.status(409).json({
+          message: `Invalid transition: ${proposal.status} → ${newState}`,
+          valid_transitions: valid,
+        });
+      }
+      // Check permissions
+      if (proposal.authorId !== req.user.id) {
+        const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
+        if (role !== 'admin' && role !== 'founder') {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+      // A manual fast-forward out of deliberation must not silently discard
+      // amendments nobody has reviewed. Before the phase deadline, the
+      // advance is blocked while author decisions are outstanding; once the
+      // deadline passes, unreviewed = dropped (same rule the automatic
+      // advance applies).
+      if (proposal.status === 'community_signal' && (newState === 'voting' || newState === 'sortition_synthesis')) {
+        const deadlinePassed = (proposal as any).phaseDeadline
+          && new Date((proposal as any).phaseDeadline).getTime() <= Date.now();
+        if (!deadlinePassed) {
+          const { proposalAmendments: pa } = await import('@shared/schema');
+          const { isNull } = await import('drizzle-orm');
+          const [pending] = await db
+            .select({ n: count() })
+            .from(pa)
+            .where(and(eq(pa.proposalId, proposalId), isNull(pa.authorDecision)));
+          if ((pending?.n ?? 0) > 0) {
+            return res.status(409).json({
+              message: `Υπάρχουν ${pending.n} τροπολογίες που εκκρεμούν για κρίση. Η πρόταση δεν μπορεί να προχωρήσει σε ψηφοφορία πριν κριθούν ή πριν λήξει η προθεσμία της φάσης.`,
+              rejection_reason: 'pending_amendments',
+              pendingAmendments: pending.n,
+            });
+          }
+        }
+      }
+      // Enforce maxConcurrentVotes when entering the voting phase.
+      if (newState === 'voting') {
+        const community = await communityRepo.getCommunity(proposal.communityId);
+        const cap = community?.maxConcurrentVotes ?? -1;
+        if (cap > 0) {
+          const active = await proposalRepo.getProposals(proposal.communityId, { status: 'voting' });
+          if (active.length >= cap) {
+            return res.status(409).json({
+              message: `Community has reached its concurrent-votes cap (${cap}). Wait for an existing vote to finalize.`,
+              maxConcurrentVotes: cap,
+              activeVotes: active.length,
+            });
+          }
+        }
+      }
+      const { storage: storageInstance } = await import('../storage');
+      const updated = await transitionProposal(proposal, newState, storage);
+      await triggerSideEffects(proposal.status, newState, updated);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to transition proposal" });
+    }
+  });
+  // ─── Sortition Routes ──────────────────────────────────────────
+  app.get("/api/proposals/:id/attendance", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const summary = await sortitionRepo.getAttendanceSummary(proposalId);
+      // Find the current user's sortition member id (if any) for this proposal
+      const userId = req.user.id;
+      const bodies = await db
+        .select()
+        .from(sortitionBodies)
+        .where(eq(sortitionBodies.proposalId, proposalId));
+      let userMemberId: number | null = null;
+      let userAttendance: any = null;
+      for (const body of bodies) {
+        const [member] = await db
+          .select()
+          .from(sortitionMembers)
+          .where(and(eq(sortitionMembers.bodyId, body.id), eq(sortitionMembers.userId, userId)))
+          .limit(1);
+        if (member) {
+          userMemberId = member.id;
+          userAttendance = await sortitionRepo.getAttendance(proposalId, member.id) ?? null;
+          break;
+        }
+      }
+      const responseDeadline = bodies[0]?.selectedAt
+        ? new Date(new Date(bodies[0].selectedAt).getTime() + (bodies[0].responseHours ?? 72) * 60 * 60 * 1000).toISOString()
+        : null;
+      res.json({ summary, userMemberId, userAttendance, responseDeadline });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get attendance" });
+    }
+  });
+  app.post("/api/proposals/:id/attendance", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const { status, notes, memberId } = req.body ?? {};
+      const allowed = ['accepted', 'declined', 'completed'];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({ message: `status must be one of ${allowed.join(', ')}` });
+      }
+      // Resolve member id from current user if not supplied
+      let resolvedMemberId = Number(memberId);
+      if (!Number.isFinite(resolvedMemberId)) {
+        const userId = req.user.id;
+        const bodies = await db
+          .select()
+          .from(sortitionBodies)
+          .where(eq(sortitionBodies.proposalId, proposalId));
+        for (const body of bodies) {
+          const [member] = await db
+            .select()
+            .from(sortitionMembers)
+            .where(and(eq(sortitionMembers.bodyId, body.id), eq(sortitionMembers.userId, userId)))
+            .limit(1);
+          if (member) {
+            resolvedMemberId = member.id;
+            break;
+          }
+        }
+      }
+      if (!Number.isFinite(resolvedMemberId)) {
+        return res.status(403).json({ message: "Not a member of this proposal's sortition body" });
+      }
+      // Verify this member belongs to the requesting user
+      const [memberRow] = await db
+        .select()
+        .from(sortitionMembers)
+        .where(eq(sortitionMembers.id, resolvedMemberId))
+        .limit(1);
+      if (!memberRow || memberRow.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not your assignment" });
+      }
+      const attendance = await sortitionRepo.upsertAttendance(proposalId, resolvedMemberId, status, notes);
+      const summary = await sortitionRepo.getAttendanceSummary(proposalId);
+      // Notify the proposal author when ≥50% confirm
+      try {
+        if (summary.confirmedPct >= 0.5 && summary.total > 0) {
+          const proposal = await proposalRepo.getProposal(proposalId);
+          if (proposal) {
+            const { createNotification } = await import('../utils/notifications');
+            await createNotification({
+              userId: proposal.authorId,
+              type: 'sortition_assigned',
+              title: 'Sortition body confirmed',
+              message: `${Math.round(summary.confirmedPct * 100)}% of selected members have confirmed attendance.`,
+              proposalId,
+              communityId: proposal.communityId,
+              actionUrl: `/proposals/${proposalId}`,
+            });
+          }
+        }
+      } catch (e) {
+        }
+      res.json({ attendance, summary });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update attendance" });
+    }
+  });
+  // Snapshot of the sortition body for a proposal: who's on the jury,
+  // how many have responded, deadline, status, the AI-pre-merged baseline.
+  app.get("/api/proposals/:id/sortition-body", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const bodies = await db
+        .select()
+        .from(sortitionBodies)
+        .where(eq(sortitionBodies.proposalId, proposalId))
+        .orderBy(desc(sortitionBodies.createdAt));
+      if (bodies.length === 0) {
+        return res.json({ body: null, members: [], userIsMember: false, deadline: null, baseline: null });
+      }
+      const body = bodies[0];
+      const memberRows = await db
+        .select({
+          memberId: sortitionMembers.id,
+          userId: sortitionMembers.userId,
+          responded: sortitionMembers.responded,
+          scoredAt: sortitionMembers.scoredAt,
+          username: users.username,
+          name: users.name,
+          profilePicture: users.profilePicture,
+        })
+        .from(sortitionMembers)
+        .innerJoin(users, eq(users.id, sortitionMembers.userId))
+        .where(eq(sortitionMembers.bodyId, body.id));
+      const userId = req.user?.id;
+      const userIsMember = userId ? memberRows.some(m => m.userId === userId) : false;
+      const deadline = body.selectedAt
+        ? new Date(new Date(body.selectedAt).getTime() + (body.responseHours ?? 72) * 60 * 60 * 1000).toISOString()
+        : null;
+      const responded = memberRows.filter(m => m.responded).length;
+      res.json({
+        body: {
+          id: body.id,
+          status: body.status,
+          purpose: body.purpose,
+          size: body.size,
+          responseHours: body.responseHours,
+          selectedAt: body.selectedAt,
+          completedAt: body.completedAt,
+        },
+        members: memberRows,
+        respondedCount: responded,
+        userIsMember,
+        deadline,
+        baseline: proposal.finalText ?? proposal.solution,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sortition body" });
+    }
+  });
+
+  // Preview or recompute the AI-merged final text. Anyone can read; the
+  // POST variant persists the result to finalText (author or admin only).
+  app.get("/api/proposals/:id/merge-preview", requireProposalContentAccess(), async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const { aiMergeAmendments } = await import('../utils/ai-merger');
+      const result = await aiMergeAmendments(proposalId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to compute merge preview" });
+    }
+  });
+
+  app.post("/api/proposals/:id/merge", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        const role = await communityRepo.getCommunityMemberRole(proposal.communityId, req.user.id);
+        if (role !== 'admin' && role !== 'founder') {
+          return res.status(403).json({ message: "Only the author or an admin can recompute the merge" });
+        }
+      }
+      // The merge is frozen once final_review begins: from there the text
+      // changes only via the constrained AI refine, and never mid-vote.
+      if (['final_review', 'voting', 'decided', 'archived'].includes(proposal.status)) {
+        return res.status(409).json({
+          message: "Η συγχώνευση έχει κλειδώσει για αυτή τη φάση.",
+          current_status: proposal.status,
+        });
+      }
+      const { saveAiMergedFinalText } = await import('../utils/ai-merger');
+      const result = await saveAiMergedFinalText(proposalId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to save merge" });
+    }
+  });
+
+  /**
+   * How many other people have invested in this proposal. Deletion is only
+   * for proposals that are still "the author's": zero engagement. Anything
+   * that reached the ballot, or that others amended/debated/signalled, is
+   * community record — withdraw (archive) instead.
+   */
+  async function proposalEngagement(proposalId: number) {
+    const [[am], [su], [vo], [th], [ar]] = await Promise.all([
+      db.select({ c: count() }).from(proposalAmendments).where(eq(proposalAmendments.proposalId, proposalId)),
+      db.select({ c: count() }).from(proposalSupport).where(eq(proposalSupport.proposalId, proposalId)),
+      db.select({ c: count() }).from(proposalVotes).where(eq(proposalVotes.proposalId, proposalId)),
+      db.select({ c: count() }).from(debateThreads).where(eq(debateThreads.proposalId, proposalId)),
+      db.select({ c: count() }).from(debateArguments).where(eq(debateArguments.proposalId, proposalId)),
+    ]);
+    return {
+      amendments: am?.c ?? 0,
+      support: su?.c ?? 0,
+      votes: vo?.c ?? 0,
+      debate: (th?.c ?? 0) + (ar?.c ?? 0),
+    };
+  }
+
+  app.delete("/api/proposals/:id", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const isAdmin = !!req.user.isAdmin;
+      if (proposal.authorId !== req.user.id && !isAdmin) {
+        return res.status(403).json({ message: "Only the author can delete this proposal" });
+      }
+      // A ballot — open or concluded — is immutable record for everyone.
+      if (proposal.status === 'voting' || proposal.status === 'decided') {
+        return res.status(409).json({ message: "Ψηφισμένες προτάσεις δεν διαγράφονται — αποτελούν δημοκρατικό αρχείο." });
+      }
+      const eng = await proposalEngagement(proposalId);
+      if (eng.votes > 0) {
+        return res.status(409).json({ message: "Η πρόταση έχει ψήφους και δεν διαγράφεται." });
+      }
+      // Authors may hard-delete only engagement-free proposals; platform
+      // admins may also delete engaged-but-unvoted ones (moderation).
+      const engaged = eng.amendments + eng.support + eng.debate > 0;
+      if (engaged && !isAdmin) {
+        return res.status(409).json({
+          message: "Άλλα μέλη έχουν συνεισφέρει (τροπολογίες/συζήτηση/στήριξη). Μπορείτε να την αποσύρετε — θα αρχειοθετηθεί χωρίς να χαθεί η συνεισφορά τους.",
+          canWithdraw: true,
+          engagement: eng,
+        });
+      }
+      await proposalRepo.deleteProposal(proposalId);
+      res.status(204).end();
+    } catch (error) {
+      console.error('delete proposal failed:', error);
+      res.status(500).json({ message: "Failed to delete proposal" });
+    }
+  });
+
+  // Withdraw (Απόσυρση): the author archives an engaged-but-fizzled
+  // proposal. The record and everyone's contributions stay visible; it just
+  // leaves the active lists. Not available once the ballot is open.
+  app.post("/api/proposals/:id/withdraw", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
+        return res.status(403).json({ message: "Only the author can withdraw this proposal" });
+      }
+      if (['voting', 'decided', 'archived'].includes(proposal.status)) {
+        return res.status(409).json({ message: "Η πρόταση δεν μπορεί να αποσυρθεί σε αυτή τη φάση." });
+      }
+      const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
+      const updated = await transitionProposal(proposal, 'archived', storage);
+      await triggerSideEffects(proposal.status as any, 'archived', updated);
+      res.json(updated);
+    } catch (error) {
+      console.error('withdraw proposal failed:', error);
+      res.status(500).json({ message: "Failed to withdraw proposal" });
+    }
+  });
+
+  app.post("/api/proposals/:id/revalidate", requireAuth, async (req: any, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      if (proposal.authorId !== req.user.id) {
+        return res.status(403).json({ message: "Only the author can request re-validation" });
+      }
+      const { validateProposal } = await import('../utils/llm-validation');
+      const { validationResults } = await import('@shared/schema');
+      const result = await validateProposal(proposal.question, proposal.solution);
+      await db.insert(validationResults).values({
+        proposalId,
+        score: Math.round(result.score),
+        feedback: result.feedback,
+        details: result.details,
+        category: result.category,
+      });
+      const updated = await proposalRepo.updateProposal(proposalId, {
+        llmScore: String(result.score),
+        llmFeedback: result.feedback,
+        llmValidatedAt: new Date(),
+        llmValidationRound: (proposal.llmValidationRound ?? 1) + 1,
+      });
+      res.json({
+        proposal: updated,
+        validation: {
+          score: result.score,
+          feedback: result.feedback,
+          category: result.category,
+          abuse: result.abuse?.kind ?? null,
+          details: result.details,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to re-validate proposal" });
+    }
+  });
+  const httpServer = createServer(app);
+  void httpServer;
+}

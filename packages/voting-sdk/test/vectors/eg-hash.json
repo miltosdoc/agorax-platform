@@ -1,0 +1,13 @@
+{
+  "type": "eg-hash",
+  "description": "ElectionGuard 2.1 hash function H = HMAC-SHA-256 with a fixed 32-byte key. Known-answer test from the reference implementation's hash.rs.",
+  "source": "microsoft/electionguard-rust src/eg/src/hash.rs test vector",
+  "cases": [
+    {
+      "name": "H(zero key, empty data)",
+      "keyHex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "dataHex": "",
+      "expectHex": "B613679A0814D9EC772F95D778C35FC5FF1697C493715653C6C712144292C5AD"
+    }
+  ]
+}

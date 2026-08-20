@@ -1,0 +1,49 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+logs/
+uploads/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Sensitive Data
+declaration*.pdf
+declaration*.png
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local agent/workspace artifacts
+.hermes/
+
+# OS
+.DS_Store
+Thumbs.db
+# Early-user feedback submissions (reviewed on the server)
+feedback/
+downloads/*.apk
+
+# Τοπικές ρυθμίσεις με διαπιστευτήρια — ΠΟΤΕ σε commit.
+# Το livekit.yaml περιέχει ζεύγος API key/secret· δες docs/livekit-setup.md.
+livekit.yaml
+.replit
+
+# Binaries που κατεβαίνουν κατά την εγκατάσταση, δεν ανήκουν στο repo
+livekit-server
+
+# Πρόχειρα επικολλήσεων
+attached_assets/
+
+# Εσωτερικά εργαλείων AI — δεν ανήκουν στο δημόσιο repo
+.agents/
+.claude/

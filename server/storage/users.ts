@@ -1,0 +1,601 @@
+/**
+ * User Repository
+ *
+ * Handles all user-related database operations: CRUD, authentication,
+ * Gov.gr verification, account activity tracking, location verification,
+ * and duplicate account detection.
+ */
+
+import { db } from '../db';
+import {
+  users,
+  accountActivity,
+  userConsents,
+  erasureRequests,
+  proposalVotes,
+  egBallots,
+  proposals,
+  pointTransactions,
+  pointBalances,
+  pointRedemptions,
+  polls,
+  pollOptions,
+  pollQuestions,
+  pollAnswers,
+  pollUserResponses,
+  votes,
+  comments,
+  communityMembers,
+  communities,
+  type User,
+  type InsertUser,
+  type InsertAccountActivity,
+  type SelectAccountActivity,
+  type UserConsent,
+  type ErasureRequest,
+} from '../../shared/schema';
+import { eq, and, ilike, desc, sql, isNull, isNotNull, inArray } from 'drizzle-orm';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export class UserRepository {
+
+  /** Get user by ID. */
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  /** Get user by username (case-insensitive). */
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(${users.username}) = LOWER(${username})`);
+    return user;
+  }
+
+  /** Get user by email (case-insensitive). */
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${email})`);
+    return user;
+  }
+
+  /** Get user by OAuth provider ID. */
+  async getUserByProviderId(providerId: string, provider: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.providerId, providerId),
+        eq(users.provider, provider)
+      ));
+    return user;
+  }
+
+  /** Get user by Gov.gr voter hash. */
+  async getUserByVoterHash(voterHash: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.govgrVoterHash, voterHash));
+    return user;
+  }
+
+  /**
+   * When an erased account's AFM hash is still reserved, this is the moment
+   * the erasure was processed — the start of the 30-day cooling-off window
+   * after which the AFM may verify a new account.
+   */
+  async getLatestErasureProcessedAt(userId: number): Promise<Date | null> {
+    const [row] = await db
+      .select({ processedAt: erasureRequests.processedAt })
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.userId, userId), isNotNull(erasureRequests.processedAt)))
+      .orderBy(desc(erasureRequests.processedAt))
+      .limit(1);
+    return row?.processedAt ?? null;
+  }
+
+  /** Create a new user. */
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  /** Record an explicit consent acceptance (GDPR Art. 7 + Art. 9(2)(a)). */
+  async recordConsent(args: {
+    userId: number;
+    consentVersion: string;
+    consentTextHash: string;
+    locale: string;
+  }): Promise<UserConsent> {
+    const [row] = await db.insert(userConsents).values(args).returning();
+    return row;
+  }
+
+  /** Return the member's current non-withdrawn consent, if any. */
+  async getActiveConsent(userId: number): Promise<UserConsent | undefined> {
+    const [row] = await db
+      .select()
+      .from(userConsents)
+      .where(and(eq(userConsents.userId, userId), isNull(userConsents.withdrawnAt)))
+      .orderBy(desc(userConsents.acceptedAt))
+      .limit(1);
+    return row;
+  }
+
+  /** Withdraw all active consents for a member (Art. 7(3)). */
+  async withdrawConsent(userId: number): Promise<number> {
+    const result = await db
+      .update(userConsents)
+      .set({ withdrawnAt: new Date() })
+      .where(and(eq(userConsents.userId, userId), isNull(userConsents.withdrawnAt)))
+      .returning({ id: userConsents.id });
+    return result.length;
+  }
+
+  /** Clear the consent-required flag — called after recordConsent succeeds. */
+  async clearRequiresConsent(userId: number): Promise<void> {
+    await db.update(users).set({ requiresConsent: false }).where(eq(users.id, userId));
+  }
+
+  /** Re-arm the consent gate for a member (used on consent withdrawal). */
+  async setRequiresConsent(userId: number, value: boolean): Promise<void> {
+    await db.update(users).set({ requiresConsent: value }).where(eq(users.id, userId));
+  }
+
+  /** GDPR Art. 17 — record a pending right-to-be-forgotten request. */
+  async createErasureRequest(args: { userId: number; reason?: string }): Promise<ErasureRequest> {
+    const [row] = await db.insert(erasureRequests).values(args).returning();
+    return row;
+  }
+
+  /** Return the member's still-open (unprocessed) erasure request, if any. */
+  async getPendingErasureRequest(userId: number): Promise<ErasureRequest | undefined> {
+    const [row] = await db
+      .select()
+      .from(erasureRequests)
+      .where(and(eq(erasureRequests.userId, userId), isNull(erasureRequests.processedAt)))
+      .orderBy(desc(erasureRequests.requestedAt))
+      .limit(1);
+    return row;
+  }
+
+  /**
+   * Close-handler hook: when a proposal reaches a terminal state, crypto-shred
+   * any votes on it that belong to members whose erasure request was already
+   * processed but had this vote deferred (Art. 17(3)(d) — pre-close lawful
+   * refusal). Idempotent: re-running it does nothing because erased rows are
+   * filtered out. Call from triggerSideEffects on transitions into
+   * 'decided' / 'archived'.
+   */
+  async processDeferredErasuresForProposal(proposalId: number): Promise<{
+    proposalVotesShredded: number;
+    egBallotsShredded: number;
+  }> {
+    const now = new Date();
+
+    const pvResult = await db.execute(sql`
+      UPDATE proposal_votes
+      SET user_id = NULL, erased_at = ${now}
+      WHERE proposal_id = ${proposalId}
+        AND erased_at IS NULL
+        AND user_id IN (
+          SELECT DISTINCT user_id FROM erasure_requests
+          WHERE processed_at IS NOT NULL
+        )
+      RETURNING id
+    `);
+
+    const egResult = await db.execute(sql`
+      UPDATE eg_ballots
+      SET user_id = NULL, erased_at = ${now}
+      WHERE election_id IN (
+          SELECT id FROM eg_elections WHERE proposal_id = ${proposalId}
+        )
+        AND erased_at IS NULL
+        AND user_id IN (
+          SELECT DISTINCT user_id FROM erasure_requests
+          WHERE processed_at IS NOT NULL
+        )
+      RETURNING id
+    `);
+
+    return {
+      proposalVotesShredded: (pvResult.rows as unknown[]).length,
+      egBallotsShredded: (egResult.rows as unknown[]).length,
+    };
+  }
+
+  /** List pending (unprocessed) erasure requests, oldest first. */
+  async listPendingErasureRequests(): Promise<ErasureRequest[]> {
+    return db
+      .select()
+      .from(erasureRequests)
+      .where(isNull(erasureRequests.processedAt))
+      .orderBy(erasureRequests.requestedAt);
+  }
+
+  /** Load a single erasure request by id. */
+  async getErasureRequest(id: number): Promise<ErasureRequest | undefined> {
+    const [row] = await db.select().from(erasureRequests).where(eq(erasureRequests.id, id)).limit(1);
+    return row;
+  }
+
+  /**
+   * GDPR Art. 17 — actually process an erasure request. Per
+   * docs/compliance/INTERNAL_POLICIES.md §2.4:
+   *   * Votes on active (not-yet-closed) proposals are DEFERRED — audit
+   *     integrity during a live deliberation is a legitimate interest under
+   *     Art. 17(3)(d). They will be erased when the proposal closes (the
+   *     close-handler must call this same path).
+   *   * Votes on closed proposals are crypto-shredded: user_id → NULL,
+   *     erased_at → now(). The chain row_hash stays opaque — verifyChain
+   *     only checks prev_hash linkage for erased rows.
+   *   * The users row is anonymised in place. voter_hash and doc_code_hash
+   *     are retained as anti-replay controls (preventing the same identity
+   *     re-registering under a new account).
+   */
+  async processErasureRequest(args: {
+    requestId: number;
+    processedBy: number;
+    notes?: string;
+  }): Promise<{
+    processed: boolean;
+    targetUserId: number;
+    cryptoShredded: {
+      proposalVotes: number;
+      egBallots: number;
+      pointTransactions: number;
+      pointRedemptions: number;
+      pointBalanceDeleted: boolean;
+    };
+    deferredVoteRowIds: number[];
+    userAnonymised: boolean;
+  }> {
+    const request = await this.getErasureRequest(args.requestId);
+    if (!request) throw new Error(`Erasure request ${args.requestId} not found`);
+    if (request.processedAt) throw new Error(`Erasure request ${args.requestId} already processed`);
+
+    const targetUserId = request.userId;
+
+    return await db.transaction(async (tx) => {
+      const erased = await this.eraseUserDataInTx(tx, targetUserId);
+
+      // Mark the request processed.
+      await tx
+        .update(erasureRequests)
+        .set({ processedAt: erased.now, processedBy: args.processedBy, notes: args.notes })
+        .where(eq(erasureRequests.id, args.requestId));
+
+      return {
+        processed: true,
+        targetUserId,
+        cryptoShredded: erased.cryptoShredded,
+        deferredVoteRowIds: erased.deferredVoteIds,
+        userAnonymised: true,
+      };
+    });
+  }
+
+  /**
+   * Core Art. 17 erasure, shared by the admin path (processErasureRequest)
+   * and self-service account deletion (deleteUser). Must run inside a
+   * transaction. Crypto-shreds vote/points bindings and anonymises the users
+   * row IN PLACE — dozens of tables reference users.id with NO ACTION FKs,
+   * so the row must survive; a hard DELETE would be rejected by Postgres.
+   * voter_hash / doc_code_hash are retained as anti-replay controls.
+   */
+  private async eraseUserDataInTx(tx: Tx, targetUserId: number): Promise<{
+    now: Date;
+    cryptoShredded: {
+      proposalVotes: number;
+      egBallots: number;
+      pointTransactions: number;
+      pointRedemptions: number;
+      pointBalanceDeleted: boolean;
+    };
+    membershipsEnded: number;
+    deferredVoteIds: number[];
+  }> {
+      // 1. Find which proposal_votes rows belong to closed proposals (eligible
+      //    for immediate crypto-shred) vs active (deferred).
+      const voteRows = await tx
+        .select({
+          id: proposalVotes.id,
+          proposalId: proposalVotes.proposalId,
+          status: proposals.status,
+        })
+        .from(proposalVotes)
+        .leftJoin(proposals, eq(proposals.id, proposalVotes.proposalId))
+        .where(and(eq(proposalVotes.userId, targetUserId), isNull(proposalVotes.erasedAt)));
+
+      const eligibleVoteIds: number[] = [];
+      const deferredVoteIds: number[] = [];
+      for (const row of voteRows) {
+        // Canonical terminal states (shared/proposal-lifecycle.ts) — votes on
+        // proposals in these states are eligible for immediate crypto-shred.
+        // Any non-terminal status defers per Art. 17(3)(d) (audit integrity).
+        const status = row.status ?? '';
+        if (status === 'decided' || status === 'archived') {
+          eligibleVoteIds.push(row.id);
+        } else {
+          deferredVoteIds.push(row.id);
+        }
+      }
+
+      const now = new Date();
+
+      // 2. Crypto-shred the eligible proposal_votes rows.
+      let pvShredded = 0;
+      if (eligibleVoteIds.length > 0) {
+        const updated = await tx
+          .update(proposalVotes)
+          .set({ userId: null, erasedAt: now })
+          .where(inArray(proposalVotes.id, eligibleVoteIds))
+          .returning({ id: proposalVotes.id });
+        pvShredded = updated.length;
+      }
+
+      // 3. Crypto-shred eg_ballots tied to closed elections. The egElections
+      //    status field is what gates eligibility there.
+      const egRows = await tx.execute(sql`
+        SELECT b.id
+        FROM eg_ballots b
+        JOIN eg_elections e ON e.id = b.election_id
+        WHERE b.user_id = ${targetUserId}
+          AND b.erased_at IS NULL
+          AND e.status = 'closed'
+      `);
+      const egIds = (egRows.rows as Array<{ id: number }>).map(r => r.id);
+      let egShredded = 0;
+      if (egIds.length > 0) {
+        const updated = await tx
+          .update(egBallots)
+          .set({ userId: null, erasedAt: now })
+          .where(inArray(egBallots.id, egIds))
+          .returning({ id: egBallots.id });
+        egShredded = updated.length;
+      }
+
+      // 4. Democracy Points crypto-shred (Art. 17 + INTERNAL_POLICIES §2.4).
+      //    Ledger and redemption rows survive for treasury reconciliation;
+      //    only the user binding is severed. The cached balance row is a
+      //    projection and is deleted outright.
+      const txnUpdated = await tx
+        .update(pointTransactions)
+        .set({ userId: null })
+        .where(eq(pointTransactions.userId, targetUserId))
+        .returning({ id: pointTransactions.id });
+      const redUpdated = await tx
+        .update(pointRedemptions)
+        .set({ userId: null })
+        .where(eq(pointRedemptions.userId, targetUserId))
+        .returning({ id: pointRedemptions.id });
+      const balDeleted = await tx
+        .delete(pointBalances)
+        .where(eq(pointBalances.userId, targetUserId))
+        .returning({ userId: pointBalances.userId });
+
+      // 5. Anonymise the user row in place. Keep voter_hash / doc_code_hash
+      //    as anti-replay controls; nullify all PII; mark status erased.
+      const sentinel = `erased-${targetUserId}`;
+      await tx.update(users).set({
+        username: sentinel,
+        email: `${sentinel}@example.invalid`,
+        name: 'Erased Member',
+        password: null,
+        providerId: null,
+        provider: null,
+        profilePicture: null,
+        deviceFingerprint: null,
+        registrationIp: null,
+        lastLoginIp: null,
+        accountFlags: null,
+        accountStatus: 'erased',
+        requiresConsent: true,
+        govgrFirstName: null,
+        govgrLastName: null,
+        govgrMunicipality: null,
+        govgrPostcode: null,
+      }).where(eq(users.id, targetUserId));
+
+      // 6. Withdraw any still-active consent rows (Art. 7(3)).
+      await tx
+        .update(userConsents)
+        .set({ withdrawnAt: now })
+        .where(and(eq(userConsents.userId, targetUserId), isNull(userConsents.withdrawnAt)));
+
+      // 7. End every community membership, and any admin rights that hung off
+      //    the community row rather than the membership row.
+      //
+      //    Not cosmetic: quorum is `ballots / count(community_members)`
+      //    (routers/proposals computeVoteResults), so an erased account left
+      //    in place permanently raises the bar for every future vote in that
+      //    community while being unable to ever vote again. The member list
+      //    would also keep showing "Erased Member" alongside real people.
+      const memberships = await tx
+        .delete(communityMembers)
+        .where(eq(communityMembers.userId, targetUserId))
+        .returning({ communityId: communityMembers.communityId });
+
+      for (const { communityId } of memberships) {
+        const [community] = await tx
+          .select({ adminIds: communities.adminIds })
+          .from(communities)
+          .where(eq(communities.id, communityId));
+        const adminIds = Array.isArray(community?.adminIds) ? community.adminIds as number[] : [];
+        if (adminIds.includes(targetUserId)) {
+          await tx
+            .update(communities)
+            .set({ adminIds: adminIds.filter(id => id !== targetUserId) })
+            .where(eq(communities.id, communityId));
+        }
+      }
+
+      return {
+        now,
+        cryptoShredded: {
+          proposalVotes: pvShredded,
+          egBallots: egShredded,
+          pointTransactions: txnUpdated.length,
+          pointRedemptions: redUpdated.length,
+          pointBalanceDeleted: balDeleted.length > 0,
+        },
+        membershipsEnded: memberships.length,
+        deferredVoteIds,
+      };
+  }
+
+  /** GDPR Art. 15 — full export of everything we hold about a member. */
+  async exportUserData(userId: number): Promise<{
+    profile: User | undefined;
+    consents: UserConsent[];
+    activity: SelectAccountActivity[];
+    erasureRequests: ErasureRequest[];
+  }> {
+    const [profile, consents, activity, erasures] = await Promise.all([
+      this.getUser(userId),
+      db.select().from(userConsents).where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.acceptedAt)),
+      this.getUserAccountActivity(userId),
+      db.select().from(erasureRequests).where(eq(erasureRequests.userId, userId)).orderBy(desc(erasureRequests.requestedAt)),
+    ]);
+    return { profile, consents, activity, erasureRequests: erasures };
+  }
+
+
+  /** Update user fields. */
+  async updateUser(userId: number, updates: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+    if (!user) throw new Error("User not found");
+    return user;
+  }
+
+  /**
+   * Self-service account deletion. Runs the shared Art. 17 erasure core
+   * (anonymise-in-place — a hard DELETE FROM users is impossible: dozens of
+   * tables reference users.id with NO ACTION FKs, so it always failed with
+   * an FK violation). With deletePolls=false the member's polls survive
+   * under the anonymised "Erased Member" row — the "transferred to the
+   * community" behaviour the UI promises.
+   */
+  async deleteUser(userId: number, deletePolls: boolean): Promise<boolean> {
+    await db.transaction(async (tx) => {
+      if (deletePolls) {
+        const owned = await tx
+          .select({ id: polls.id })
+          .from(polls)
+          .where(eq(polls.creatorId, userId));
+        const pollIds = owned.map((p) => p.id);
+        if (pollIds.length > 0) {
+          // FK-safe order; ballot_votes and poll_notifications cascade.
+          const questionIds = (
+            await tx
+              .select({ id: pollQuestions.id })
+              .from(pollQuestions)
+              .where(inArray(pollQuestions.pollId, pollIds))
+          ).map((q) => q.id);
+          await tx.delete(pollUserResponses).where(inArray(pollUserResponses.pollId, pollIds));
+          if (questionIds.length > 0) {
+            await tx.delete(pollAnswers).where(inArray(pollAnswers.questionId, questionIds));
+            await tx.delete(pollQuestions).where(inArray(pollQuestions.id, questionIds));
+          }
+          await tx.delete(votes).where(inArray(votes.pollId, pollIds));
+          await tx.delete(pollOptions).where(inArray(pollOptions.pollId, pollIds));
+          await tx.delete(comments).where(inArray(comments.pollId, pollIds));
+          await tx.delete(polls).where(inArray(polls.id, pollIds));
+        }
+      }
+
+      // Record a pre-processed erasure request so votes deferred on active
+      // proposals get crypto-shredded when those proposals close —
+      // processDeferredErasuresForProposal keys off processed requests.
+      await tx.insert(erasureRequests).values({
+        userId,
+        reason: 'self-service account deletion',
+        processedAt: new Date(),
+        processedBy: userId,
+      });
+
+      await this.eraseUserDataInTx(tx, userId);
+    });
+    return true;
+  }
+
+  /** Check for duplicate accounts by device fingerprint and IP. */
+  async checkDuplicateAccounts(deviceFingerprint: string, ip: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(and(
+        eq(users.deviceFingerprint, deviceFingerprint),
+        eq(users.registrationIp, ip)
+      ));
+    return result[0]?.count || 0;
+  }
+
+  /** Create an account activity record. */
+  async createAccountActivity(activity: InsertAccountActivity): Promise<void> {
+    await db.insert(accountActivity).values(activity);
+  }
+
+  /** Update user login info (IP, timestamp). */
+  async updateUserLoginInfo(userId: number, data: { lastLoginIp: string }): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ lastLoginIp: data.lastLoginIp })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!user) throw new Error("User not found");
+    return user;
+  }
+
+  /** Get user account activity history. */
+  async getUserAccountActivity(userId: number): Promise<SelectAccountActivity[]> {
+    return await db
+      .select()
+      .from(accountActivity)
+      .where(eq(accountActivity.userId, userId))
+      .orderBy(desc(accountActivity.timestamp));
+  }
+
+  /** Get all users with optional filters. */
+  async getAllUsersWithAccountInfo(filters?: { status?: string; search?: string }): Promise<User[]> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(users.accountStatus, filters.status));
+    }
+    if (filters?.search) {
+      conditions.push(ilike(users.username, `%${filters.search}%`));
+    }
+    return await db
+      .select()
+      .from(users)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(users.id));
+  }
+
+  /** Update account status (active, suspended, etc.). */
+  async updateAccountStatus(userId: number, status: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ accountStatus: status })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!user) throw new Error("User not found");
+    return user;
+  }
+
+}
+
