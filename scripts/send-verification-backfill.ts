@@ -35,6 +35,21 @@ import { isMailConfigured, publicUrl } from '../server/utils/mailer';
 
 const DELAY_MS = 2_000;
 
+/**
+ * Addresses that exist in the users table but cannot receive mail: seeded
+ * demo accounts, e2e fixtures, reserved example domains.
+ *
+ * Without this the run hands 30 of them to the provider one by one, collects
+ * 30 rejections, and spends 30 attempts of a metered quota proving what the
+ * domain names already say. Worse, a run log full of failures is a run log
+ * nobody reads, and the real failure hides in it.
+ */
+const UNDELIVERABLE = /@(example\.(com|org|net|invalid)|demo\.agorax\.local|.*\.test|.*\.invalid|.*\.local)$/i;
+
+function isDeliverable(email: string): boolean {
+  return !UNDELIVERABLE.test(email.trim());
+}
+
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit?.split('=')[1];
@@ -66,14 +81,23 @@ async function main(): Promise<void> {
     ))
     .orderBy(users.id);
 
+  const deliverable = pending.filter((u) => isDeliverable(u.email));
+  const undeliverable = pending.length - deliverable.length;
+
   console.log(`${pending.length} unverified account(s).`);
+  if (undeliverable > 0) {
+    // Named, not silent. A count that quietly shrinks is how a backfill
+    // ends up having skipped real people nobody noticed.
+    console.log(`${undeliverable} skipped as undeliverable (demo/test/reserved domains).`);
+  }
+  console.log(`${deliverable.length} will be mailed.`);
 
   let sent = 0;
   let skipped = 0;
 
-  for (const user of pending) {
+  for (const user of deliverable) {
     if (sent >= limit) {
-      console.log(`Reached --limit=${limit}; ${pending.length - sent - skipped} left for the next run.`);
+      console.log(`Reached --limit=${limit}; ${deliverable.length - sent - skipped} left for the next run.`);
       break;
     }
 
@@ -120,7 +144,7 @@ async function main(): Promise<void> {
         expiresInHours: VERIFICATION_TTL_HOURS,
       });
       sent++;
-      console.log(`sent → user #${user.id} (${sent}/${pending.length})`);
+      console.log(`sent → user #${user.id} (${sent}/${deliverable.length})`);
     } catch (err: any) {
       // Keep going. One bad address must not end the run — the token row
       // stays and the next run will skip this account until it expires.

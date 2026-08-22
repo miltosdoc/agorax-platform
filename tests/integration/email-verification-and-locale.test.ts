@@ -428,6 +428,48 @@ describe('backfill script', () => {
   it('refuses to run against an unconfigured mail server', () => {
     expect(backfill).toMatch(/if \(!isMailConfigured\(\) && !dryRun\)/);
   });
+
+  it('never hands a demo, test or reserved address to the provider', () => {
+    expect(backfill).toMatch(/const UNDELIVERABLE = /);
+    expect(backfill).toMatch(/function isDeliverable/);
+    expect(backfill).toMatch(/pending\.filter\(\(u\) => isDeliverable\(u\.email\)\)/);
+  });
+
+  it('says out loud how many it skipped, rather than quietly shrinking', () => {
+    expect(backfill).toMatch(/skipped as undeliverable/);
+    expect(backfill).toMatch(/will be mailed/);
+  });
+});
+
+describe('the undeliverable filter', () => {
+  // Mirrors the regex in the script; kept in the test so a change to one
+  // without the other is visible.
+  const UNDELIVERABLE = /@(example\.(com|org|net|invalid)|demo\.agorax\.local|.*\.test|.*\.invalid|.*\.local)$/i;
+  const deliverable = (e: string) => !UNDELIVERABLE.test(e.trim());
+
+  it('rejects every placeholder family present in this database', () => {
+    for (const e of [
+      'demo_civic_nikos@demo.agorax.local',
+      'e2e_panel_x@example.invalid',
+      'sharetest@example.com',
+      'someone@thing.test',
+      'someone@box.local',
+    ]) {
+      expect(deliverable(e), e).toBe(false);
+    }
+  });
+
+  it('lets real addresses through, including lookalikes', () => {
+    for (const e of [
+      'miltos@gmail.com',
+      'a@yahoo.gr',
+      'b@xsilico.ai',
+      'c@exampleschool.gr',
+      'd@testcompany.com',
+    ]) {
+      expect(deliverable(e), e).toBe(true);
+    }
+  });
 });
 
 // ─── Migration ──────────────────────────────────────────────────────────────
