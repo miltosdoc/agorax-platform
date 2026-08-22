@@ -147,7 +147,7 @@ describe('confirming', () => {
 
   it('is unauthenticated, because the link opens in whatever browser has the inbox', () => {
     expect(handler).not.toMatch(/requireAuth/);
-    expect(auth).toMatch(/app\.post\("\/api\/email-verification\/verify", authLimiter/);
+    expect(auth).toMatch(/app\.post\("\/api\/email-verification\/verify", tokenCheckLimiter/);
   });
 
   it('is a POST, so a link scanner cannot confirm an address nobody read', () => {

@@ -195,7 +195,7 @@ describe('POST /api/password-reset/request', () => {
 
 describe('POST /api/password-reset', () => {
   const handler = auth.slice(
-    auth.indexOf('app.post("/api/password-reset", authLimiter'),
+    auth.indexOf('app.post("/api/password-reset", sensitiveLimiter'),
     auth.indexOf('app.post("/api/login"'),
   );
 
@@ -326,6 +326,46 @@ describe('the login form offers a way back in', () => {
     const submit = forgotPage.slice(forgotPage.indexOf('const submit ='));
     expect(submit).toMatch(/setSent\(true\)/);
     expect(submit).not.toMatch(/errorToast|setError/);
+  });
+});
+
+// ─── Recovery must not spend the login budget ───────────────────────────────
+
+describe('rate limits are separated by what they protect', () => {
+  it('gives login, state changes and link-landings their own buckets', () => {
+    for (const name of ['loginLimiter', 'sensitiveLimiter', 'tokenCheckLimiter']) {
+      expect(auth, `${name} missing`).toMatch(new RegExp(`const ${name} = rateLimit\\(`));
+    }
+    // The single shared bucket is gone.
+    expect(auth).not.toMatch(/const authLimiter = rateLimit\(/);
+  });
+
+  it('does not let the reset flow consume login attempts', () => {
+    // Opening the link, saving the password and confirming an address must
+    // not come out of the allowance the member needs to then sign in.
+    expect(auth).toMatch(/app\.post\("\/api\/password-reset\/check", tokenCheckLimiter/);
+    expect(auth).toMatch(/app\.post\("\/api\/email-verification\/verify", tokenCheckLimiter/);
+    expect(auth).toMatch(/app\.post\("\/api\/password-reset", sensitiveLimiter/);
+    expect(auth).toMatch(/app\.post\("\/api\/login", loginLimiter/);
+  });
+
+  it('does not count a successful sign-in against the guessing limit', () => {
+    const fn = auth.slice(auth.indexOf('const loginLimiter = rateLimit('));
+    expect(fn.slice(0, 400)).toMatch(/skipSuccessfulRequests: true/);
+  });
+
+  it('counts every failed attempt — the limit still bites where it should', () => {
+    const sensitive = auth.slice(auth.indexOf('const sensitiveLimiter = rateLimit('), auth.indexOf('const tokenCheckLimiter'));
+    expect(sensitive).not.toMatch(/skipSuccessfulRequests/);
+  });
+
+  it('gives link-landings the most headroom, since page loads fire them', () => {
+    const check = auth.slice(auth.indexOf('const tokenCheckLimiter = rateLimit('));
+    expect(check.slice(0, 300)).toMatch(/max: demo \? 999 : 40/);
+  });
+
+  it('keeps the reset-request ceiling the tightest of all', () => {
+    expect(RESET_REQUESTS_PER_IP_PER_HOUR).toBeLessThan(40);
   });
 });
 

@@ -232,12 +232,63 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const authLimiter = rateLimit({
+  // ── Rate limits ──────────────────────────────────────────────────────
+  //
+  // These used to be one bucket of 10 per quarter-hour shared by login,
+  // registration, both reset endpoints and address confirmation. That was
+  // fine while the only way to spend it was to try passwords. It stopped
+  // being fine the moment reset-by-email existed, because the recovery flow
+  // now spends the login budget on the way through: opening the reset page
+  // costs a check, saving the password costs another, clicking the
+  // confirmation link costs a third — and then the member, having done
+  // everything right, is told "too many requests" the first time they try
+  // the password they just set. Locking someone out at the end of account
+  // recovery is the exact failure recovery exists to prevent.
+  //
+  // So: three buckets, each sized for what it protects.
+  const limiterBase = {
+    standardHeaders: true as const,
+    legacyHeaders: false as const,
+    skip: (req: any) => req.method === "GET" || process.env.DEMO_MODE === "true",
+  };
+
+  const demo = process.env.DEMO_MODE === "true";
+
+  /**
+   * Password guessing. Successful sign-ins are not counted — the limit
+   * exists to slow down someone trying passwords, and a correct password is
+   * not an attempt at guessing. Without this, a shared office address burns
+   * its allowance on people simply signing in.
+   */
+  const loginLimiter = rateLimit({
+    ...limiterBase,
     windowMs: 15 * 60 * 1000,
-    max: process.env.DEMO_MODE === "true" ? 999 : 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => req.method === "GET" || process.env.DEMO_MODE === "true",
+    max: demo ? 999 : 10,
+    skipSuccessfulRequests: true,
+  });
+
+  /**
+   * State-changing account actions: registration, setting a new password,
+   * the mobile OAuth handoff. Rare per person, expensive to get wrong.
+   */
+  const sensitiveLimiter = rateLimit({
+    ...limiterBase,
+    windowMs: 15 * 60 * 1000,
+    max: demo ? 999 : 10,
+  });
+
+  /**
+   * Landing on a link from an email: "is this token still good?".
+   *
+   * Fires on every page load, including a reload and a mail client's own
+   * prefetch, so it needs headroom. It is also the cheapest thing here to
+   * get wrong from an attacker's side — the tokens are 256 bits, so this
+   * limit is about noise, not about guessing.
+   */
+  const tokenCheckLimiter = rateLimit({
+    ...limiterBase,
+    windowMs: 15 * 60 * 1000,
+    max: demo ? 999 : 40,
   });
 
   passport.use(
@@ -417,7 +468,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/register", authLimiter, async (req, res, next) => {
+  app.post("/api/register", sensitiveLimiter, async (req, res, next) => {
     try {
       // GDPR Art. 9(2)(a) — registration requires explicit consent to the
       // current canonical privacy text. Reject before any DB work so a
@@ -623,7 +674,7 @@ export function setupAuth(app: Express) {
    * first would strand exactly the people whose address needs confirming.
    * The token is the proof; it grants nothing except setting this one flag.
    */
-  app.post("/api/email-verification/verify", authLimiter, async (req, res) => {
+  app.post("/api/email-verification/verify", tokenCheckLimiter, async (req, res) => {
     try {
       const token = typeof req.body?.token === 'string' ? req.body.token : '';
       if (!token) return res.json({ ok: false });
@@ -788,7 +839,7 @@ export function setupAuth(app: Express) {
 
   // ── Self-service "I forgot my password" ──────────────────────────────
 
-  // Tighter than authLimiter: a login attempt costs the attacker a guess,
+  // Tighter than the login bucket: a login attempt costs the attacker a guess,
   // but a reset request costs us an email and costs the account holder an
   // unwanted message, so the ceiling per address is lower. Both ceilings
   // live in utils/password-reset.ts alongside the token rules.
@@ -905,12 +956,12 @@ export function setupAuth(app: Express) {
 
   // Lets the page say "this link is expired" before someone types a new
   // password twice for nothing.
-  app.post("/api/password-reset/check", authLimiter, async (req, res) => {
+  app.post("/api/password-reset/check", tokenCheckLimiter, async (req, res) => {
     const row = await findLiveResetToken(req.body?.token);
     res.json({ valid: !!row });
   });
 
-  app.post("/api/password-reset", authLimiter, async (req, res) => {
+  app.post("/api/password-reset", sensitiveLimiter, async (req, res) => {
     try {
       // Same rule as registration — the shared policy, not a copy of it.
       const parsedPassword = passwordPolicySchema.safeParse(req.body?.password);
@@ -969,7 +1020,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", authLimiter, (req, res, next) => {
+  app.post("/api/login", loginLimiter, (req, res, next) => {
     // Store any returnTo info from the session or request body
     const returnTo = req.body.returnTo || '/feed';
 
@@ -1166,7 +1217,7 @@ export function setupAuth(app: Express) {
   });
 
   // Exchange a deep-link one-time code for a webview session (mobile app).
-  app.post('/api/auth/mobile-exchange', authLimiter, async (req, res) => {
+  app.post('/api/auth/mobile-exchange', sensitiveLimiter, async (req, res) => {
     const code = typeof req.body?.code === 'string' ? req.body.code : '';
     const entry = code ? consumeMobileAuthCode(code) : null;
     if (!entry) {
