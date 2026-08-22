@@ -303,12 +303,22 @@ export function setupAuth(app: Express) {
 
               if (existingUser) {
                 // Update existing user with Google provider details
+                // Signing in through Google proves the same mailbox our own
+                // confirmation link would have proved, so an account that
+                // arrives this way stops being "unverified" on the spot.
+                const linkVerified = profile._json?.email_verified === true
+                  || (profile.emails?.[0] as { verified?: boolean | string } | undefined)?.verified === true
+                  || (profile.emails?.[0] as { verified?: boolean | string } | undefined)?.verified === 'true';
+
                 const [updatedUser] = await db
                   .update(users)
                   .set({
                     providerId: profile.id,
                     provider: 'google',
-                    profilePicture: profile.photos?.[0]?.value || null
+                    profilePicture: profile.photos?.[0]?.value || null,
+                    ...(linkVerified && !existingUser.emailVerifiedAt
+                      ? { emailVerifiedAt: new Date() }
+                      : {}),
                   })
                   .where(eq(users.id, existingUser.id))
                   .returning();
@@ -317,9 +327,27 @@ export function setupAuth(app: Express) {
               }
             }
 
-            // Create a new user with Google profile info
+            // Create a new user with Google profile info.
+            //
+            // There is no separate "sign up with Google" — this callback is
+            // the sign-up. Which is fine, and normal for OAuth, but it means
+            // the address arriving here is the only one this account will
+            // ever have.
+            //
+            // It used to fall back to the numeric Google profile id at
+            // gmail.com when Google returned no address: a fabricated mailbox
+            // belonging to nobody, or to a stranger. That was survivable only
+            // while AgoraX sent no mail at all. It now sends password-reset
+            // links, so an invented address is a reset link posted to someone
+            // else. Refuse instead.
             const name = profile.displayName || 'User';
-            const email = profile.emails?.[0]?.value || `${profile.id}@gmail.com`;
+            const email = profile.emails?.[0]?.value;
+            if (!email) {
+              return done(null, false, {
+                message: 'Η Google δεν επέστρεψε διεύθυνση email. '
+                  + 'Επιτρέψτε την πρόσβαση στο email σας ή εγγραφείτε με email και κωδικό.',
+              });
+            }
 
             // Generate a unique username
             const baseUsername = (profile.displayName || 'user').toLowerCase().replace(/\s+/g, '');
@@ -335,14 +363,24 @@ export function setupAuth(app: Express) {
             }
 
             // Create the new user
+            // Google states whether it has verified the address. When it
+            // has, asking the member to prove the same mailbox to us again
+            // is ceremony: Google's check is the stronger of the two, and a
+            // confirmation email nobody needed is still a confirmation email
+            // in their inbox.
+            const googleVerified = profile._json?.email_verified === true
+              || (profile.emails?.[0] as { verified?: boolean | string } | undefined)?.verified === true
+              || (profile.emails?.[0] as { verified?: boolean | string } | undefined)?.verified === 'true';
+
             const newUser = await storage.createUser({
               username,
               name,
               email,
               provider: 'google',
               providerId: profile.id,
-              profilePicture: profile.photos?.[0]?.value || null
-            });
+              profilePicture: profile.photos?.[0]?.value || null,
+              emailVerifiedAt: googleVerified ? new Date() : null,
+            } as any);
 
             // Auto-enrol in the General community, same as local
             // registration. Best-effort: never block a Google signup.
@@ -806,10 +844,27 @@ export function setupAuth(app: Express) {
       const user = await storage.getUserByEmail(email);
       if (!user) return;
 
-      // An account that signed up through Google has no password to reset.
-      // Sending a link that sets one would quietly convert it into a
+      // An account that signed up through Google has no password to reset,
+      // and minting a link that sets one would quietly convert it into a
       // password account behind the member's back.
-      if (!user.password) return;
+      //
+      // But silence here is its own failure: about a third of this platform
+      // signs in with Google, and every one of them would get the uniform
+      // "check your inbox" and then wait for a link that by design never
+      // arrives. The form still cannot say so — that would disclose the
+      // account — but an email to the address discloses nothing to anyone
+      // except the person who can already read that mailbox.
+      if (!user.password) {
+        sendSecurityEmailInBackground({
+          userId: user.id,
+          template: 'google_account',
+          // One per hour per account: enough that a second honest attempt
+          // gets an answer, not so many that this becomes a way to post
+          // mail to someone repeatedly.
+          idempotencyKey: `google_account:${user.id}:${Math.floor(Date.now() / 3_600_000)}`,
+        });
+        return;
+      }
 
       if (user.accountStatus === 'banned') return;
 

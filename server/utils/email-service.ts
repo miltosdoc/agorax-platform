@@ -52,6 +52,7 @@ import {
   normalizeLocale,
   passwordChangedEmail,
   passwordResetEmail,
+  googleAccountEmail,
   proposalUpdateEmail,
   verifyEmailEmail,
   votingEmail,
@@ -314,7 +315,8 @@ async function deliver(args: DeliverArgs): Promise<void> {
 export type SecurityTemplate =
   | 'password_reset'
   | 'password_changed'
-  | 'email_verification';
+  | 'email_verification'
+  | 'google_account';
 
 interface SecurityMailArgs {
   userId: number;
@@ -346,6 +348,12 @@ export async function sendSecurityEmail(args: SecurityMailArgs): Promise<void> {
       name: recipient.name,
       resetUrl: args.resetUrl,
       expiresInMinutes: args.expiresInMinutes ?? 30,
+    });
+  } else if (args.template === 'google_account') {
+    rendered = googleAccountEmail({
+      locale: recipient.locale,
+      name: recipient.name,
+      loginUrl: `${publicUrl()}/auth`,
     });
   } else if (args.template === 'email_verification') {
     if (!args.verifyUrl) throw new Error('email_verification requires a verifyUrl');

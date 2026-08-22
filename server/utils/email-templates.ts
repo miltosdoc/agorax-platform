@@ -287,6 +287,52 @@ export function verifyEmailEmail(opts: {
   });
 }
 
+/**
+ * "You asked to reset a password on an account that has none."
+ *
+ * Half the reason this exists: the reset form must answer identically whether
+ * or not an address has an account, so it cannot say "you signed in with
+ * Google" — that would disclose the account to anyone probing addresses. But
+ * an *email* to that address discloses nothing to a stranger; only the person
+ * holding the mailbox reads it. So the uniform response stays uniform and the
+ * owner still gets told what to do, instead of waiting for a link that by
+ * design will never come.
+ */
+export function googleAccountEmail(opts: {
+  locale: MailLocale;
+  name: string;
+  loginUrl: string;
+}): RenderedMail {
+  const { locale, name, loginUrl } = opts;
+  const n = esc(name);
+
+  if (locale === 'en') {
+    return render('Signing in to AgoraX', {
+      locale,
+      title: 'This account signs in with Google',
+      paragraphs: [
+        `Hello ${n},`,
+        'Someone asked to reset the password for the AgoraX account on this address. There is no password to reset: this account signs in with Google.',
+        'Use the <strong>Sign in with Google</strong> button on the sign-in page and you are in — no password needed, and nothing about your account has changed.',
+        'If that was not you, no action is needed.',
+      ],
+      cta: { label: 'Go to sign-in', url: loginUrl },
+    });
+  }
+
+  return render('Σύνδεση στο AgoraX', {
+    locale,
+    title: 'Ο λογαριασμός συνδέεται με Google',
+    paragraphs: [
+      `Γεια σας ${n},`,
+      'Ζητήθηκε επαναφορά κωδικού για τον λογαριασμό AgoraX σε αυτή τη διεύθυνση. Δεν υπάρχει κωδικός να επαναφερθεί: ο λογαριασμός συνδέεται μέσω Google.',
+      'Χρησιμοποιήστε το κουμπί <strong>Σύνδεση με Google</strong> στη σελίδα σύνδεσης και μπαίνετε κατευθείαν — χωρίς κωδικό, και χωρίς καμία αλλαγή στον λογαριασμό σας.',
+      'Αν δεν το ζητήσατε εσείς, δεν χρειάζεται καμία ενέργεια.',
+    ],
+    cta: { label: 'Στη σελίδα σύνδεσης', url: loginUrl },
+  });
+}
+
 // ─── Optional mail — always carries settings + unsubscribe ──────────────────
 
 interface OptionalOpts {

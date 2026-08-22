@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Google accounts always carry a real address** — the OAuth callback used
+  to invent `<google-profile-id>@gmail.com` when Google returned no email,
+  creating an account whose only address belonged to nobody. Harmless while
+  AgoraX sent no mail; a password-reset link posted to a stranger once it
+  did. It now refuses the sign-in and says why. Google's own `email_verified`
+  is accepted in place of our confirmation link, both on sign-up and when an
+  existing account links to Google — Google's check is the stronger one, and
+  a confirmation nobody needed is still an email in their inbox.
+- **A Google account asking for a password reset is told so** — by email, not
+  by the form. About a third of the platform signs in with Google and has no
+  password to reset; before this they got the uniform "check your inbox" and
+  waited for a link that by design never arrives. The form still cannot say
+  so without disclosing that the account exists, but an email to that address
+  discloses nothing to anyone who cannot already read the mailbox. Capped to
+  one per account per hour.
 - **Email address confirmation** — new registrations are mailed a confirmation
   link; the member can ask for another from `/notifications/settings`, capped
   per hour. `users.email_verified_at` records the fact and the admin accounts

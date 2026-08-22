@@ -183,6 +183,79 @@ describe('confirming', () => {
   });
 });
 
+// ─── Google accounts always have a real address ─────────────────────────────
+
+describe('Google sign-in', () => {
+  const strategy = auth.slice(
+    auth.indexOf('new GoogleStrategy('),
+    auth.indexOf('// ── Email verification'),
+  );
+
+  it('never invents an address when Google returns none', () => {
+    // The old fallback was `${profile.id}@gmail.com` — a mailbox belonging
+    // to nobody, or to a stranger. Harmless while nothing was ever sent;
+    // a reset link posted to the wrong person once mail exists.
+    expect(strategy).not.toMatch(/\$\{profile\.id\}@gmail\.com/);
+    expect(strategy).toMatch(/const email = profile\.emails\?\.\[0\]\?\.value;/);
+    expect(strategy).toMatch(/if \(!email\) \{/);
+    expect(strategy).toMatch(/return done\(null, false, \{/);
+  });
+
+  it('refuses rather than creating a half-account', () => {
+    const guard = strategy.slice(strategy.indexOf('if (!email) {'));
+    expect(guard.indexOf('return done(null, false')).toBeLessThan(
+      guard.indexOf('storage.createUser'),
+    );
+  });
+
+  it('accepts Google’s own verification instead of asking twice', () => {
+    expect(strategy).toMatch(/email_verified === true/);
+    expect(strategy).toMatch(/emailVerifiedAt: googleVerified \? new Date\(\) : null/);
+  });
+
+  it('marks an existing account verified when it links to Google', () => {
+    expect(strategy).toMatch(/linkVerified && !existingUser\.emailVerifiedAt/);
+  });
+});
+
+describe('a Google account asking for a password reset', () => {
+  it('gets told, by email, rather than left waiting', () => {
+    const handler = auth.slice(
+      auth.indexOf('app.post("/api/password-reset/request"'),
+      auth.indexOf('app.post("/api/password-reset/check"'),
+    );
+    expect(handler).toMatch(/if \(!user\.password\) \{/);
+    expect(handler).toMatch(/template: 'google_account'/);
+  });
+
+  it('still mints no reset token for it', () => {
+    const handler = auth.slice(auth.indexOf('app.post("/api/password-reset/request"'));
+    const guard = handler.slice(handler.indexOf('if (!user.password) {'));
+    // The early return lands before any token is created.
+    expect(guard.indexOf('return;')).toBeLessThan(guard.indexOf('generateResetToken()'));
+  });
+
+  it('does not change what the form says — no disclosure', () => {
+    const handler = auth.slice(
+      auth.indexOf('app.post("/api/password-reset/request"'),
+      auth.indexOf('app.post("/api/password-reset/check"'),
+    );
+    expect(handler.match(/res\.json\(/g)?.length).toBe(1);
+  });
+
+  it('is capped so it cannot be used to mail someone repeatedly', () => {
+    expect(auth).toMatch(/google_account:\$\{user\.id\}:\$\{Math\.floor\(Date\.now\(\) \/ 3_600_000\)\}/);
+  });
+
+  it('renders in both languages and points at sign-in', () => {
+    expect(templates).toMatch(/export function googleAccountEmail/);
+    const tpl = templates.slice(templates.indexOf('export function googleAccountEmail'));
+    expect(tpl).toMatch(/locale === 'en'/);
+    expect(tpl).toMatch(/Σύνδεση με Google/);
+    expect(tpl).toMatch(/Sign in with Google/);
+  });
+});
+
 // ─── Nothing is gated ───────────────────────────────────────────────────────
 
 describe('verification gates nothing', () => {

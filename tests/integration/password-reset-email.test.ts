@@ -180,8 +180,14 @@ describe('POST /api/password-reset/request', () => {
     expect(migration).not.toMatch(/\bemail TEXT\b/);
   });
 
-  it('refuses to mint a link for an account that has no password to reset', () => {
-    expect(auth).toMatch(/if \(!user\.password\) return;/);
+  it('mints no link for an account that has no password to reset', () => {
+    const handler = auth.slice(auth.indexOf('app.post("/api/password-reset/request"'));
+    const guard = handler.slice(handler.indexOf('if (!user.password) {'));
+    expect(handler).toMatch(/if \(!user\.password\) \{/);
+    // Exits before anything is minted…
+    expect(guard.indexOf('return;')).toBeLessThan(guard.indexOf('generateResetToken()'));
+    // …but tells the mailbox owner why, instead of leaving them waiting.
+    expect(guard).toMatch(/template: 'google_account'/);
   });
 });
 
