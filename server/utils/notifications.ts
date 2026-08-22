@@ -13,8 +13,11 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { sortitionNotifications } from '@shared/schema';
+import { createHash } from 'node:crypto';
 import { notificationBus } from './notification-bus';
 import { pushToUsers } from './push-client';
+import { enqueueOptionalEmail, type OptionalTemplate } from './email-service';
+import { emailCategoryForNotification } from '@shared/email-categories';
 
 // ─── Notification Types ─────────────────────────────────────────────────────
 
@@ -89,6 +92,61 @@ export async function createNotification(params: CreateNotificationParams): Prom
     url: params.actionUrl ?? '/notifications',
     tag: `agorax-${params.type}-${params.proposalId ?? params.sortitionBodyId ?? 'x'}`,
   });
+
+  void queueEmailFor(params);
+}
+
+// ─── Email fan-out ──────────────────────────────────────────────────────────
+
+const EMAIL_TEMPLATE_FOR: Readonly<Record<string, OptionalTemplate>> = {
+  new_proposal: 'community_proposal',
+  vote_started: 'voting_open',
+  proposal_advanced: 'proposal_update',
+  amendment_ready: 'proposal_update',
+  deliberation_reminder: 'proposal_update',
+};
+
+/**
+ * Queue the email twin of an in-app notification, if this type has one.
+ *
+ * Reached only after the in-app preference gate above, deliberately: a member
+ * who switched a notification type off should not keep receiving it by mail.
+ * The email-specific switches in /notifications/settings narrow further from
+ * there — they never widen.
+ *
+ * Nothing is decided here beyond "is there an email for this type at all".
+ * Whether the member wants it is re-read by the worker at send time.
+ */
+async function queueEmailFor(params: CreateNotificationParams): Promise<void> {
+  const category = emailCategoryForNotification(params.type);
+  const template = EMAIL_TEMPLATE_FOR[params.type];
+  if (!category || !template) return;
+
+  try {
+    // Same member, same subject, same wording, same day → one email. The
+    // amendment fan-out rolls a single row forward for a whole day and the
+    // phase sweep runs on a timer; without a day bucket in the key, a busy
+    // proposal would mail its community on every pass.
+    const subjectId = params.proposalId ?? params.sortitionBodyId ?? 0;
+    const titleFingerprint = createHash('sha256')
+      .update(params.title)
+      .digest('hex')
+      .slice(0, 12);
+    const day = new Date().toISOString().slice(0, 10);
+
+    await enqueueOptionalEmail({
+      userId: params.userId,
+      template,
+      category,
+      idempotencyKey: `${params.type}:${params.userId}:${subjectId}:${titleFingerprint}:${day}`,
+      subjectLine: params.message?.trim() || params.title,
+      actionPath: params.actionUrl ?? '/notifications',
+      updateLine: params.title,
+    });
+  } catch {
+    // An email that could not be queued must never take the in-app
+    // notification down with it — the bell is the primary channel.
+  }
 }
 
 // ─── Batch: Notify Community of New Proposal ────────────────────────────────

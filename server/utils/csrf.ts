@@ -44,6 +44,12 @@ const EXEMPT_PATH_PATTERNS: RegExp[] = [
   // pagehide, which cannot carry custom headers. It only records a
   // participation timestamp for the session user — nothing to forge.
   /^\/api\/livekit\/rooms\/\d+\/leave$/,
+  // One-click unsubscribe: RFC 8058 has the mail client POST the
+  // List-Unsubscribe-Post URL directly, with no chance to carry our header.
+  // The signed token in the link is the authorisation, and the only thing it
+  // authorises is turning optional email off — there is no session to
+  // protect and nothing an attacker gains by forging it.
+  /^\/api\/unsubscribe$/,
 ];
 
 function newToken(): string {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -20,6 +20,14 @@ import { loginUserSchema, registerUserSchema } from "@shared/schema";
 import { CURRENT_CONSENT_VERSION } from "@shared/consent";
 import { FcGoogle } from "react-icons/fc";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  BUTTON_PRIMARY,
+  BUTTON_SECONDARY,
+  CHECKBOX_CLASS,
+  EYEBROW,
+  INPUT_CLASS,
+  LINK_CLASS,
+} from "@/components/auth/auth-styles";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import logoImage from "../assets/logo.png";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
@@ -51,18 +59,10 @@ async function getFingerprint(): Promise<string | undefined> {
   }
 }
 
-// ————— Institutional idiom (tokens only, 120ms color transitions) —————
-const EYEBROW = "text-xs uppercase tracking-[0.14em] font-semibold text-ink-faint";
-const BUTTON_BASE =
-  "inline-flex w-full items-center justify-center gap-2 rounded-sm px-6 py-2.5 text-sm font-medium transition-colors duration-[120ms] disabled:cursor-not-allowed disabled:opacity-50";
-const BUTTON_PRIMARY = `${BUTTON_BASE} bg-ink text-paper hover:bg-kyanos-deep`;
-const BUTTON_SECONDARY = `${BUTTON_BASE} border border-ink bg-surface text-ink hover:bg-sunken`;
-const LINK_CLASS =
-  "text-sm text-kyanos transition-colors duration-[120ms] hover:underline underline-offset-2";
-const INPUT_CLASS =
-  "h-10 rounded-sm border-line bg-paper text-sm text-ink placeholder:text-ink-faint transition-colors duration-[120ms] focus-visible:ring-1 focus-visible:ring-kyanos focus-visible:border-line-strong";
-const CHECKBOX_CLASS =
-  "mt-0.5 h-4 w-4 rounded-[2px] border border-ink bg-paper data-[state=checked]:bg-ink data-[state=checked]:text-paper";
+// The institutional idiom now lives in components/auth/auth-styles.ts, shared
+// with the password-reset, address-confirmation and unsubscribe pages — they
+// are all signed-out pages reached from an email, and they have to look like
+// the same platform.
 
 export default function AuthPage() {
   const { t } = useTranslation();
@@ -265,9 +265,17 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('auth.username')}</FormLabel>
+              {/* Either identifier works. Reset is keyed on the address, so
+                  a form that took only a username would strand everyone who
+                  came back through it. */}
+              <FormLabel>{t('auth.usernameOrEmail')}</FormLabel>
               <FormControl>
-                <Input className={INPUT_CLASS} placeholder={t('auth.usernamePlaceholder') as string} {...field} />
+                <Input
+                  className={INPUT_CLASS}
+                  autoComplete="username"
+                  placeholder={t('auth.usernameOrEmailPlaceholder') as string}
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -280,13 +288,16 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
             <FormItem>
               <FormLabel>{t('auth.password')}</FormLabel>
               <FormControl>
-                <PasswordInput className={INPUT_CLASS} placeholder="••••••••" {...field} />
+                <PasswordInput className={INPUT_CLASS} autoComplete="current-password" placeholder="••••••••" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/forgot-password" className={LINK_CLASS}>
+            {t('auth.forgotPassword')}
+          </Link>
           <button type="button" className={LINK_CLASS} onClick={onSwitchToRegister}>
             {t('auth.noAccount')}
           </button>
@@ -348,6 +359,10 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
     registerMutation.mutate({
       ...payload,
       deviceFingerprint,
+      // The language they are reading this form in becomes the language
+      // AgoraX writes to them in — starting with the address-confirmation
+      // email, which goes out before they could set a preference anywhere.
+      locale,
       consent: { version: CURRENT_CONSENT_VERSION, locale: consentLocale },
       returnTo: urlReturnTo
     }, {

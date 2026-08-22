@@ -41,6 +41,7 @@ import { registerCommunityMediaRoutes } from "./routers/community-media";
 import { registerLivekitRoutes } from "./routers/livekit";
 import { setupLiveKitProxy } from "./utils/livekit-proxy";
 import { registerPushRoutes } from "./routers/push";
+import { registerEmailPrefsRoutes } from "./routers/email-prefs";
 import { registerSurveysRoutes } from "./routers/surveys";
 import { registerMiscRoutes } from "./routers/misc";
 
@@ -69,6 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCommunityMediaRoutes(app);
   registerLivekitRoutes(app);
   registerPushRoutes(app);
+  registerEmailPrefsRoutes(app);
   registerSurveysRoutes(app);
   registerMiscRoutes(app);
 

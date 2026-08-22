@@ -19,11 +19,16 @@ import AdminAccountsPage from "@/pages/admin-accounts";
 import CommunityDashboardPage from "@/pages/community-dashboard";
 import ConferenceRoomPage from "@/pages/conference-room";
 import ResetPasswordPage from "@/pages/reset-password";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import VerifyEmailPage from "@/pages/verify-email";
+import UnsubscribePage from "@/pages/unsubscribe";
+import { LocaleSync } from "@/components/auth/LocaleSync";
 import VerifyBallotPage from "@/pages/verify-ballot";
 import InviteAcceptPage from "@/pages/invite-accept";
 import CommunitySettingsPage from "@/pages/community-settings";
 import { PlatformSettingsPage } from "@/pages/platform-settings";
 import NotificationsPage from "@/pages/notifications";
+import NotificationSettingsPage from "@/pages/notification-settings";
 import ProposalDetailPage from "@/pages/proposal-detail";
 import ProposalsPage from "@/pages/proposals-page";
 import FeedPage from "@/pages/feed-page";
@@ -118,6 +123,10 @@ function AppRouter() {
         <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
         <Route path="/reset-password" component={ResetPasswordPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        {/* Reached from a link in an email, so they must work signed out. */}
+        <Route path="/unsubscribe" component={UnsubscribePage} />
+        <Route path="/verify-email" component={VerifyEmailPage} />
         <ProtectedRoute path="/home" component={HomePage} />
         <Route path="/my-polls">
           <Redirect to="/home" />
@@ -175,6 +184,7 @@ function AppRouter() {
         <ProtectedRoute path="/proposals/:id/amendments/signals" component={AmendmentCommunitySignal} />
         <ProtectedRoute path="/points" component={DemocracyPointsPage} />
         <ProtectedRoute path="/settings" component={PlatformSettingsPage} />
+        <ProtectedRoute path="/notifications/settings" component={NotificationSettingsPage} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <Route path="/walkthrough" component={DeliberationWalkthrough} />
         <Route path="/verify" component={VerifyBallotPage} />
@@ -196,6 +206,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <AuthProvider>
+          <LocaleSync />
           <AppRouter />
           <FeedbackWidget />
           <Toaster />

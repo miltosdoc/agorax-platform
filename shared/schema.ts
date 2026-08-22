@@ -42,6 +42,16 @@ export const users = pgTable("users", {
   // consent. /api/user/consent/accept clears it for OAuth users at first
   // login. See migration 0016 + the requireConsent middleware.
   requiresConsent: boolean("requires_consent").notNull().default(true),
+
+  // Interface and email language. The consent row's locale is a legal
+  // artefact — which text they were shown — not a standing preference;
+  // this is the preference.
+  locale: text("locale").notNull().default("el"),
+
+  // NULL = the address was never proved. Nothing is gated on it: locking
+  // out every member who registered before verification existed would be a
+  // worse failure than an unconfirmed address.
+  emailVerifiedAt: timestamp("email_verified_at"),
 });
 
 // Append-only consent audit log (GDPR Art. 7 + Art. 9(2)(a)).
@@ -930,21 +940,90 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 
 // ─── Job Queue ──────────────────────────────────────────────────────────────
 
-// ─── Admin-issued password reset ────────────────────────────────────────────
-// No mail service is configured, so there is no self-service "forgot my
-// password" flow. An admin mints a single-use link here and hands it over
-// out of band. Only the SHA-256 of the token is stored — a database reader
-// cannot replay a link, same rule as the panel tokens and claim codes.
+// ─── Password reset ─────────────────────────────────────────────────────────
+// Two ways in, one table. `issuedById` NULL means the member asked for the
+// link themselves through "forgot my password" and it was mailed to them
+// (30-minute expiry); a user id means an admin minted it and delivered it
+// out of band (24 hours), which is still the route for someone who has lost
+// access to their address. Only the SHA-256 of the token is stored — a
+// database reader cannot replay a link, same rule as the panel tokens and
+// claim codes.
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash").notNull().unique(),
-  issuedById: integer("issued_by_id").notNull().references(() => users.id),
+  issuedById: integer("issued_by_id").references(() => users.id),
+  requestedIp: text("requested_ip"),
   expiresAt: timestamp("expires_at").notNull(),
   usedAt: timestamp("used_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   passwordResetUserIdx: index('password_reset_tokens_user_idx').on(table.userId),
+  passwordResetExpiresIdx: index('password_reset_tokens_expires_idx').on(table.expiresAt),
+}));
+
+// Proof that a member controls the address on their account.
+//
+// Same construction as the reset tokens: only the SHA-256 is stored. `email`
+// pins the link to one specific address, so changing the address before
+// clicking retires the link rather than verifying the new one.
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  emailVerifyUserIdx: index('email_verification_tokens_user_idx').on(table.userId),
+  emailVerifyExpiresIdx: index('email_verification_tokens_expires_idx').on(table.expiresAt),
+}));
+
+// Rate-limit counters for self-service reset. Addresses are HMACed with a key
+// derived from SIGNING_MASTER_KEY — the response is identical whether or not
+// an account exists, so this table would otherwise accumulate every address
+// anyone ever typed into the form, most of them belonging to nobody here.
+export const passwordResetRequests = pgTable("password_reset_requests", {
+  id: serial("id").primaryKey(),
+  emailHmac: text("email_hmac").notNull(),
+  ipHmac: text("ip_hmac"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+}, (table) => ({
+  resetReqEmailIdx: index('password_reset_requests_email_idx').on(table.emailHmac, table.requestedAt),
+  resetReqIpIdx: index('password_reset_requests_ip_idx').on(table.ipHmac, table.requestedAt),
+}));
+
+// ─── Optional-email preferences ─────────────────────────────────────────────
+// Categories live in a jsonb map, not a column each: the in-app preferences
+// of 0003b took the column-per-type route and every notification type added
+// since shipped with no preference, because adding one meant a migration
+// nobody wrote. The catalogue is shared/email-categories.ts.
+export const emailNotificationPrefs = pgTable("email_notification_prefs", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  masterEnabled: boolean("master_enabled").notNull().default(true),
+  categories: jsonb("categories").notNull().default({}),
+  // Opaque subject for the signed unsubscribe link — carries no user id and
+  // no address, so a link in an inbox cannot be read back into an identity.
+  unsubscribeId: text("unsubscribe_id").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Idempotency ledger. The row is claimed before the SMTP call, so a retried
+// job or two overlapping fan-outs cannot mail the same member twice.
+export const emailDeliveries = pgTable("email_deliveries", {
+  id: serial("id").primaryKey(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  template: text("template").notNull(),
+  status: text("status").notNull().default("queued"), // queued | sent | failed | suppressed
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  sentAt: timestamp("sent_at"),
+}, (table) => ({
+  emailDeliveriesCreatedIdx: index('email_deliveries_created_idx').on(table.createdAt),
+  emailDeliveriesUserIdx: index('email_deliveries_user_idx').on(table.userId),
 }));
 
 export const jobs = pgTable("jobs", {
@@ -1404,13 +1483,27 @@ export const createSurveyPollSchema = z.object({
   endTime: z.string().optional()
 });
 
+/**
+ * What counts as an acceptable password, in one place.
+ *
+ * Registration and password reset must agree — a reset that accepted weaker
+ * passwords than registration would be a way around the policy rather than a
+ * way back into an account. Tightening the rule here tightens both.
+ */
+export const passwordPolicySchema = z
+  .string()
+  .min(8, { message: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" });
+
 // Extended schemas with validations
 export const registerUserSchema = insertUserSchema.extend({
-  password: z.string().min(8, { message: "Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες" }),
+  password: passwordPolicySchema,
   email: z.string().email({ message: "Εισάγετε έγκυρη διεύθυνση email" }),
   name: z.string().min(2, { message: "Το όνομα πρέπει να έχει τουλάχιστον 2 χαρακτήρες" }),
   returnTo: z.string().optional(), // Add returnTo field for redirection after authentication
   deviceFingerprint: z.string().optional(),
+  // The interface language they registered in, so the first email we send
+  // them — the address confirmation — is already in their language.
+  locale: z.enum(['el', 'en']).optional(),
   // GDPR Art. 9(2)(a) — explicit consent for processing political opinions.
   // Server validates the version matches the current canonical text.
   consent: z.object({
@@ -1420,7 +1513,9 @@ export const registerUserSchema = insertUserSchema.extend({
 });
 
 export const loginUserSchema = z.object({
-  username: z.string().min(1, { message: "Το όνομα χρήστη είναι υποχρεωτικό" }),
+  // Accepts a username or an email address — see the LocalStrategy in
+  // server/auth.ts for why reset-by-email requires login-by-email.
+  username: z.string().min(1, { message: "Συμπληρώστε όνομα χρήστη ή email" }),
   password: z.string().min(1, { message: "Ο κωδικός είναι υποχρεωτικός" }),
   returnTo: z.string().optional(), // Add returnTo field for redirection after authentication
   deviceFingerprint: z.string().optional(),
@@ -1491,6 +1586,10 @@ export type LivekitRoom = typeof livekitRooms.$inferSelect;
 export type LivekitRoomKind = 'community' | 'sortition';
 export type LivekitRoomStatus = 'scheduled' | 'active' | 'closed';
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type EmailNotificationPrefs = typeof emailNotificationPrefs.$inferSelect;
+export type EmailDelivery = typeof emailDeliveries.$inferSelect;
 export type LivekitParticipation = typeof livekitParticipations.$inferSelect;
 export type ProposalVoteChoice = z.infer<typeof proposalVoteChoiceSchema>;
 export type AdminAction = typeof adminActions.$inferSelect;
@@ -1531,6 +1630,8 @@ export type SafeUser = Pick<
   | 'govgrLastName'
   | 'govgrMunicipality'
   | 'govgrPostcode'
+  | 'locale'
+  | 'emailVerifiedAt'
 >;
 
 

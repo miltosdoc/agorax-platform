@@ -11,6 +11,11 @@ import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembe
 import { db } from '../db';
 import { sortitionBodies, proposals, proposalAmendments } from '@shared/schema';
 import { and, eq, lt, isNotNull, inArray, sql } from 'drizzle-orm';
+import {
+  cleanupEmailDeliveries,
+  deliverOptionalEmail,
+  type OptionalEmailJob,
+} from './email-service';
 
 // ─── Handler: structure_proposal ────────────────────────────────────────────
 
@@ -115,6 +120,55 @@ async function handleCleanupExpired(_payload: JobPayload): Promise<void> {
   if (deleted.rows.length > 0) {
     console.log(`[cleanup] removed ${deleted.rows.length} read notifications older than ${NOTIFICATION_RETENTION_DAYS}d`);
   }
+
+  // Spent reset links. A used or expired token can no longer do anything,
+  // but the row still ties an account to the moment someone asked for it —
+  // and to the IP they asked from. There is no reason to keep either.
+  const resets = await db.execute(sql`
+    DELETE FROM password_reset_tokens
+    WHERE used_at IS NOT NULL OR expires_at < NOW() - INTERVAL '24 hours'
+    RETURNING id
+  `);
+  if (resets.rows.length > 0) {
+    console.log(`[cleanup] removed ${resets.rows.length} spent password reset tokens`);
+  }
+
+  // Rate-limit counters past every window they could still be counted in.
+  await db.execute(sql`
+    DELETE FROM password_reset_requests
+    WHERE requested_at < NOW() - INTERVAL '24 hours'
+  `);
+
+  // Spent confirmation links. Kept a week past expiry rather than dropped at
+  // expiry, so "this link is dead" and "this link never existed" stay the
+  // same answer for as long as anyone is plausibly still clicking one.
+  const verifications = await db.execute(sql`
+    DELETE FROM email_verification_tokens
+    WHERE used_at IS NOT NULL OR expires_at < NOW() - INTERVAL '7 days'
+    RETURNING id
+  `);
+  if (verifications.rows.length > 0) {
+    console.log(`[cleanup] removed ${verifications.rows.length} spent email verification tokens`);
+  }
+
+  const mails = await cleanupEmailDeliveries();
+  if (mails > 0) {
+    console.log(`[cleanup] removed ${mails} email delivery records`);
+  }
+}
+
+// ─── Handler: send_email ────────────────────────────────────────────────────
+
+/**
+ * One optional notification email for one member.
+ *
+ * The job payload carries no address and no rendered body — only ids and the
+ * text that goes in the subject line. Preferences and address are read inside
+ * deliverOptionalEmail() at the moment of sending, so a member who switched
+ * the category off after the job was queued gets nothing.
+ */
+async function handleSendEmail(payload: JobPayload): Promise<void> {
+  await deliverOptionalEmail(payload.data as unknown as OptionalEmailJob);
 }
 
 // ─── Handler: sortition_timeout ─────────────────────────────────────────────
@@ -345,6 +399,7 @@ export function registerAllHandlers(): void {
   registerHandler('sortition_timeout', handleSortitionTimeout);
   registerHandler('phase_auto_advance', handlePhaseAutoAdvance);
   registerHandler('conference_reminder', handleConferenceReminder);
+  registerHandler('send_email', handleSendEmail);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────

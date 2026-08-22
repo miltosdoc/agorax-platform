@@ -28,7 +28,8 @@ export type JobType =
   | 'sortition_timeout'     // Sortition deadline sweep & completion
   | 'phase_auto_advance'    // Advance proposals past expired phase deadlines
   | 'conference_reminder'   // "Starts soon" fan-out for scheduled meetings
-  | 'refresh_final_text';   // Live re-merge of the AI final text during deliberation
+  | 'refresh_final_text'    // Live re-merge of the AI final text during deliberation
+  | 'send_email';           // One optional notification email to one member
 
 export interface JobPayload {
   type: JobType;

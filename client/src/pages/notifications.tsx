@@ -4,7 +4,7 @@ import { useNotifications, useMarkAllAsRead, useClearNotifications } from "@/hoo
 import { NotificationItem } from "@/components/notifications/notification-item";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bell, CheckCheck, FileText, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, FileText, Mail, Trash2 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
@@ -64,8 +64,16 @@ export default function NotificationsPage() {
         </div>
       }
     >
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <PushOptIn />
+        <Link
+          href="/notifications/settings"
+          className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          data-testid="link-email-prefs"
+        >
+          <Mail className="h-4 w-4" />
+          {t('emailPrefs.title')}
+        </Link>
       </div>
       {/* Capacitor plugin-chain debug harness — admins only. */}
       {user?.isAdmin && <LocalNotifTestButton />}

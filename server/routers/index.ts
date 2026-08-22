@@ -11,6 +11,7 @@ export { registerAmendmentsRoutes } from './amendments';
 export { registerSortitionRoutes } from './sortition';
 export { registerDebateRoutes } from './debate';
 export { registerNotificationsRoutes } from './notifications';
+export { registerEmailPrefsRoutes } from './email-prefs';
 export { registerPlatformRoutes } from './platform';
 export { registerBallotRoutes } from './ballot';
 export { registerAdminRoutes } from './admin';

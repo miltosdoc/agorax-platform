@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Ban, CheckCircle, KeyRound, MessageSquare } from "lucide-react";
+import { Eye, Ban, CheckCircle, CheckCircle2, KeyRound, MessageSquare, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { el } from "date-fns/locale";
 import { useTranslation } from "@/hooks/use-translation";
@@ -225,6 +225,7 @@ export default function AdminAccountsPage() {
                 <TableRow>
                   <TableHead data-testid="table-head-username">{t('auth.username')}</TableHead>
                   <TableHead data-testid="table-head-email">{t('auth.email')}</TableHead>
+                  <TableHead data-testid="table-head-email-verified">{t('admin.emailVerified')}</TableHead>
                   <TableHead data-testid="table-head-status">{t('admin.accountStatus')}</TableHead>
                   <TableHead data-testid="table-head-reg-ip">{t('admin.registrationIp')}</TableHead>
                   <TableHead data-testid="table-head-last-ip">{t('admin.lastLoginIp')}</TableHead>
@@ -238,6 +239,22 @@ export default function AdminAccountsPage() {
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell data-testid={`text-username-${user.id}`}>{user.username}</TableCell>
                       <TableCell data-testid={`text-email-${user.id}`}>{user.email}</TableCell>
+                      {/* Whether the address was ever proved, not whether it
+                          looks well-formed. Nothing is gated on it — this
+                          column exists so an admin can see who to chase. */}
+                      <TableCell data-testid={`cell-email-verified-${user.id}`}>
+                        {user.emailVerifiedAt ? (
+                          <Badge variant="outline" className="gap-1 border-emerald-300 text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {t('admin.verified')}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700">
+                            <ShieldAlert className="h-3 w-3" />
+                            {t('admin.notVerified')}
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell data-testid={`cell-status-${user.id}`}>
                         {getStatusBadge(user.accountStatus)}
                       </TableCell>
@@ -301,7 +318,7 @@ export default function AdminAccountsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8" data-testid="text-no-users">
+                    <TableCell colSpan={8} className="text-center py-8" data-testid="text-no-users">
                       {t('admin.noUsersFound')}
                     </TableCell>
                   </TableRow>

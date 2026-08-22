@@ -8,6 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Email address confirmation** — new registrations are mailed a confirmation
+  link; the member can ask for another from `/notifications/settings`, capped
+  per hour. `users.email_verified_at` records the fact and the admin accounts
+  page shows a Verified / Not verified badge per account. **Nothing is gated
+  on it** — every account predating this feature is unverified, and locking
+  those people out would be a worse failure than an unconfirmed address. The
+  token is pinned to the address it was issued for, so correcting a typo
+  retires the old link rather than confirming the new address unread.
+  `scripts/send-verification-backfill.ts` mails existing members once, paced
+  and safe to re-run. Migration `0044_user_locale_and_email_verification`.
+- **Per-member language** — `users.locale` is set from the interface language
+  at registration and updated whenever the member uses the language switcher,
+  so choosing a language once covers both the site and the email. Every
+  template renders in Greek and English; accounts predating the column fall
+  back to their consent locale, then to Greek.
+- **Signed-out pages wear the platform's chrome** — password reset, forgot
+  password, address confirmation and unsubscribe now share the login screen's
+  masthead, wordmark, Beta badge, type and language switcher via
+  `components/auth/AuthShell`. These pages are reached by clicking a link in
+  an email, in a browser with no session — the exact moment a careful person
+  asks whether the page is genuine, and a generic white card answers badly.
+- **Self-service password reset by email** — a "Ξέχασα τον κωδικό μου;" link
+  on the login form leads to `/forgot-password`, which answers identically
+  whether or not the address has an account and mails a single-use link that
+  expires in 30 minutes. Requesting a new link retires the previous one; the
+  reset is rate-limited per IP and, more tightly, per address (counted as an
+  HMAC, so the counter table is not a list of addresses). Completing a reset
+  applies the shared password policy, drops every session for the account,
+  signs nobody in, and sends a password-changed notice. The admin-issued link
+  from `0040` still works for a member who has lost the address itself
+  (`issued_by_id` NULL now means "the member asked"). Migration
+  `0042_self_service_password_reset`.
+- **Email notification preferences** — `/notifications/settings` gives every
+  member a master switch plus one switch per category (new proposals in their
+  communities; votes and polls; updates on proposals they follow). Categories
+  live in a jsonb map (`0043_email_notification_prefs`), so a new one is an
+  entry in `shared/email-categories.ts` and two locale strings, never a
+  migration. Preferences are read at send time, not at enqueue time. Every
+  optional email carries a settings link and a signed one-click unsubscribe
+  whose token carries no user id and no address and authorises exactly one
+  action. Security mail is not representable in the preference schema at all.
+- **Email delivery** — Scaleway Transactional Email over SMTP via Nodemailer,
+  behind a single service (`server/utils/email-service.ts`) that claims an
+  idempotency row before every send. Five responsive, image-free templates
+  with plain-text twins, in Greek and English, following the locale the member
+  accepted the consent text in. With no SMTP credentials configured every send
+  is a silent no-op — which is also what keeps the test suite off the wire.
+  See [docs/email-setup.md](docs/email-setup.md).
 - **Community Library** — per-community media tab (audio / video / documents)
   decoupled from proposals and the global feed; members upload, founder and
   admins pin items to the top; content respects the community's

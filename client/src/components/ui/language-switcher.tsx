@@ -6,11 +6,14 @@
  */
 
 import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/hooks/use-auth';
+import { api } from '@/lib/api';
 import { LOCALE_NAMES, LOCALE_FLAGS, SUPPORTED_LOCALES, type Locale } from '@/lib/i18n-types';
 import { useState, useRef, useEffect } from 'react';
 
 export function LanguageSwitcher() {
   const { locale, setLocale } = useTranslation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +31,17 @@ export function LanguageSwitcher() {
   const handleSelect = (newLocale: Locale) => {
     setLocale(newLocale);
     setIsOpen(false);
+
+    // Choosing a language here also chooses the language AgoraX writes to you
+    // in. Two separate settings for "the language I read" and "the language
+    // you email me in" would be one setting too many, and the second one
+    // would be the one nobody finds.
+    //
+    // Fire-and-forget: a failed save costs the member nothing right now —
+    // the interface has already switched — and the next switch retries.
+    if (user) {
+      void api.put('/api/user/locale', { locale: newLocale }).catch(() => undefined);
+    }
   };
 
   return (
