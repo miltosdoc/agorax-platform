@@ -438,24 +438,59 @@ for (const e of entries) {
 }
 const shotBytes = Object.values(thumbs).reduce((n, s) => n + s.length, 0);
 
+// Εβδομαδιαία κατανομή. Η σελίδα ταξινομεί και φιλτράρει χρονικά, οπότε
+// χρειάζεται τις ημερομηνίες ως δεδομένα, όχι μόνο τα πλήθη.
+const mondayOf = (iso) => {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+};
+const weekCounts = new Map();
+for (const e of entries) {
+  const k = mondayOf(when(e));
+  weekCounts.set(k, (weekCounts.get(k) || 0) + 1);
+}
+// Μπαίνουν και οι άδειες εβδομάδες: η σιωπή μιας περιόδου είναι πληροφορία,
+// και χωρίς αυτές οι στήλες θα έδειχναν συνεχή ροή εκεί που δεν υπήρχε.
+const activity = [];
+{
+  const lastWeek = mondayOf(when(entries[entries.length - 1]));
+  let w = mondayOf(when(entries[0]));
+  while (w <= lastWeek) {
+    activity.push({ week: w, n: weekCounts.get(w) || 0 });
+    const d = new Date(w + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 7);
+    w = d.toISOString().slice(0, 10);
+  }
+}
+
+const publicEntry = e => ({
+  date: when(e), who: whoPublic(e), page: e.page || '', shot: e.screenshot || '',
+  message: (e.message || '').trim(),
+});
+
 const payload = {
   meta: {
     total: entries.length, users: users.length, span,
     shots: entries.filter(e => e.screenshot).length,
     done: countBy('done'), partial: countBy('partial'), open: countBy('open'), decision: countBy('decision'),
+    untriaged: untriaged.length,
+    first: when(entries[0]), last: when(entries[entries.length - 1]),
+    generatedAt: new Date().toISOString(),
   },
   themes: THEMES,
   themeOrder: THEME_ORDER,
   statuses: Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])),
   reporters: perUser.map(([u, n]) => ({ name: u === '«<redacted-email>»' ? 'χρήστης χωρίς λογαριασμό' : u, n })),
+  activity,
   topics: ranked.concat(slugs.filter(s => TOPICS[s][2] === 'noise')).map(s => ({
     slug: s, label: TOPICS[s][0], theme: TOPICS[s][1], status: TOPICS[s][2], note: TOPICS[s][3] || '',
     reporters: [...new Set(byTopic.get(s).map(whoPublic))],
-    entries: byTopic.get(s).map(e => ({
-      date: when(e), who: whoPublic(e), page: e.page || '', shot: e.screenshot || '',
-      message: (e.message || '').trim(),
-    })),
+    entries: byTopic.get(s).map(publicEntry),
   })),
+  // Η σελίδα τα έδειχνε ποτέ: μόνο το REVIEW.md. Με ημερήσιο cron οι νέες
+  // καταχωρήσεις είναι ακριβώς αυτές που θέλει κανείς να δει, οπότε μπαίνουν.
+  untriaged: untriaged.map(publicEntry),
   thumbs,
 };
 
@@ -539,11 +574,39 @@ h2{font-size:1.4rem; margin:0 0 6px}
   background:var(--kyanos-wash); border-radius:0 var(--radius) var(--radius) 0; font-size:.92rem;
 }
 
+.panels{display:grid; gap:16px; grid-template-columns:1fr}
+@media (min-width:900px){.panels{grid-template-columns:1.1fr .9fr; align-items:start}}
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:22px}
+.panel h2{font-size:1.15rem; margin:0 0 4px}
+.panel .sub{margin:0 0 6px}
+
+/* Καταχωρήσεις ανά εβδομάδα. Οι άδειες εβδομάδες κρατούν το πλάτος τους ώστε
+   ο χρόνος να διαβάζεται γραμμικά — μια σιωπηλή εβδομάδα φαίνεται ως κενό. */
+.weeks{display:flex; align-items:flex-end; gap:3px; height:116px; margin:12px 0 6px}
+.wk{
+  flex:1 1 0; min-width:5px; padding:0; border:0; background:none; cursor:pointer;
+  display:flex; flex-direction:column; justify-content:flex-end; height:100%;
+}
+.wk i{display:block; background:var(--kyanos); border-radius:2px 2px 0 0; min-height:2px; opacity:.8}
+.wk:hover i{opacity:1}
+.wk.zero i{background:var(--line); opacity:1}
+.wk[aria-pressed=true] i{background:var(--ink); opacity:1}
+.wk:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
+.axis{display:flex; justify-content:space-between; font-size:.72rem; color:var(--ink-faint)}
+
 .controls{
   position:sticky; top:0; z-index:20; background:var(--paper);
   border-bottom:1px solid var(--line); padding:12px 0;
 }
 .ctl-inner{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.ctl-second{margin-top:9px; padding-top:9px; border-top:1px dashed var(--line); gap:8px 14px}
+.fld{display:inline-flex; align-items:center; gap:6px; font-size:.74rem; color:var(--ink-faint); white-space:nowrap}
+.fld select,.fld input{font-size:.86rem}
+input[type=date]{
+  font:inherit; font-size:.86rem; color:var(--ink); background:var(--surface);
+  border:1px solid var(--line); border-radius:var(--radius); padding:6px 9px;
+}
+input[type=date]:focus-visible{outline:2px solid var(--kyanos); outline-offset:1px}
 input[type=search],select{
   font:inherit; font-size:.9rem; color:var(--ink); background:var(--surface);
   border:1px solid var(--line); border-radius:var(--radius); padding:7px 11px;
@@ -581,6 +644,15 @@ input[type=search]:focus-visible,select:focus-visible,button:focus-visible{outli
 .t-label{font-weight:600; flex:1 1 320px; min-width:0}
 .t-status{font-size:.75rem; color:var(--sc); font-weight:600; white-space:nowrap}
 .t-meta{font-size:.78rem; color:var(--ink-faint); white-space:nowrap}
+.t-date{font-size:.78rem; color:var(--ink-faint); white-space:nowrap}
+.chip{
+  font-size:.7rem; color:var(--ink-soft); background:var(--sunken);
+  border:1px solid var(--line); border-radius:var(--radius); padding:1px 7px; white-space:nowrap;
+}
+.untriaged-note{
+  margin:0 0 10px; padding:10px 14px; border-left:3px solid var(--kyanos);
+  background:var(--kyanos-wash); border-radius:0 var(--radius) var(--radius) 0; font-size:.86rem;
+}
 .card[open] summary{border-bottom:1px solid var(--line)}
 .body{padding:4px 16px 16px}
 .note{
@@ -615,28 +687,46 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 </div></header>
 
 <div class="wrap">
-  <section>
-    <h2>Ποιος μιλάει</h2>
-    <p class="sub">Πριν διαβάσετε τι ζητήθηκε, δείτε από ποιους. Η κατανομή αλλάζει τον τρόπο που μετράμε τη ζήτηση.</p>
-    <div class="voices">
+  <section class="panels">
+    <div class="panel">
+      <h2>Ποιος μιλάει</h2>
+      <p class="sub">Πριν διαβάσετε τι ζητήθηκε, δείτε από ποιους. Η κατανομή αλλάζει τον τρόπο που μετράμε τη ζήτηση.</p>
       <div class="bar" id="bar"></div>
       <div class="legend" id="legend"></div>
       <p class="pull">Οι μισές καταχωρήσεις είναι ενός ανθρώπου. Γι' αυτό η κατάταξη μετράει <b>πόσοι διαφορετικοί άνθρωποι</b> ζήτησαν κάτι, όχι πόσες φορές γράφτηκε.</p>
     </div>
+    <div class="panel">
+      <h2>Πότε μιλάνε</h2>
+      <p class="sub">Καταχωρήσεις ανά εβδομάδα. Κάντε κλικ σε μια στήλη για να κρατήσετε μόνο εκείνη την εβδομάδα.</p>
+      <div class="weeks" id="weeks"></div>
+      <div class="axis" id="axis"></div>
+      <p class="pull" id="periodNote"></p>
+    </div>
   </section>
 </div>
 
-<div class="controls"><div class="wrap ctl-inner">
-  <input type="search" id="q" placeholder="Αναζήτηση στα λόγια των χρηστών…" aria-label="Αναζήτηση">
-  <div class="pills" id="statusPills"></div>
-  <select id="reporter" aria-label="Φίλτρο αναφέροντα"></select>
-  <span class="count" id="count"></span>
+<div class="controls"><div class="wrap">
+  <div class="ctl-inner">
+    <input type="search" id="q" placeholder="Αναζήτηση στα λόγια των χρηστών…" aria-label="Αναζήτηση">
+    <div class="pills" id="statusPills"></div>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="ctl-inner ctl-second">
+    <label class="fld">Ταξινόμηση <select id="sort"></select></label>
+    <label class="fld">Περιοχή <select id="theme"></select></label>
+    <label class="fld">Αναφέρων <select id="reporter"></select></label>
+    <label class="fld">Από <input type="date" id="from"></label>
+    <label class="fld">Έως <input type="date" id="to"></label>
+    <div class="pills" id="presets"></div>
+    <button class="pill" id="reset" type="button">Καθαρισμός φίλτρων</button>
+  </div>
 </div></div>
 
 <div class="wrap"><main id="list"></main></div>
 
 <footer><div class="wrap">
-  Παράγεται από <code>scripts/feedback-report.mjs</code>. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.
+  <p id="generated"></p>
+  <p>Παράγεται από <code>scripts/feedback-report.mjs</code>, αυτόματα κάθε μέρα. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.</p>
 </div></footer>
 
 <script>
@@ -644,10 +734,29 @@ const D = ${JSON.stringify(payload).replace(/</g, '\\u003c')};
 const SC = {done:'--s-done', partial:'--s-partial', open:'--s-open', decision:'--s-decision', noise:'--s-noise'};
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+const fmt = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '—';
+const shift = (iso, days) => new Date(Date.parse(iso + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
+const today = () => new Date().toISOString().slice(0, 10);
+// Υπολογίζεται στον browser, όχι κατά την παραγωγή: η σελίδα ξαναφτιάχνεται
+// μία φορά την ημέρα, το «πριν πόσο» πρέπει να ισχύει κάθε ώρα.
+const ago = iso => {
+  const n = Math.floor((Date.parse(today() + 'T00:00:00Z') - Date.parse(iso + 'T00:00:00Z')) / 86400000);
+  if (n <= 0) return 'σήμερα';
+  if (n === 1) return 'χθες';
+  if (n < 31) return 'πριν ' + n + ' ημέρες';
+  const m = Math.round(n / 30);
+  return m <= 1 ? 'πριν έναν μήνα' : 'πριν ' + m + ' μήνες';
+};
+
 document.getElementById('stats').innerHTML = [
   [D.meta.total, 'καταχωρήσεις'], [D.topics.length, 'θέματα'], [D.meta.users, 'χρήστες'],
-  [D.meta.open, 'ανοιχτά'], [D.meta.done, 'έγιναν'], [D.meta.shots, 'στιγμιότυπα'],
+  [D.meta.open, 'ανοιχτά'], [D.meta.done, 'έγιναν'], [D.meta.untriaged, 'αδιαλογάριαστα'],
+  [D.meta.shots, 'στιγμιότυπα'],
 ].map(([n, l]) => '<div class="stat"><b class="mono">' + n + '</b><span>' + l + '</span></div>').join('');
+
+document.getElementById('generated').textContent =
+  'Τελευταία παραγωγή: ' + new Date(D.meta.generatedAt).toLocaleString('el-GR') +
+  ' · τελευταία καταχώρηση: ' + fmt(D.meta.last) + ' (' + ago(D.meta.last) + ').';
 
 // Μονοχρωματική κλίμακα του kyanós: η ένταση δείχνει όγκο, χωρίς να
 // εισάγει χρώματα εκτός του συστήματος.
@@ -663,68 +772,213 @@ document.getElementById('legend').innerHTML = D.reporters.slice(0, 6).map((r, i)
   (D.reporters.length > 6 ? '<span><i style="background:' + palette[5] + '"></i>λοιποί <span class="mono">' +
     D.reporters.slice(6).reduce((n, r) => n + r.n, 0) + '</span></span>' : '');
 
-let fStatus = 'all', fReporter = 'all', fQuery = '';
-const STATUS_ORDER = ['all','decision','open','partial','done','noise'];
-document.getElementById('statusPills').innerHTML = STATUS_ORDER.map(s =>
-  '<button class="pill" data-s="' + s + '" aria-pressed="' + (s === 'all') + '">' +
-  (s === 'all' ? 'Όλα' : esc(D.statuses[s])) + '</button>').join('');
+// ── Κατάσταση φίλτρων ────────────────────────────────────────────────────────
+// Το χρονικό φίλτρο δουλεύει σε επίπεδο *καταχώρησης*, όχι θέματος: αλλιώς μια
+// αναζήτηση «τι ειπώθηκε την περασμένη εβδομάδα» θα επέστρεφε ολόκληρο θέμα με
+// αναφορές έξι εβδομάδων μέσα του. Ό,τι βλέπετε στον μετρητή, το είπαν τότε.
+let fStatus = 'all', fReporter = 'all', fTheme = 'all', fQuery = '', fFrom = '', fTo = '', fSort = 'demand';
+
+const SORTS = [
+  ['demand',  'Ζήτηση, ανά περιοχή', (a, b) => b.people - a.people || b.es.length - a.es.length],
+  ['recent',  'Πιο πρόσφατα πρώτα',  (a, b) => b.last.localeCompare(a.last) || b.people - a.people],
+  ['oldest',  'Παλαιότερα πρώτα',    (a, b) => a.first.localeCompare(b.first) || b.people - a.people],
+  ['reports', 'Περισσότερες αναφορές', (a, b) => b.es.length - a.es.length || b.people - a.people],
+  ['people',  'Περισσότεροι άνθρωποι', (a, b) => b.people - a.people || b.es.length - a.es.length],
+];
+const sortFn = () => (SORTS.find(x => x[0] === fSort) || SORTS[0])[2];
+
+// ── Έλεγχοι ──────────────────────────────────────────────────────────────────
+const STATUS_ORDER = ['all', 'untriaged', 'decision', 'open', 'partial', 'done', 'noise'];
+const statusLabel = k => k === 'all' ? 'Όλα' : k === 'untriaged' ? 'Αδιαλογάριαστα' : D.statuses[k];
+document.getElementById('statusPills').innerHTML = STATUS_ORDER
+  .filter(k => k !== 'untriaged' || D.untriaged.length)
+  .map(k => '<button class="pill" type="button" data-s="' + k + '" aria-pressed="' + (k === 'all') + '">' +
+    esc(statusLabel(k)) + (k === 'untriaged' ? ' <span class="mono">' + D.untriaged.length + '</span>' : '') +
+    '</button>').join('');
 document.getElementById('statusPills').addEventListener('click', ev => {
   const b = ev.target.closest('.pill'); if (!b) return;
   fStatus = b.dataset.s;
-  document.querySelectorAll('#statusPills .pill').forEach(p => p.setAttribute('aria-pressed', String(p === b)));
-  render();
+  sync(); render();
 });
 
-const names = [...new Set(D.topics.flatMap(t => t.reporters))].sort((a, b) => a.localeCompare(b, 'el'));
+document.getElementById('sort').innerHTML = SORTS
+  .map(([k, l]) => '<option value="' + k + '">' + esc(l) + '</option>').join('');
+document.getElementById('sort').addEventListener('change', e => { fSort = e.target.value; render(); });
+
+document.getElementById('theme').innerHTML = '<option value="all">Όλες οι περιοχές</option>' +
+  D.themeOrder.filter(th => D.topics.some(t => t.theme === th))
+    .map(th => '<option value="' + th + '">' + esc(D.themes[th]) + '</option>').join('');
+document.getElementById('theme').addEventListener('change', e => { fTheme = e.target.value; render(); });
+
+const names = [...new Set(D.topics.flatMap(t => t.reporters).concat(D.untriaged.map(e => e.who)))]
+  .sort((a, b) => a.localeCompare(b, 'el'));
 document.getElementById('reporter').innerHTML = '<option value="all">Όλοι οι αναφέροντες</option>' +
   names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
 document.getElementById('reporter').addEventListener('change', e => { fReporter = e.target.value; render(); });
+
 document.getElementById('q').addEventListener('input', e => { fQuery = e.target.value.trim().toLowerCase(); render(); });
 
-function match(t) {
-  if (fStatus !== 'all' && t.status !== fStatus) return false;
-  if (fReporter !== 'all' && !t.reporters.includes(fReporter)) return false;
-  if (fQuery) {
-    const hay = (t.label + ' ' + t.note + ' ' + t.entries.map(e => e.message + ' ' + e.who + ' ' + e.page).join(' ')).toLowerCase();
-    if (!hay.includes(fQuery)) return false;
-  }
+for (const id of ['from', 'to']) {
+  const el = document.getElementById(id);
+  el.min = D.meta.first;
+  el.max = D.meta.last > today() ? D.meta.last : today();
+  el.addEventListener('change', e => {
+    if (id === 'from') fFrom = e.target.value; else fTo = e.target.value;
+    sync(); render();
+  });
+}
+
+// Τα προκαθορισμένα διαστήματα μετρούν από σήμερα, όχι από την τελευταία
+// καταχώρηση: αν επί δέκα μέρες δεν έγραψε κανείς, το «7 ημέρες» οφείλει να
+// βγάλει άδειο αποτέλεσμα — αυτό είναι η πληροφορία.
+document.getElementById('presets').innerHTML = [7, 30, 90]
+  .map(d => '<button class="pill" type="button" data-d="' + d + '">' + d + ' ημέρες</button>').join('');
+document.getElementById('presets').addEventListener('click', ev => {
+  const b = ev.target.closest('.pill'); if (!b) return;
+  const from = shift(today(), 1 - Number(b.dataset.d));
+  if (fFrom === from && fTo === today()) { fFrom = ''; fTo = ''; } else { fFrom = from; fTo = today(); }
+  sync(); render();
+});
+
+document.getElementById('reset').addEventListener('click', () => {
+  fStatus = 'all'; fReporter = 'all'; fTheme = 'all'; fQuery = ''; fFrom = ''; fTo = ''; fSort = 'demand';
+  document.getElementById('q').value = '';
+  document.getElementById('sort').value = 'demand';
+  document.getElementById('theme').value = 'all';
+  document.getElementById('reporter').value = 'all';
+  sync(); render();
+});
+
+// ── Εβδομαδιαία κατανομή ─────────────────────────────────────────────────────
+const maxWeek = Math.max(1, ...D.activity.map(a => a.n));
+document.getElementById('weeks').innerHTML = D.activity.map(a =>
+  '<button class="wk' + (a.n ? '' : ' zero') + '" type="button" data-w="' + a.week + '" aria-pressed="false" ' +
+  'title="Εβδομάδα ' + fmt(a.week) + ' — ' + a.n + (a.n === 1 ? ' καταχώρηση' : ' καταχωρήσεις') + '">' +
+  '<i style="height:' + Math.max(2, Math.round(a.n / maxWeek * 100)) + '%"></i></button>').join('');
+document.getElementById('axis').innerHTML =
+  '<span>' + fmt(D.activity[0].week) + '</span>' +
+  '<span class="mono">κορυφή: ' + maxWeek + '</span>' +
+  '<span>' + fmt(D.activity[D.activity.length - 1].week) + '</span>';
+document.getElementById('weeks').addEventListener('click', ev => {
+  const b = ev.target.closest('.wk'); if (!b) return;
+  const w = b.dataset.w, end = shift(w, 6);
+  if (fFrom === w && fTo === end) { fFrom = ''; fTo = ''; } else { fFrom = w; fTo = end; }
+  sync(); render();
+});
+
+function sync() {
+  document.querySelectorAll('#statusPills .pill').forEach(p =>
+    p.setAttribute('aria-pressed', String(p.dataset.s === fStatus)));
+  document.querySelectorAll('#presets .pill').forEach(p =>
+    p.setAttribute('aria-pressed', String(fTo === today() && fFrom === shift(today(), 1 - Number(p.dataset.d)))));
+  document.querySelectorAll('.wk').forEach(p =>
+    p.setAttribute('aria-pressed', String(fFrom === p.dataset.w && fTo === shift(p.dataset.w, 6))));
+  document.getElementById('from').value = fFrom;
+  document.getElementById('to').value = fTo;
+  document.getElementById('periodNote').textContent = (fFrom || fTo)
+    ? 'Περίοδος: ' + (fFrom ? fmt(fFrom) : 'αρχή') + ' έως ' + (fTo ? fmt(fTo) : 'σήμερα') + '.'
+    : 'Όλη η περίοδος: ' + fmt(D.meta.first) + ' έως ' + fmt(D.meta.last) + '.';
+}
+
+// ── Φιλτράρισμα ──────────────────────────────────────────────────────────────
+function entryPass(e, labelHit) {
+  if (fFrom && e.date < fFrom) return false;
+  if (fTo && e.date > fTo) return false;
+  if (fReporter !== 'all' && e.who !== fReporter) return false;
+  if (fQuery && !labelHit && !(e.message + ' ' + e.who + ' ' + e.page).toLowerCase().includes(fQuery)) return false;
   return true;
 }
 
-function render() {
-  const shown = D.topics.filter(match);
-  document.getElementById('count').textContent =
-    shown.length + (shown.length === 1 ? ' θέμα' : ' θέματα') + ' · ' +
-    shown.reduce((n, t) => n + t.entries.length, 0) + ' αναφορές';
+function visibleTopics() {
+  if (fStatus === 'untriaged') return [];
   const out = [];
-  for (const th of D.themeOrder) {
-    const ts = shown.filter(t => t.theme === th);
-    if (!ts.length) continue;
-    out.push('<div class="theme-h"><h3>' + esc(D.themes[th]) + '</h3><span class="mono">' + ts.length + '</span></div><div class="cards">');
-    for (const t of ts) {
-      const open = fQuery && t.entries.length <= 4;
-      out.push('<details class="card" style="--sc:var(' + SC[t.status] + ')"' + (open ? ' open' : '') + '><summary>' +
-        '<span class="t-label">' + esc(t.label) + '</span>' +
-        '<span class="t-status">' + esc(D.statuses[t.status]) + '</span>' +
-        '<span class="t-meta mono">' + t.reporters.length + ' άτομα · ' + t.entries.length + ' αναφ.</span>' +
-        '</summary><div class="body">');
-      if (t.note) out.push('<p class="note"><b>Σημείωση:</b> ' + esc(t.note) + '</p>');
-      for (const e of t.entries) {
-        out.push('<div class="entry"><div class="ehead"><b>' + esc(e.who) + '</b>' +
-          '<span class="mono">' + esc(e.date) + '</span>' +
-          (e.page ? '<span class="mono">' + esc(e.page) + '</span>' : '') + '</div>' +
-          '<p class="quote">' + esc(e.message) + '</p>' +
-          (e.shot && D.thumbs[e.shot]
-            ? '<figure class="shot"><img loading="lazy" alt="Στιγμιότυπο από ' + esc(e.who) + '" src="' + D.thumbs[e.shot] + '"><figcaption>Στιγμιότυπο που επισύναψε ο χρήστης</figcaption></figure>'
-            : '') + '</div>');
-      }
-      out.push('</div></details>');
+  for (const t of D.topics) {
+    if (fStatus !== 'all' && t.status !== fStatus) continue;
+    if (fTheme !== 'all' && t.theme !== fTheme) continue;
+    const labelHit = fQuery ? (t.label + ' ' + t.note).toLowerCase().includes(fQuery) : false;
+    const es = t.entries.filter(e => entryPass(e, labelHit));
+    if (!es.length) continue;
+    const ds = es.map(e => e.date).slice().sort();
+    out.push({ ...t, es, first: ds[0], last: ds[ds.length - 1], people: new Set(es.map(e => e.who)).size });
+  }
+  return out;
+}
+
+// ── Απόδοση ──────────────────────────────────────────────────────────────────
+const narrowed = () => fQuery || fFrom || fTo || fReporter !== 'all';
+
+function entryHTML(e) {
+  return '<div class="entry"><div class="ehead"><b>' + esc(e.who) + '</b>' +
+    '<time class="mono" datetime="' + e.date + '">' + fmt(e.date) + '</time>' +
+    '<span>' + ago(e.date) + '</span>' +
+    (e.page ? '<span class="mono">' + esc(e.page) + '</span>' : '') + '</div>' +
+    '<p class="quote">' + esc(e.message) + '</p>' +
+    (e.shot && D.thumbs[e.shot]
+      ? '<figure class="shot"><img loading="lazy" alt="Στιγμιότυπο από ' + esc(e.who) + '" src="' + D.thumbs[e.shot] + '"><figcaption>Στιγμιότυπο που επισύναψε ο χρήστης</figcaption></figure>'
+      : '') + '</div>';
+}
+
+function topicHTML(t, withTheme) {
+  const es = fSort === 'recent'
+    ? t.es.slice().sort((a, b) => b.date.localeCompare(a.date))
+    : t.es.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const span = t.first === t.last ? fmt(t.first) : 'από ' + fmt(t.first) + ' έως ' + fmt(t.last);
+  return '<details class="card" style="--sc:var(' + SC[t.status] + ')"' + (narrowed() && es.length <= 4 ? ' open' : '') +
+    '><summary><span class="t-label">' + esc(t.label) + '</span>' +
+    (withTheme ? '<span class="chip">' + esc(D.themes[t.theme]) + '</span>' : '') +
+    '<span class="t-status">' + esc(D.statuses[t.status]) + '</span>' +
+    '<span class="t-meta mono">' + t.people + ' άτομα · ' + es.length + ' αναφ.</span>' +
+    '<time class="t-date mono" datetime="' + t.last + '" title="' + span + '">' + fmt(t.last) + '</time>' +
+    '</summary><div class="body">' +
+    (t.note ? '<p class="note"><b>Σημείωση:</b> ' + esc(t.note) + '</p>' : '') +
+    es.map(entryHTML).join('') + '</div></details>';
+}
+
+function render() {
+  const shown = visibleTopics().sort(sortFn());
+  // Τα αδιαλογάριαστα δεν ανήκουν σε περιοχή, οπότε φεύγουν μόλις φιλτράρεις κατά περιοχή.
+  const un = ((fStatus === 'all' || fStatus === 'untriaged') && fTheme === 'all')
+    ? D.untriaged.filter(e => entryPass(e, false)).sort((a, b) =>
+        fSort === 'oldest' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date))
+    : [];
+  const reports = shown.reduce((n, t) => n + t.es.length, 0);
+
+  const parts = [];
+  if (shown.length) parts.push(shown.length + (shown.length === 1 ? ' θέμα' : ' θέματα'));
+  if (reports) parts.push(reports + (reports === 1 ? ' αναφορά' : ' αναφορές'));
+  if (un.length) parts.push(un.length + ' αδιαλογάριαστα');
+  document.getElementById('count').textContent = parts.join(' · ') || 'κανένα αποτέλεσμα';
+
+  const out = [];
+  if (un.length) {
+    out.push('<div class="theme-h"><h3>Αδιαλογάριαστα</h3><span class="mono">' + un.length + '</span></div>' +
+      '<p class="untriaged-note">Καταχωρήσεις που δεν έχουν μπει ακόμη στη διαλογή του <code>scripts/feedback-report.mjs</code>. ' +
+      'Εμφανίζονται αυτούσιες ώστε τίποτα καινούργιο να μη χάνεται μεταξύ δύο διαλογών.</p><div class="cards">' +
+      '<div class="card" style="--sc:var(--kyanos)"><div class="body">' + un.map(entryHTML).join('') + '</div></div></div>');
+  }
+
+  if (fSort === 'demand') {
+    for (const th of D.themeOrder) {
+      const ts = shown.filter(t => t.theme === th);
+      if (!ts.length) continue;
+      out.push('<div class="theme-h"><h3>' + esc(D.themes[th]) + '</h3><span class="mono">' + ts.length + '</span></div><div class="cards">');
+      out.push(ts.map(t => topicHTML(t, false)).join(''));
+      out.push('</div>');
     }
+  } else if (shown.length) {
+    // Εκτός θεματικής ταξινόμησης η ομαδοποίηση θα έσπαγε τη σειρά, οπότε η
+    // περιοχή μετακομίζει σε ετικέτα πάνω σε κάθε κάρτα.
+    out.push('<div class="theme-h"><h3>' + esc((SORTS.find(x => x[0] === fSort) || SORTS[0])[1]) +
+      '</h3><span class="mono">' + shown.length + '</span></div><div class="cards">');
+    out.push(shown.map(t => topicHTML(t, true)).join(''));
     out.push('</div>');
   }
+
   document.getElementById('list').innerHTML = out.join('') ||
     '<p class="empty">Κανένα θέμα δεν ταιριάζει με αυτά τα φίλτρα.</p>';
 }
+
+sync();
 render();
 </script></body></html>`;
 
