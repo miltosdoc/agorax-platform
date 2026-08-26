@@ -438,6 +438,15 @@ for (const e of entries) {
 }
 const shotBytes = Object.values(thumbs).reduce((n, s) => n + s.length, 0);
 
+// Το σήμα του AgoraX. Η σελίδα σερβίρεται από τον δίσκο, έξω από το bundle του
+// Vite, οπότε δεν μπορεί να δείξει το assets/logo.png με τη διεύθυνση που του
+// δίνει το build — μπαίνει σμικρυμένο μέσα στη σελίδα, όπως τα στιγμιότυπα.
+const logo = 'data:image/png;base64,' + (await sharp(path.join(ROOT, 'client', 'src', 'assets', 'logo.png'))
+  .resize({ height: 96, withoutEnlargement: true })
+  .png({ compressionLevel: 9 })
+  .toBuffer()).toString('base64');
+const year = new Date().getFullYear();
+
 // Εβδομαδιαία κατανομή. Η σελίδα ταξινομεί και φιλτράρει χρονικά, οπότε
 // χρειάζεται τις ημερομηνίες ως δεδομένα, όχι μόνο τα πλήθη.
 const mondayOf = (iso) => {
@@ -542,6 +551,33 @@ body{
 h1,h2,h3{font-family:"GFS Didot",Georgia,"Times New Roman",serif; font-weight:400; text-wrap:balance}
 .mono{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums}
 
+/* Επιγραφή. Ίδια δομή με το client/src/components/layout/header.tsx: μολυβιά
+   μελανιού στην κορυφή, σήμα, λεκτικό σήμα, ένδειξη Beta, υπότιτλος. Δεν
+   κολλάει στην κορυφή όπως στην εφαρμογή — εδώ κολλημένη είναι η μπάρα των
+   φίλτρων, και δύο κολλημένες σειρές θα έτρωγαν μισή οθόνη σε κινητό. */
+.rule{height:4px; background:var(--ink)}
+.masthead{border-bottom:1px solid var(--line); background:var(--paper)}
+.masthead-inner{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:10px 0}
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; min-width:0}
+.masthead .brand{margin-right:auto}
+.brand img{height:36px; width:auto; flex:0 0 auto}
+.brand-line{display:flex; align-items:baseline; gap:6px; line-height:1}
+.wordmark{font-family:"GFS Didot",Georgia,"Times New Roman",serif; font-size:1.5rem; color:var(--ink)}
+.beta{
+  border:1px solid rgba(11,76,140,.4); background:var(--kyanos-wash); color:var(--kyanos);
+  border-radius:2px; padding:2px 4px; font-size:10px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.12em; line-height:1;
+}
+.brand-sub{
+  display:block; margin-top:4px; font-size:10px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.14em; color:var(--ink-faint);
+}
+.masthead-nav{display:flex; flex-wrap:wrap; gap:8px 16px; font-size:.82rem}
+.masthead-nav a{color:var(--kyanos); text-decoration:none; font-weight:500}
+.masthead-nav a:hover{text-decoration:underline}
+.masthead-nav a:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
+@media (max-width:640px){.brand-sub{display:none}}
+
 header.top{border-bottom:1px solid var(--line); background:var(--surface)}
 .head-inner{display:flex; flex-direction:column; gap:10px; padding:40px 0 30px}
 h1{font-size:clamp(1.9rem,4vw,2.7rem); line-height:1.15; margin:0}
@@ -550,9 +586,6 @@ h1{font-size:clamp(1.9rem,4vw,2.7rem); line-height:1.15; margin:0}
   margin:0; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
   color:var(--kyanos); font-weight:600;
 }
-.back{color:var(--kyanos); text-decoration:none; font-size:.82rem; font-weight:500}
-.back:hover{text-decoration:underline}
-.back:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
 
 .stats{display:flex; flex-wrap:wrap; margin-top:22px; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden}
 .stat{flex:1 1 130px; padding:12px 16px; background:var(--sunken); border-right:1px solid var(--line)}
@@ -672,15 +705,47 @@ input[type=search]:focus-visible,select:focus-visible,button:focus-visible{outli
 .shot img{max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius); display:block}
 .shot figcaption{font-size:.74rem; color:var(--ink-faint); margin-top:5px}
 .empty{padding:50px 0; text-align:center; color:var(--ink-soft)}
-footer{border-top:1px solid var(--line); margin-top:40px; padding:24px 0 44px; font-size:.82rem; color:var(--ink-faint)}
+/* Colophon, όπως στο client/src/components/layout/footer.tsx. Τα χρώματά του
+   δεν είναι tokens που εναλλάσσονται: το υποσέλιδο της εφαρμογής είναι σκούρο
+   και στα δύο θέματα, και οφείλει να δείχνει το ίδιο κι εδώ. */
+.colophon{background:#14212E; color:#FAFAF7; border-top:1px solid #9AA096; margin-top:48px}
+.colophon-grid{display:grid; gap:34px; padding:54px 0; grid-template-columns:1fr}
+@media (min-width:760px){.colophon-grid{grid-template-columns:6fr 3fr 3fr; gap:32px}}
+.colophon .wordmark{color:#FAFAF7; font-size:2rem}
+.tagline{margin:16px 0 0; max-width:40ch; font-size:.86rem; line-height:1.65; color:#93A6BA}
+.col-h{margin:0; font-family:Inter,system-ui,sans-serif; font-size:.7rem; font-weight:600;
+  text-transform:uppercase; letter-spacing:.14em; color:#93A6BA}
+.col-links{list-style:none; margin:14px 0 0; padding:0; border-top:1px solid #27405C}
+.col-links li{border-bottom:1px solid #27405C}
+.col-links a{display:block; padding:9px 0; font-size:.86rem; color:#93A6BA; text-decoration:none; transition:color 120ms ease-out}
+.col-links a:hover{color:#FAFAF7}
+.col-links a:focus-visible{outline:2px solid #6E9FD4; outline-offset:-2px}
+.col-note{margin:14px 0 0; font-size:.8rem; line-height:1.6; color:#93A6BA}
+.colophon code{background:#16293F; border-color:#27405C; color:#F2F6FA}
+.legal{border-top:1px solid #27405C; padding:22px 0}
+.legal p{margin:0; font-size:.74rem; color:#93A6BA}
 code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; background:var(--sunken); padding:1px 5px; border-radius:var(--radius); border:1px solid var(--line)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
 @media (max-width:640px){.head-inner{padding:28px 0 22px} .count{margin-left:0; width:100%}}
 </style></head><body>
 
+<div class="rule" aria-hidden="true"></div>
+<header class="masthead"><div class="wrap masthead-inner">
+  <a class="brand" href="/feed">
+    <img src="${logo}" alt="" width="36" height="36">
+    <span>
+      <span class="brand-line"><span class="wordmark">AgoraX</span><span class="beta">Beta</span></span>
+      <span class="brand-sub">Πλατφόρμα Ψηφιακής Δημοκρατίας</span>
+    </span>
+  </a>
+  <nav class="masthead-nav">
+    <a href="/admin/accounts">Διαχείριση</a>
+    <a href="/feed">Επιστροφή στην πλατφόρμα</a>
+  </nav>
+</div></header>
+
 <header class="top"><div class="wrap head-inner">
   <p class="eyebrow">AgoraX &middot; διαλογή ανατροφοδότησης</p>
-  <a class="back" href="/admin/accounts">&larr; Πίσω στη διαχείριση</a>
   <h1>Τι μας είπαν οι πρώτοι χρήστες</h1>
   <p class="lede">Κάθε υποβολή από το widget της πλατφόρμας, ομαδοποιημένη κατά θέμα αντί για ημερομηνία. Ανοίξτε ένα θέμα για να δείτε τα αυτούσια λόγια.</p>
   <div class="stats" id="stats"></div>
@@ -724,9 +789,31 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 
 <div class="wrap"><main id="list"></main></div>
 
-<footer><div class="wrap">
-  <p id="generated"></p>
-  <p>Παράγεται από <code>scripts/feedback-report.mjs</code>, αυτόματα κάθε μέρα. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.</p>
+<footer class="colophon"><div class="wrap">
+  <div class="colophon-grid">
+    <div>
+      <a class="brand" href="/">
+        <img src="${logo}" alt="" width="36" height="36">
+        <span class="wordmark">AgoraX</span>
+      </a>
+      <p class="tagline">Πλατφόρμα ψηφιακής δημοκρατίας για μια πιο ανοιχτή και συμμετοχική διακυβέρνηση</p>
+    </div>
+    <div>
+      <h3 class="col-h">Χρήσιμοι Σύνδεσμοι</h3>
+      <ul class="col-links">
+        <li><a href="/how-it-works">Πώς λειτουργεί</a></li>
+        <li><a href="/faq">Συχνές Ερωτήσεις</a></li>
+        <li><a href="/terms">Όροι Χρήσης</a></li>
+        <li><a href="/privacy">Πολιτική Απορρήτου</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="col-h">Αυτή η αναφορά</h3>
+      <p class="col-note" id="generated"></p>
+      <p class="col-note">Παράγεται από <code>scripts/feedback-report.mjs</code>, αυτόματα κάθε μέρα. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.</p>
+    </div>
+  </div>
+  <div class="legal"><p class="mono">&copy; ${year} AgoraX &mdash; Πλατφόρμα Ψηφιακής Δημοκρατίας</p></div>
 </div></footer>
 
 <script>

@@ -119,6 +119,19 @@ describe.skipIf(!generated)('feedback review page', () => {
     if (r.n > 0) expect(r.shown).toBe(true);
   });
 
+  it('wears the AgoraX masthead and colophon, not a bare report page', () => {
+    const html = fs.readFileSync(REVIEW, 'utf8');
+    expect(html).toContain('class="masthead"');
+    expect(html).toContain('class="beta"');   // η πλατφόρμα δηλώνει ότι είναι Beta παντού
+    expect(html).toContain('class="colophon"');
+    for (const href of ['/feed', '/how-it-works', '/faq', '/terms', '/privacy', '/admin/accounts']) {
+      expect(html).toContain(`href="${href}"`);
+    }
+    // Το σήμα μπαίνει ενσωματωμένο: η σελίδα σερβίρεται από τον δίσκο, έξω από
+    // το bundle του Vite, και δεν έχει διεύθυνση για τα assets της εφαρμογής.
+    expect(html).toMatch(/<img src="data:image\/png;base64,/);
+  });
+
   it('never puts a reporter email on the page', () => {
     const html = fs.readFileSync(REVIEW, 'utf8');
     // Το REVIEW.md ταυτοποιεί όποιον δεν έχει λογαριασμό από το email του· η
