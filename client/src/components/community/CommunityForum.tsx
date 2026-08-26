@@ -258,15 +258,13 @@ export function CommunityForum({ communityId, isMember, canManage }: Props) {
    * The topic goes to the proposal form, not straight into the database: a
    * proposal needs a track and a duration, and a forum post that quietly
    * became a proposal would be worse than a moment of friction.
+   *
+   * Only ids travel in the URL. The form fetches the draft — the opening post
+   * plus the whole discussion — because a thread does not fit in a query
+   * string, and a truncated argument is worse than no argument.
    */
   function promote(topic: ForumPost) {
-    const params = new URLSearchParams({
-      community: String(communityId),
-      question: topic.title ?? '',
-      solution: topic.content,
-      fromPost: String(topic.id),
-    });
-    navigate(`/proposals/new?${params.toString()}`);
+    navigate(`/proposals/new?community=${communityId}&fromPost=${topic.id}`);
   }
 
   // ── Pieces ───────────────────────────────────────────────────────────────

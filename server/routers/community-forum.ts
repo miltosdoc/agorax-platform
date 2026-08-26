@@ -187,13 +187,15 @@ export function registerCommunityForumRoutes(app: Express) {
         if (!parent || parent.communityId !== communityId) {
           return res.status(404).json({ message: 'Topic not found' });
         }
-        // One level, not a tree: a reply to a reply attaches to the topic.
+        // The repository flattens a reply-to-a-reply onto its topic; the
+        // topic is resolved here too, because a closed topic refuses replies
+        // however deep in it the reader clicked.
         const topicId = parent.parentId ?? parent.id;
         const topic = parent.parentId ? await communityForumRepo.getPost(topicId) : parent;
         if (topic?.deletedAt || topic?.hiddenAt) {
           return res.status(409).json({ message: 'This topic is closed' });
         }
-        const reply = await communityForumRepo.createReply(topicId, communityId, req.user.id, content);
+        const reply = await communityForumRepo.createReply(parentId, communityId, req.user.id, content);
 
         // Only the topic's author is told, and only about their own topic.
         // Notifying every participant on every message is how a platform
@@ -411,6 +413,33 @@ export function registerCommunityForumRoutes(app: Express) {
   });
 
   // ── Promotion to a proposal ──────────────────────────────────────────────
+
+  /**
+   * The topic and its discussion, assembled into a proposal draft.
+   *
+   * This used to travel in the query string. A thread does not fit there —
+   * browsers and proxies cut long URLs, and the failure mode is a silently
+   * truncated argument, which is worse than an error. The form asks for the
+   * draft by id instead.
+   */
+  app.get('/api/communities/:id/posts/:postId/draft', requireAuth, async (req: any, res) => {
+    try {
+      const found = await loadPost(req.params.id, req.params.postId, res);
+      if (!found) return;
+      const { post, postId, communityId } = found;
+      if (!(await requireReadable(communityId, req.user.id, res))) return;
+      if (!(await requireMember(communityId, req.user.id, res))) return;
+      if (post.parentId != null) {
+        return res.status(400).json({ message: 'Only a topic can become a proposal' });
+      }
+      const draft = await communityForumRepo.composeProposalDraft(postId);
+      if (!draft) return res.status(409).json({ message: 'This topic is no longer available' });
+      res.json(draft);
+    } catch (error) {
+      logger.error('[forum] compose draft failed', { err: (error as any)?.message });
+      res.status(500).json({ message: 'Failed to prepare the proposal' });
+    }
+  });
 
   /**
    * Record that a proposal came out of a topic.

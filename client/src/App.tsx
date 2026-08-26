@@ -86,13 +86,7 @@ function ProposalFormPage({ editId }: { editId?: number }) {
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <ProposalForm
-          communityId={communityId}
-          editProposalId={editId}
-          initialQuestion={params.get('question') ?? undefined}
-          initialSolution={params.get('solution') ?? undefined}
-          fromPostId={fromPostId}
-        />
+        <ProposalForm communityId={communityId} editProposalId={editId} fromPostId={fromPostId} />
       </div>
       <Footer />
     </div>

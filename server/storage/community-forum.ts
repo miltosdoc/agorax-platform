@@ -56,6 +56,26 @@ export interface ForumPostView {
 
 type Row = CommunityPost & { author?: ForumAuthor | null };
 
+/**
+ * Which topic a reply belongs under. A reply to a reply belongs to the same
+ * topic as the reply it answers — the forum is one level deep, and this is
+ * the sentence that makes it so.
+ *
+ * Exported and pure so the rule can be tested without a database, because
+ * getting it wrong writes a row that is counted nowhere and rendered nowhere.
+ */
+export function topicIdOf(parent: { id: number; parentId: number | null }): number {
+  return parent.parentId ?? parent.id;
+}
+
+/**
+ * Ceiling on an assembled proposal draft. The compiler's own solution schema
+ * stops at 12000 characters, so a draft that sails past it would be rejected
+ * at the moment the author pressed save — after they had edited it.
+ */
+const DRAFT_MAX_CHARS = 10_000;
+const DRAFT_DISCUSSION_HEADING = '— Από τη συζήτηση της κοινότητας —';
+
 const iso = (value: unknown): string =>
   value instanceof Date ? value.toISOString() : String(value ?? '');
 
@@ -243,7 +263,22 @@ export class CommunityForumRepository {
     return row;
   }
 
-  async createReply(topicId: number, communityId: number, authorId: number, content: string) {
+  /**
+   * Reply to a post. `parentPostId` may be the topic or any reply in it: a
+   * reply to a reply attaches to the topic, because one level is the whole
+   * shape of this forum.
+   *
+   * That flattening lives here rather than in the router. getThread() only
+   * loads rows whose parentId is the topic, so a second-level row would be
+   * written, counted nowhere and rendered nowhere — present in the database
+   * and invisible to every reader. An invariant that one caller can quietly
+   * break is not an invariant; the layer that owns the shape enforces it.
+   */
+  async createReply(parentPostId: number, communityId: number, authorId: number, content: string) {
+    const parent = await this.getPost(parentPostId);
+    if (!parent) throw new Error(`Post ${parentPostId} not found`);
+    const topicId = topicIdOf(parent);
+
     const [row] = await db
       .insert(communityPosts)
       .values({ communityId, authorId, parentId: topicId, content })
@@ -421,6 +456,56 @@ export class CommunityForumRepository {
       return false;
     }
     return post.hiddenAt != null;
+  }
+
+  /**
+   * Assemble a topic and its discussion into a proposal draft.
+   *
+   * Not a summary and not an AI call: the author gets the raw thread, with
+   * attributions, in the field where they will rewrite it. Anything cleverer
+   * would put words in the community's mouth, and the proposal form already
+   * has an AI button for whoever wants one.
+   *
+   * Removed posts stay removed. A member who withdrew their words, or whose
+   * words a community took down, does not have them reappear inside a
+   * proposal — that would make the tombstone a formality.
+   */
+  async composeProposalDraft(topicId: number): Promise<{
+    question: string;
+    solution: string;
+    included: number;
+    omitted: number;
+  } | null> {
+    const thread = await this.getThread(topicId);
+    if (!thread || thread.topic.removed) return null;
+
+    const usable = thread.replies.filter(r => !r.removed && r.content.trim());
+    const omittedRemoved = thread.replies.length - usable.length;
+
+    const parts: string[] = [thread.topic.content.trim()];
+    let budget = DRAFT_MAX_CHARS - parts[0].length;
+    let included = 0;
+
+    for (const reply of usable) {
+      const line = `${reply.author?.name?.trim() || reply.author?.username || '—'}: ${reply.content.trim()}`;
+      // Stop at the ceiling rather than truncating mid-sentence: a draft that
+      // ends in the middle of someone's argument misrepresents them.
+      if (line.length + 2 > budget) break;
+      parts.push(line);
+      budget -= line.length + 2;
+      included += 1;
+    }
+
+    const solution = included > 0
+      ? [parts[0], DRAFT_DISCUSSION_HEADING, ...parts.slice(1)].join('\n\n')
+      : parts[0];
+
+    return {
+      question: thread.topic.title ?? '',
+      solution,
+      included,
+      omitted: omittedRemoved + (usable.length - included),
+    };
   }
 
   async countTopics(communityId: number): Promise<number> {

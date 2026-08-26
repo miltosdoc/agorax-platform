@@ -26,13 +26,11 @@ import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/u
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
   editProposalId?: number;  // When set, edit an existing draft instead of creating
-  // Prefill when a community forum topic is being turned into a proposal.
-  // The text is a starting point, not a commitment: the author still chooses
-  // the track and the durations, and can rewrite every word before saving.
-  initialQuestion?: string;
-  initialSolution?: string;
-  // The topic this came from, linked back to it once the proposal exists so
-  // the discussion can point at what it produced.
+  // The community forum topic this proposal is being made from. The form
+  // fetches the topic and its whole discussion and fills itself with them —
+  // a starting point, not a commitment: the author still chooses the track
+  // and the durations, and can rewrite every word before saving. The topic is
+  // linked back to the proposal once it exists.
   fromPostId?: number;
 }
 
@@ -48,9 +46,7 @@ interface MemberCommunity {
   communitySignalHours?: number | null;
 }
 
-export function ProposalForm({
-  communityId, editProposalId, initialQuestion, initialSolution, fromPostId,
-}: ProposalFormProps) {
+export function ProposalForm({ communityId, editProposalId, fromPostId }: ProposalFormProps) {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -85,10 +81,46 @@ export function ProposalForm({
   const votingMin = targetCommunity?.votingMinHours ?? 24;
   const votingMax = targetCommunity?.votingMaxHours ?? 720;
   const [formData, setFormData] = useState({
-    question: initialQuestion ?? '',
-    solution: initialSolution ?? '',
+    question: '',
+    solution: '',
     category: '',
   });
+  // How much of the discussion made it into the draft, so the author is told
+  // rather than left to wonder why a long thread came in shorter.
+  const [draftNote, setDraftNote] = useState<string | null>(null);
+
+  // Pull the topic and its replies in once, on arrival from the forum. It
+  // never overwrites: if the author has already typed something (a reload
+  // after editing, say), their words win over the draft.
+  useEffect(() => {
+    if (!fromPostId || !communityId || editProposalId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/communities/${communityId}/posts/${fromPostId}/draft`, {
+          credentials: 'include',
+        });
+        if (!res.ok || cancelled) return;
+        const draft = await res.json() as {
+          question: string; solution: string; included: number; omitted: number;
+        };
+        setFormData(prev =>
+          prev.question || prev.solution
+            ? prev
+            : { ...prev, question: draft.question, solution: draft.solution });
+        if (!cancelled) {
+          setDraftNote(
+            t('proposal.from_forum_note')
+              .replace('{included}', String(draft.included))
+              .replace('{omitted}', String(draft.omitted)),
+          );
+        }
+      } catch {
+        // The form still works empty; the topic is one tab away.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [fromPostId, communityId, editProposalId, t]);
 
   // Proposal track — only chosen at creation time; editing a draft never
   // changes its track, so the selector is hidden in edit mode.
@@ -284,6 +316,11 @@ export function ProposalForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {draftNote && (
+          <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+            {draftNote}
+          </div>
+        )}
         <div className="mb-6 rounded-lg border bg-muted/40 p-4 space-y-3">
           <Label htmlFor="ai-intent" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-blue-600" />

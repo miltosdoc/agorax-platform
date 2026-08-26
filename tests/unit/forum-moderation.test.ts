@@ -14,6 +14,7 @@ import {
   isFlagDirection,
   shouldHideByFlags,
 } from '../../shared/forum-moderation';
+import { topicIdOf } from '../../server/storage/community-forum';
 
 describe('forum moderation verdict', () => {
   it('refuses to hide below the quorum, however one-sided', () => {
@@ -69,5 +70,23 @@ describe('forum moderation verdict', () => {
     expect(isFlagDirection('delete')).toBe(false);
     expect(isFlagDirection(undefined)).toBe(false);
     expect(isFlagDirection(1)).toBe(false);
+  });
+});
+
+/**
+ * A forum that branches stops being readable, so this one is one level deep.
+ * The rule matters more than it looks: getThread() loads only the rows whose
+ * parent is the topic, so a second-level row would exist in the database and
+ * appear to nobody — the worst kind of bug, because nothing reports it.
+ */
+describe('forum thread depth', () => {
+  it('files a reply to a reply under the same topic', () => {
+    const topic = { id: 10, parentId: null };
+    const reply = { id: 11, parentId: 10 };
+
+    expect(topicIdOf(topic)).toBe(10);
+    expect(topicIdOf(reply)).toBe(10);
+    // However deep the reader clicked, the answer lands in the same place.
+    expect(topicIdOf({ id: 12, parentId: topicIdOf(reply) })).toBe(10);
   });
 });
