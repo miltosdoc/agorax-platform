@@ -79,8 +79,13 @@ export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, Govern
  * guard, no screen. gov.gr verification is not part of the product today, so
  * putting an inert flag on the ballot asks members to decide something that
  * has no effect. Take it off this list the day something enforces it.
+ *
+ * governanceModel: same story, with a twist — it is now derived from the
+ * community's `type` (see governanceModelForType), which is the field the
+ * permission checks actually read. A vote on it could only have set a label
+ * that contradicts the type it is derived from.
  */
-export const RETIRED_GOVERNABLE_SETTING_KEYS = ['requireGovgrVerification'] as const;
+export const RETIRED_GOVERNABLE_SETTING_KEYS = ['requireGovgrVerification', 'governanceModel'] as const;
 
 /** The settings members actually vote on. */
 export const ACTIVE_GOVERNABLE_SETTING_KEYS: readonly GovernableSettingKey[] =

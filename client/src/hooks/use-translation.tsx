@@ -128,36 +128,3 @@ export function getStatusLabel(
   return key ? t(key) : status;
 }
 
-/**
- * Map community type strings to translation keys.
- */
-export function getCommunityTypeLabel(
-  type: string,
-  t: (key: keyof TranslationDictionary) => string
-): string {
-  const typeMap: Record<string, keyof TranslationDictionary> = {
-    'autonomous': 'community.type.autonomous',
-    'managed': 'community.type.managed',
-    'hybrid': 'community.type.hybrid',
-  };
-  
-  const key = typeMap[type];
-  return key ? t(key) : type;
-}
-
-/**
- * Map governance model strings to translation keys.
- */
-export function getGovernanceLabel(
-  model: string,
-  t: (key: keyof TranslationDictionary) => string
-): string {
-  const govMap: Record<string, keyof TranslationDictionary> = {
-    'no_admin': 'community.governance.noAdmin',
-    'admin_founded': 'community.governance.adminFounded',
-    'admin_guided': 'community.governance.adminGuided',
-  };
-  
-  const key = govMap[model];
-  return key ? t(key) : model;
-}

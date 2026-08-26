@@ -1,8 +1,25 @@
 export const COMMUNITY_TYPES = ['autonomous', 'managed'] as const;
 export type CommunityType = typeof COMMUNITY_TYPES[number];
 
-export const COMMUNITY_GOVERNANCE_MODELS = ['no_admin', 'admin_team', 'hybrid'] as const;
+/**
+ * How a community is governed. Not a choice of its own: it is derived from
+ * `type`, which is the field the platform actually enforces — the PATCH
+ * refusal, the founder/admin role and the liquid-settings ballot all read
+ * `type` and never this.
+ *
+ * It used to be an independent dropdown with a third option, 'hybrid'. No
+ * route, guard or screen ever read it, so picking a value changed nothing
+ * while the dashboard label happily contradicted reality: a managed community
+ * whose founder left the dropdown alone announced itself as having no
+ * administrators. Rows written before this still hold 'hybrid'; nothing reads
+ * them, and the label now comes from `type`.
+ */
+export const COMMUNITY_GOVERNANCE_MODELS = ['no_admin', 'admin_team'] as const;
 export type CommunityGovernanceModel = typeof COMMUNITY_GOVERNANCE_MODELS[number];
+
+export function governanceModelForType(type: CommunityType): CommunityGovernanceModel {
+  return type === 'managed' ? 'admin_team' : 'no_admin';
+}
 
 export const COMMUNITY_SORTITION_MODES = ['absolute', 'percentage'] as const;
 export type CommunitySortitionMode = typeof COMMUNITY_SORTITION_MODES[number];
@@ -220,12 +237,15 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
 export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): CommunityCreateSettings {
   const name = requiredString(input.name, 'Community name is required');
   const description = optionalString(input.description);
+  const type = enumValue(input.type, COMMUNITY_TYPES, DEFAULT_COMMUNITY_SETTINGS.type, 'Invalid community type');
 
   return {
     name,
     ...(description ? { description } : {}),
-    type: enumValue(input.type, COMMUNITY_TYPES, DEFAULT_COMMUNITY_SETTINGS.type, 'Invalid community type'),
-    governanceModel: enumValue(input.governanceModel, COMMUNITY_GOVERNANCE_MODELS, DEFAULT_COMMUNITY_SETTINGS.governanceModel, 'Invalid governance model'),
+    type,
+    // Derived, never taken from the caller: the two must agree, and `type` is
+    // the one with consequences.
+    governanceModel: governanceModelForType(type),
     maxConcurrentVotes: unlimitedOrPositiveInteger(input.maxConcurrentVotes, DEFAULT_COMMUNITY_SETTINGS.maxConcurrentVotes, 'maxConcurrentVotes must be -1 or greater than 0'),
     minParticipationPct: decimalString(input.minParticipationPct, DEFAULT_COMMUNITY_SETTINGS.minParticipationPct ?? '0', 0, 100, 'minParticipationPct must be between 0 and 100'),
     sortitionSize: integerValue(input.sortitionSize, DEFAULT_COMMUNITY_SETTINGS.sortitionSize ?? 12, 3, 500, 'sortitionSize must be between 3 and 500'),
@@ -281,8 +301,9 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
   const type = optionalEnumValue(input.type, COMMUNITY_TYPES, 'Invalid community type');
   if (type !== undefined) updates.type = type;
 
-  const governanceModel = optionalEnumValue(input.governanceModel, COMMUNITY_GOVERNANCE_MODELS, 'Invalid governance model');
-  if (governanceModel !== undefined) updates.governanceModel = governanceModel;
+  // Follows the type rather than being set on its own, so switching a
+  // community's type cannot leave the stored model describing the old one.
+  if (type !== undefined) updates.governanceModel = governanceModelForType(type);
 
   const maxConcurrentVotes = optionalUnlimitedOrPositiveInteger(input.maxConcurrentVotes, 'maxConcurrentVotes must be -1 or greater than 0');
   if (maxConcurrentVotes !== undefined) updates.maxConcurrentVotes = maxConcurrentVotes;

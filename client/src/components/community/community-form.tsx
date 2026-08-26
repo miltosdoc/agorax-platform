@@ -19,7 +19,6 @@ export function CommunityForm() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('autonomous');
-  const [governanceModel, setGovernanceModel] = useState('no_admin');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +28,12 @@ export function CommunityForm() {
     setLoading(true);
 
     try {
+      // Ο τρόπος διακυβέρνησης προκύπτει από το είδος — ο διακομιστής τον
+      // παράγει μόνος του, δεν τον διαλέγει ο ιδρυτής χωριστά.
       const resp = await api.post('/api/communities', {
         name,
         description,
         type,
-        governanceModel,
       });
       const data = resp.data as { id: number };
       navigate(`/communities/${data.id}`);
@@ -84,20 +84,6 @@ export function CommunityForm() {
               <SelectContent>
                 <SelectItem value="autonomous">{t('community.type_autonomous')}</SelectItem>
                 <SelectItem value="managed">{t('community.type_managed')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="governance">{t('community.governance_label')}</Label>
-            <Select value={governanceModel} onValueChange={setGovernanceModel}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="no_admin">{t('community.governance_no_admin')}</SelectItem>
-                <SelectItem value="admin_team">{t('community.governance_admin_team')}</SelectItem>
-                <SelectItem value="hybrid">{t('community.governance_hybrid')}</SelectItem>
               </SelectContent>
             </Select>
           </div>

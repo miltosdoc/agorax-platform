@@ -12,14 +12,17 @@ import {
 } from '../../shared/community-summary';
 
 describe('community dashboard view model', () => {
-  it('maps governance enum values to translation keys instead of leaking raw values', () => {
-    expect(getGovernanceTranslationKey('no_admin')).toBe('community.governance_no_admin');
-    expect(getGovernanceTranslationKey('admin_team')).toBe('community.governance_admin_team');
-    expect(getGovernanceTranslationKey('hybrid')).toBe('community.governance_hybrid');
+  it('labels governance from the community type, which is what is enforced', () => {
+    expect(getGovernanceTranslationKey('managed')).toBe('community.governance_admin_team');
+    expect(getGovernanceTranslationKey('autonomous')).toBe('community.governance_no_admin');
 
-    // Legacy seed values should still render as human labels while data is cleaned up.
-    expect(getGovernanceTranslationKey('admin_founded')).toBe('community.governance_admin_team');
-    expect(getGovernanceTranslationKey('admin_guided')).toBe('community.governance_hybrid');
+    // The label used to read the stored governanceModel column, which nothing
+    // enforced: a managed community could announce that it had no admins.
+    // Anything that is not 'managed' — missing, legacy, junk — reads as the
+    // community governing itself, which is the platform's default.
+    expect(getGovernanceTranslationKey(null)).toBe('community.governance_no_admin');
+    expect(getGovernanceTranslationKey(undefined)).toBe('community.governance_no_admin');
+    expect(getGovernanceTranslationKey('hybrid')).toBe('community.governance_no_admin');
   });
 
   it('treats missing democracy score as not available instead of rendering /100', () => {

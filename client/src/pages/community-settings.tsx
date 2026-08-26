@@ -21,7 +21,7 @@ import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
-import type { CommunityGovernanceModel, CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
+import type { CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -29,7 +29,6 @@ interface CommunitySettingsForm {
   name: string;
   description: string;
   type: CommunityType;
-  governanceModel: CommunityGovernanceModel;
   maxConcurrentVotes: number;
   minParticipationPct: string;
   sortitionSize: number;
@@ -57,7 +56,6 @@ function toForm(community: Community): CommunitySettingsForm {
     name: community.name ?? '',
     description: community.description ?? '',
     type: (community.type as CommunityType) || 'autonomous',
-    governanceModel: (community.governanceModel as CommunityGovernanceModel) || 'no_admin',
     maxConcurrentVotes: community.maxConcurrentVotes ?? -1,
     minParticipationPct: String(community.minParticipationPct ?? '0'),
     sortitionSize: community.sortitionSize ?? 12,
@@ -216,17 +214,6 @@ export default function CommunitySettingsPage() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="governanceModel">{t('community.governance_label')}</Label>
-                      <Select value={form.governanceModel} onValueChange={(value) => update('governanceModel', value as CommunityGovernanceModel)}>
-                        <SelectTrigger id="governanceModel"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="no_admin">{t('community.governance_no_admin')}</SelectItem>
-                          <SelectItem value="admin_team">{t('community.governance_admin_team')}</SelectItem>
-                          <SelectItem value="hybrid">{t('community.governance_hybrid')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="maxConcurrentVotes">{t('community.max_concurrent_votes')}</Label>
                       <Input id="maxConcurrentVotes" type="number" value={form.maxConcurrentVotes} onChange={(e) => update('maxConcurrentVotes', Number(e.target.value))} />

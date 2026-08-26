@@ -19,7 +19,8 @@ import {
 describe('community settings contract', () => {
   it('exposes stable type and governance options for UI controls', () => {
     expect(COMMUNITY_TYPES).toEqual(['autonomous', 'managed']);
-    expect(COMMUNITY_GOVERNANCE_MODELS).toEqual(['no_admin', 'admin_team', 'hybrid']);
+    // 'hybrid' is gone: it was a third option no permission check ever read.
+    expect(COMMUNITY_GOVERNANCE_MODELS).toEqual(['no_admin', 'admin_team']);
   });
 
   it('sanitizes community creation with safe defaults and configurable deliberation settings', () => {
@@ -27,7 +28,7 @@ describe('community settings contract', () => {
       name: '  Δήμος Αθηναίων  ',
       description: '  Civic participation  ',
       type: 'managed',
-      governanceModel: 'hybrid',
+      governanceModel: 'hybrid',   // αγνοείται: παράγεται από το type
       maxConcurrentVotes: 3,
       minParticipationPct: '25',
       sortitionSize: 12,
@@ -44,7 +45,7 @@ describe('community settings contract', () => {
       name: 'Δήμος Αθηναίων',
       description: 'Civic participation',
       type: 'managed',
-      governanceModel: 'hybrid',
+      governanceModel: 'admin_team',
       maxConcurrentVotes: 3,
       minParticipationPct: '25',
       sortitionSize: 12,
@@ -98,6 +99,16 @@ describe('community settings contract', () => {
     });
   });
 
+  it('derives the governance model from the type on update, and never from input', () => {
+    // A community that switches type must not keep a stored model describing
+    // the type it just left.
+    expect(sanitizeCommunityUpdateInput({ type: 'managed' }))
+      .toEqual({ type: 'managed', governanceModel: 'admin_team' });
+    expect(sanitizeCommunityUpdateInput({ type: 'autonomous' }))
+      .toEqual({ type: 'autonomous', governanceModel: 'no_admin' });
+    expect(sanitizeCommunityUpdateInput({ governanceModel: 'admin_team' })).toEqual({});
+  });
+
   it('sanitizes updates by whitelisting configurable fields only', () => {
     const result = sanitizeCommunityUpdateInput({
       name: ' Updated ',
@@ -118,7 +129,10 @@ describe('community settings contract', () => {
   it('rejects invalid parametrization values', () => {
     expect(() => sanitizeCommunityCreateInput({ name: '' })).toThrow('Community name is required');
     expect(() => sanitizeCommunityCreateInput({ name: 'X', type: 'private' })).toThrow('Invalid community type');
-    expect(() => sanitizeCommunityCreateInput({ name: 'X', governanceModel: 'dictator' })).toThrow('Invalid governance model');
+    // No longer rejected, because it is no longer read: the governance model
+    // is derived from the type, so a caller cannot set it at all.
+    expect(sanitizeCommunityCreateInput({ name: 'X', governanceModel: 'dictator' }).governanceModel).toBe('no_admin');
+    expect(sanitizeCommunityCreateInput({ name: 'X', type: 'managed', governanceModel: 'dictator' }).governanceModel).toBe('admin_team');
     expect(() => sanitizeCommunityCreateInput({ name: 'X', amendmentThreshold: 1.5 })).toThrow('amendmentThreshold must be between 0 and 1');
     expect(() => sanitizeCommunityCreateInput({ name: 'X', minParticipationPct: 101 })).toThrow('minParticipationPct must be between 0 and 100');
     expect(() => sanitizeCommunityCreateInput({ name: 'X', sortitionSize: 2 })).toThrow('sortitionSize must be between 3 and 500');

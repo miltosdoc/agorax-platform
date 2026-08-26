@@ -34,18 +34,16 @@ export function getCommunitySummaryPermissions(role: CommunityUserRole): Communi
   return { canManageSettings: role === 'founder' || role === 'admin' };
 }
 
-export function getGovernanceTranslationKey(governanceModel?: string | null): string {
-  switch (governanceModel) {
-    case 'admin_team':
-    case 'admin_founded':
-      return 'community.governance_admin_team';
-    case 'hybrid':
-    case 'admin_guided':
-      return 'community.governance_hybrid';
-    case 'no_admin':
-    default:
-      return 'community.governance_no_admin';
-  }
+/**
+ * Label for how a community is governed, from its `type`.
+ *
+ * It used to read the stored governanceModel column, which nothing enforced
+ * and which drifted from reality — managed communities announcing themselves
+ * as having no administrators. Reading `type` cannot drift: it is the field
+ * the permission checks use.
+ */
+export function getGovernanceTranslationKey(type?: string | null): string {
+  return type === 'managed' ? 'community.governance_admin_team' : 'community.governance_no_admin';
 }
 
 export function hasDemocracyScore(score: unknown): boolean {
@@ -86,7 +84,7 @@ export function buildCommunitySummary(
   const permissions = getCommunitySummaryPermissions(currentUserRole);
   const normalizedCommunity = {
     ...community,
-    governanceModel: getGovernanceTranslationKey(community.governanceModel),
+    governanceModel: getGovernanceTranslationKey(community.type),
     democracyScore: hasDemocracyScore(community.democracyScore) ? community.democracyScore : null,
   };
 

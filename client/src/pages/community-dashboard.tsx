@@ -285,7 +285,7 @@ export default function CommunityDashboardPage() {
   const metrics = getCommunityDashboardMetrics({ memberCount, proposals });
   const democracyScoreAvailable = hasDemocracyScore(community.democracyScore);
   const democracyScore = democracyScoreAvailable ? Number(community.democracyScore) : null;
-  const governanceLabel = t(getGovernanceTranslationKey(community.governanceModel));
+  const governanceLabel = t(getGovernanceTranslationKey(community.type));
   const description = community.description?.trim();
 
   return (

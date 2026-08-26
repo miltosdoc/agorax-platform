@@ -17,7 +17,6 @@ interface Community {
   name: string;
   description?: string;
   type: string;
-  governanceModel?: string;
   memberCount?: number;
   democracyScore?: number;
   latestProposal?: { id: number; question: string; status: string; createdAt: string } | null;
