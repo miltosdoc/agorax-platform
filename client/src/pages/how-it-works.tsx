@@ -12,7 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, CheckCircle, Edit3, TrendingUp, Users, Vote,
   Shield, ArrowRight, Zap, Globe, Lock, Award,
-  Mic, Rss, Bell, Video, Smartphone
+  Mic, Rss, Bell, Video, Smartphone, Clock, Building2
 } from "lucide-react";
 
 export default function HowItWorksPage() {
@@ -190,6 +190,110 @@ export default function HowItWorksPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          {/* Communities — where proposals live, who may join, and who sets the
+              rules. The kind (autonomous / managed) is the only choice that
+              changes who decides; everything below is configured either way. */}
+          <div className="mt-16 mb-16" id="communities">
+            <h2 className="text-2xl font-bold text-center mb-2">{t('hiw.communities_title')}</h2>
+            <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+              {t('hiw.communities_subtitle')}
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <Card>
+                <CardContent className="p-6">
+                  <Users className="w-8 h-8 text-primary mb-3" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.communities_autonomous_title')}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{t('hiw.communities_autonomous_desc')}</p>
+                  <ul className="space-y-2">
+                    {[
+                      t('hiw.communities_autonomous_point1'),
+                      t('hiw.communities_autonomous_point2'),
+                      t('hiw.communities_autonomous_point3'),
+                    ].map((point, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <Building2 className="w-8 h-8 text-amber-500 mb-3" />
+                  <h3 className="font-semibold text-lg mb-2">{t('hiw.communities_managed_title')}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{t('hiw.communities_managed_desc')}</p>
+                  <ul className="space-y-2">
+                    {[
+                      t('hiw.communities_managed_point1'),
+                      t('hiw.communities_managed_point2'),
+                      t('hiw.communities_managed_point3'),
+                    ].map((point, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="max-w-3xl mx-auto mb-12">
+              <CardContent className="p-6">
+                <h3 className="font-semibold text-lg mb-4">{t('hiw.communities_create_title')}</h3>
+                <ol className="space-y-4">
+                  {[
+                    t('hiw.communities_create_step1'),
+                    t('hiw.communities_create_step2'),
+                    t('hiw.communities_create_step3'),
+                    t('hiw.communities_create_step4'),
+                  ].map((step, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm text-muted-foreground leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="text-center mt-6">
+                  <Link href="/communities">
+                    <Button variant="outline" size="sm">{t('hiw.communities_cta')}</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            <h3 className="text-xl font-bold text-center mb-2">{t('hiw.communities_settings_title')}</h3>
+            <p className="text-center text-muted-foreground mb-6 max-w-2xl mx-auto">
+              {t('hiw.communities_settings_subtitle')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { icon: Globe, title: t('hiw.communities_setting_join_title'), desc: t('hiw.communities_setting_join_desc') },
+                { icon: Lock, title: t('hiw.communities_setting_visibility_title'), desc: t('hiw.communities_setting_visibility_desc') },
+                { icon: Clock, title: t('hiw.communities_setting_timing_title'), desc: t('hiw.communities_setting_timing_desc') },
+                { icon: Zap, title: t('hiw.communities_setting_synthesis_title'), desc: t('hiw.communities_setting_synthesis_desc') },
+                { icon: Edit3, title: t('hiw.communities_setting_amendments_title'), desc: t('hiw.communities_setting_amendments_desc') },
+              ].map((item, i) => (
+                <Card key={i}>
+                  <CardContent className="p-5 flex items-start gap-3">
+                    <item.icon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div>
+                      <h4 className="font-medium mb-1">{item.title}</h4>
+                      <p className="text-sm text-muted-foreground">{item.desc}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="mt-6 p-4 bg-muted/30 rounded-lg border text-sm text-muted-foreground max-w-3xl mx-auto">
+              {t('hiw.communities_settings_note')}
+            </div>
           </div>
 
           {/* Engagement tools — surfaces built on top of the lifecycle */}
