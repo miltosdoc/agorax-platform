@@ -89,6 +89,12 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   // rather than left to wonder why a long thread came in shorter.
   const [draftNote, setDraftNote] = useState<string | null>(null);
 
+  // AI-assisted drafting (same UX as the poll compiler): describe the idea
+  // in plain language, the LLM fills the fields below, the author edits.
+  const [aiIntent, setAiIntent] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   // Pull the topic and its replies in once, on arrival from the forum. It
   // never overwrites: if the author has already typed something (a reload
   // after editing, say), their words win over the draft.
@@ -108,6 +114,15 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
           prev.question || prev.solution
             ? prev
             : { ...prev, question: draft.question, solution: draft.solution });
+        // The same discussion also goes into the AI box, so «Συμπλήρωση με AI»
+        // is one click away and drafts a proposal *from the thread* rather
+        // than from a description of it.
+        //
+        // Not run automatically, and the reason is ordering rather than cost:
+        // whoever promotes a topic should read what their neighbours actually
+        // wrote before reading a machine's version of it. An AI draft that
+        // appears first is an AI draft nobody checks against the source.
+        setAiIntent(prev => prev || `${draft.question}\n\n${draft.solution}`);
         if (!cancelled) {
           setDraftNote(
             t('proposal.from_forum_note')
@@ -176,11 +191,6 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     }).catch(() => setError(t('proposal.create_error')));
   }, [editProposalId, t]);
 
-  // AI-assisted drafting (same UX as the poll compiler): describe the idea
-  // in plain language, the LLM fills the fields below, the author edits.
-  const [aiIntent, setAiIntent] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   async function handleAiDraft() {
     if (aiIntent.trim().length < 10) return;

@@ -1032,7 +1032,7 @@ const en: TranslationDictionary = {
   // decides behaviour is the type: autonomous or managed.
   // ── Community forum ───────────────────────────────────────────────────────
   'community.tab_forum': 'Forum',
-  'proposal.from_forum_note': 'This text came from the community discussion: the opening topic and {included} replies ({omitted} left out — withdrawn or over the length limit). Edit it freely before submitting.',
+  'proposal.from_forum_note': 'This text came from the community discussion: the opening topic and {included} replies ({omitted} left out — withdrawn or over the length limit). Read it and edit it freely, or press "Fill in with AI" below to have it synthesised into a single proposal.',
   'forum.new_topic': 'New topic',
   'forum.title_placeholder': 'What do you want to discuss?',
   'forum.content_placeholder': 'Describe the issue in your own words. If it leads somewhere, it becomes a proposal.',
