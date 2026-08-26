@@ -12,6 +12,7 @@
 // Domain repositories (classes for testing)
 export { UserRepository } from './storage/users';
 export { CommunityRepository } from './storage/communities';
+export { CommunityForumRepository } from './storage/community-forum';
 export { ProposalRepository } from './storage/proposals';
 export { AmendmentRepository } from './storage/amendments';
 export { SortitionRepository } from './storage/sortition';
@@ -25,6 +26,7 @@ export { LivekitRepository } from './storage/livekit';
 // Pre-instantiated repository instances (for use in routers)
 import { UserRepository } from './storage/users';
 import { CommunityRepository } from './storage/communities';
+import { CommunityForumRepository } from './storage/community-forum';
 import { ProposalRepository } from './storage/proposals';
 import { AmendmentRepository } from './storage/amendments';
 import { SortitionRepository } from './storage/sortition';
@@ -37,6 +39,7 @@ import { LivekitRepository } from './storage/livekit';
 
 export const userRepo = new UserRepository();
 export const communityRepo = new CommunityRepository();
+export const communityForumRepo = new CommunityForumRepository();
 export const proposalRepo = new ProposalRepository();
 export const amendmentRepo = new AmendmentRepository();
 export const sortitionRepo = new SortitionRepository();

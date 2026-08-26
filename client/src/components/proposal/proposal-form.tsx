@@ -26,6 +26,14 @@ import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/u
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
   editProposalId?: number;  // When set, edit an existing draft instead of creating
+  // Prefill when a community forum topic is being turned into a proposal.
+  // The text is a starting point, not a commitment: the author still chooses
+  // the track and the durations, and can rewrite every word before saving.
+  initialQuestion?: string;
+  initialSolution?: string;
+  // The topic this came from, linked back to it once the proposal exists so
+  // the discussion can point at what it produced.
+  fromPostId?: number;
 }
 
 interface MemberCommunity {
@@ -40,7 +48,9 @@ interface MemberCommunity {
   communitySignalHours?: number | null;
 }
 
-export function ProposalForm({ communityId, editProposalId }: ProposalFormProps) {
+export function ProposalForm({
+  communityId, editProposalId, initialQuestion, initialSolution, fromPostId,
+}: ProposalFormProps) {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -75,8 +85,8 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
   const votingMin = targetCommunity?.votingMinHours ?? 24;
   const votingMax = targetCommunity?.votingMaxHours ?? 720;
   const [formData, setFormData] = useState({
-    question: '',
-    solution: '',
+    question: initialQuestion ?? '',
+    solution: initialSolution ?? '',
     category: '',
   });
 
@@ -241,6 +251,19 @@ export function ProposalForm({ communityId, editProposalId }: ProposalFormProps)
           await apiRequest('POST', `/api/proposals/${proposalId}/submit`);
         } catch {
           /* draft saved — retry from the proposal page */
+        }
+      }
+
+      // Point the originating topic at the proposal it produced. Failure is
+      // non-fatal — the proposal exists either way, and a missing backlink is
+      // not worth losing it over.
+      if (fromPostId && !editProposalId && targetCommunityId) {
+        try {
+          await apiRequest('POST', `/api/communities/${targetCommunityId}/posts/${fromPostId}/link-proposal`, {
+            proposalId,
+          });
+        } catch {
+          /* best-effort backlink */
         }
       }
 

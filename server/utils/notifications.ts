@@ -36,6 +36,10 @@ export type NotificationType =
   | 'file_lost'
   | 'deliberation_reminder'
   | 'community_invite'
+  // A reply to a topic you started in a community forum. Only the topic's
+  // author is told, and only about their own topic: a forum that notifies
+  // every participant on every message teaches people to switch the bell off.
+  | 'forum_reply'
   // Platform-wide announcement: a change to how the platform itself works,
   // addressed to every member rather than to a proposal or a body.
   | 'platform_update';

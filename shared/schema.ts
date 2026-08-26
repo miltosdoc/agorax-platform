@@ -1713,6 +1713,82 @@ export const sortitionAttendance = pgTable(
 export type SortitionAttendance = InferSelectModel<typeof sortitionAttendance>;
 export type InsertSortitionAttendance = InferInsertModel<typeof sortitionAttendance>;
 
+// ─── Community Forum (Αγορά της κοινότητας) ─────────────────────────
+// Threaded discussion that belongs to a community rather than to a proposal.
+//
+// The shape deliberately mirrors debateThreads — self-referencing parentId,
+// up/down votes, one vote per member — so anyone who knows the proposal
+// debate already knows this. It is a separate table because debateThreads
+// cascades away with its proposal and its routes only open during
+// deliberation; two lifecycles in one table means one eventually deletes the
+// other.
+//
+// parentId null → a topic, which has a title.
+// parentId set  → a reply to a topic, which does not. One level, not a tree:
+//                 a forum thread that branches stops being readable.
+
+export const communityPosts = pgTable("community_posts", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  parentId: integer("parent_id").references((): any => communityPosts.id, { onDelete: "cascade" }),
+  title: text("title"),
+  content: text("content").notNull(),
+  upvotes: integer("upvotes").notNull().default(0),
+  downvotes: integer("downvotes").notNull().default(0),
+  replyCount: integer("reply_count").notNull().default(0),
+  pinned: boolean("pinned").notNull().default(false),
+  // Sorted by liveliness, not birthday: last month's topic being argued today
+  // belongs at the top.
+  lastActivityAt: timestamp("last_activity_at").notNull().defaultNow(),
+
+  // hiddenBy null while hiddenAt is set means the members hid it by majority,
+  // which is the only way it can happen in a community with no admins.
+  hiddenAt: timestamp("hidden_at"),
+  hiddenBy: integer("hidden_by").references(() => users.id),
+  hiddenReason: text("hidden_reason"),
+  // Author removal. The row survives so replies keep their anchor; the text
+  // is never served again.
+  deletedAt: timestamp("deleted_at"),
+
+  // Why the forum exists: a topic is the antechamber to a proposal, not a
+  // parallel venue. SET NULL so deleting a proposal does not erase the
+  // discussion it came from.
+  promotedProposalId: integer("promoted_proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const communityPostVotes = pgTable("community_post_votes", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  direction: text("direction").notNull(), // 'up' | 'down'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  communityPostVoteUnique: uniqueIndex('community_post_vote_unique').on(table.postId, table.userId),
+}));
+
+// One row per member per post: 'hide' is the report, 'keep' is the defence.
+// In an autonomous community these two values *are* the verdict — there is no
+// administrator to reach one.
+export const communityPostFlags = pgTable("community_post_flags", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  direction: text("direction").notNull(), // 'hide' | 'keep'
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  communityPostFlagUnique: uniqueIndex('community_post_flag_unique').on(table.postId, table.userId),
+}));
+
+export type CommunityPost = InferSelectModel<typeof communityPosts>;
+export type InsertCommunityPost = InferInsertModel<typeof communityPosts>;
+export type CommunityPostVote = InferSelectModel<typeof communityPostVotes>;
+export type CommunityPostFlag = InferSelectModel<typeof communityPostFlags>;
+
 // ─── Polling module (panel, question bank, two-tier polls) ──────────────────
 // Tables live in their own file to keep this one navigable; re-exported here
 // so drizzle-kit and `import * as schema from '@shared/schema'` pick them up.

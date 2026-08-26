@@ -79,11 +79,20 @@ function ProposalFormPage({ editId }: { editId?: number }) {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('community');
   const communityId = raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : undefined;
+  // A community forum topic being turned into a proposal arrives prefilled.
+  const fromPostRaw = params.get('fromPost');
+  const fromPostId = fromPostRaw && /^\d+$/.test(fromPostRaw) ? parseInt(fromPostRaw, 10) : undefined;
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <ProposalForm communityId={communityId} editProposalId={editId} />
+        <ProposalForm
+          communityId={communityId}
+          editProposalId={editId}
+          initialQuestion={params.get('question') ?? undefined}
+          initialSolution={params.get('solution') ?? undefined}
+          fromPostId={fromPostId}
+        />
       </div>
       <Footer />
     </div>

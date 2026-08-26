@@ -10,6 +10,7 @@
 // Domain repository classes (for testing/custom instantiation)
 export { UserRepository } from './users';
 export { CommunityRepository } from './communities';
+export { CommunityForumRepository } from './community-forum';
 export { ProposalRepository } from './proposals';
 export { AmendmentRepository } from './amendments';
 export { SortitionRepository } from './sortition';
@@ -21,6 +22,7 @@ export { PlatformRepository } from './platform';
 // Pre-instantiated repository instances for use in routers
 import { UserRepository } from './users';
 import { CommunityRepository } from './communities';
+import { CommunityForumRepository } from './community-forum';
 import { ProposalRepository } from './proposals';
 import { AmendmentRepository } from './amendments';
 import { SortitionRepository } from './sortition';
@@ -31,6 +33,7 @@ import { PlatformRepository } from './platform';
 
 export const users = new UserRepository();
 export const communities = new CommunityRepository();
+export const communityForum = new CommunityForumRepository();
 export const proposals = new ProposalRepository();
 export const amendments = new AmendmentRepository();
 export const sortition = new SortitionRepository();

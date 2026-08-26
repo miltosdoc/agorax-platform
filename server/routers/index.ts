@@ -6,6 +6,7 @@
 
 export { registerUsersRoutes } from './users';
 export { registerCommunitiesRoutes } from './communities';
+export { registerCommunityForumRoutes } from './community-forum';
 export { registerProposalsRoutes } from './proposals';
 export { registerAmendmentsRoutes } from './amendments';
 export { registerSortitionRoutes } from './sortition';
