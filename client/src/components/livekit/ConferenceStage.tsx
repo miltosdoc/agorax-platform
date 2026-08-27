@@ -13,13 +13,15 @@
  * information a raised hand carries in a room with chairs in it.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   VideoConference,
   useLocalParticipant,
   useParticipants,
+  useRoomContext,
 } from '@livekit/components-react';
-import type { Participant } from 'livekit-client';
+import { RoomEvent, Track } from 'livekit-client';
+import type { LocalTrackPublication, Participant } from 'livekit-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -58,6 +60,23 @@ export function ConferenceStage({ title, subtitle, capacity, isHost, ending, onE
   const participants = useParticipants();
   const [panelOpen, setPanelOpen] = useState(false);
   const [handBusy, setHandBusy] = useState(false);
+  const room = useRoomContext();
+
+  // Tell the encoder that a shared screen is text, not motion. Under
+  // congestion it then sacrifices frames rather than sharpness, which is the
+  // right trade for a document and the wrong one for a face — hence setting
+  // it on the screen-share track only rather than as a global degradation
+  // preference. There is no room-level option for this, so it is applied at
+  // publish time.
+  useEffect(() => {
+    const onPublished = (pub: LocalTrackPublication) => {
+      if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
+        pub.track.mediaStreamTrack.contentHint = 'text';
+      }
+    };
+    room.on(RoomEvent.LocalTrackPublished, onPublished);
+    return () => { room.off(RoomEvent.LocalTrackPublished, onPublished); };
+  }, [room]);
 
   const queue = useMemo(() => speakerQueue(participants), [participants]);
   const myPosition = localParticipant ? queuePositionOf(queue, localParticipant.identity) : null;

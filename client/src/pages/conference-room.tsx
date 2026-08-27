@@ -243,11 +243,29 @@ export default function ConferenceRoomPage() {
           serverUrl={conn.url}
           token={conn.token}
           connect
-          video={choices?.videoEnabled ?? true}
+          video={choices?.videoEnabled ?? false}
           audio={choices?.audioEnabled ?? true}
           options={{
+            // Send each viewer the resolution their tile can actually show.
+            // Without this the SFU ships full 720p to a 180px tile and the
+            // browser throws nine tenths of the pixels away in the scaler —
+            // measured at ~4x the necessary downstream traffic. Pinning a
+            // speaker full-screen raises the layer back automatically, so
+            // nothing visible is lost.
+            adaptiveStream: true,
+            // Stop encoding layers nobody is subscribed to.
+            dynacast: true,
             videoCaptureDefaults: choices?.videoDeviceId ? { deviceId: choices.videoDeviceId } : undefined,
             audioCaptureDefaults: choices?.audioDeviceId ? { deviceId: choices.audioDeviceId } : undefined,
+            publishDefaults: {
+              // A shared screen is a different problem from a face: what has
+              // to survive is the resolution (text must be readable), not the
+              // frame rate (a slide does not move). The library default is
+              // 1080p at 15fps / 2.5 Mbps, which spends half its budget on
+              // frames of a motionless document. Same crispness, half the
+              // traffic.
+              screenShareEncoding: { maxBitrate: 1_200_000, maxFramerate: 5, priority: 'high' },
+            },
           }}
           onDisconnected={handleDisconnected}
           onError={handleConnectError}
@@ -354,10 +372,18 @@ export default function ConferenceRoomPage() {
               <p className="px-4 pt-3 text-xs text-muted-foreground">
                 {t('conference.joining_as').replace('{name}', user?.name || user?.username || '')}
               </p>
+              <p className="px-4 pt-2 text-xs text-muted-foreground" data-testid="conference-camera-norm">
+                {t('conference.camera_norm')}
+              </p>
               <PreJoin
                 defaults={{
                   username: user?.name || user?.username || t('conference.member'),
-                  videoEnabled: true,
+                  // Meetings open with cameras off. Two reasons that point the
+                  // same way: a camera is a barrier to attending at all (bad
+                  // room, no good light, not dressed, a child in the
+                  // background), and video cost grows with the square of the
+                  // room while audio does not. One click turns it on.
+                  videoEnabled: false,
                   audioEnabled: true,
                 }}
                 joinLabel={stage === 'connecting'
