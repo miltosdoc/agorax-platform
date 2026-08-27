@@ -12,6 +12,7 @@
  */
 
 import { createHmac } from 'crypto';
+import { readRoomCapacity } from '@shared/conference';
 
 export class LivekitUnavailableError extends Error {
   constructor(message: string) {
@@ -107,6 +108,10 @@ export async function issueJoinToken(opts: IssueTokenOptions): Promise<string> {
       canPublish: opts.canPublish ?? true,
       canSubscribe: opts.canSubscribe ?? true,
       canPublishData: opts.canPublishData ?? true,
+      // Raising a hand is the participant writing to their own attribute map.
+      // Without this grant the SFU rejects setAttributes() and the queue is a
+      // button that does nothing.
+      canUpdateOwnMetadata: true,
       roomAdmin: !!opts.isAdmin,
     },
   }, opts.ttlSeconds ?? 4 * 3600);
@@ -137,6 +142,79 @@ export async function deleteRoom(roomName: string): Promise<void> {
     if (/not.found|does not exist/i.test(err?.message ?? '')) return;
     throw err;
   }
+}
+
+
+// ── Room service calls ──────────────────────────────────────────────────────
+
+/**
+ * Admin token for a RoomService call.
+ *
+ * `roomAdmin` is only honoured for the room named in the same grant — a
+ * project-wide roomAdmin token is rejected with 401 "permissions denied" by
+ * per-room calls such as ListParticipants. Pass the room whenever the call
+ * addresses one.
+ */
+function adminToken(cfg: LivekitConfig, roomName?: string, ttlSeconds = 60): string {
+  return mintJwt(cfg.apiKey, cfg.apiSecret, {
+    sub: 'server',
+    video: {
+      roomCreate: true,
+      roomList: true,
+      roomAdmin: true,
+      ...(roomName ? { room: roomName } : {}),
+    },
+  }, ttlSeconds);
+}
+
+async function twirp(cfg: LivekitConfig, method: string, body: unknown, roomName?: string): Promise<any> {
+  const res = await fetch(`${cfg.httpUrl}/twirp/livekit.RoomService/${method}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminToken(cfg, roomName)}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text().catch(() => '');
+  if (!res.ok) {
+    // A room nobody has connected to yet does not exist on the SFU. That is
+    // an empty room, not a failure.
+    if (res.status === 404 || /not.?found|does not exist/i.test(text)) return null;
+    throw new Error(`LiveKit ${method} ${res.status}: ${text}`);
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+/** How many participants the platform allows in one room at a time. */
+export function roomCapacity(): number {
+  return readRoomCapacity(process.env.LIVEKIT_MAX_PARTICIPANTS);
+}
+
+/**
+ * Identities currently connected to a room, or [] when the room has not been
+ * created on the SFU yet.
+ */
+export async function listParticipantIdentities(roomName: string): Promise<string[]> {
+  const cfg = requireConfig();
+  const data = await twirp(cfg, 'ListParticipants', { room: roomName }, roomName);
+  if (!data || !Array.isArray(data.participants)) return [];
+  return data.participants
+    .map((p: any) => String(p?.identity ?? ''))
+    .filter((identity: string) => identity.length > 0);
+}
+
+/**
+ * Create the room with a hard participant cap before anyone connects.
+ *
+ * The app already refuses a join past the cap with a message that explains
+ * itself; this is the backstop for the race where two people pass that check
+ * in the same instant. CreateRoom on a room that already exists returns it
+ * unchanged, so this is safe to call on every join.
+ */
+export async function ensureRoom(roomName: string, maxParticipants: number): Promise<void> {
+  const cfg = requireConfig();
+  await twirp(cfg, 'CreateRoom', { name: roomName, max_participants: maxParticipants }, roomName);
 }
 
 /**

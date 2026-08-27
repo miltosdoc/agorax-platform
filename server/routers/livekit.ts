@@ -8,6 +8,7 @@
  *   GET    /api/sortition/:bodyId/room                    — get-or-null the body's room
  *   POST   /api/sortition/:bodyId/room                    — get-or-create the body's room (sortition member only)
  *   POST   /api/livekit/rooms/:id/token                   — issue a join token (gated per kind)
+ *   GET    /api/livekit/rooms/:id/presence                — who is in there right now (count only)
  *   PATCH  /api/livekit/rooms/:id                         — toggle recording / close (host-only)
  *
  * Access gates:
@@ -33,6 +34,9 @@ import {
   issueJoinToken,
   deleteRoom,
   publicLivekitUrl,
+  listParticipantIdentities,
+  ensureRoom,
+  roomCapacity,
   LivekitUnavailableError,
 } from '../utils/livekit-client';
 import {
@@ -213,6 +217,7 @@ export function registerLivekitRoutes(app: Express): void {
         communityName: community?.name ?? null,
         canJoin: isMember && room.status !== 'closed',
         isHost,
+        capacity: roomCapacity(),
       });
     } catch (err: any) {
       logger.error('get livekit room failed', { err: err?.message });
@@ -407,10 +412,35 @@ export function registerLivekitRoutes(app: Express): void {
         }
       }
 
+      // Capacity. Enforced here so a member who cannot get in is told why and
+      // by how much, rather than meeting an opaque WebSocket error — and
+      // re-checked by the SFU itself via ensureRoom(), for the race where two
+      // people clear this check in the same instant.
+      //
+      // Fails open: if the SFU cannot be reached for a count, that is a reason
+      // to let someone into their own meeting, not to keep them out.
+      const identity = `user-${userId}`;
+      const capacity = roomCapacity();
+      try {
+        await ensureRoom(room.roomName, capacity);
+        const present = await listParticipantIdentities(room.roomName);
+        // A refresh or a second tab must not lock someone out of a room they
+        // are already counted in.
+        if (present.length >= capacity && !present.includes(identity)) {
+          return res.status(409).json({
+            code: 'room_full',
+            capacity,
+            message: `room is full (${capacity})`,
+          });
+        }
+      } catch (capErr: any) {
+        logger.warn('livekit capacity check failed', { roomId: room.id, err: capErr?.message });
+      }
+
       const displayName = (req.user.name || req.user.username || `user-${userId}`).toString();
       const token = await issueJoinToken({
         roomName: room.roomName,
-        identity: `user-${userId}`,
+        identity,
         name: displayName,
         isAdmin: isHost,
       });
@@ -425,11 +455,46 @@ export function registerLivekitRoutes(app: Express): void {
       const host = req.get('host') ?? '';
       const scheme = (host.startsWith('localhost') || host.startsWith('127.')) ? 'ws' : 'wss';
       const turnUrl = `${scheme}://${host}/turn`;
-      res.json({ token, url: publicLivekitUrl(host), roomName: room.roomName, isHost, participationId, turnUrl });
+      res.json({ token, url: publicLivekitUrl(host), roomName: room.roomName, isHost, participationId, turnUrl, capacity });
     } catch (err: any) {
       if (err instanceof LivekitUnavailableError) return unavailable(res);
       logger.error('issue livekit token failed', { err: err?.message });
       res.status(500).json({ message: 'failed to issue join token' });
+    }
+  });
+
+  // ── Who is in the room right now ─────────────────────────────────────
+  // The lobby polls this so "is anyone there yet?" has an answer before you
+  // switch your camera on. Count only — the names of the people already
+  // talking are for the people already in the room.
+  app.get('/api/livekit/rooms/:id/presence', requireAuth, async (req: any, res) => {
+    try {
+      if (!isLivekitConfigured()) return unavailable(res);
+      const id = parseInt(req.params.id, 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ message: 'invalid room id' });
+      const room = await livekitRepo.getById(id);
+      if (!room) return res.status(404).json({ message: 'room not found' });
+
+      const userId: number = req.user.id;
+      const isAdmin = !!req.user.isAdmin;
+      const allowed = room.kind === 'community'
+        ? (isAdmin || await communityRepo.isCommunityMember(room.communityId, userId))
+        : (isAdmin || (!!room.sortitionBodyId && await isSortitionMember(room.sortitionBodyId, userId)));
+      if (!allowed) return res.status(403).json({ message: 'not allowed in this room' });
+
+      const capacity = roomCapacity();
+      try {
+        const present = await listParticipantIdentities(room.roomName);
+        res.json({ count: present.length, capacity });
+      } catch (probeErr: any) {
+        // Not knowing the count is not an error worth showing anyone.
+        logger.warn('livekit presence probe failed', { roomId: room.id, err: probeErr?.message });
+        res.json({ count: null, capacity });
+      }
+    } catch (err: any) {
+      if (err instanceof LivekitUnavailableError) return unavailable(res);
+      logger.error('livekit presence failed', { err: err?.message });
+      res.status(500).json({ message: 'failed to read presence' });
     }
   });
 

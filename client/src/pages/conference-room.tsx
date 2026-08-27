@@ -18,7 +18,7 @@ import AppShell from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, CalendarPlus, Loader2, PhoneOff, XCircle } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, Hand, Loader2, MessageSquare, MonitorUp, PhoneOff, Users, Video } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useTranslation } from '@/hooks/use-translation';
 import { useErrorToast } from '@/hooks/use-error-toast';
@@ -28,10 +28,11 @@ import { LinkedText } from '@/components/ui/linked-text';
 import {
   LiveKitRoom,
   PreJoin,
-  VideoConference,
   type LocalUserChoices,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
+import { ConferenceStage } from '@/components/livekit/ConferenceStage';
+import { COMFORTABLE_VIDEO_PARTICIPANTS, DEFAULT_ROOM_CAPACITY } from '@shared/conference';
 
 interface RoomInfo {
   id: number;
@@ -46,6 +47,7 @@ interface RoomInfo {
   communityName: string | null;
   canJoin: boolean;
   isHost: boolean;
+  capacity: number;
 }
 
 interface JoinTokenResponse {
@@ -53,6 +55,7 @@ interface JoinTokenResponse {
   url: string;
   roomName: string;
   isHost: boolean;
+  capacity: number;
 }
 
 function readCsrfCookie(): string {
@@ -94,6 +97,9 @@ export default function ConferenceRoomPage() {
   const [choices, setChoices] = useState<LocalUserChoices | null>(null);
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [ending, setEnding] = useState(false);
+  const [presence, setPresence] = useState<number | null>(null);
+
+  const capacity = room?.capacity ?? DEFAULT_ROOM_CAPACITY;
 
   const backUrl = room
     ? (room.kind === 'sortition' && room.sortitionBodyId
@@ -145,6 +151,14 @@ export default function ConferenceRoomPage() {
         void loadRoom();
         return;
       }
+      if (err instanceof ApiError && err.status === 409) {
+        errorToast(
+          t('conference.join_failed'),
+          t('conference.room_full').replace('{capacity}', String(capacity)),
+        );
+        setStage('lobby');
+        return;
+      }
       const message = err instanceof ApiError && err.status === 503
         ? (t('livekit.unavailableBody') || 'Video conferencing is not configured on this instance.')
         : (err?.message || 'Failed to join');
@@ -153,7 +167,7 @@ export default function ConferenceRoomPage() {
     } finally {
       joiningRef.current = false;
     }
-  }, [roomId, t, errorToast, loadRoom]);
+  }, [roomId, t, errorToast, loadRoom, capacity]);
 
   const leaveOnce = useCallback(() => {
     if (!inCallRef.current) return;
@@ -189,6 +203,22 @@ export default function ConferenceRoomPage() {
   }, [stage, leaveOnce]);
   useEffect(() => () => leaveOnce(), [leaveOnce]);
 
+  // While someone sits in the lobby deciding, tell them whether anyone is
+  // already inside. Silent on failure — an unknown count is not an error.
+  useEffect(() => {
+    if (stage !== 'lobby' || !room || room.status === 'closed' || !room.canJoin) return;
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const resp = await api.get<{ count: number | null }>(`/api/livekit/rooms/${roomId}/presence`);
+        if (!cancelled) setPresence(resp.data.count);
+      } catch { /* leave the count unknown */ }
+    };
+    void probe();
+    const timer = window.setInterval(probe, 15_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [stage, room, roomId]);
+
   const handleEndForAll = useCallback(async () => {
     if (!room) return;
     if (!window.confirm(t('conference.end_confirm') || 'Να τερματιστεί η συνάντηση για όλους;')) return;
@@ -208,49 +238,30 @@ export default function ConferenceRoomPage() {
   // ── Full-screen call — rendered above the app chrome (incl. BottomNav) ──
   if (stage === 'in-call' && conn && room) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-[#111]" data-lk-theme="default" data-testid="conference-call">
-        <header className="flex items-center gap-3 px-4 py-2 border-b border-white/10 text-white">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-semibold truncate">{room.title}</h1>
-            {room.communityName && (
-              <p className="text-xs text-white/60 truncate">{room.communityName}</p>
-            )}
-          </div>
-          <Badge variant="outline" className="border-red-400/50 text-red-300">
-            {t('livekit.live') || 'Σε εξέλιξη'}
-          </Badge>
-          {room.isHost && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleEndForAll}
-              disabled={ending}
-              data-testid="conference-end-for-all"
-            >
-              <XCircle className="w-4 h-4 mr-1" />
-              {t('conference.end_for_all') || 'Τερματισμός για όλους'}
-            </Button>
-          )}
-        </header>
-        <div className="flex-1 min-h-0">
-          <LiveKitRoom
-            serverUrl={conn.url}
-            token={conn.token}
-            connect
-            video={choices?.videoEnabled ?? true}
-            audio={choices?.audioEnabled ?? true}
-            options={{
-              videoCaptureDefaults: choices?.videoDeviceId ? { deviceId: choices.videoDeviceId } : undefined,
-              audioCaptureDefaults: choices?.audioDeviceId ? { deviceId: choices.audioDeviceId } : undefined,
-            }}
-            onDisconnected={handleDisconnected}
-            onError={handleConnectError}
-            style={{ height: '100%' }}
-          >
-            <VideoConference />
-          </LiveKitRoom>
-        </div>
+      <div className="fixed inset-0 z-50 bg-[#111]" data-lk-theme="default" data-testid="conference-call">
+        <LiveKitRoom
+          serverUrl={conn.url}
+          token={conn.token}
+          connect
+          video={choices?.videoEnabled ?? true}
+          audio={choices?.audioEnabled ?? true}
+          options={{
+            videoCaptureDefaults: choices?.videoDeviceId ? { deviceId: choices.videoDeviceId } : undefined,
+            audioCaptureDefaults: choices?.audioDeviceId ? { deviceId: choices.audioDeviceId } : undefined,
+          }}
+          onDisconnected={handleDisconnected}
+          onError={handleConnectError}
+          style={{ height: '100%' }}
+        >
+          <ConferenceStage
+            title={room.title}
+            subtitle={room.communityName}
+            capacity={capacity}
+            isHost={room.isHost}
+            ending={ending}
+            onEndForAll={handleEndForAll}
+          />
+        </LiveKitRoom>
       </div>
     );
   }
@@ -333,8 +344,22 @@ export default function ConferenceRoomPage() {
             </Card>
           ) : (
             <div className="rounded-lg overflow-hidden border" data-lk-theme="default" data-testid="conference-prejoin">
+              {/* The SFU takes its display name from the join token, i.e. from
+                  the signed-in account — deliberately, since a meeting where
+                  people vote is a meeting where names have to be real. PreJoin
+                  offers a free-text name box anyway, and whatever is typed
+                  there is discarded; hiding it is more honest than leaving a
+                  field that does nothing. */}
+              <style>{'[data-testid="conference-prejoin"] .lk-username-container{display:none}'}</style>
+              <p className="px-4 pt-3 text-xs text-muted-foreground">
+                {t('conference.joining_as').replace('{name}', user?.name || user?.username || '')}
+              </p>
               <PreJoin
-                defaults={{ username: user?.name || user?.username || '', videoEnabled: true, audioEnabled: true }}
+                defaults={{
+                  username: user?.name || user?.username || t('conference.member'),
+                  videoEnabled: true,
+                  audioEnabled: true,
+                }}
                 joinLabel={stage === 'connecting'
                   ? (t('common.loading') || '…')
                   : (t('livekit.join') || 'Συμμετοχή')}
@@ -345,6 +370,33 @@ export default function ConferenceRoomPage() {
                 onError={(err) => errorToast(t('conference.device_error') || 'Πρόβλημα με κάμερα/μικρόφωνο', err?.message)}
               />
             </div>
+          )}
+          {room.status !== 'closed' && room.canJoin && (
+            <Card data-testid="conference-capabilities">
+              <CardContent className="p-4 space-y-3">
+                <h2 className="text-sm font-semibold">{t('conference.whats_possible')}</h2>
+                <ul className="grid gap-2 sm:grid-cols-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2"><Video className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_video')}</li>
+                  <li className="flex items-start gap-2"><MonitorUp className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_screen')}</li>
+                  <li className="flex items-start gap-2"><MessageSquare className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_chat')}</li>
+                  <li className="flex items-start gap-2"><Hand className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_hand')}</li>
+                  <li className="flex items-start gap-2"><Users className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_list')}</li>
+                  <li className="flex items-start gap-2"><PhoneOff className="w-4 h-4 mt-0.5 shrink-0" />{t('conference.cap_no_recording')}</li>
+                </ul>
+                <p className="text-xs text-muted-foreground border-t pt-3">
+                  {t('conference.capacity_note')
+                    .replace('{capacity}', String(capacity))
+                    .replace('{comfortable}', String(COMFORTABLE_VIDEO_PARTICIPANTS))}
+                </p>
+                {presence !== null && (
+                  <p className="text-xs font-medium" data-testid="conference-presence">
+                    {presence === 0
+                      ? t('conference.presence_empty')
+                      : t('conference.presence_count').replace('{count}', String(presence))}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           )}
           <p className="text-xs text-muted-foreground">{t('livekit.permissionsHint')}</p>
         </div>
