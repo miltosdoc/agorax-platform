@@ -368,7 +368,10 @@ export default function ConferenceRoomPage() {
                   offers a free-text name box anyway, and whatever is typed
                   there is discarded; hiding it is more honest than leaving a
                   field that does nothing. */}
-              <style>{'[data-testid="conference-prejoin"] .lk-username-container{display:none}'}</style>
+              {/* Hide the name INPUT only. The join button lives inside the
+                  same .lk-username-container form, so hiding the container
+                  removes the only way into the call. */}
+              <style>{'[data-testid="conference-prejoin"] .lk-username-container #username{display:none}'}</style>
               <p className="px-4 pt-3 text-xs text-muted-foreground">
                 {t('conference.joining_as').replace('{name}', user?.name || user?.username || '')}
               </p>
