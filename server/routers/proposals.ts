@@ -153,15 +153,21 @@ export function registerProposalsRoutes(app: Express): void {
    * A missing row is a deleted account, whose arguments stay on the record —
    * the client falls back to the numeric label for those.
    */
-  const withAuthorHandles = async <T extends { authorId: number }>(rows: T[]): Promise<(T & { authorUsername: string | null })[]> => {
+  const withAuthorHandles = async <T extends { authorId: number }>(rows: T[]): Promise<(T & { authorName: string | null; authorUsername: string | null })[]> => {
     if (rows.length === 0) return [];
     const ids = [...new Set(rows.map((r) => r.authorId).filter((id) => typeof id === 'number'))];
-    if (ids.length === 0) return rows.map((r) => ({ ...r, authorUsername: null }));
-    const found = await db.select({ id: users.id, username: users.username })
+    if (ids.length === 0) return rows.map((r) => ({ ...r, authorName: null, authorUsername: null }));
+    const found = await db.select({ id: users.id, name: users.name, username: users.username })
       .from(users)
       .where(inArray(users.id, ids));
-    const handleById = new Map(found.map((u) => [u.id, u.username]));
-    return rows.map((r) => ({ ...r, authorUsername: handleById.get(r.authorId) ?? null }));
+    const byId = new Map(found.map((u) => [u.id, u]));
+    // Both: the name is the label, the handle disambiguates two members who
+    // share one. The client decides how much of that a given surface shows.
+    return rows.map((r) => ({
+      ...r,
+      authorName: byId.get(r.authorId)?.name ?? null,
+      authorUsername: byId.get(r.authorId)?.username ?? null,
+    }));
   };
 
   /**

@@ -437,10 +437,7 @@ export function registerLivekitRoutes(app: Express): void {
         logger.warn('livekit capacity check failed', { roomId: room.id, err: capErr?.message });
       }
 
-      // The handle, not the real name. This string is shown to everyone else
-      // in the call, and it was publishing a Google display name that the
-      // member never chose to make public.
-      const displayName = (req.user.username || `user-${userId}`).toString();
+      const displayName = (req.user.name || req.user.username || `user-${userId}`).toString();
       const token = await issueJoinToken({
         roomName: room.roomName,
         identity,

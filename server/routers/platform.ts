@@ -67,6 +67,7 @@ export function registerPlatformRoutes(app: Express): void {
         })),
         members: members.map(m => ({
           id: m.id,
+          name: m.name ?? m.username,
           username: m.username,
           profilePicture: m.profilePicture,
         })),

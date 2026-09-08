@@ -12,6 +12,7 @@ import {
   RESERVED_USERNAMES,
   USERNAME_CHANGE_COOLDOWN_DAYS,
   normalizeUsername,
+  publicHandle,
   publicLabel,
   usernameChangeAvailableAt,
   validateUsername,
@@ -98,18 +99,31 @@ describe('the wait between renames', () => {
 });
 
 describe('the label shown for a member', () => {
-  it('is the handle', () => {
-    expect(publicLabel({ username: 'miltos', id: 6 })).toBe('miltos');
+  it('is the display name', () => {
+    expect(publicLabel({ name: 'Μιλτος Τριανταφύλλου', username: 'miltos', id: 6 }))
+      .toBe('Μιλτος Τριανταφύλλου');
+  });
+
+  it('falls back to the handle when no name is set', () => {
+    expect(publicLabel({ name: '', username: 'miltos', id: 6 })).toBe('miltos');
   });
 
   it('falls back to the number when the account is gone', () => {
     // A deleted account still has authored arguments on the record.
-    expect(publicLabel({ username: null, id: 6 })).toBe('#6');
+    expect(publicLabel({ name: null, username: null, id: 6 })).toBe('#6');
     expect(publicLabel(null)).toBe('—');
   });
+});
 
-  it('never reveals a real name, even when one is handed to it', () => {
-    expect(publicLabel({ username: 'miltos', id: 6, name: 'Miltos Triantafillou' } as any))
-      .toBe('miltos');
+describe('the handle shown beside the name', () => {
+  it('is prefixed, because that is how people type it', () => {
+    expect(publicHandle({ username: 'miltos' })).toBe('@miltos');
+  });
+
+  it('is absent rather than empty when there is none', () => {
+    // Names are not unique, so the handle is what separates two members who
+    // share one; a caller must be able to tell it is missing.
+    expect(publicHandle({ username: null })).toBeNull();
+    expect(publicHandle(null)).toBeNull();
   });
 });

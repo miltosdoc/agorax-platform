@@ -265,6 +265,12 @@ export default function Header() {
                     <p className="mt-0.5 truncate text-xs text-ink-faint">{user.name}</p>
                   </div>
                   <div className="py-1">
+                    {/* First item: the account card above names the member, so
+                        the way to edit that is where they look for it. */}
+                    <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer" data-testid="menu-profile">
+                      <User className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.profile')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/bookmarks")} className="cursor-pointer sm:hidden" data-testid="menu-bookmarks">
                       <Bookmark className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.bookmarks')}
