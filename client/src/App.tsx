@@ -193,6 +193,12 @@ function AppRouter() {
         <ProtectedRoute path="/notifications/settings" component={NotificationSettingsPage} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <Route path="/walkthrough" component={DeliberationWalkthrough} />
+        {/* Reachable only by the link printed on a ballot receipt
+            (client/src/components/ceremony/BallotReceipt.tsx), which carries
+            ?proposal=&hash= and verifies on load. Deliberately absent from
+            every menu: it is a check you run against a certificate you were
+            handed, not a page to browse to. The route stays because every
+            receipt already issued points at it. */}
         <Route path="/verify" component={VerifyBallotPage} />
         {/* Public: an invitee must be able to read the invite before signing up. */}
         <Route path="/invite/:token" component={InviteAcceptPage} />

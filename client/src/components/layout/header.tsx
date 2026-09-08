@@ -17,7 +17,7 @@ import {
 import {
   UserCircle, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare,
   MessageSquarePlus, Menu, Coins, Home, Smartphone, Check, Bookmark, X,
-  BadgeCheck, Settings, HelpCircle, PlusCircle,
+  Settings, HelpCircle, PlusCircle,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../../assets/logo.png";
@@ -268,10 +268,6 @@ export default function Header() {
                     <DropdownMenuItem onClick={() => navigate("/bookmarks")} className="cursor-pointer sm:hidden" data-testid="menu-bookmarks">
                       <Bookmark className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.bookmarks')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/verify")} className="cursor-pointer" data-testid="menu-govgr">
-                      <BadgeCheck className="mr-2.5 h-4 w-4 text-ink-faint" />
-                      {t('nav.govgrVerify')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/proposals?mine=1")} className="cursor-pointer" data-testid="menu-my-proposals">
                       <FileText className="mr-2.5 h-4 w-4 text-ink-faint" />
