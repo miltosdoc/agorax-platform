@@ -72,6 +72,23 @@ async function ensureCsrfCookie(): Promise<void> {
   csrfBootstrapped = null;
 }
 
+/**
+ * POST a file as a raw body, with the same CSRF handling as apiRequest.
+ *
+ * Uploads cannot go through apiRequest (which JSON-encodes), and every caller
+ * that reimplemented the header got the cookie name wrong at least once. The
+ * name lives here and nowhere else.
+ */
+export async function apiUpload(url: string, file: Blob, contentType?: string): Promise<Response> {
+  await ensureCsrfCookie();
+  const headers: Record<string, string> = {
+    "Content-Type": contentType || file.type || "application/octet-stream",
+  };
+  const csrf = readCookie(CSRF_COOKIE);
+  if (csrf) headers["X-CSRF-Token"] = csrf;
+  return fetch(url, { method: "POST", headers, body: file, credentials: "include" });
+}
+
 export async function apiRequest(
   method: string,
   url: string,

@@ -48,6 +48,10 @@ export const users = pgTable("users", {
   // this is the preference.
   locale: text("locale").notNull().default("el"),
 
+  // Colour theme: one of shared/theme.ts ACCENT_THEMES. Navy is what the
+  // platform always looked like, so the default changes nothing.
+  theme: text("theme").notNull().default("navy"),
+
   // NULL = the address was never proved. Nothing is gated on it: locking
   // out every member who registered before verification existed would be a
   // worse failure than an unconfirmed address.
@@ -281,6 +285,26 @@ export const communities = pgTable("communities", {
   // votes, attached media/docs) respectively.
   memberListVisibility: text("member_list_visibility").notNull().default("public"),
   contentVisibility: text("content_visibility").notNull().default("public"),
+
+  // ── Public identity (AGORA 2026 design) ──────────────────────────────────
+  // The community card and header show a face, not just a name. All nullable:
+  // the 18 communities that predate this have none, and the card falls back
+  // rather than inventing one.
+  username: text("username"),                 // the @handle; unique when set
+  coverPath: text("cover_path"),               // 2:1 banner, relative to AGORAX_MEDIA_DIR
+  avatarPath: text("avatar_path"),             // 1:1 mark, same convention
+  tagline: text("tagline"),                    // the line under the banner
+  // One of the browse filters: koinonia | perivallon | politiki | politismos
+  // | oikonomia | allilengyi | ygeia. Text with a CHECK rather than an enum,
+  // because the list is a design decision and Postgres enums do not shrink.
+  category: text("category"),
+  region: text("region"),
+  language: text("language").notNull().default("el"),
+  website: text("website"),
+  // Catalogue key (`<pattern>-<palette>`, see shared/thumbnails.ts), not a
+  // file path. Null means nobody chose: the card derives one from the id, so
+  // the slot is never blank and never reshuffles.
+  thumbnailKey: text("thumbnail_key"),
 });
 
 export const communityMembers = pgTable("community_members", {
@@ -413,6 +437,8 @@ export const proposals = pgTable("proposals", {
   // silence still advances at the deadline).
   authorRefineInstruction: text("author_refine_instruction"),
   authorAcceptedFinalAt: timestamp("author_accepted_final_at"),
+  // Catalogue key for the card picture — see shared/thumbnails.ts.
+  thumbnailKey: text("thumbnail_key"),
 });
 
 // ─── Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────
@@ -1631,6 +1657,7 @@ export type SafeUser = Pick<
   | 'govgrMunicipality'
   | 'govgrPostcode'
   | 'locale'
+  | 'theme'
   | 'emailVerifiedAt'
 >;
 
@@ -1788,6 +1815,134 @@ export type CommunityPost = InferSelectModel<typeof communityPosts>;
 export type InsertCommunityPost = InferInsertModel<typeof communityPosts>;
 export type CommunityPostVote = InferSelectModel<typeof communityPostVotes>;
 export type CommunityPostFlag = InferSelectModel<typeof communityPostFlags>;
+
+// ─── Bookmarks ──────────────────────────────────────────────────────────────
+// The save icon sits on every card in the design — communities, proposals,
+// surveys, media, forum posts. One polymorphic table rather than five, because
+// nothing about the behaviour differs per kind, only the destination. No FK on
+// entityId: reads always join the kind's own table, so orphans simply vanish.
+export const bookmarks = pgTable("bookmarks", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // 'community' | 'proposal' | 'survey' | 'media' | 'post'
+  entityId: integer("entity_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  bookmarksUnique: uniqueIndex('bookmarks_unique').on(table.userId, table.entityType, table.entityId),
+  bookmarksUserIdx: index('bookmarks_user_idx').on(table.userId, table.createdAt),
+}));
+
+// ─── Tags ───────────────────────────────────────────────────────────────────
+// The Ετικέτες block on a community page. The slug is the identity so that
+// "Θεσσαλονίκη" and "θεσσαλονίκη" cannot become two tags.
+export const tags = pgTable("tags", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tagsSlugUnique: uniqueIndex('tags_slug_unique').on(table.slug),
+}));
+
+export const entityTags = pgTable("entity_tags", {
+  id: serial("id").primaryKey(),
+  tagId: integer("tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // 'community' | 'proposal' | 'survey' | 'media'
+  entityId: integer("entity_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  entityTagsUnique: uniqueIndex('entity_tags_unique').on(table.tagId, table.entityType, table.entityId),
+  entityTagsEntityIdx: index('entity_tags_entity_idx').on(table.entityType, table.entityId),
+}));
+
+// ─── Community meetings ─────────────────────────────────────────────────────
+// Separate from livekit_rooms on purpose: the room is the plumbing that lives
+// as long as the call, the meeting is the announcement that exists weeks before
+// and months after. An online meeting points at a room; an in-person one has
+// no room at all.
+export const communityMeetings = pgTable("community_meetings", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  location: text("location"),
+  isOnline: boolean("is_online").notNull().default(true),
+  roomId: integer("room_id").references(() => livekitRooms.id, { onDelete: "set null" }),
+  isUrgent: boolean("is_urgent").notNull().default(false), // the red ΕΚΤΑΚΤΗ pill
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  communityMeetingsUpcomingIdx: index('community_meetings_upcoming_idx').on(table.communityId, table.startsAt),
+}));
+
+export const meetingRsvps = pgTable("meeting_rsvps", {
+  id: serial("id").primaryKey(),
+  meetingId: integer("meeting_id").notNull().references(() => communityMeetings.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // The card counts only 'yes', but 'no' has to be expressible so a 'yes' can
+  // be taken back.
+  status: text("status").notNull().default("yes"), // 'yes' | 'no' | 'maybe'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  meetingRsvpsUnique: uniqueIndex('meeting_rsvps_unique').on(table.meetingId, table.userId),
+}));
+
+// ─── Newsletter ─────────────────────────────────────────────────────────────
+// The footer sign-up. Deliberately not email_notification_prefs: that speaks to
+// a user with an account, this to an address that may belong to nobody.
+// confirmedAt is double opt-in — nothing is ever sent before it is set.
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  locale: text("locale").notNull().default("el"),
+  // Tied to an account when there is one, so a GDPR erasure takes the
+  // subscription with it.
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  confirmToken: text("confirm_token"),
+  confirmedAt: timestamp("confirmed_at"),
+  unsubscribeToken: text("unsubscribe_token").notNull(),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  newsletterUnsubscribeTokenUnique: uniqueIndex('newsletter_unsubscribe_token_unique').on(table.unsubscribeToken),
+}));
+
+// ─── Κατακτήσεις Δημοκρατίας ────────────────────────────────────────────────
+// A decision that became a fact, with the number of people behind it and how
+// long it took. Not derived from decided proposals: passing a vote is not the
+// same as being carried out, so this is a curated row pointing back at the
+// proposal it came from.
+export const democracyAchievements = pgTable("democracy_achievements", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
+  communityId: integer("community_id").references(() => communities.id, { onDelete: "set null" }),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  story: text("story"),
+  region: text("region"),
+  imagePath: text("image_path"),
+  participantsCount: integer("participants_count"),
+  durationDays: integer("duration_days"),
+  // Unpublished until someone approves it; the card shows published only.
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  democracyAchievementsPublishedIdx: index('democracy_achievements_published_idx').on(table.publishedAt),
+}));
+
+export type Bookmark = InferSelectModel<typeof bookmarks>;
+export type InsertBookmark = InferInsertModel<typeof bookmarks>;
+export type Tag = InferSelectModel<typeof tags>;
+export type EntityTag = InferSelectModel<typeof entityTags>;
+export type CommunityMeeting = InferSelectModel<typeof communityMeetings>;
+export type InsertCommunityMeeting = InferInsertModel<typeof communityMeetings>;
+export type MeetingRsvp = InferSelectModel<typeof meetingRsvps>;
+export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribers>;
+export type DemocracyAchievement = InferSelectModel<typeof democracyAchievements>;
+export type InsertDemocracyAchievement = InferInsertModel<typeof democracyAchievements>;
 
 // ─── Polling module (panel, question bank, two-tier polls) ──────────────────
 // Tables live in their own file to keep this one navigable; re-exported here

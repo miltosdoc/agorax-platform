@@ -8,6 +8,14 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import AppShell from "@/components/layout/AppShell";
+import {
+  CommunityIdentityRail,
+  CommunityStatsRail,
+  CommunityMeetingsRail,
+  CommunityActivityRail,
+  CommunityDocumentsRail,
+  CommunityTagsRail,
+} from "@/components/rails/community-rails";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +29,6 @@ import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSectio
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
-import { ImpactMetricsDashboard } from '@/components/community/ImpactMetricsDashboard';
 import { CommunityLibrary } from '@/components/community/CommunityLibrary';
 import { CommunityForum } from '@/components/community/CommunityForum';
 import ShareButton from '@/components/ShareButton';
@@ -289,133 +296,117 @@ export default function CommunityDashboardPage() {
   const governanceLabel = t(getGovernanceTranslationKey(community.type));
   const description = community.description?.trim();
 
+  const adminCount = Array.isArray(community.adminIds) ? (community.adminIds as number[]).length : 0;
+
+  // The join control lives with the page (it owns joinState), but the comps
+  // put it at the foot of the identity card, so it is handed to the rail.
+  const joinAction = user && !isMember && community.joinPolicy !== 'invite_only' && joinState !== 'pending' ? (
+    <Button size="sm" className="w-full" disabled={joinState === 'submitting'} onClick={applyToJoin}>
+      {community.joinPolicy === 'approval'
+        ? (t('community.apply_to_join') || 'Apply to join')
+        : (t('community.join') || 'Join')}
+    </Button>
+  ) : user && isMember ? (
+    <Button size="sm" className="w-full" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
+      <Plus className="w-4 h-4 mr-2" />
+      {t('home.submitProposal')}
+    </Button>
+  ) : undefined;
+
   return (
-    <AppShell breadcrumb={[{ label: t('nav.communities'), href: '/communities' }, { label: community.name }]}>
-      <Button variant="ghost" className="mb-4" onClick={() => window.history.back()}>
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        {t('common.back')}
-      </Button>
-
-      <Card className="mb-6 border-primary/10 bg-gradient-to-br from-background to-muted/30">
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-2xl font-serif font-normal">{community.name}</CardTitle>
-                <Badge variant="secondary">{governanceLabel}</Badge>
-              </div>
-              <CardDescription>
-                {description || t('community.no_description')}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {user && isMember && (
-                <Button size="sm" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('home.submitProposal')}
-                </Button>
-              )}
-              {user && !isMember && community.joinPolicy !== 'invite_only' && joinState !== 'pending' && (
-                <Button size="sm" disabled={joinState === 'submitting'} onClick={applyToJoin}>
-                  {community.joinPolicy === 'approval'
-                    ? (t('community.apply_to_join') || 'Apply to join')
-                    : (t('community.join') || 'Join')}
-                </Button>
-              )}
-              {user && !isMember && myInvite && (
-                <Button size="sm" onClick={() => setLocation(`/invite/${myInvite.token}`)} data-testid="community-accept-invite">
-                  <MailOpen className="w-4 h-4 mr-2" />
-                  {t('community.invite_accept') || 'Αποδοχή πρόσκλησης'}
-                </Button>
-              )}
-              {user && !isMember && !myInvite && community.joinPolicy === 'invite_only' && (
-                <Badge variant="outline">{t('community.invite_only') || 'Invite only'}</Badge>
-              )}
-              {user && !isMember && joinState === 'pending' && (
-                <Badge variant="outline">{t('community.request_pending') || 'Request pending'}</Badge>
-              )}
-              {joinError && (
-                <span className="text-sm text-destructive" data-testid="join-error">{joinError}</span>
-              )}
-              {user && (canManageSettings || isMember || community.type === 'autonomous') && (
-                <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  {community.type === 'autonomous'
-                    ? (t('community.settings_vote_title') || t('community.settings_title'))
-                    : t('community.settings_title')}
-                </Button>
-              )}
-              <ShareButton
-                url={`/communities/${communityId}`}
-                title={community.name}
-                text={community.description ?? undefined}
-                size="sm"
-                variant="outline"
-              />
-              {/* Founders can't leave — they'd orphan the community. */}
-              {user && isMember && currentUserRole !== 'founder' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 hover:bg-red-50"
-                  onClick={handleLeave}
-                  data-testid="community-leave"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  {t('community.leave') || 'Αποχώρηση'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 lg:divide-x divide-line border-y border-line">
-            {[
-              { label: t('community.members'), value: metrics.memberCount },
-              { label: t('community.proposals'), value: metrics.proposalCount },
-              { label: t('community.active_proposals'), value: metrics.activeProposalCount },
-              { label: t('community.decided_proposals'), value: metrics.decidedProposalCount },
-            ].map((s, i) => (
-              <div key={i} className="flex flex-col gap-1 px-4 py-3 lg:first:pl-0">
-                <span className="font-serif text-3xl leading-none text-ink tabular-nums">{s.value}</span>
-                <span className="text-xs uppercase tracking-wider text-ink-faint font-semibold">{s.label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Impact Metrics Dashboard — Civic Tech Best Practice */}
-          <ImpactMetricsDashboard
-            metrics={{
-              totalProposals: metrics.proposalCount,
-              proposalsImplemented: metrics.decidedProposalCount,
-              totalParticipants: metrics.memberCount,
-              totalVotes: 0, // TODO: fetch from API
-              activeProposals: metrics.activeProposalCount,
-              proposalsInVoting: 0, // TODO: fetch from API
-              proposalsInDeliberation: 0, // TODO: fetch from API
-              averageParticipationRate: 0, // TODO: fetch from API
-            }}
-            onViewAll={() => setLocation('/analytics')}
+    <AppShell
+      breadcrumb={[{ label: t('nav.communities'), href: '/communities' }, { label: community.name }]}
+      leftRail={
+        <>
+          <CommunityIdentityRail
+            community={community as any}
+            memberCount={memberCount}
+            adminCount={adminCount}
+            joinAction={joinAction}
+            canEditAppearance={
+              // Mirrors canEditAppearance in server/routers/discovery.ts.
+              canManageSettings || !!user?.isAdmin || (community.type === 'autonomous' && isMember)
+            }
           />
+          <CommunityStatsRail
+            memberCount={memberCount}
+            proposalCount={metrics.proposalCount}
+            activeCount={metrics.activeProposalCount}
+            decidedCount={metrics.decidedProposalCount}
+            democracyScore={democracyScore}
+          />
+          <CommunityMeetingsRail communityId={community.id} />
+        </>
+      }
+      rightRail={
+        <>
+          <CommunityActivityRail communityId={community.id} />
+          <CommunityDocumentsRail communityId={community.id} />
+          <CommunityTagsRail communityId={community.id} />
+        </>
+      }
+    >
+      {/* ── Community banner ──
+          Comp 4 fills this with "ΚΕΝΤΡΙΚΟ BANNER ΚΟΙΝΟΤΗΤΑΣ + TAGLINE"; the
+          real thing carries the community's own name and tagline. */}
+      <section className="mb-5 rounded-sm border border-line bg-ink px-6 py-12 text-center sm:px-10 sm:py-16">
+        <h1 className="font-serif text-3xl leading-tight text-paper sm:text-4xl">{community.name}</h1>
+        {(community.tagline || description) && (
+          <p className="mx-auto mt-3 max-w-[52ch] text-sm leading-relaxed text-bc-ink-soft">
+            {community.tagline || description}
+          </p>
+        )}
+      </section>
 
-          <div className="border border-line rounded px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase tracking-wider font-semibold text-ink-faint flex items-center gap-2">
-                <Shield className="w-3.5 h-3.5" />
-                {t('community.democracy_score')}
-              </span>
-              <span className="text-sm tabular-nums">
-                {democracyScoreAvailable
-                  ? <><span className="font-serif text-lg text-ink">{democracyScore}</span><span className="text-ink-faint">/100</span></>
-                  : <span className="text-ink-faint">{t('community.score_not_available')}</span>}
-              </span>
-            </div>
-            <div className="h-1.5 bg-sunken rounded-full overflow-hidden">
-              <div className="h-full bg-kyanos rounded-full transition-[width] duration-500" style={{ width: `${democracyScore ?? 0}%` }} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* The name, description, join button and share now live in the identity
+          rail and the banner; what stays here is the governance state and the
+          controls that only make sense next to the community's own content. */}
+      {/* A slim bar, not a card: governance state and the membership controls.
+          The numbers that used to sit here are in the side rail — they are
+          reference, and having them first pushed the forum and the calls,
+          which are what people actually come for, below the fold. */}
+      <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-line pb-4">
+        <Badge variant="secondary">{governanceLabel}</Badge>
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {user && !isMember && myInvite && (
+            <Button size="sm" onClick={() => setLocation(`/invite/${myInvite.token}`)} data-testid="community-accept-invite">
+              <MailOpen className="w-4 h-4 mr-2" />
+              {t('community.invite_accept') || 'Αποδοχή πρόσκλησης'}
+            </Button>
+          )}
+          {user && !isMember && !myInvite && community.joinPolicy === 'invite_only' && (
+            <Badge variant="outline">{t('community.invite_only') || 'Invite only'}</Badge>
+          )}
+          {user && !isMember && joinState === 'pending' && (
+            <Badge variant="outline">{t('community.request_pending') || 'Request pending'}</Badge>
+          )}
+          {joinError && (
+            <span className="text-sm text-destructive" data-testid="join-error">{joinError}</span>
+          )}
+          {user && (canManageSettings || isMember || community.type === 'autonomous') && (
+            <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
+              <Settings className="w-4 h-4 mr-2" />
+              {community.type === 'autonomous'
+                ? (t('community.settings_vote_title') || t('community.settings_title'))
+                : t('community.settings_title')}
+            </Button>
+          )}
+          {/* Founders can't leave — they'd orphan the community. */}
+          {user && isMember && currentUserRole !== 'founder' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 hover:bg-red-50"
+              onClick={handleLeave}
+              data-testid="community-leave"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {t('community.leave') || 'Αποχώρηση'}
+            </Button>
+          )}
+        </div>
+      </div>
 
       <CommunityRoomsSection
         communityId={community.id}
@@ -423,7 +414,10 @@ export default function CommunityDashboardPage() {
         viewerIsMember={isMember}
       />
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        {/* The comps show eight tabs on a wide screen; five already overflow a
+            375px phone, so the bar scrolls sideways instead of pushing the
+            page wider than the viewport. */}
+        <TabsList className="flex w-full justify-start overflow-x-auto">
           <TabsTrigger value="forum">{t('community.tab_forum')}</TabsTrigger>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
           <TabsTrigger value="library">{t('community.tab_library')}</TabsTrigger>

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { ThumbnailPicker } from "@/components/thumbnails/Thumbnail";
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -144,6 +145,9 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   // Empty = use the community's own deliberation length. The author only
   // overrides it deliberately, and only inside the community's range.
   const [deliberationDurationHours, setDeliberationDurationHours] = useState('');
+  // Null until the author picks: the card derives one from the proposal id,
+  // so an author who never opens the picker still gets a picture.
+  const [thumbnailKey, setThumbnailKey] = useState<string | null>(null);
   // Optional author-defined multiple choice (vote track). Empty = Ναι/Όχι.
   const [voteOptions, setVoteOptions] = useState<string[]>([]);
 
@@ -254,6 +258,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, {
             ...formData,
             track,
+            ...(thumbnailKey ? { thumbnailKey } : {}),
             ...(track === 'vote'
               ? {
                   votingDurationHours: parseInt(votingDurationHours, 10),
@@ -487,6 +492,18 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                     {t('proposal.deliberation_duration_hint', { min: deliberationMin, max: deliberationMax })}
                   </p>
                 </div>
+              )}
+
+              {/* The card picture. Create only: changing it later belongs with
+                  the proposal's own edit screen, not buried in the ballot
+                  settings. */}
+              {!editProposalId && (
+                <ThumbnailPicker
+                  value={thumbnailKey}
+                  onChange={setThumbnailKey}
+                  seed={`proposal-new-${targetCommunityId ?? 0}`}
+                  label={t('appearance.proposalThumbnail')}
+                />
               )}
 
               {track === 'vote' && (

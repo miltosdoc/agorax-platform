@@ -45,6 +45,7 @@ import { registerPushRoutes } from "./routers/push";
 import { registerEmailPrefsRoutes } from "./routers/email-prefs";
 import { registerSurveysRoutes } from "./routers/surveys";
 import { registerMiscRoutes } from "./routers/misc";
+import { registerDiscoveryRoutes } from "./routers/discovery";
 
 /**
  * Register all application routes.
@@ -74,6 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerPushRoutes(app);
   registerEmailPrefsRoutes(app);
   registerSurveysRoutes(app);
+  registerDiscoveryRoutes(app);
   registerMiscRoutes(app);
 
   // Create and return the server

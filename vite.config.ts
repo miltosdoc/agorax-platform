@@ -36,7 +36,20 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
-    allowedHosts: ['elude-willed-bunion.ngrok-free.dev'],
+    // Hosts the dev server will answer to besides localhost. A leading dot
+    // matches the domain and its subdomains, which is what a Cloudflare quick
+    // tunnel needs — it mints a fresh random hostname on every run, so it can
+    // never be listed individually.
+    //
+    // The ngrok entry is a reserved domain that currently serves a different
+    // project from the VPS; kept so a local ngrok run still works if that one
+    // is ever freed.
+    allowedHosts: [
+      'elude-willed-bunion.ngrok-free.dev',
+      '.trycloudflare.com',
+      '.ngrok-free.dev',
+      '.ngrok.io',
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

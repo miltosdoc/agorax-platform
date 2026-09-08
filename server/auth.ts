@@ -10,6 +10,7 @@ import { promisify } from "util";
 import { DatabaseStorage } from "./storage";
 export const storage = new DatabaseStorage();
 import { User as SelectUser, registerUserSchema } from "@shared/schema";
+import { isAccentTheme } from "@shared/theme";
 import { db } from "./db";
 import {
   users,
@@ -112,6 +113,7 @@ function sanitizeUser(user: User): SafeUser {
     govgrMunicipality: user.govgrMunicipality,
     govgrPostcode: user.govgrPostcode,
     locale: user.locale,
+    theme: user.theme,
     emailVerifiedAt: user.emailVerifiedAt,
   };
 }
@@ -758,6 +760,24 @@ export function setupAuth(app: Express) {
       res.json({ ok: true, locale });
     } catch {
       res.status(500).json({ message: "Η γλώσσα δεν αποθηκεύτηκε" });
+    }
+  });
+
+  /**
+   * The member's colour theme. Set from the header picker; the interface has
+   * already switched by the time this lands, so this only makes the choice
+   * follow them to the next device.
+   */
+  app.put("/api/user/theme", requireAuth, async (req: any, res) => {
+    const theme = req.body?.theme;
+    if (!isAccentTheme(theme)) {
+      return res.status(400).json({ message: "Μη υποστηριζόμενο θέμα" });
+    }
+    try {
+      await db.update(users).set({ theme }).where(eq(users.id, req.user.id));
+      res.json({ ok: true, theme });
+    } catch {
+      res.status(500).json({ message: "Το θέμα δεν αποθηκεύτηκε" });
     }
   });
 

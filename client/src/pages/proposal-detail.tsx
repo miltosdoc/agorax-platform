@@ -21,6 +21,7 @@ import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import AppShell from '@/components/layout/AppShell';
+import { CommunityContextRail } from '@/components/rails/context-rails';
 import ShareButton from '@/components/ShareButton';
 import LifecycleStepper from '@/components/ui/LifecycleStepper';
 import NextActionPanel from '@/components/proposal/NextActionPanel';
@@ -327,10 +328,13 @@ export default function ProposalDetailPage() {
     ?? !(proposal.status === 'voting' && hasDistinctFinalText);
 
   return (
-    <AppShell breadcrumb={[
-      { label: t('home.proposals'), href: '/proposals' },
-      { label: proposal.question.length > 60 ? proposal.question.slice(0, 60) + '…' : proposal.question },
-    ]}>
+    <AppShell
+      breadcrumb={[
+        { label: t('home.proposals'), href: '/proposals' },
+        { label: proposal.question.length > 60 ? proposal.question.slice(0, 60) + '…' : proposal.question },
+      ]}
+      leftRail={<CommunityContextRail communityId={proposal.communityId} excludeProposalId={proposal.id} />}
+    >
       <Button variant="ghost" className="mb-4" onClick={() => window.history.back()}>
         <ArrowLeft className="w-4 h-4 mr-2" />
         {t('general.back')}

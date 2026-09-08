@@ -22,6 +22,7 @@ export { NotificationRepository } from './storage/notifications';
 export { PlatformRepository } from './storage/platform';
 export { MediaRepository } from './storage/media';
 export { LivekitRepository } from './storage/livekit';
+export { DiscoveryRepository } from './storage/discovery';
 
 // Pre-instantiated repository instances (for use in routers)
 import { UserRepository } from './storage/users';
@@ -36,6 +37,7 @@ import { NotificationRepository } from './storage/notifications';
 import { PlatformRepository } from './storage/platform';
 import { MediaRepository } from './storage/media';
 import { LivekitRepository } from './storage/livekit';
+import { DiscoveryRepository } from './storage/discovery';
 
 export const userRepo = new UserRepository();
 export const communityRepo = new CommunityRepository();
@@ -49,6 +51,7 @@ export const notificationRepo = new NotificationRepository();
 export const platformRepo = new PlatformRepository();
 export const mediaRepo = new MediaRepository();
 export const livekitRepo = new LivekitRepository();
+export const discoveryRepo = new DiscoveryRepository();
 
 // Legacy facade (backward compatibility)
 export { DatabaseStorage } from './storage/legacy';

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- AgoraX type system: GFS Didot (display, Greek state serif) ·
          Inter (UI, tabular numerals) · IBM Plex Mono (hashes/counts/time). -->
-    <link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto+Condensed:wght@700;800&family=Fira+Sans:wght@800;900&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/favicon.png">
     
     <!-- Social Media Sharing - Dynamic tags loaded per page -->
@@ -22,6 +22,17 @@
     <meta name="twitter:description" content="Ψηφιακή πλατφόρμα για μια πιο ανοιχτή και συμμετοχική διακυβέρνηση." />
     
     <meta name="description" content="AgoraX - Πλατφόρμα Ψηφιακής Δημοκρατίας για μια πιο ανοιχτή και συμμετοχική διακυβέρνηση." />
+
+    <!-- Colour theme, applied before first paint so the page never flashes
+         navy for a member who chose another accent. Mirrors use-theme.ts. -->
+    <script>
+      try {
+        var agoraTheme = localStorage.getItem('agorax-theme');
+        if (agoraTheme && agoraTheme !== 'navy' && /^[a-z]{1,16}$/.test(agoraTheme)) {
+          document.documentElement.setAttribute('data-accent', agoraTheme);
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

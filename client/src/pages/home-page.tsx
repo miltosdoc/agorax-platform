@@ -10,6 +10,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
+import { DiscoveryRail } from '@/components/rails/discovery-rail';
+import { MyAgoraRail } from '@/components/rails/personal-rails';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -208,7 +210,11 @@ export default function HomePage() {
   const activeBodies = sortitionBodies.filter((b) => b.status !== 'completed' && b.status !== 'archived');
 
   return (
-    <AppShell title={t('dashboard.title')}>
+    <AppShell
+      title={t('dashboard.title')}
+      leftRail={<DiscoveryRail />}
+      rightRail={<MyAgoraRail />}
+    >
       {loading ? (
         <LoadingState label={t('general.loading')} />
       ) : (

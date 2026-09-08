@@ -26,6 +26,9 @@
     --kyanos:       #0B4C8C;
     --kyanos-deep:  #093A6B;
     --kyanos-wash:  #EDF2F8;
+    /* Second accent for themes that carry one (Spray magenta, Poster coral);
+       elsewhere it falls back to the deep accent so nothing paints wrong. */
+    --accent-2:     #093A6B;
     /* ── Civic semantics (never reused for errors/deletion) ── */
     --yper:         #2F6B3F;  --yper-wash:   #EEF4EE;
     --kata:         #8F2A25;  --kata-wash:   #F8EFEE;
@@ -74,7 +77,8 @@
     --border: 83 10% 84.7%;              /* line */
     --input: 83 10% 84.7%;
     --ring: 210 85% 29.6%;               /* kyanós */
-    --radius: 0.25rem;                   /* 4px — the maximum radius anywhere */
+    --radius: 0.75rem;                   /* 12px — the one radius; every
+                                            rounded-* scale derives from it */
 
     --chart-1: 210 85% 29.6%;            /* kyanós */
     --chart-2: 136 39% 30.2%;            /* yper */
@@ -91,6 +95,398 @@
     --sidebar-border: 210 30% 24%;
     --sidebar-ring: 210 85% 29.6%;
   }
+
+  /* ── Colour themes ─────────────────────────────────────────────────
+     Four from the AGORA logo set and four born as design sketches
+     (Marble, Parliament, Spray, Poster), chosen per member from the
+     header (shared/theme.ts). Navy is the bare :root above; the selectors
+     are unscoped so any element can carry a theme, which is how the
+     Appearance page renders each card's preview in its own palette.
+
+     A theme re-inks the whole surface: the ink family (text, headings,
+     primary buttons, footer), the paper/sunken/line tints, the accent
+     (kyanós) and its wash, the dark broadcast ground the ceremony pages
+     stand on, and every shadcn token mapped onto those. What never moves:
+     yper, kata, apochi, warn, bronze and antip — the vote and status
+     colours mean the same thing in every theme. Pairings below all pass
+     AA against their ground (ink ≥ 11:1, ink-faint ≥ 4.9:1, accent ≥ 5:1).
+     ── */
+  /* Navy repeats the :root values so a scoped preview (Appearance page)
+     can show navy inside a page that is currently another theme. */
+  [data-accent="navy"] {
+    --paper:        #FAFAF7;
+    --sunken:       #F1F2ED;
+    --line:         #D9DCD4;
+    --line-strong:  #9AA096;
+    --ink:          #14212E;
+    --ink-soft:     #4A5561;
+    --ink-faint:    #6B7480;
+    --kyanos:       #0B4C8C;
+    --kyanos-deep:  #093A6B;
+    --kyanos-wash:  #EDF2F8;
+    --accent-2:     #093A6B;
+    --bc-ground: #0C1B2A;  --bc-panel: #12253A;  --bc-line: #27405C;
+    --bc-ink: #F2F6FA;     --bc-ink-soft: #93A6BA;
+
+    --background: 60 23% 97.5%;
+    --foreground: 210 39% 12.9%;
+    --card-foreground: 210 39% 12.9%;
+    --popover-foreground: 210 39% 12.9%;
+    --primary: 210 39% 12.9%;
+    --primary-foreground: 60 23% 97.5%;
+    --accent: 210 85% 29.6%;
+    --secondary: 72 16% 93.9%;
+    --secondary-foreground: 210 39% 12.9%;
+    --muted: 72 16% 93.9%;
+    --muted-foreground: 214 9% 46.1%;
+    --destructive-foreground: 60 23% 97.5%;
+    --border: 83 10% 84.7%;
+    --input: 83 10% 84.7%;
+    --ring: 210 85% 29.6%;
+    --chart-1: 210 85% 29.6%;
+    --sidebar-background: 210 39% 12.9%;
+    --sidebar-foreground: 60 23% 97.5%;
+    --sidebar-primary: 210 85% 29.6%;
+    --sidebar-accent: 210 84% 22.7%;
+    --sidebar-accent-foreground: 60 23% 97.5%;
+    --sidebar-border: 210 30% 24%;
+    --sidebar-ring: 210 85% 29.6%;
+  }
+  [data-accent="teal"] {
+    --paper:        #F6FAF8;
+    --sunken:       #EAF1EE;
+    --line:         #CFDBD6;
+    --line-strong:  #89A19A;
+    --ink:          #153B36;
+    --ink-soft:     #3A5B56;
+    --ink-faint:    #557370;
+    --kyanos:       #1F7A6C;
+    --kyanos-deep:  #165C51;
+    --kyanos-wash:  #E4F1EE;
+    --accent-2:     #165C51;
+    --bc-ground: #0B1F1C;  --bc-panel: #12302B;  --bc-line: #254D46;
+    --bc-ink: #F1F8F6;     --bc-ink-soft: #92B2AB;
+
+    --background: 150 28.6% 97.3%;
+    --foreground: 172 47.5% 15.7%;
+    --card-foreground: 172 47.5% 15.7%;
+    --popover-foreground: 172 47.5% 15.7%;
+    --primary: 172 47.5% 15.7%;
+    --primary-foreground: 150 28.6% 97.3%;
+    --accent: 171 59.5% 30.0%;
+    --secondary: 154 20.0% 93.1%;
+    --secondary-foreground: 172 47.5% 15.7%;
+    --muted: 154 20.0% 93.1%;
+    --muted-foreground: 174 15.0% 39.2%;
+    --destructive-foreground: 150 28.6% 97.3%;
+    --border: 155 14.3% 83.5%;
+    --input: 155 14.3% 83.5%;
+    --ring: 171 59.5% 30.0%;
+    --chart-1: 171 59.5% 30.0%;
+    --sidebar-background: 172 47.5% 15.7%;
+    --sidebar-foreground: 150 28.6% 97.3%;
+    --sidebar-primary: 171 59.5% 30.0%;
+    --sidebar-accent: 171 61.4% 22.4%;
+    --sidebar-accent-foreground: 150 28.6% 97.3%;
+    --sidebar-border: 172 33.3% 25.3%;
+    --sidebar-ring: 171 59.5% 30.0%;
+  }
+  [data-accent="burgundy"] {
+    --paper:        #FBF7F8;
+    --sunken:       #F3EAEC;
+    --line:         #DFD0D4;
+    --line-strong:  #A58B92;
+    --ink:          #3A1420;
+    --ink-soft:     #64414C;
+    --ink-faint:    #7F5E67;
+    --kyanos:       #8B2F4A;
+    --kyanos-deep:  #6B2239;
+    --kyanos-wash:  #F6E8EC;
+    --accent-2:     #6B2239;
+    --bc-ground: #210E17;  --bc-panel: #301620;  --bc-line: #532E3B;
+    --bc-ink: #FAF2F4;     --bc-ink-soft: #B898A2;
+
+    --background: 345 33.3% 97.6%;
+    --foreground: 341 48.7% 15.3%;
+    --card-foreground: 341 48.7% 15.3%;
+    --popover-foreground: 341 48.7% 15.3%;
+    --primary: 341 48.7% 15.3%;
+    --primary-foreground: 345 33.3% 97.6%;
+    --accent: 342 49.5% 36.5%;
+    --secondary: 347 27.3% 93.5%;
+    --secondary-foreground: 341 48.7% 15.3%;
+    --muted: 347 27.3% 93.5%;
+    --muted-foreground: 344 14.9% 43.3%;
+    --destructive-foreground: 345 33.3% 97.6%;
+    --border: 344 19.0% 84.5%;
+    --input: 344 19.0% 84.5%;
+    --ring: 342 49.5% 36.5%;
+    --chart-1: 342 49.5% 36.5%;
+    --sidebar-background: 341 48.7% 15.3%;
+    --sidebar-foreground: 345 33.3% 97.6%;
+    --sidebar-primary: 342 49.5% 36.5%;
+    --sidebar-accent: 341 51.8% 27.6%;
+    --sidebar-accent-foreground: 345 33.3% 97.6%;
+    --sidebar-border: 338 27.7% 27.6%;
+    --sidebar-ring: 342 49.5% 36.5%;
+  }
+  [data-accent="brown"] {
+    --paper:        #FAF8F3;
+    --sunken:       #F2EDE3;
+    --line:         #DDD5C6;
+    --line-strong:  #9F927B;
+    --ink:          #372711;
+    --ink-soft:     #5F4E36;
+    --ink-faint:    #77674E;
+    --kyanos:       #8A6530;
+    --kyanos-deep:  #6B4D22;
+    --kyanos-wash:  #F5EDDF;
+    --accent-2:     #6B4D22;
+    --bc-ground: #1F1508;  --bc-panel: #2E210F;  --bc-line: #4E3C1F;
+    --bc-ink: #F8F3EA;     --bc-ink-soft: #B4A385;
+
+    --background: 43 41.2% 96.7%;
+    --foreground: 35 52.8% 14.1%;
+    --card-foreground: 35 52.8% 14.1%;
+    --popover-foreground: 35 52.8% 14.1%;
+    --primary: 35 52.8% 14.1%;
+    --primary-foreground: 43 41.2% 96.7%;
+    --accent: 35 48.4% 36.5%;
+    --secondary: 40 36.6% 92.0%;
+    --secondary-foreground: 35 52.8% 14.1%;
+    --muted: 40 36.6% 92.0%;
+    --muted-foreground: 37 20.8% 38.6%;
+    --destructive-foreground: 43 41.2% 96.7%;
+    --border: 39 25.3% 82.2%;
+    --input: 39 25.3% 82.2%;
+    --ring: 35 48.4% 36.5%;
+    --chart-1: 35 48.4% 36.5%;
+    --sidebar-background: 35 52.8% 14.1%;
+    --sidebar-foreground: 43 41.2% 96.7%;
+    --sidebar-primary: 35 48.4% 36.5%;
+    --sidebar-accent: 35 51.8% 27.6%;
+    --sidebar-accent-foreground: 43 41.2% 96.7%;
+    --sidebar-border: 37 46.1% 22.5%;
+    --sidebar-ring: 35 48.4% 36.5%;
+  }
+
+  [data-accent="marble"] {
+    --font-display: "GFS Didot", Georgia, "Times New Roman", serif;
+    --paper:        #F6F1E7;
+    --surface:      #FCFAF5;
+    --sunken:       #EEE7D8;
+    --line:         #D8CDB8;
+    --line-strong:  #A69A80;
+    --ink:          #1C1A16;
+    --ink-soft:     #514B41;
+    --ink-faint:    #75694F;
+    --kyanos:       #8A6420;
+    --kyanos-deep:  #6E4F18;
+    --kyanos-wash:  #F3EAD6;
+    --accent-2:     #6E4F18;
+    --bc-ground: #1C1A16;  --bc-panel: #2A2620;  --bc-line: #4A443A;
+    --bc-ink: #F6F1E7;     --bc-ink-soft: #B9AE98;
+
+    --background: 40 45.5% 93.5%;
+    --foreground: 40 12.0% 9.8%;
+    --card: 43 53.8% 97.5%;
+    --card-foreground: 40 12.0% 9.8%;
+    --popover: 43 53.8% 97.5%;
+    --popover-foreground: 40 12.0% 9.8%;
+    --primary: 40 12.0% 9.8%;
+    --primary-foreground: 40 45.5% 93.5%;
+    --accent: 38 62.4% 33.3%;
+    --accent-foreground: 0 0.0% 100.0%;
+    --secondary: 41 39.3% 89.0%;
+    --secondary-foreground: 40 12.0% 9.8%;
+    --muted: 41 39.3% 89.0%;
+    --muted-foreground: 41 19.4% 38.4%;
+    --destructive-foreground: 40 45.5% 93.5%;
+    --border: 39 29.1% 78.4%;
+    --input: 39 29.1% 78.4%;
+    --ring: 38 62.4% 33.3%;
+    --chart-1: 38 62.4% 33.3%;
+    --sidebar-background: 40 12.0% 9.8%;
+    --sidebar-foreground: 40 45.5% 93.5%;
+    --sidebar-primary: 38 62.4% 33.3%;
+    --sidebar-accent: 38 64.2% 26.3%;
+    --sidebar-accent-foreground: 40 45.5% 93.5%;
+    --sidebar-border: 37 12.1% 25.9%;
+    --sidebar-ring: 38 62.4% 33.3%;
+  }
+  [data-accent="parliament"] {
+    
+    --paper:        #0F1B2B;
+    --surface:      #152638;
+    --sunken:       #1B3049;
+    --line:         #2A4159;
+    --line-strong:  #4B6685;
+    --ink:          #F2F6FA;
+    --ink-soft:     #B7C5D5;
+    --ink-faint:    #8DA0B6;
+    --kyanos:       #D0AB4F;
+    --kyanos-deep:  #E6C56F;
+    --kyanos-wash:  #2B302F;
+    --accent-2:     #E6C56F;
+    --yper: #56A96E;  --yper-wash: #16302A;
+    --kata: #C75A50;  --kata-wash: #35201F;
+    --apochi: #8DA0B6;  --apochi-wash: #1B3049;
+    --warn: #D9A441;  --warn-wash: #33301F;
+    --destructive: 5 51.5% 54.7%;
+    --chart-2: 137 32.5% 50.0%;
+    --chart-3: 5 51.5% 54.7%;
+    --chart-5: 212 21.9% 63.3%;
+    --bc-ground: #0C1B2A;  --bc-panel: #12253A;  --bc-line: #27405C;
+    --bc-ink: #F2F6FA;     --bc-ink-soft: #93A6BA;
+
+    --background: 214 48.3% 11.4%;
+    --foreground: 210 44.4% 96.5%;
+    --card: 211 45.5% 15.1%;
+    --card-foreground: 210 44.4% 96.5%;
+    --popover: 211 45.5% 15.1%;
+    --popover-foreground: 210 44.4% 96.5%;
+    --primary: 210 44.4% 96.5%;
+    --primary-foreground: 214 48.3% 11.4%;
+    --accent: 43 57.8% 56.3%;
+    --accent-foreground: 214 48.3% 11.4%;
+    --secondary: 213 46.0% 19.6%;
+    --secondary-foreground: 210 44.4% 96.5%;
+    --muted: 213 46.0% 19.6%;
+    --muted-foreground: 212 21.9% 63.3%;
+    --destructive-foreground: 214 48.3% 11.4%;
+    --border: 211 35.9% 25.7%;
+    --input: 211 35.9% 25.7%;
+    --ring: 43 57.8% 56.3%;
+    --chart-1: 43 57.8% 56.3%;
+    --sidebar-background: 210 44.4% 96.5%;
+    --sidebar-foreground: 214 48.3% 11.4%;
+    --sidebar-primary: 43 57.8% 56.3%;
+    --sidebar-accent: 43 70.4% 66.9%;
+    --sidebar-accent-foreground: 214 48.3% 11.4%;
+    --sidebar-border: 211 35.9% 25.7%;
+    --sidebar-ring: 43 57.8% 56.3%;
+  }
+  [data-accent="spray"] {
+    --font-display: "Roboto Condensed", Impact, "Arial Narrow", sans-serif; --radius: 0.25rem;
+    --paper:        #121212;
+    --surface:      #1B1B1B;
+    --sunken:       #232323;
+    --line:         #3A3A3A;
+    --line-strong:  #6B6B6B;
+    --ink:          #F4F4EE;
+    --ink-soft:     #C9C9C0;
+    --ink-faint:    #8E8E86;
+    --kyanos:       #C6FF00;
+    --kyanos-deep:  #E2FF66;
+    --kyanos-wash:  #2A3300;
+    --accent-2:     #FF3EA5;
+    --yper: #5DD682;  --yper-wash: #14301E;
+    --kata: #FF6B5E;  --kata-wash: #3A1F1C;
+    --apochi: #8E8E86;  --apochi-wash: #232323;
+    --warn: #FFB347;  --warn-wash: #332A14;
+    --destructive: 5 100.0% 68.4%;
+    --chart-2: 138 59.6% 60.2%;
+    --chart-3: 5 100.0% 68.4%;
+    --chart-5: 60 3.4% 54.1%;
+    --bc-ground: #0A0A0A;  --bc-panel: #161616;  --bc-line: #333333;
+    --bc-ink: #F4F4EE;     --bc-ink-soft: #9A9A92;
+
+    --background: 0 0.0% 7.1%;
+    --foreground: 60 21.4% 94.5%;
+    --card: 0 0.0% 10.6%;
+    --card-foreground: 60 21.4% 94.5%;
+    --popover: 0 0.0% 10.6%;
+    --popover-foreground: 60 21.4% 94.5%;
+    --primary: 60 21.4% 94.5%;
+    --primary-foreground: 0 0.0% 7.1%;
+    --accent: 73 100.0% 50.0%;
+    --accent-foreground: 0 0.0% 7.1%;
+    --secondary: 0 0.0% 13.7%;
+    --secondary-foreground: 60 21.4% 94.5%;
+    --muted: 0 0.0% 13.7%;
+    --muted-foreground: 60 3.4% 54.1%;
+    --destructive-foreground: 0 0.0% 7.1%;
+    --border: 0 0.0% 22.7%;
+    --input: 0 0.0% 22.7%;
+    --ring: 73 100.0% 50.0%;
+    --chart-1: 73 100.0% 50.0%;
+    --sidebar-background: 60 21.4% 94.5%;
+    --sidebar-foreground: 0 0.0% 7.1%;
+    --sidebar-primary: 73 100.0% 50.0%;
+    --sidebar-accent: 71 100.0% 70.0%;
+    --sidebar-accent-foreground: 0 0.0% 7.1%;
+    --sidebar-border: 0 0.0% 22.7%;
+    --sidebar-ring: 73 100.0% 50.0%;
+  }
+  [data-accent="poster"] {
+    --font-display: "Fira Sans", "Arial Black", Impact, sans-serif; --radius: 1rem;
+    --paper:        #FFFCF2;
+    --surface:      #FFFFFF;
+    --sunken:       #F4EFDF;
+    --line:         #C9C7E0;
+    --line-strong:  #14133A;
+    --ink:          #14133A;
+    --ink-soft:     #3F3E6B;
+    --ink-faint:    #6C6B93;
+    --kyanos:       #2D3BFF;
+    --kyanos-deep:  #1B27C4;
+    --kyanos-wash:  #E8EAFF;
+    --accent-2:     #FF5A36;
+    --bc-ground: #14133A;  --bc-panel: #1E1D4F;  --bc-line: #3A397A;
+    --bc-ink: #FFFCF2;     --bc-ink-soft: #B9B8D9;
+
+    --background: 46 100.0% 97.5%;
+    --foreground: 242 50.6% 15.1%;
+    --card: 0 0.0% 100.0%;
+    --card-foreground: 242 50.6% 15.1%;
+    --popover: 0 0.0% 100.0%;
+    --popover-foreground: 242 50.6% 15.1%;
+    --primary: 242 50.6% 15.1%;
+    --primary-foreground: 46 100.0% 97.5%;
+    --accent: 236 100.0% 58.8%;
+    --accent-foreground: 0 0.0% 100.0%;
+    --secondary: 46 48.8% 91.6%;
+    --secondary-foreground: 242 50.6% 15.1%;
+    --muted: 46 48.8% 91.6%;
+    --muted-foreground: 242 15.7% 49.8%;
+    --destructive-foreground: 46 100.0% 97.5%;
+    --border: 245 28.7% 82.9%;
+    --input: 245 28.7% 82.9%;
+    --ring: 236 100.0% 58.8%;
+    --chart-1: 236 100.0% 58.8%;
+    --sidebar-background: 242 50.6% 15.1%;
+    --sidebar-foreground: 46 100.0% 97.5%;
+    --sidebar-primary: 236 100.0% 58.8%;
+    --sidebar-accent: 236 75.8% 43.7%;
+    --sidebar-accent-foreground: 46 100.0% 97.5%;
+    --sidebar-border: 241 36.3% 35.1%;
+    --sidebar-ring: 236 100.0% 58.8%;
+  }
+
+  /* ── Per-theme typography and ornament ─────────────────────────────
+     The four sketch-born themes change more than colour. Spray and
+     Poster set condensed and heavy display faces with Greek glyphs
+     (the sketches' Anton and Archivo Black have none) and uppercase
+     the serif headings; Marble draws a meander rule under the header.
+     Body copy stays Inter in every theme. ── */
+  .theme-rule { display: none; }
+  [data-accent="marble"] .theme-rule {
+    display: block; height: 12px; margin: 0 16px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' viewBox='0 0 24 12'%3E%3Cpath d='M0 1h23v10H12V4h8v4h-5V6h2' fill='none' stroke='%238A6420' stroke-width='1.1'/%3E%3C/svg%3E");
+    background-repeat: repeat-x; opacity: 0.8;
+  }
+  /* Uppercase only page and section titles (h1, h2): those are translated
+     strings, so they follow the document language and Chrome drops the
+     Greek tonos correctly. Member-written titles (h3 on cards) stay mixed
+     case — uppercased Greek content in an English interface keeps its
+     accents as stray marks. */
+  [data-accent="spray"] :is(h1, h2).font-serif,
+  [data-accent="poster"] :is(h1, h2).font-serif {
+    text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.1;
+  }
+  [data-accent="spray"] :is(h1, h2).font-serif { font-weight: 700; }
+  [data-accent="poster"] :is(h1, h2).font-serif { font-weight: 900; letter-spacing: -0.01em; }
+  [data-accent="spray"] .font-serif, [data-accent="poster"] .font-serif { font-weight: 700; }
 
   .dark {
     --background: 222.2 47.4% 11.2%;

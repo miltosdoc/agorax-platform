@@ -9,7 +9,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-md hover:shadow-lg",
+        // Accent tokens, not a fixed blue: the member's colour theme (shared/theme.ts)
+        // swaps --kyanos, and every default button has to follow it.
+        default: "bg-kyanos text-accent-foreground hover:bg-kyanos-deep shadow-md hover:shadow-lg",
         destructive:
           "bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg",
         outline:
@@ -17,8 +19,8 @@ const buttonVariants = cva(
         secondary:
           "bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm",
         ghost: "hover:bg-gray-100 text-gray-600 hover:text-gray-900",
-        link: "text-blue-600 underline-offset-4 hover:underline hover:text-blue-700",
-        solid: "bg-white text-blue-600 hover:bg-blue-50 shadow-md hover:shadow-lg",
+        link: "text-kyanos underline-offset-4 hover:underline hover:text-kyanos-deep",
+        solid: "bg-white text-kyanos hover:bg-kyanos-wash shadow-md hover:shadow-lg",
       },
       size: {
         default: "h-10 px-4 py-2",

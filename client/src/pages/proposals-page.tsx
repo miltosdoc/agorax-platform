@@ -15,6 +15,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
+import { DiscoveryRail } from '@/components/rails/discovery-rail';
+import { EntityCard } from '@/components/cards/entity-card';
+import { CARD_STACK } from '@/components/rails/rail-section';
+import { AgoraFeedRail } from '@/components/rails/agora-feed-rail';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -155,6 +159,8 @@ export default function ProposalsPage() {
 
   return (
     <AppShell
+      leftRail={<DiscoveryRail />}
+      rightRail={<AgoraFeedRail />}
       title={t('proposals.title')}
       breadcrumb={[{ label: t('nav.home'), href: '/' }, { label: t('proposals.title') }]}
       actions={
@@ -293,50 +299,43 @@ export default function ProposalsPage() {
       ) : (
         <div className="space-y-6" data-testid="proposals-list">
           {/* ── The register ── */}
-          <div className="divide-y divide-line overflow-hidden rounded border border-line bg-surface">
+          {/* Cards, not a bordered register with dividers — same card language
+              and the same CARD_STACK gap as the feed and the rails. */}
+          <div className={CARD_STACK}>
             {visible.map((proposal) => {
               const score = parseScore(proposal.llmScore);
               return (
-                <Link
+                <EntityCard
                   key={proposal.id}
+                  subject="proposal"
+                  kindLabel={t('nav.proposals')}
+                  id={proposal.id}
+                  title={proposal.question}
+                  excerpt={proposal.solution}
                   href={`/proposals/${proposal.id}`}
-                  className="group block p-5 transition-colors duration-[120ms] hover:bg-sunken sm:p-6"
-                  data-testid={`proposals-card-${proposal.id}`}
-                >
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-faint">
-                    <span className="inline-flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                      {communityName(proposal.communityId, proposal.communityName)}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <time dateTime={proposal.createdAt} className="font-mono tabular-nums">
-                      {new Date(proposal.createdAt).toLocaleDateString()}
-                    </time>
-                    <span className="ml-auto">
-                      <StatusBadge status={proposal.status} />
-                    </span>
-                  </div>
-
-                  <h3 className="mt-2.5 line-clamp-2 font-serif text-lg leading-snug decoration-1 underline-offset-2 group-hover:underline sm:text-xl">
-                    {proposal.question}
-                  </h3>
-
-                  <p className="mb-0 mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">
-                    {proposal.solution}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-faint">
-                    <span>
-                      {t('proposal.by')}{' '}
-                      {proposal.authorName ?? t('proposal.userWithId', { id: proposal.authorId })}
-                    </span>
-                    {score !== null && (
-                      <span className="font-mono tabular-nums" data-testid={`proposals-score-${proposal.id}`}>
-                        {t('proposals.score')}: {Math.round(score)}/100
+                  ctaLabel={t('rail.learnMore')}
+                  tag={communityName(proposal.communityId, proposal.communityName)}
+                  tagHref={`/communities/${proposal.communityId}`}
+                  badge={<StatusBadge status={proposal.status} />}
+                  bookmarkKind="proposal"
+                  thumbnailKey={(proposal as { thumbnailKey?: string | null }).thumbnailKey}
+                  meta={
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
+                      <time dateTime={proposal.createdAt} className="font-mono tabular-nums">
+                        {new Date(proposal.createdAt).toLocaleDateString()}
+                      </time>
+                      <span>
+                        {t('proposal.by')}{' '}
+                        {proposal.authorName ?? t('proposal.userWithId', { id: proposal.authorId })}
                       </span>
-                    )}
-                  </div>
-                </Link>
+                      {score !== null && (
+                        <span className="font-mono tabular-nums" data-testid={`proposals-score-${proposal.id}`}>
+                          {t('proposals.score')}: {Math.round(score)}/100
+                        </span>
+                      )}
+                    </span>
+                  }
+                />
               );
             })}
           </div>

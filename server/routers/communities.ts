@@ -5,7 +5,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
-import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
+import {  communityRepo, proposalRepo, sortitionRepo , storage, discoveryRepo } from '../storage';
 
 import { db } from '../db';
 import { requireAuth } from '../auth';
@@ -96,6 +96,41 @@ export function registerCommunitiesRoutes(app: Express): void {
         }
       }
 
+      // Proposal counts per community — the card of the new design states a
+      // count next to the member count, and deriving it from latestRows would
+      // undercount once that query grows a limit.
+      const proposalCountRows = await db
+        .select({
+          communityId: proposals.communityId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(proposals)
+        .where(inArray(proposals.communityId, ids))
+        .groupBy(proposals.communityId);
+      const proposalCounts = new Map(proposalCountRows.map((r) => [r.communityId, r.count]));
+
+      // Which of these the viewer has saved, in one query rather than one per
+      // card.
+      const savedIds = userId
+        ? await discoveryRepo.bookmarkedIds(userId, 'community', ids)
+        : new Set<number>();
+
+      // Which of these the viewer belongs to. One query for the whole list —
+      // the rails ask "my communities" of this same response rather than
+      // calling isCommunityMember once per row.
+      const memberOf = userId
+        ? new Set(
+            (await db
+              .select({ communityId: communityMembers.communityId })
+              .from(communityMembers)
+              .where(and(
+                eq(communityMembers.userId, userId),
+                inArray(communityMembers.communityId, ids),
+              ))
+            ).map((r) => r.communityId),
+          )
+        : new Set<number>();
+
       // Members-only content stays out of the public directory: the row is
       // listed (name, description, member count), but proposal teasers are
       // only shown to viewers who may read the community's content.
@@ -104,6 +139,9 @@ export function registerCommunitiesRoutes(app: Express): void {
       const enriched = list.map((c) => ({
         ...c,
         memberCount: memberCounts.get(c.id) ?? 0,
+        proposalCount: proposalCounts.get(c.id) ?? 0,
+        savedByViewer: savedIds.has(c.id),
+        viewerIsMember: memberOf.has(c.id),
         contentHidden: !visibleContent.has(c.id),
         latestProposal: visibleContent.has(c.id) && latestByCommunity.get(c.id)
           ? {

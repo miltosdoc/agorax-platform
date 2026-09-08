@@ -7,6 +7,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
+import { DiscoveryRail } from '@/components/rails/discovery-rail';
+import { EntityCard } from '@/components/cards/entity-card';
+import { CARD_STACK } from '@/components/rails/rail-section';
+import { AgoraFeedRail } from '@/components/rails/agora-feed-rail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +58,8 @@ export default function SurveysPage() {
 
   return (
     <AppShell
+      leftRail={<DiscoveryRail />}
+      rightRail={<AgoraFeedRail />}
       title={t('surveys.title')}
       actions={user ? (
         <div className="flex gap-2">
@@ -120,46 +126,42 @@ export default function SurveysPage() {
         <EmptyState icon={<BarChart3 className="h-12 w-12" />} title={t('surveys.empty')} />
       )}
 
-      <div className="grid gap-4">
-        {list.map((poll) => (
-          <Card key={poll.id} className="hover:border-primary/40 transition-colors">
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <CardTitle className="text-base">{poll.title}</CardTitle>
-                  <CardDescription>{poll.topicTag}</CardDescription>
-                </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
+      {/* Same card language and gap as the feed, proposals and the rails. */}
+      <div className={CARD_STACK}>
+        {list.map((poll) => {
+          const live = poll.status === 'live';
+          const openable = live || poll.status === 'closed' || (user && poll.creatorId === user.id);
+          return (
+            <EntityCard
+              key={poll.id}
+              subject="survey"
+              kindLabel={t('nav.surveys')}
+              id={poll.id}
+              title={poll.title}
+              excerpt={poll.topicTag}
+              href={live ? `/surveys/${poll.id}/take` : `/surveys/${poll.id}`}
+              ctaLabel={live
+                ? t('surveys.take')
+                : poll.status === 'draft' ? t('surveys.previewPublish') : t('surveys.results')}
+              tag={poll.topicTag}
+              badge={
+                <span className="flex items-center gap-1.5">
                   <TierBadge tier={poll.tier} />
                   <Badge variant="secondary">{t(`surveys.status.${poll.status}`)}</Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {poll.completion ? t('surveys.completions', { n: poll.completion.completed }) : ''}
-              </span>
-              <div className="flex gap-2">
-                {(poll.status === 'live' || poll.status === 'closed') && (
-                  <ShareButton url={`/surveys/${poll.id}`} title={poll.title} text={poll.topicTag} variant="ghost" iconOnly />
-                )}
-                {poll.status === 'live' && (
-                  <Link href={`/surveys/${poll.id}/take`}>
-                    <Button size="sm">{t('surveys.take')}</Button>
-                  </Link>
-                )}
-                {(poll.status === 'closed' || (user && poll.creatorId === user.id)) && (
-                  <Link href={`/surveys/${poll.id}`}>
-                    <Button size="sm" variant="ghost">
-                      <BarChart3 className="w-4 h-4 mr-1" />
-                      {poll.status === 'draft' ? t('surveys.previewPublish') : t('surveys.results')}
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                </span>
+              }
+              bookmarkKind="survey"
+              thumbnailKey={(poll as { thumbnailKey?: string | null }).thumbnailKey}
+              meta={
+                poll.completion ? (
+                  <span className="text-xs text-ink-faint">
+                    {t('surveys.completions', { n: poll.completion.completed })}
+                  </span>
+                ) : undefined
+              }
+            />
+          );
+        })}
       </div>
     </AppShell>
   );

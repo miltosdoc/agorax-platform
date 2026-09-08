@@ -28,4 +28,4 @@ export const INPUT_CLASS =
   "h-10 rounded-sm border-line bg-paper text-sm text-ink placeholder:text-ink-faint transition-colors duration-[120ms] focus-visible:ring-1 focus-visible:ring-kyanos focus-visible:border-line-strong";
 
 export const CHECKBOX_CLASS =
-  "mt-0.5 h-4 w-4 rounded-[2px] border border-ink bg-paper data-[state=checked]:bg-ink data-[state=checked]:text-paper";
+  "mt-0.5 h-4 w-4 rounded-[5px] border border-ink bg-paper data-[state=checked]:bg-ink data-[state=checked]:text-paper";

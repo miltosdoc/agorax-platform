@@ -17,12 +17,19 @@ import PrivacyPage from "@/pages/privacy";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminAccountsPage from "@/pages/admin-accounts";
 import CommunityDashboardPage from "@/pages/community-dashboard";
+import CommunitiesPage from "@/pages/communities";
+import MediaLibraryPage from "@/pages/media-library";
+import BookmarksPage from "@/pages/bookmarks";
+import AppearancePage from "@/pages/appearance";
+import SupportPage from "@/pages/support";
+import NewsletterConfirmPage from "@/pages/newsletter-confirm";
 import ConferenceRoomPage from "@/pages/conference-room";
 import ResetPasswordPage from "@/pages/reset-password";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import VerifyEmailPage from "@/pages/verify-email";
 import UnsubscribePage from "@/pages/unsubscribe";
 import { LocaleSync } from "@/components/auth/LocaleSync";
+import { ThemeSync } from "@/components/auth/ThemeSync";
 import VerifyBallotPage from "@/pages/verify-ballot";
 import InviteAcceptPage from "@/pages/invite-accept";
 import CommunitySettingsPage from "@/pages/community-settings";
@@ -56,18 +63,6 @@ import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { I18nProvider } from "./hooks/use-translation";
 import { ProtectedRoute } from "./lib/protected-route";
 import BottomNav from "@/components/layout/bottom-nav";
-
-function CommunitiesPage() {
-  return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <div className="container mx-auto py-6 px-4 max-w-6xl flex-grow">
-        <CommunityList />
-      </div>
-      <Footer />
-    </div>
-  );
-}
 
 function EditProposalFormPage() {
   const params = useParams();
@@ -168,6 +163,13 @@ function AppRouter() {
         <Route path="/groups">
           <Redirect to="/communities" />
         </Route>
+        {/* Public shelves: a signed-out visitor may browse the media and the
+            support page; only the saved list needs an account. */}
+        <Route path="/podcasts">{() => <MediaLibraryPage kind="podcast" />}</Route>
+        <Route path="/videos">{() => <MediaLibraryPage kind="video" />}</Route>
+        <Route path="/support" component={SupportPage} />
+        <Route path="/newsletter/confirm" component={NewsletterConfirmPage} />
+        <ProtectedRoute path="/bookmarks" component={BookmarksPage} />
         <ProtectedRoute path="/communities" component={CommunitiesPage} />
         <ProtectedRoute path="/communities/new" component={CommunityFormPage} />
         <ProtectedRoute path="/communities/:id/settings" component={CommunitySettingsPage} />
@@ -187,6 +189,7 @@ function AppRouter() {
         <ProtectedRoute path="/proposals/:id/amendments/signals" component={AmendmentCommunitySignal} />
         <ProtectedRoute path="/points" component={DemocracyPointsPage} />
         <ProtectedRoute path="/settings" component={PlatformSettingsPage} />
+        <Route path="/appearance" component={AppearancePage} />
         <ProtectedRoute path="/notifications/settings" component={NotificationSettingsPage} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <Route path="/walkthrough" component={DeliberationWalkthrough} />
@@ -210,6 +213,7 @@ function App() {
       <I18nProvider>
         <AuthProvider>
           <LocaleSync />
+          <ThemeSync />
           <AppRouter />
           <FeedbackWidget />
           <Toaster />

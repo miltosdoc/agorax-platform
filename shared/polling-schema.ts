@@ -138,6 +138,8 @@ export const surveyPolls = pgTable("survey_polls", {
   closesAt: timestamp("closes_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   closedAt: timestamp("closed_at"),
+  // Catalogue key for the card picture — see shared/thumbnails.ts.
+  thumbnailKey: text("thumbnail_key"),
 }, (table) => ({
   surveyPollsStatusIdx: index("survey_polls_status_idx").on(table.status, table.tier),
 }));

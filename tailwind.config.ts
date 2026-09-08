@@ -6,15 +6,23 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
-        serif: ["GFS Didot", "Georgia", "Times New Roman", "serif"],
-        display: ["GFS Didot", "Georgia", "Times New Roman", "serif"],
-        mono: ["IBM Plex Mono", "Menlo", "Consolas", "monospace"],
+        /* Resolved through the design tokens so a colour theme can also
+           swap the display face (Spray, Poster) — see index.css. */
+        sans: ["var(--font-ui)"],
+        serif: ["var(--font-display)"],
+        display: ["var(--font-display)"],
+        mono: ["var(--font-data)"],
       },
+      // Every radius in the app derives from the one token, so the whole
+      // interface rounds or squares together and nothing is left behind at an
+      // old corner. Bare `rounded` is mapped too — without a DEFAULT it keeps
+      // Tailwind's own 4px and quietly breaks the set.
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 1px)",
-        sm: "max(2px, calc(var(--radius) - 2px))",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        DEFAULT: "calc(var(--radius) - 4px)",
       },
       colors: {
         /* ── AgoraX named palette (design-system tokens) ── */
@@ -24,6 +32,7 @@ export default {
         line: { DEFAULT: "var(--line)", strong: "var(--line-strong)" },
         ink: { DEFAULT: "var(--ink)", soft: "var(--ink-soft)", faint: "var(--ink-faint)" },
         kyanos: { DEFAULT: "var(--kyanos)", deep: "var(--kyanos-deep)", wash: "var(--kyanos-wash)" },
+        accent2: "var(--accent-2)",
         yper: { DEFAULT: "var(--yper)", wash: "var(--yper-wash)" },
         kata: { DEFAULT: "var(--kata)", wash: "var(--kata-wash)" },
         apochi: { DEFAULT: "var(--apochi)", wash: "var(--apochi-wash)" },

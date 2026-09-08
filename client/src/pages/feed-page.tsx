@@ -19,6 +19,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import AppShell from '@/components/layout/AppShell';
+import { EntityCard } from '@/components/cards/entity-card';
+import { CARD_STACK } from '@/components/rails/rail-section';
+import { DiscoveryRail } from '@/components/rails/discovery-rail';
+import { MyAgoraRail } from '@/components/rails/personal-rails';
 import { GuideCard } from '@/components/GuideCard';
 import ShareButton from '@/components/ShareButton';
 import StatusBadge from '@/components/proposal/StatusBadge';
@@ -97,174 +101,110 @@ const META_DATE = 'font-mono text-xs tabular-nums text-ink-faint';
 const TITLE = 'font-serif text-lg sm:text-xl leading-snug';
 const OPEN_LINK = 'text-sm font-medium text-kyanos hover:underline underline-offset-2';
 
+/* Every feed row is an EntityCard: same picture, eyebrow, title, quick view
+   and actions as the communities grid. The three kinds differ only in their
+   verb and their badge, which is exactly what the card takes as props. */
+
 function ProposalFeedRow({ item }: { item: ProposalFeedItem }) {
   const { t, locale } = useTranslation();
   const dateLocale = locale === 'en' ? 'en-US' : 'el-GR';
   return (
-    <article data-testid={`feed-proposal-${item.id}`} className={ROW}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className={EYEBROW}>
-          <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('feed.newProposal')}
-        </span>
-        <Link
-          href={`/communities/${item.communityId}`}
-          className="text-xs text-kyanos hover:underline underline-offset-2"
-        >
-          {item.communityName}
-        </Link>
-        <span className="text-xs text-ink-faint" aria-hidden="true">·</span>
+    <EntityCard
+      subject="proposal"
+      kindLabel={t('feed.newProposal')}
+      id={item.id}
+      title={item.question}
+      excerpt={item.solution}
+      href={`/proposals/${item.id}`}
+      ctaLabel={t('feed.openProposal')}
+      tag={item.communityName}
+      tagHref={`/communities/${item.communityId}`}
+      badge={<StatusBadge status={item.status} />}
+      bookmarkKind="proposal"
+      thumbnailKey={(item as { thumbnailKey?: string | null }).thumbnailKey}
+      meta={
         <time dateTime={item.createdAt} className={META_DATE}>
           {new Date(item.createdAt).toLocaleDateString(dateLocale)}
         </time>
-        <span className="ml-auto">
-          <StatusBadge status={item.status} />
-        </span>
-      </div>
-
-      <Link href={`/proposals/${item.id}`} className="mt-2.5 block">
-        <h3 className={`${TITLE} decoration-1 underline-offset-2 hover:underline`}>{item.question}</h3>
-      </Link>
-
-      {item.solution && (
-        <p className="mb-0 mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">{item.solution}</p>
-      )}
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-        <ShareButton url={`/proposals/${item.id}`} title={item.question} text={item.solution} variant="ghost" />
-        <Link href={`/proposals/${item.id}`} className={OPEN_LINK}>
-          {t('feed.openProposal')}
-        </Link>
-      </div>
-    </article>
+      }
+    />
   );
 }
 
 function SurveyFeedRow({ item }: { item: SurveyFeedItem }) {
   const { t, locale } = useTranslation();
   const dateLocale = locale === 'en' ? 'en-US' : 'el-GR';
+  const live = item.status === 'live';
   return (
-    <article data-testid={`feed-survey-${item.id}`} className={ROW}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className={EYEBROW}>
-          <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('feed.newSurvey')}
-        </span>
+    <EntityCard
+      subject="survey"
+      kindLabel={t('feed.newSurvey')}
+      id={item.id}
+      title={item.title}
+      excerpt={item.topicTag}
+      href={live ? `/surveys/${item.id}/take` : `/surveys/${item.id}`}
+      ctaLabel={live ? t('feed.openSurvey') : t('feed.surveyResults')}
+      tag={item.topicTag}
+      badge={<TierBadge tier={item.tier} />}
+      bookmarkKind="survey"
+      thumbnailKey={(item as { thumbnailKey?: string | null }).thumbnailKey}
+      meta={
         <time dateTime={item.createdAt} className={META_DATE}>
           {new Date(item.createdAt).toLocaleDateString(dateLocale)}
         </time>
-        <span className="ml-auto">
-          <TierBadge tier={item.tier} />
-        </span>
-      </div>
-
-      <Link href={`/surveys/${item.id}`} className="mt-2.5 block">
-        <h3 className={`${TITLE} decoration-1 underline-offset-2 hover:underline`}>{item.title}</h3>
-      </Link>
-
-      <p className="mb-0 mt-1.5 text-sm text-ink-soft">{item.topicTag}</p>
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-        <ShareButton url={`/surveys/${item.id}`} title={item.title} text={item.topicTag} variant="ghost" />
-        {item.status === 'live' ? (
-          <Link
-            href={`/surveys/${item.id}/take`}
-            className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
-          >
-            {t('feed.openSurvey')}
-          </Link>
-        ) : (
-          <Link href={`/surveys/${item.id}`} className={OPEN_LINK}>
-            {t('feed.surveyResults')}
-          </Link>
-        )}
-      </div>
-    </article>
+      }
+    />
   );
 }
 
-function MediaFeedRow({ item, onShare }: { item: MediaFeedItem; onShare: (item: MediaFeedItem) => void }) {
+function MediaFeedRow({ item }: { item: MediaFeedItem }) {
   const { t, locale } = useTranslation();
-  const Icon = item.kind === 'podcast' ? Mic : Video;
-  const mediaUrl = `/media/${item.filePath}`;
+  const src = `/media/${item.filePath}`;
   const thumbUrl = item.thumbPath ? `/media/${item.thumbPath}` : undefined;
   const dateLocale = locale === 'en' ? 'en-US' : 'el-GR';
-  const created = new Date(item.createdAt).toLocaleDateString(dateLocale);
-  const byline = t('feed.byUploader', { uploader: item.uploaderName });
+
+  // The player belongs in the quick view, not on the card. A feed of ten
+  // cards each holding a loaded <video> is a feed that cannot be scrolled.
+  const player = item.kind === 'podcast' ? (
+    <audio controls preload="none" src={src} className="w-full" />
+  ) : (
+    <video controls preload="none" src={src} poster={thumbUrl} className="max-h-96 w-full rounded-sm bg-ink" />
+  );
 
   return (
-    <article data-testid={`feed-item-${item.id}`} className={ROW}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <Icon className="h-3.5 w-3.5 text-ink-faint" aria-hidden="true" />
-        <Link
-          href={`/communities/${item.communityId}`}
-          className="text-xs text-kyanos hover:underline underline-offset-2"
-        >
-          {item.communityName}
-        </Link>
-        <span className="text-xs text-ink-faint" aria-hidden="true">·</span>
-        <time dateTime={item.createdAt} className={META_DATE}>{created}</time>
-        {item.isFeatured && (
-          <span className="ml-auto">
-            <Badge variant="outline" className="border-bronze text-bronze bg-bronze-wash gap-1">
-              <Star className="w-3 h-3" />
-              {t('media.featured')}
-            </Badge>
-          </span>
-        )}
-      </div>
-
-      <Link href={`/proposals/${item.proposalId}`} className="mt-2.5 block">
-        <h3 className={`${TITLE} decoration-1 underline-offset-2 hover:underline`}>
-          {item.title || item.proposalQuestion}
-        </h3>
-        {item.title && (
-          <p className="mb-0 mt-1 text-sm text-ink-soft">{item.proposalQuestion}</p>
-        )}
-      </Link>
-
-      <div className="mt-4">
-        {item.kind === 'podcast' ? (
-          <audio controls preload="metadata" src={mediaUrl} className="w-full" />
-        ) : (
-          <video
-            controls
-            preload="metadata"
-            src={mediaUrl}
-            poster={thumbUrl}
-            className="w-full max-h-96 rounded-sm bg-ink"
-          />
-        )}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <span className="text-xs text-ink-faint">
+    <EntityCard
+      subject={item.kind}
+      kindLabel={item.kind === 'podcast' ? t('nav.podcasts') : t('nav.videos')}
+      id={item.id}
+      title={item.title || item.proposalQuestion}
+      excerpt={item.title ? item.proposalQuestion : item.proposalSolution}
+      href={`/proposals/${item.proposalId}`}
+      ctaLabel={t('feed.openProposal')}
+      tag={item.communityName}
+      tagHref={`/communities/${item.communityId}`}
+      badge={item.isFeatured ? (
+        <Badge variant="outline" className="gap-1 border-bronze bg-bronze-wash text-bronze">
+          <Star className="h-3 w-3" />
+          {t('media.featured')}
+        </Badge>
+      ) : undefined}
+      bookmarkKind="media"
+      thumbSrc={thumbUrl}
+      detail={player}
+      meta={
+        <span className="flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
           {item.durationS && (
             <span className="font-mono tabular-nums">{formatDuration(item.durationS)}</span>
           )}
-          {item.durationS ? ' · ' : ''}
-          {byline}
+          {item.durationS ? <span aria-hidden="true">·</span> : null}
+          <time dateTime={item.createdAt} className={META_DATE}>
+            {new Date(item.createdAt).toLocaleDateString(dateLocale)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{t('feed.byUploader', { uploader: item.uploaderName })}</span>
         </span>
-        <span className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            onClick={() => onShare(item)}
-            data-testid={`feed-share-${item.id}`}
-            className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors duration-[120ms] hover:text-ink"
-          >
-            <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {t('media.share')}
-          </button>
-          <Link
-            href={`/proposals/${item.proposalId}`}
-            className={OPEN_LINK}
-            data-testid={`feed-open-${item.id}`}
-          >
-            {t('feed.openProposal')}
-          </Link>
-        </span>
-      </div>
-    </article>
+      }
+    />
   );
 }
 
@@ -331,8 +271,11 @@ export default function FeedPage() {
   ];
 
   return (
-    <AppShell>
-      <div className="mx-auto max-w-3xl pb-8">
+    <AppShell
+      leftRail={<DiscoveryRail />}
+      rightRail={<MyAgoraRail />}
+    >
+      <div className="pb-8">
         {/* ── Page head: big serif statement over a quiet standfirst ── */}
         <header className="pt-4 sm:pt-8">
           <h1 className="text-4xl leading-[1.1] sm:text-5xl">{t('feed.title')}</h1>
@@ -372,14 +315,17 @@ export default function FeedPage() {
             <EmptyState title={t('feed.empty')} />
           )}
           {items.length > 0 && (
-            <section className="divide-y divide-line overflow-hidden rounded border border-line bg-surface">
+            /* Cards carry their own border and ground, so the old bordered
+               register with dividers double-framed them and butted them
+               together. Same gap as the rails — CARD_STACK is the one value. */
+            <section className={CARD_STACK}>
               {items.map(item => (
                 item.feedType === 'proposal' ? (
                   <ProposalFeedRow key={`p-${item.id}`} item={item} />
                 ) : item.feedType === 'survey' ? (
                   <SurveyFeedRow key={`s-${item.id}`} item={item} />
                 ) : (
-                  <MediaFeedRow key={`m-${item.id}`} item={item} onShare={handleShare} />
+                  <MediaFeedRow key={`m-${item.id}`} item={item} />
                 )
               ))}
             </section>

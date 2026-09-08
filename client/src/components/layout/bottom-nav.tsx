@@ -59,7 +59,7 @@ export default function BottomNav({ user }: BottomNavProps) {
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 safe-area-inset-bottom"
+      className="sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-line bg-paper shadow-lg safe-area-inset-bottom"
       data-testid="bottom-navigation"
     >
       <div className="flex justify-around items-center h-16 px-2">
@@ -76,10 +76,10 @@ export default function BottomNav({ user }: BottomNavProps) {
                 className="flex flex-col items-center justify-center flex-1 relative -mt-5 tap-highlight-none"
                 data-testid={item.testId}
               >
-                <span className="flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg border-4 border-background">
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-paper bg-ink text-paper shadow-lg">
                   <Icon className="h-7 w-7" />
                 </span>
-                <span className={cn("text-xs font-medium mt-0.5", active ? "text-primary" : "text-muted-foreground")}>
+                <span className={cn("mt-0.5 text-xs font-medium", active ? "text-kyanos" : "text-ink-faint")}>
                   {item.label}
                 </span>
               </Link>
@@ -90,20 +90,20 @@ export default function BottomNav({ user }: BottomNavProps) {
               key={item.path}
               href={item.path}
               className={cn(
-                "flex flex-col items-center justify-center min-h-[44px] min-w-[44px] flex-1 relative tap-highlight-none transition-smooth",
-                active ? "text-primary" : "text-muted-foreground"
+                "relative flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center tap-highlight-none transition-smooth",
+                active ? "text-kyanos" : "text-ink-faint"
               )}
               data-testid={item.testId}
             >
               <Icon
                 className={cn(
-                  "h-6 w-6 mb-1 transition-smooth",
-                  active && "text-primary"
+                  "mb-1 h-6 w-6 transition-smooth",
+                  active && "text-kyanos"
                 )}
               />
               <span className="text-xs font-medium">{item.label}</span>
               {active && (
-                <span className="absolute top-0 w-12 h-1 bg-primary rounded-b-full transition-smooth" />
+                <span className="absolute top-0 h-1 w-12 rounded-b-full bg-kyanos transition-smooth" />
               )}
             </Link>
           );

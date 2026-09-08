@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
+import { isThumbnailKey } from '../../shared/thumbnails';
 import { db, voteDb } from '../db';
 import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
@@ -149,7 +150,7 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member to submit proposals" });
       }
-      const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions } = req.body;
+      const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions, thumbnailKey } = req.body;
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
       }
@@ -232,6 +233,10 @@ export function registerProposalsRoutes(app: Express): void {
         votingDurationHours: durationHours,
         deliberationDurationHours: deliberationHours,
         ballotOptions: customBallot,
+        // Presentation only. An unrecognised key is dropped rather than
+        // rejected: a bad picture must never be the reason a proposal cannot
+        // be filed.
+        thumbnailKey: isThumbnailKey(thumbnailKey) ? thumbnailKey : null,
       });
       // Members are notified on submit (draft → deliberation), not here —
       // a draft is private to its author and shouldn't be announced.

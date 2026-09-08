@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
+import { ProfileSummaryRail, MyProposalsRail } from '@/components/rails/personal-rails';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,12 @@ export default function ProfilePage() {
   );
 
   return (
-    <AppShell title={t('profile.accountSettings')} actions={headerActions}>
+    <AppShell
+      title={t('profile.accountSettings')}
+      actions={headerActions}
+      leftRail={<ProfileSummaryRail />}
+      rightRail={<MyProposalsRail />}
+    >
       <div data-testid="page-profile-settings">
         <Button
           variant="ghost"

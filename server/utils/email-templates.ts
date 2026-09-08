@@ -451,3 +451,44 @@ export function proposalUpdateEmail(o: OptionalOpts & { updateLine: string }): R
     footer,
   });
 }
+
+// ─── Newsletter ─────────────────────────────────────────────────────────────
+
+/**
+ * Double opt-in for the footer sign-up.
+ *
+ * Deliberately worded so it reads correctly to somebody who did NOT ask for
+ * it: the address is typed by whoever is at the keyboard, which need not be
+ * its owner. Nothing is sent to the list until this link is clicked, so the
+ * honest instruction to a stranger is "ignore this", and that is what it says.
+ */
+export function newsletterConfirmEmail(opts: {
+  locale: MailLocale;
+  confirmUrl: string;
+}): RenderedMail {
+  const { locale, confirmUrl } = opts;
+
+  if (locale === 'en') {
+    return render('Confirm your AgoraX newsletter subscription', {
+      locale,
+      title: 'Confirm your subscription',
+      paragraphs: [
+        'Someone entered this address to receive the AgoraX newsletter — what is being proposed, debated and decided across the platform.',
+        'Confirm below and you will start receiving it. Every issue carries an unsubscribe link.',
+        'If that was not you, ignore this message. Without the confirmation below nothing is ever sent to this address.',
+      ],
+      cta: { label: 'Confirm subscription', url: confirmUrl },
+    });
+  }
+
+  return render('Επιβεβαίωση εγγραφής στο newsletter του AgoraX', {
+    locale,
+    title: 'Επιβεβαίωση εγγραφής',
+    paragraphs: [
+      'Κάποιος καταχώρησε αυτή τη διεύθυνση για το newsletter του AgoraX — τι προτείνεται, τι συζητιέται και τι αποφασίζεται στην πλατφόρμα.',
+      'Επιβεβαιώστε παρακάτω για να αρχίσετε να το λαμβάνετε. Κάθε αποστολή περιέχει σύνδεσμο διαγραφής.',
+      'Αν δεν το κάνατε εσείς, αγνοήστε αυτό το μήνυμα. Χωρίς την παρακάτω επιβεβαίωση δεν στέλνεται ποτέ τίποτα σε αυτή τη διεύθυνση.',
+    ],
+    cta: { label: 'Επιβεβαίωση εγγραφής', url: confirmUrl },
+  });
+}

@@ -6,6 +6,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
+import { DiscoveryRail } from '@/components/rails/discovery-rail';
+import { AgoraFeedRail } from '@/components/rails/agora-feed-rail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,7 +121,12 @@ export default function SurveyDetailPage() {
   const weighting = results?.weighting;
 
   return (
-    <AppShell title={poll.title} breadcrumb={[{ label: t('surveys.title'), href: '/surveys' }, { label: `#${poll.id}` }]}>
+    <AppShell
+      title={poll.title}
+      breadcrumb={[{ label: t('surveys.title'), href: '/surveys' }, { label: `#${poll.id}` }]}
+      leftRail={<DiscoveryRail />}
+      rightRail={<AgoraFeedRail />}
+    >
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <TierBadge tier={poll.tier} />
         <Badge variant="secondary">{t(`surveys.status.${poll.status}`)}</Badge>

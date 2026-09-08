@@ -1,8 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +14,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { PlusCircle, UserCircle, ChevronDown, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare, MessageSquarePlus, Menu, Coins, Home, Smartphone, Check } from "lucide-react";
+import {
+  UserCircle, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare,
+  MessageSquarePlus, Menu, Coins, Home, Smartphone, Check, Bookmark, X,
+  BadgeCheck, Settings, HelpCircle, PlusCircle,
+} from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../../assets/logo.png";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 
 import { useUnreadCount, useNotifications } from "@/hooks/use-notifications";
 import { NotificationItem } from "@/components/notifications/notification-item";
@@ -26,13 +30,23 @@ import type { SortitionNotification } from "@/types/notifications";
 import SearchBar from "@/components/SearchBar";
 import { downloadApk } from "@/lib/download-apk";
 import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
+import { initials } from "@/lib/initials";
 
+/**
+ * The AGORA 2026 masthead.
+ *
+ * Three columns on desktop — wordmark, centred primary nav, icon cluster —
+ * mirroring the comps. The design's green is not reproduced: every accent here
+ * resolves to Kyanós (--kyanos), the platform's flag blue, so the new layout
+ * arrives without a rebrand.
+ */
 export default function Header() {
   const { user, logoutMutation } = useAuth();
   const { t } = useTranslation();
   const [location, navigate] = useLocation();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [feedbackOn, setFeedbackOn] = useState(isFeedbackWidgetEnabled);
   useEffect(() => {
     const sync = () => setFeedbackOn(isFeedbackWidgetEnabled());
@@ -42,7 +56,7 @@ export default function Header() {
   const { toast } = useToast();
 
   async function handleApkDownload() {
-    setIsMenuOpen(false);
+    setIsAccountOpen(false);
     const result = await downloadApk();
     if (result === "unavailable") {
       toast({ title: t('android.notAvailable'), variant: "destructive" });
@@ -52,17 +66,13 @@ export default function Header() {
   }
 
   const handleLogout = () => {
+    setIsAccountOpen(false);
     navigate("/");
     logoutMutation.mutate();
   };
 
-  // Fetch unread notification count
   const { data: unreadCountData } = useUnreadCount();
-
-  // Fetch notifications when popover is open
-  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications({
-    limit: 20,
-  });
+  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications({ limit: 20 });
 
   // Navigation only: NotificationItem marks the notification read itself, and
   // calls this back solely when there is somewhere to go — a message that is
@@ -82,43 +92,49 @@ export default function Header() {
   const unreadCount = unreadCountData?.count || 0;
   const notifications = notificationsData?.notifications || [];
 
-  // Current-page detection for the tier-2 nav
-  const isCommunitiesActive = location === "/communities" || location.startsWith("/communities/");
-  const isWalkthroughActive = location === "/walkthrough";
+  // The primary nav of the comps. Shown to everyone: a signed-out visitor can
+  // browse proposals, surveys and the media shelves, and hits the auth wall
+  // only where the route itself is protected.
+  const navItems: { label: string; href: string; match: (l: string) => boolean }[] = [
+    { label: t('nav.home'), href: user ? "/feed" : "/", match: (l) => l === "/" || l === "/feed" || l === "/home" },
+    { label: t('nav.communities'), href: "/communities", match: (l) => l.startsWith("/communities") },
+    { label: t('nav.proposals'), href: "/proposals", match: (l) => l.startsWith("/proposals") },
+    { label: t('nav.surveys'), href: "/surveys", match: (l) => l.startsWith("/surveys") },
+    { label: t('nav.podcasts'), href: "/podcasts", match: (l) => l.startsWith("/podcasts") },
+    { label: t('nav.videos'), href: "/videos", match: (l) => l.startsWith("/videos") },
+    { label: t('nav.profile'), href: "/profile", match: (l) => l.startsWith("/profile") },
+  ];
 
   const navLinkClass = (active: boolean) =>
-    `inline-flex items-center border-b-2 px-0.5 text-sm font-medium transition-colors duration-[120ms] ${
+    `relative inline-flex items-center whitespace-nowrap px-0.5 py-1 text-[15px] transition-colors duration-[120ms] ${
       active
-        ? "border-ink text-ink"
-        : "border-transparent text-ink-soft hover:text-ink"
+        ? "font-semibold text-ink after:absolute after:inset-x-0 after:-bottom-[13px] after:h-[3px] after:bg-kyanos after:content-['']"
+        : "text-ink-soft hover:text-ink"
     }`;
+
+  const iconButtonClass =
+    "inline-flex h-9 w-9 items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken hover:text-ink";
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-paper">
       {/* Institutional signature: solid ink rule across the very top */}
       <div className="h-1 bg-ink" aria-hidden="true" />
 
-      {/* ── Tier 1: masthead ── */}
-      <div className="container mx-auto flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2.5 sm:gap-x-3 sm:py-3">
+      <div className="mx-auto flex max-w-[1680px] items-center gap-3 px-4 py-2.5 lg:gap-6 lg:px-6">
+        {/* ── Wordmark ── */}
         <Link
           href={user ? "/feed" : "/"}
-          className="mr-auto flex min-w-0 items-center gap-2.5 sm:gap-3"
+          className="flex min-w-0 flex-1 items-center gap-2.5 lg:w-[220px] lg:flex-none xl:w-[260px]"
           data-testid="logo-link"
         >
-          <img
-            src={logoImage}
-            alt=""
-            className="h-8 w-auto flex-shrink-0 sm:h-9"
-          />
+          <img src={logoImage} alt="" className="h-8 w-auto flex-shrink-0 sm:h-9" />
           <span className="min-w-0">
             <span className="flex items-baseline gap-1.5 leading-none">
-              <span className="font-serif text-xl text-ink sm:text-2xl">
-                AgoraX
-              </span>
+              <span className="font-serif text-lg leading-none text-ink sm:text-2xl">AgoraX</span>
               {/* The platform is not finished and should never pretend to be:
                   votes are advisory (Terms §7) and the rules still move. */}
               <span
-                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos sm:text-[10px]"
+                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos"
                 data-testid="badge-beta"
               >
                 Beta
@@ -130,77 +146,43 @@ export default function Header() {
           </span>
         </Link>
 
-        {!user ? (
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <LanguageSwitcher />
-            {/* Desktop buttons */}
-            <button
-              type="button"
-              onClick={() => navigate("/auth")}
-              className="hidden h-9 items-center justify-center whitespace-nowrap rounded-sm border border-ink px-3.5 text-sm font-medium text-ink transition-colors duration-[120ms] hover:bg-sunken sm:inline-flex"
-              data-testid="button-login"
+        {/* ── Primary nav (desktop) ── */}
+        <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8" aria-label="Primary">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={navLinkClass(item.match(location))}
+              data-testid={`nav-${item.href.replace(/\//g, "") || "home"}`}
             >
-              {t('auth.login')}
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/auth?tab=register")}
-              className="hidden h-9 items-center justify-center whitespace-nowrap rounded-sm bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep sm:inline-flex"
-              data-testid="button-register"
-            >
-              {t('auth.register')}
-            </button>
-            {/* Mobile hamburger */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-ink transition-colors duration-[120ms] hover:bg-sunken sm:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
-                <DropdownMenuItem onClick={() => navigate("/auth")} className="cursor-pointer">
-                  {t('auth.login')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/auth?tab=register")} className="cursor-pointer">
-                  {t('auth.register')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/proposals")} className="cursor-pointer">
-                  <FileText className="mr-2 h-4 w-4" />
-                  {t('nav.proposals')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/walkthrough")} className="cursor-pointer">
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  {t('nav.process')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ) : (
-          <>
-            {/* Search: inline on desktop, wraps to its own full-width line on mobile */}
-            <div className="order-last w-full sm:order-none sm:w-56 md:w-72 lg:w-80">
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/* ── Icon cluster ── */}
+        <div className="ml-auto flex flex-shrink-0 items-center gap-1 lg:ml-0">
+          {user && (
+            <div className="hidden w-44 xl:block xl:w-56">
               <SearchBar />
             </div>
+          )}
 
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <LanguageSwitcher />
+          <span className="hidden sm:inline-flex">
+            <LanguageSwitcher />
+          </span>
 
-              {/* Notification Bell */}
+          <ThemeSwitcher />
+
+          {user ? (
+            <>
               <Popover open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
                 <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken hover:text-ink"
-                    data-testid="button-notifications"
-                  >
-                    <Bell className="h-4 w-4" />
+                  <button type="button" className={`relative ${iconButtonClass}`} data-testid="button-notifications" aria-label={t('notification.title')}>
+                    <Bell className="h-[18px] w-[18px]" />
                     {unreadCount > 0 && (
                       <span
-                        className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-sm bg-kyanos px-1 font-mono text-[10px] leading-none tabular-nums text-paper"
+                        className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-sm bg-kyanos px-1 font-mono text-[10px] leading-none tabular-nums text-paper"
                         data-testid="badge-notification-count"
                       >
                         {unreadCount > 9 ? "9+" : unreadCount}
@@ -238,183 +220,205 @@ export default function Header() {
                 </PopoverContent>
               </Popover>
 
-              <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <Link
+                href="/bookmarks"
+                className={`hidden sm:inline-flex ${iconButtonClass}`}
+                data-testid="link-bookmarks"
+                aria-label={t('nav.bookmarks')}
+              >
+                <Bookmark className="h-[18px] w-[18px]" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => navigate("/proposals/new")}
+                className="hidden h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep md:inline-flex"
+                data-testid="button-new-proposal"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span className="hidden lg:inline">{t('nav.newProposal')}</span>
+              </button>
+
+              {/* Avatar + account panel. The comps put the initials disc and the
+                  hamburger side by side inside one pill; both open the panel. */}
+              <DropdownMenu open={isAccountOpen} onOpenChange={setIsAccountOpen}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border border-line px-2 text-sm text-ink transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken sm:px-3"
+                    className="ml-0.5 flex h-9 items-center gap-1.5 rounded-full border border-line pl-0.5 pr-2 transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken"
                     data-testid="button-user-menu"
+                    aria-label={t('nav.account')}
                   >
-                    <UserCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
-                    <span className="hidden max-w-[120px] truncate sm:inline md:max-w-[150px]">{user.name}</span>
-                    <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-ink-faint" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-kyanos font-sans text-[11px] font-semibold tracking-wide text-paper">
+                      {initials(user.name)}
+                    </span>
+                    {isAccountOpen ? (
+                      <X className="h-4 w-4 text-ink-soft" />
+                    ) : (
+                      <Menu className="h-4 w-4 text-ink-soft" />
+                    )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
-                  <DropdownMenuItem
-                    onClick={() => navigate("/home")}
-                    className="cursor-pointer"
-                    data-testid="menu-dashboard"
-                  >
+                <DropdownMenuContent align="end" className="mt-2 w-72 rounded-sm border-line p-0">
+                  <div className="border-b border-line px-4 py-3">
+                    <p className="font-serif text-lg leading-tight text-ink">{t('nav.account')}</p>
+                    <p className="mt-0.5 truncate text-xs text-ink-faint">{user.name}</p>
+                  </div>
+                  <div className="py-1">
+                    <DropdownMenuItem onClick={() => navigate("/bookmarks")} className="cursor-pointer sm:hidden" data-testid="menu-bookmarks">
+                      <Bookmark className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.bookmarks')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/verify")} className="cursor-pointer" data-testid="menu-govgr">
+                      <BadgeCheck className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.govgrVerify')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/proposals?mine=1")} className="cursor-pointer" data-testid="menu-my-proposals">
+                      <FileText className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.myProposals')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/communities")} className="cursor-pointer" data-testid="menu-communities">
+                      <Users className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.myCommunities')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/surveys")} className="cursor-pointer" data-testid="menu-surveys">
+                      <BarChart3 className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.mySurveys')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/points")} className="cursor-pointer" data-testid="menu-points">
+                      <Coins className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.points')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/walkthrough")} className="cursor-pointer" data-testid="menu-walkthrough">
+                      <HelpCircle className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.help')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer" data-testid="menu-settings">
+                      <Settings className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('nav.settings')}
+                    </DropdownMenuItem>
+
+                    {user.isAdmin && <DropdownMenuSeparator />}
+                    {user.isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate("/analytics")} className="cursor-pointer" data-testid="menu-analytics">
+                        <BarChart3 className="mr-2.5 h-4 w-4 text-ink-faint" />
+                        {t('nav.analytics')}
+                      </DropdownMenuItem>
+                    )}
+                    {user.isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate("/admin/accounts")} className="cursor-pointer" data-testid="menu-admin-accounts">
+                        <Users className="mr-2.5 h-4 w-4 text-ink-faint" />
+                        {t('nav.adminAccounts')}
+                      </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleApkDownload} className="cursor-pointer" data-testid="menu-android-download">
+                      <Smartphone className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      {t('android.downloadMenuLabel')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        // Keep the menu open so the check state is visible.
+                        e.preventDefault();
+                        const next = !feedbackOn;
+                        setFeedbackWidgetEnabled(next);
+                        setFeedbackOn(next);
+                      }}
+                      className="cursor-pointer"
+                      data-testid="menu-feedback-toggle"
+                    >
+                      <MessageSquarePlus className="mr-2.5 h-4 w-4 text-ink-faint" />
+                      <span className="flex-1">{t('feedback.toggleLabel')}</span>
+                      {feedbackOn && <Check className="ml-2 h-4 w-4 text-yper" />}
+                    </DropdownMenuItem>
+                  </div>
+                  <div className="border-t border-line py-1">
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-kata focus:text-kata" data-testid="menu-logout">
+                      <LogOut className="mr-2.5 h-4 w-4" />
+                      {t('auth.logout')}
+                    </DropdownMenuItem>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate("/auth")}
+              className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+              data-testid="button-login"
+            >
+              {t('auth.login')}
+              <UserCircle className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Mobile nav trigger — the primary nav collapses here below lg. */}
+          <DropdownMenu open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={`${iconButtonClass} lg:hidden`}
+                data-testid="button-mobile-nav"
+                aria-label={t('nav.home')}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
+              {navItems.map((item) => (
+                <DropdownMenuItem key={item.href} onClick={() => navigate(item.href)} className="cursor-pointer">
+                  {item.label}
+                </DropdownMenuItem>
+              ))}
+              {!user && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/auth")} className="cursor-pointer">
+                    {t('auth.login')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/auth?tab=register")} className="cursor-pointer">
+                    {t('auth.register')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/walkthrough")} className="cursor-pointer">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    {t('nav.process')}
+                  </DropdownMenuItem>
+                </>
+              )}
+              {user && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/proposals/new")} className="cursor-pointer">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    {t('nav.newProposal')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/home")} className="cursor-pointer">
                     <Home className="mr-2 h-4 w-4" />
                     {t('dashboard.title')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/profile")}
-                    className="cursor-pointer"
-                    data-testid="menu-profile"
-                  >
+                  <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     {t('nav.profile')}
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/proposals")}
-                    className="cursor-pointer"
-                    data-testid="menu-proposals"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    {t('nav.proposals')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/communities")}
-                    className="cursor-pointer"
-                    data-testid="menu-communities"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    {t('nav.communities')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/surveys")}
-                    className="cursor-pointer"
-                    data-testid="menu-surveys"
-                  >
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    {t('nav.surveys')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/points")}
-                    className="cursor-pointer"
-                    data-testid="menu-points"
-                  >
-                    <Coins className="mr-2 h-4 w-4" />
-                    {t('nav.points')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/walkthrough")}
-                    className="cursor-pointer"
-                    data-testid="menu-walkthrough"
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    {t('nav.walkthrough')}
-                  </DropdownMenuItem>
-                  {user.isAdmin && (
-                    <DropdownMenuItem
-                      onClick={() => navigate("/analytics")}
-                      className="cursor-pointer"
-                      data-testid="menu-analytics"
-                    >
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      {t('nav.analytics')}
-                    </DropdownMenuItem>
-                  )}
-                  {user.isAdmin && (
-                    <DropdownMenuItem
-                      onClick={() => navigate("/admin/accounts")}
-                      className="cursor-pointer"
-                      data-testid="menu-admin-accounts"
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      {t('nav.adminAccounts')}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onClick={handleApkDownload}
-                    className="cursor-pointer"
-                    data-testid="menu-android-download"
-                  >
-                    <Smartphone className="mr-2 h-4 w-4" />
-                    {t('android.downloadMenuLabel')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      // Keep the menu open so the check state is visible.
-                      e.preventDefault();
-                      const next = !feedbackOn;
-                      setFeedbackWidgetEnabled(next);
-                      setFeedbackOn(next);
-                    }}
-                    className="cursor-pointer"
-                    data-testid="menu-feedback-toggle"
-                  >
-                    <MessageSquarePlus className="mr-2 h-4 w-4" />
-                    <span className="flex-1">{t('feedback.toggleLabel')}</span>
-                    {feedbackOn && <Check className="ml-2 h-4 w-4 text-yper" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    className="cursor-pointer text-kata focus:text-kata"
-                    data-testid="menu-logout"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t('auth.logout')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </>
-        )}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {/* ── Tier 2: nav row (desktop) ── */}
-      {!user ? (
-        <nav className="hidden border-t border-line sm:block">
-          <div className="container mx-auto flex h-11 items-stretch px-4">
-            <button
-              type="button"
-              onClick={() => navigate("/walkthrough")}
-              className={navLinkClass(isWalkthroughActive)}
-              data-testid="button-walkthrough"
-            >
-              {t('nav.process')}
-            </button>
-          </div>
-        </nav>
-      ) : (
-        <nav className="hidden border-t border-line sm:block">
-          <div className="container mx-auto flex h-11 items-stretch gap-6 px-4">
-            <button
-              type="button"
-              onClick={() => navigate("/communities")}
-              className={navLinkClass(isCommunitiesActive)}
-              data-testid="button-communities"
-            >
-              {t('nav.communities')}
-            </button>
+      {/* Ornament slot: empty in every theme but Marble, which draws a meander here. */}
+      <div className="theme-rule" aria-hidden="true" />
 
-            <button
-              type="button"
-              onClick={() => navigate("/surveys")}
-              className={navLinkClass(location.startsWith("/surveys"))}
-              data-testid="button-surveys"
-            >
-              {t('nav.surveys')}
-            </button>
-
-            {/* Primary CTA */}
-            <button
-              type="button"
-              onClick={() => navigate("/proposals/new")}
-              className="ml-auto inline-flex items-center gap-2 self-center rounded-sm bg-ink px-3.5 py-1.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
-              data-testid="button-new-proposal"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>{t('nav.newProposal')}</span>
-            </button>
-          </div>
-        </nav>
+      {/* Search drops to its own line below xl so it never squeezes the nav. */}
+      {user && (
+        <div className="border-t border-line px-4 py-2 xl:hidden">
+          <SearchBar />
+        </div>
       )}
-
     </header>
   );
 }
