@@ -17,6 +17,117 @@ import { downloadApk } from "@/lib/download-apk";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { api, ApiError } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
+import { usernameChangeAvailableAt } from "@shared/user-identity";
+
+/**
+ * Editing the two identity fields.
+ *
+ * They are deliberately unalike. The handle is the label everyone else sees,
+ * so it is unique, constrained and changed seldom; the display name is
+ * account data that addresses the member's email and is shown to nobody, so
+ * it is theirs to change freely.
+ */
+function IdentityEditor({ user }: { user: { username: string; name: string; usernameChangedAt?: string | null } }) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [name, setName] = useState(user.name ?? '');
+  const [username, setUsername] = useState(user.username ?? '');
+  const [savingName, setSavingName] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+
+  const lockedUntil = usernameChangeAvailableAt(user.usernameChangedAt ?? null);
+
+  async function saveName() {
+    setSavingName(true);
+    try {
+      await api.put('/api/user/name', { name: name.trim() });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      toast({ title: t('profile.nameSaved') });
+    } catch (e) {
+      toast({
+        title: e instanceof ApiError ? e.message : t('profile.saveFailed'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  async function saveUsername() {
+    setSavingUsername(true);
+    try {
+      await api.put('/api/user/username', { username: username.trim() });
+      await queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      toast({ title: t('profile.usernameSaved') });
+    } catch (e) {
+      toast({
+        title: e instanceof ApiError ? e.message : t('profile.saveFailed'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingUsername(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <label htmlFor="profile-username" className="text-sm font-medium text-muted-foreground">
+          {t('auth.username')}
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id="profile-username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={!!lockedUntil || savingUsername}
+            data-testid="input-username"
+            autoCapitalize="none"
+            spellCheck={false}
+          />
+          <Button
+            size="sm"
+            onClick={saveUsername}
+            disabled={!!lockedUntil || savingUsername || username.trim() === user.username}
+            data-testid="button-save-username"
+          >
+            {savingUsername ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.save')}
+          </Button>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {lockedUntil
+            ? t('profile.usernameLocked', { date: lockedUntil.toLocaleDateString() })
+            : t('profile.usernameHelp')}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="profile-name" className="text-sm font-medium text-muted-foreground">
+          {t('profile.name')}
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id="profile-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={savingName}
+            data-testid="input-name"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={saveName}
+            disabled={savingName || name.trim() === user.name}
+            data-testid="button-save-name"
+          >
+            {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.save')}
+          </Button>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{t('profile.nameHelp')}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -133,14 +244,20 @@ export default function ProfilePage() {
                 <p className="font-mono text-sm">#{effectiveUser.id}</p>
               </div>
               <Separator />
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">{t('auth.username')}</p>
-                <p className="break-words font-medium">{effectiveUser.username}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">{t('profile.name')}</p>
-                <p className="break-words">{effectiveUser.name}</p>
-              </div>
+              {user ? (
+                <IdentityEditor user={effectiveUser as any} />
+              ) : (
+                <>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{t('auth.username')}</p>
+                    <p className="break-words font-medium">{effectiveUser.username}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{t('profile.name')}</p>
+                    <p className="break-words">{effectiveUser.name}</p>
+                  </div>
+                </>
+              )}
               <div>
                 <p className="text-sm font-medium text-muted-foreground">{t('auth.email')}</p>
                 <p className="break-words">{effectiveUser.email}</p>

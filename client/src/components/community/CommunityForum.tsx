@@ -64,8 +64,10 @@ interface Props {
   canManage: boolean;
 }
 
+// The handle, never the real name: users.name is account data that addresses
+// their email, and the forum used to publish it without anyone choosing to.
 const authorName = (a: ForumAuthor | null, fallback: string) =>
-  a ? (a.name?.trim() || a.username) : fallback;
+  a ? (a.username?.trim() || fallback) : fallback;
 
 function relativeDate(iso: string, locale: string) {
   const d = new Date(iso);

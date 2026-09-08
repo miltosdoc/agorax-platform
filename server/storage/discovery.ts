@@ -507,14 +507,14 @@ export interface ActivityEvent {
  */
 export async function communityActivity(communityId: number, limit = 12): Promise<ActivityEvent[]> {
   const [joins, newProposals, decided, posts, media] = await Promise.all([
-    db.select({ at: communityMembers.joinedAt, name: users.name })
+    db.select({ at: communityMembers.joinedAt, name: users.username })
       .from(communityMembers)
       .innerJoin(users, eq(communityMembers.userId, users.id))
       .where(eq(communityMembers.communityId, communityId))
       .orderBy(desc(communityMembers.joinedAt))
       .limit(limit),
 
-    db.select({ at: proposals.createdAt, name: users.name, id: proposals.id, question: proposals.question })
+    db.select({ at: proposals.createdAt, name: users.username, id: proposals.id, question: proposals.question })
       .from(proposals)
       .innerJoin(users, eq(proposals.authorId, users.id))
       .where(and(eq(proposals.communityId, communityId), sql`${proposals.status} not in ('draft','archived')`))
@@ -532,7 +532,7 @@ export async function communityActivity(communityId: number, limit = 12): Promis
       .orderBy(desc(proposals.updatedAt))
       .limit(limit),
 
-    db.select({ at: communityPosts.createdAt, name: users.name, id: communityPosts.id, title: communityPosts.title })
+    db.select({ at: communityPosts.createdAt, name: users.username, id: communityPosts.id, title: communityPosts.title })
       .from(communityPosts)
       .innerJoin(users, eq(communityPosts.authorId, users.id))
       .where(and(
@@ -544,7 +544,7 @@ export async function communityActivity(communityId: number, limit = 12): Promis
       .orderBy(desc(communityPosts.createdAt))
       .limit(limit),
 
-    db.select({ at: communityMedia.createdAt, name: users.name, title: communityMedia.title, kind: communityMedia.kind })
+    db.select({ at: communityMedia.createdAt, name: users.username, title: communityMedia.title, kind: communityMedia.kind })
       .from(communityMedia)
       .innerJoin(users, eq(communityMedia.uploaderId, users.id))
       .where(and(eq(communityMedia.communityId, communityId), eq(communityMedia.status, 'published')))

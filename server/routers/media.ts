@@ -447,7 +447,7 @@ export function registerMediaRoutes(app: Express): void {
               createdAt: proposals.createdAt,
               communityId: proposals.communityId,
               communityName: communities.name,
-              authorName: users.name,
+              authorName: users.username,
             })
             .from(proposals)
             .innerJoin(communities, eq(proposals.communityId, communities.id))

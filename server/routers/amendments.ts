@@ -241,7 +241,7 @@ export function registerAmendmentsRoutes(app: Express): void {
           id: amendmentComments.id,
           amendmentId: amendmentComments.amendmentId,
           authorId: amendmentComments.authorId,
-          authorName: users.name,
+          authorName: users.username,
           content: amendmentComments.content,
           createdAt: amendmentComments.createdAt,
         })
@@ -301,7 +301,7 @@ export function registerAmendmentsRoutes(app: Express): void {
         .insert(amendmentComments)
         .values({ amendmentId, authorId: req.user!.id, content })
         .returning();
-      res.status(201).json({ ...created, authorName: req.user!.name });
+      res.status(201).json({ ...created, authorName: req.user!.username });
     } catch (error) {
       console.error('amendment comment failed:', error);
       res.status(500).json({ message: "Failed to post comment" });
@@ -399,10 +399,10 @@ export function registerAmendmentsRoutes(app: Express): void {
       const { inArray } = await import('drizzle-orm');
       const authorIds = Array.from(new Set(revisions.map((a: any) => a.authorId)));
       const authors = await db
-        .select({ id: users.id, name: users.name })
+        .select({ id: users.id, username: users.username })
         .from(users)
         .where(inArray(users.id, authorIds));
-      const nameById = new Map(authors.map((u) => [u.id, u.name]));
+      const nameById = new Map(authors.map((u) => [u.id, u.username]));
       res.json(
         revisions
           .sort((a: any, b: any) => a.id - b.id)

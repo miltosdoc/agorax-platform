@@ -56,6 +56,10 @@ export const users = pgTable("users", {
   // out every member who registered before verification existed would be a
   // worse failure than an unconfirmed address.
   emailVerifiedAt: timestamp("email_verified_at"),
+
+  // When the member last changed their public handle. NULL = never, which is
+  // true of every account that predates the rename route (migration 0050).
+  usernameChangedAt: timestamp("username_changed_at"),
 });
 
 // Append-only consent audit log (GDPR Art. 7 + Art. 9(2)(a)).
@@ -1663,6 +1667,7 @@ export type SafeUser = Pick<
   | 'locale'
   | 'theme'
   | 'emailVerifiedAt'
+  | 'usernameChangedAt'
 >;
 
 

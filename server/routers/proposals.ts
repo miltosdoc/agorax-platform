@@ -121,7 +121,7 @@ export function registerProposalsRoutes(app: Express): void {
       // Global list respects per-community content visibility (public
       // communities plus the viewer's own memberships) and draft privacy.
       const visible = await visibleCommunityIdSet(all.map((p) => p.communityId), req.user?.id);
-      res.json(all.filter((p) => visible.has(p.communityId)).filter(visibleTo(req.user?.id)));
+      res.json(await withAuthorHandles(all.filter((p) => visible.has(p.communityId)).filter(visibleTo(req.user?.id))));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
@@ -137,11 +137,33 @@ export function registerProposalsRoutes(app: Express): void {
         status: status as string,
         category: category as string,
       });
-      res.json(proposals.filter(visibleTo(req.user?.id)));
+      res.json(await withAuthorHandles(proposals.filter(visibleTo(req.user?.id))));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
   });
+  /**
+   * Attach the author's public handle to proposals.
+   *
+   * Proposals never carried any author identity, so every row on the site
+   * read "User #6" while the forum beside it showed real names. One batched
+   * query rather than a join in the repository: the same enrichment is needed
+   * by several routes that build their lists differently.
+   *
+   * A missing row is a deleted account, whose arguments stay on the record —
+   * the client falls back to the numeric label for those.
+   */
+  const withAuthorHandles = async <T extends { authorId: number }>(rows: T[]): Promise<(T & { authorUsername: string | null })[]> => {
+    if (rows.length === 0) return [];
+    const ids = [...new Set(rows.map((r) => r.authorId).filter((id) => typeof id === 'number'))];
+    if (ids.length === 0) return rows.map((r) => ({ ...r, authorUsername: null }));
+    const found = await db.select({ id: users.id, username: users.username })
+      .from(users)
+      .where(inArray(users.id, ids));
+    const handleById = new Map(found.map((u) => [u.id, u.username]));
+    return rows.map((r) => ({ ...r, authorUsername: handleById.get(r.authorId) ?? null }));
+  };
+
   /**
    * May this member put a proposal into this community?
    *
@@ -284,7 +306,8 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.status === 'draft' && proposal.authorId !== req.user?.id && !req.user?.isAdmin) {
         return res.status(404).json({ message: "Proposal not found" });
       }
-      res.json(proposal);
+      const [withHandle] = await withAuthorHandles([proposal as any]);
+      res.json(withHandle);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch proposal" });
     }

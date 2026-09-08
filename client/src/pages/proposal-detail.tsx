@@ -41,7 +41,7 @@ interface Proposal {
   solution: string;
   status: string;
   authorId: number;
-  authorName?: string;
+  authorUsername?: string | null;
   communityId: number;
   communityName?: string;
   createdAt: string;
@@ -118,7 +118,7 @@ export default function ProposalDetailPage() {
           solution: 'Εισαγωγή ηλεκτρικών λεωφορείων και επέκταση ποδηλατοδρόμων.',
           status: 'voting',
           authorId: 1,
-          authorName: 'Δημοκράτης Παπαδόπουλος',
+          authorUsername: 'dimokratis',
           communityId: 1,
           communityName: 'Πολίτες Αθήνας',
           createdAt: new Date().toISOString(),
@@ -446,7 +446,7 @@ export default function ProposalDetailPage() {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>
-                {t('proposal.by')} {proposal.authorName || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
+                {t('proposal.by')} {proposal.authorUsername || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
               </span>
               <StatusBadge status={proposal.status} />
               {proposal.track === 'vote' && (

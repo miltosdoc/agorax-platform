@@ -41,10 +41,10 @@ async searchMembers(query: string, limit = 10): Promise<User[]> {
   return await db
     .select()
     .from(users)
-    .where(or(
-      sql`LOWER(${users.name}) LIKE ${term}`,
-      sql`LOWER(${users.username}) LIKE ${term}`,
-    ))
+    // The handle only. Matching on users.name let any signed-in member look
+    // someone up by their real name, which is account data and not published
+    // anywhere else on the platform.
+    .where(sql`LOWER(${users.username}) LIKE ${term}`)
     .limit(limit);
 }
 

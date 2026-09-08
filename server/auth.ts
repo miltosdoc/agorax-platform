@@ -11,6 +11,12 @@ import { DatabaseStorage } from "./storage";
 export const storage = new DatabaseStorage();
 import { User as SelectUser, registerUserSchema } from "@shared/schema";
 import { isAccentTheme } from "@shared/theme";
+import {
+  USERNAME_CHANGE_COOLDOWN_DAYS,
+  normalizeUsername,
+  usernameChangeAvailableAt,
+  validateUsername,
+} from "@shared/user-identity";
 import { db } from "./db";
 import {
   users,
@@ -21,7 +27,7 @@ import {
   User,
   SafeUser,
 } from "@shared/schema";
-import { eq, and, isNull, gte, count, desc } from "drizzle-orm";
+import { eq, and, isNull, gte, count, desc, sql } from "drizzle-orm";
 import rateLimit from "express-rate-limit";
 import { addMember as addCommunityMember, getGeneralCommunity } from "./utils/community-manager";
 import {
@@ -114,6 +120,7 @@ function sanitizeUser(user: User): SafeUser {
     govgrPostcode: user.govgrPostcode,
     locale: user.locale,
     theme: user.theme,
+    usernameChangedAt: (user as any).usernameChangedAt ?? null,
     emailVerifiedAt: user.emailVerifiedAt,
   };
 }
@@ -778,6 +785,89 @@ export function setupAuth(app: Express) {
       res.json({ ok: true, theme });
     } catch {
       res.status(500).json({ message: "Το θέμα δεν αποθηκεύτηκε" });
+    }
+  });
+
+  /**
+   * The member's display name.
+   *
+   * Account data, not a public label: it addresses their email and appears in
+   * their own account view, and nothing renders it to anyone else. So it is
+   * freely editable — no uniqueness to protect, nobody citing it.
+   */
+  app.put("/api/user/name", requireAuth, async (req: any, res) => {
+    const name = String(req.body?.name ?? '').trim();
+    if (name.length < 2 || name.length > 80) {
+      return res.status(400).json({ message: "Το όνομα πρέπει να έχει 2–80 χαρακτήρες" });
+    }
+    try {
+      await db.update(users).set({ name }).where(eq(users.id, req.user.id));
+      res.json({ ok: true, name });
+    } catch {
+      res.status(500).json({ message: "Το όνομα δεν αποθηκεύτηκε" });
+    }
+  });
+
+  /**
+   * The member's public handle.
+   *
+   * This is the label shown wherever they appear, so it carries every
+   * constraint the display name does not: a charset that cannot be used to
+   * impersonate, a reserved list, uniqueness, and a wait between changes
+   * because other members cite it.
+   *
+   * Editable at all because of Google sign-ups: those handles were generated
+   * from a Google display name and appended with a digit on collision, so
+   * those members are carrying a name they were never asked about.
+   */
+  app.put("/api/user/username", requireAuth, async (req: any, res) => {
+    const checked = validateUsername(req.body?.username);
+    if (!checked.ok) {
+      const message = {
+        too_short: "Το όνομα χρήστη είναι πολύ σύντομο",
+        too_long: "Το όνομα χρήστη είναι πολύ μεγάλο",
+        charset: "Χρησιμοποιήστε λατινικά πεζά, αριθμούς και . _ -",
+        reserved: "Αυτό το όνομα χρήστη δεν είναι διαθέσιμο",
+        taken: "Αυτό το όνομα χρήστη χρησιμοποιείται ήδη",
+      }[checked.reason];
+      return res.status(400).json({ message, reason: checked.reason });
+    }
+    const username = checked.username;
+
+    try {
+      const [me] = await db.select().from(users).where(eq(users.id, req.user.id));
+      if (!me) return res.status(404).json({ message: "Ο λογαριασμός δεν βρέθηκε" });
+
+      // Re-picking the same handle is not a change and must not start a new
+      // wait — otherwise saving the form twice costs a month.
+      if (normalizeUsername(me.username) === username) {
+        return res.json({ ok: true, username: me.username, unchanged: true });
+      }
+
+      const availableAt = usernameChangeAvailableAt((me as any).usernameChangedAt);
+      if (availableAt) {
+        return res.status(429).json({
+          message: `Μπορείτε να αλλάξετε ξανά όνομα χρήστη μετά τις ${availableAt.toLocaleDateString('el-GR')}`,
+          availableAt: availableAt.toISOString(),
+          cooldownDays: USERNAME_CHANGE_COOLDOWN_DAYS,
+        });
+      }
+
+      // Case-insensitive, matching how invitations resolve a handle: taking
+      // "Nikos" while "nikos" exists would produce two members nobody can
+      // tell apart in a member list.
+      const [clash] = await db.select({ id: users.id }).from(users)
+        .where(sql`lower(${users.username}) = ${username}`);
+      if (clash && clash.id !== req.user.id) {
+        return res.status(409).json({ message: "Αυτό το όνομα χρήστη χρησιμοποιείται ήδη", reason: 'taken' });
+      }
+
+      await db.update(users)
+        .set({ username, usernameChangedAt: new Date() })
+        .where(eq(users.id, req.user.id));
+      res.json({ ok: true, username });
+    } catch {
+      res.status(500).json({ message: "Το όνομα χρήστη δεν αποθηκεύτηκε" });
     }
   });
 

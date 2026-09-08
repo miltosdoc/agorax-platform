@@ -15,7 +15,6 @@ interface SearchProposal {
 
 interface SearchMember {
   id: number;
-  name: string;
   username: string;
   profilePicture: string | null;
 }
@@ -175,7 +174,7 @@ export default function SearchBar() {
                     )}
                     {item.kind === 'member' && (
                       <>
-                        <div className="font-medium truncate">{item.data.name || item.data.username}</div>
+                        <div className="font-medium truncate">@{item.data.username}</div>
                         <div className="text-xs text-muted-foreground">{t('search.kind.member')} · @{item.data.username}</div>
                       </>
                     )}

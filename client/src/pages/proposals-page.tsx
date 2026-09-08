@@ -43,7 +43,7 @@ interface Proposal {
   solution: string;
   status: string;
   authorId: number;
-  authorName?: string;
+  authorUsername?: string | null;
   communityId: number;
   communityName?: string;
   createdAt: string;
@@ -326,7 +326,7 @@ export default function ProposalsPage() {
                       </time>
                       <span>
                         {t('proposal.by')}{' '}
-                        {proposal.authorName ?? t('proposal.userWithId', { id: proposal.authorId })}
+                        {proposal.authorUsername ?? t('proposal.userWithId', { id: proposal.authorId })}
                       </span>
                       {score !== null && (
                         <span className="font-mono tabular-nums" data-testid={`proposals-score-${proposal.id}`}>
