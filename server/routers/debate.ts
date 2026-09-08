@@ -12,6 +12,7 @@ import { requireProposalContentAccess } from '../utils/community-visibility';
 import { db } from '../db';
 import { debateArguments, debateThreads } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { withAuthorLabelsDeep } from '../utils/author-labels';
 
 /**
  * Voting on debate content is participation, same as writing it: it
@@ -113,7 +114,7 @@ export function registerDebateRoutes(app: Express): void {
         return res.status(400).json({ message: "Invalid proposal id" });
       }
       const threads = await debateService.getThreads(proposalId);
-      res.json(threads);
+      res.json(await withAuthorLabelsDeep(threads as any));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch debate threads" });
     }

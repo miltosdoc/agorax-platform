@@ -24,7 +24,8 @@ interface ThreadNode {
   id: number;
   proposalId: number;
   authorId: number;
-  authorName?: string;
+  authorName?: string | null;
+  authorUsername?: string | null;
   parentId: number | null;
   content: string;
   upvotes: number | null;
@@ -320,7 +321,7 @@ function ThreadCard({ thread, canParticipate, onVote, onReply, depth = 0 }: Thre
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                 <span className="font-medium text-foreground">
-                  {thread.authorName ?? t('proposal.userWithId', { id: thread.authorId })}
+                  {thread.authorName ?? thread.authorUsername ?? t('proposal.userWithId', { id: thread.authorId })}
                 </span>
                 <span>·</span>
                 <span>{formatTimestamp(thread.createdAt)}</span>

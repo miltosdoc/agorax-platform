@@ -33,7 +33,8 @@ interface Amendment {
   id: number;
   proposalId: number;
   authorId: number;
-  authorName?: string;
+  authorName?: string | null;
+  authorUsername?: string | null;
   type?: string;
   text: string;
   status: 'pending' | 'accepted' | 'rejected' | 'flagged';
@@ -340,7 +341,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                   <p className="text-sm whitespace-pre-wrap">{amendment.text}</p>
                   <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground gap-2 flex-wrap">
                     <span>
-                      {amendment.authorName || t('proposal.userWithId', { id: amendment.authorId })}
+                      {amendment.authorName || amendment.authorUsername || t('proposal.userWithId', { id: amendment.authorId })}
                     </span>
                     <div className="flex items-center gap-2">
                       {canReviewTopLevel(amendment) && (
@@ -446,7 +447,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                             </div>
                             <p className="text-sm whitespace-pre-wrap">{child.text}</p>
                             <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground gap-2 flex-wrap">
-                              <span>{child.authorName || t('proposal.userWithId', { id: child.authorId })}</span>
+                              <span>{child.authorName || child.authorUsername || t('proposal.userWithId', { id: child.authorId })}</span>
                               <div className="flex items-center gap-1">
                                 {canReviewChild(child, amendment) && (
                                   <>
@@ -591,7 +592,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
               children: amendments.map((a) => ({
                 id: a.id,
                 text: a.text,
-                authorName: a.authorName || `User #${a.authorId}`,
+                authorName: a.authorName || a.authorUsername || `User #${a.authorId}`,
                 createdAt: a.createdAt,
                 status: a.status as any,
                 children: [],

@@ -17,6 +17,7 @@ import {
   buildSortitionInput,
   saveFinalText,
 } from '../utils/amendment-processor';
+import { withAuthorLabels } from '../utils/author-labels';
 
 /** True if `userId` belongs to a sortition body assigned to `proposalId`. */
 async function isSortitionMember(proposalId: number, userId: number): Promise<boolean> {
@@ -68,7 +69,7 @@ export function registerAmendmentsRoutes(app: Express): void {
           userVote: userVotes.get(a.id) ?? 0,
         };
       });
-      res.json(enriched);
+      res.json(await withAuthorLabels(enriched));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch amendments" });
     }
