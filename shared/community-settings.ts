@@ -30,6 +30,52 @@ export type CommunitySortitionMode = typeof COMMUNITY_SORTITION_MODES[number];
 export const COMMUNITY_SYNTHESIS_MODES = ['ai', 'sortition'] as const;
 export type CommunitySynthesisMode = typeof COMMUNITY_SYNTHESIS_MODES[number];
 
+/**
+ * Who may submit a proposal.
+ *
+ * Only the submission is gated. The forum, the deliberation, amendments and
+ * the ballot stay open to every member under all three values — a community
+ * where members cannot speak or vote would not be a community.
+ *
+ * An autonomous community has no admin team, so the value is meaningless
+ * there and `effectiveProposalPolicy` reports 'all_members' whatever the
+ * column holds. Read the effective value, never the raw column.
+ */
+export const COMMUNITY_PROPOSAL_POLICIES = ['all_members', 'admins', 'founder'] as const;
+export type CommunityProposalPolicy = typeof COMMUNITY_PROPOSAL_POLICIES[number];
+
+export function effectiveProposalPolicy(community: {
+  type?: string | null;
+  proposalPolicy?: string | null;
+}): CommunityProposalPolicy {
+  if (community.type !== 'managed') return 'all_members';
+  const raw = community.proposalPolicy;
+  return (COMMUNITY_PROPOSAL_POLICIES as readonly string[]).includes(String(raw))
+    ? (raw as CommunityProposalPolicy)
+    : 'all_members';
+}
+
+/**
+ * May this member submit a proposal?
+ *
+ * `isCreator` is not a convenience: a managed community built through
+ * `createCommunity` in server/utils/community-manager.ts records its creator
+ * with role 'admin' and no 'founder' row exists at all. Trusting the role
+ * alone would lock the founder out of their own community under the
+ * 'founder' policy.
+ */
+export function canSubmitProposal(opts: {
+  policy: CommunityProposalPolicy;
+  role?: string | null;
+  isCreator?: boolean;
+}): boolean {
+  const { policy, role, isCreator = false } = opts;
+  if (policy === 'all_members') return true;
+  const isFounder = isCreator || role === 'founder';
+  if (policy === 'founder') return isFounder;
+  return isFounder || role === 'admin';
+}
+
 export const COMMUNITY_JOIN_POLICIES = ['open', 'approval', 'invite_only'] as const;
 export type CommunityJoinPolicy = typeof COMMUNITY_JOIN_POLICIES[number];
 
@@ -51,6 +97,7 @@ export interface CommunitySettingsInput {
   amendmentInclusionThreshold?: unknown;
   maxAmendmentsPerProposal?: unknown;
   requireGovgrVerification?: unknown;
+  proposalPolicy?: unknown;
   joinPolicy?: unknown;
   memberListVisibility?: unknown;
   contentVisibility?: unknown;
@@ -82,6 +129,7 @@ export interface CommunityCreateSettings {
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
   requireGovgrVerification: boolean;
+  proposalPolicy: CommunityProposalPolicy;
   joinPolicy: CommunityJoinPolicy;
   memberListVisibility: CommunityVisibilityLevel;
   contentVisibility: CommunityVisibilityLevel;
@@ -110,6 +158,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   amendmentInclusionThreshold: '0.6',
   maxAmendmentsPerProposal: -1,
   requireGovgrVerification: false,
+  proposalPolicy: 'all_members',
   joinPolicy: 'open',
   memberListVisibility: 'public',
   contentVisibility: 'public',
@@ -256,6 +305,11 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     amendmentInclusionThreshold: decimalString(input.amendmentInclusionThreshold, DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold, 0, 1, 'amendmentInclusionThreshold must be between 0 and 1'),
     maxAmendmentsPerProposal: unlimitedOrPositiveInteger(input.maxAmendmentsPerProposal, DEFAULT_COMMUNITY_SETTINGS.maxAmendmentsPerProposal ?? -1, 'maxAmendmentsPerProposal must be -1 or greater than 0'),
     requireGovgrVerification: booleanValue(input.requireGovgrVerification, DEFAULT_COMMUNITY_SETTINGS.requireGovgrVerification ?? false),
+    // Forced for autonomous the way governanceModel is: the stored value must
+    // never describe a restriction the community's type cannot have.
+    proposalPolicy: type === 'managed'
+      ? enumValue(input.proposalPolicy, COMMUNITY_PROPOSAL_POLICIES, DEFAULT_COMMUNITY_SETTINGS.proposalPolicy, 'Invalid proposal policy')
+      : 'all_members',
     joinPolicy: enumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, DEFAULT_COMMUNITY_SETTINGS.joinPolicy, 'Invalid join policy'),
     memberListVisibility: enumValue(input.memberListVisibility, COMMUNITY_VISIBILITY_LEVELS, DEFAULT_COMMUNITY_SETTINGS.memberListVisibility, 'Invalid member list visibility'),
     contentVisibility: enumValue(input.contentVisibility, COMMUNITY_VISIBILITY_LEVELS, DEFAULT_COMMUNITY_SETTINGS.contentVisibility, 'Invalid content visibility'),
@@ -333,6 +387,12 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
 
   const requireGovgrVerification = optionalBoolean(input.requireGovgrVerification);
   if (requireGovgrVerification !== undefined) updates.requireGovgrVerification = requireGovgrVerification;
+
+  const proposalPolicy = optionalEnumValue(input.proposalPolicy, COMMUNITY_PROPOSAL_POLICIES, 'Invalid proposal policy');
+  if (proposalPolicy !== undefined) updates.proposalPolicy = proposalPolicy;
+  // Switching to autonomous dissolves the admin team, so any restriction that
+  // named it has to go with it rather than linger as a value nothing honours.
+  if (type === 'autonomous') updates.proposalPolicy = 'all_members';
 
   const joinPolicy = optionalEnumValue(input.joinPolicy, COMMUNITY_JOIN_POLICIES, 'Invalid join policy');
   if (joinPolicy !== undefined) updates.joinPolicy = joinPolicy;

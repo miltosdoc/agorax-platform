@@ -19,6 +19,7 @@
  */
 
 import type { IStorage } from '../storage';
+import { effectiveProposalPolicy } from '../../shared/community-settings';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -85,8 +86,22 @@ async function calculateAdminIntervention(
     score -= 5;
   }
   
+  // Who is allowed to write a proposal at all.
+  //
+  // The admin ratio above measures who holds office; this measures what the
+  // office is worth. A community that reserves proposal-writing for its admin
+  // team has concentrated the agenda regardless of how few admins it has, and
+  // reserving it for one person concentrates it entirely. This is the
+  // "admin blocking proposals" case named at the top of this file, expressed
+  // as a standing rule rather than a per-incident one.
+  const community = await storage.getCommunity(communityId);
+  if (community) {
+    const policy = effectiveProposalPolicy(community as any);
+    if (policy === 'founder') score -= 10;
+    else if (policy === 'admins') score -= 6;
+  }
+
   // TODO: Track admin actions in a separate table and penalize based on frequency
-  // For now, we only consider the admin ratio
   
   return Math.max(0, Math.min(20, score));
 }
@@ -160,9 +175,26 @@ async function calculateTransparency(
   communityId: number,
   storage: IStorage,
 ): Promise<number> {
-  // TODO: Implement transparency tracking
-  // For now, return a baseline score
-  return 15; // Assume basic transparency is in place
+  // Read from the community's own settings rather than the flat 15 this
+  // returned for everyone, which told a reader nothing and made the factor
+  // impossible to improve. Each deduction is a choice the community made
+  // about who may see it and who may join, so each one is answerable.
+  let score = 20;
+
+  const community = await storage.getCommunity(communityId);
+  if (!community) return score;
+
+  // Proceedings visible only to members: the decisions cannot be checked by
+  // the public they may affect.
+  if ((community as any).contentVisibility === 'members') score -= 5;
+  // Who is in the room is part of reading a decision.
+  if ((community as any).memberListVisibility === 'members') score -= 3;
+
+  const joinPolicy = (community as any).joinPolicy;
+  if (joinPolicy === 'invite_only') score -= 4;
+  else if (joinPolicy === 'approval') score -= 2;
+
+  return Math.max(0, Math.min(20, score));
 }
 
 /**
@@ -250,12 +282,23 @@ export async function calculateDemocracyScore(
   
   // Overall score is the sum of all factors (max 100)
   const score = adminIntervention + sortitionUsage + participation + transparency + deliberation;
+
+  const community = await storage.getCommunity(communityId);
+  const proposalPolicy = community ? effectiveProposalPolicy(community as any) : 'all_members';
   
   // Generate recommendations based on low-scoring factors
   const recommendations: string[] = [];
   
   if (adminIntervention < 10) {
     recommendations.push('Reduce admin-to-member ratio or document admin actions more transparently');
+  }
+  // Named separately from the ratio advice above: a community can sit at a
+  // healthy admin ratio and still have closed proposal-writing, and being
+  // told to "reduce the ratio" would then be advice it cannot act on.
+  if (proposalPolicy === 'founder') {
+    recommendations.push('Only the founder may submit proposals — opening this to admins, or to every member, is the single largest gain available to this community');
+  } else if (proposalPolicy === 'admins') {
+    recommendations.push('Only the founder and admins may submit proposals — letting every member propose would raise this score and widen the agenda');
   }
   if (sortitionUsage < 10) {
     recommendations.push('Use sortition panels more frequently for proposal review');

@@ -45,6 +45,8 @@ interface MemberCommunity {
   votingMinHours?: number | null;
   votingMaxHours?: number | null;
   communitySignalHours?: number | null;
+  /** False when this community reserves proposal-writing for its admins or founder. */
+  viewerCanPropose?: boolean;
 }
 
 export function ProposalForm({ communityId, editProposalId, fromPostId }: ProposalFormProps) {
@@ -60,10 +62,16 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     fetch('/api/communities', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to load communities'))))
       .then((list: MemberCommunity[]) => {
-        setMemberCommunities(list);
+        // Only communities that would actually accept the proposal. Offering
+        // one that refuses on submit wastes everything the author wrote; the
+        // server still re-checks, this just keeps the picker honest.
+        // Older responses without the flag are treated as open, so a stale
+        // client degrades to the previous behaviour rather than an empty list.
+        const eligible = list.filter((c) => c.viewerCanPropose !== false);
+        setMemberCommunities(eligible);
         if (!communityId) {
-          const general = list.find((c) => c.isGeneral);
-          setSelectedCommunityId((prev) => prev ?? general?.id ?? list[0]?.id ?? null);
+          const general = eligible.find((c) => c.isGeneral);
+          setSelectedCommunityId((prev) => prev ?? general?.id ?? eligible[0]?.id ?? null);
         }
       })
       .catch(() => setMemberCommunities([]))

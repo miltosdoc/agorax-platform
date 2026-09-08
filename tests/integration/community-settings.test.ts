@@ -56,6 +56,7 @@ describe('community settings contract', () => {
       amendmentInclusionThreshold: '0.6',
       maxAmendmentsPerProposal: 8,
       requireGovgrVerification: true,
+      proposalPolicy: 'all_members',
       joinPolicy: 'open',
       memberListVisibility: 'public',
       contentVisibility: 'public',
@@ -85,6 +86,7 @@ describe('community settings contract', () => {
       amendmentInclusionThreshold: '0.6',
       maxAmendmentsPerProposal: -1,
       requireGovgrVerification: false,
+      proposalPolicy: 'all_members',
       joinPolicy: 'open',
       memberListVisibility: 'public',
       contentVisibility: 'public',
@@ -105,7 +107,9 @@ describe('community settings contract', () => {
     expect(sanitizeCommunityUpdateInput({ type: 'managed' }))
       .toEqual({ type: 'managed', governanceModel: 'admin_team' });
     expect(sanitizeCommunityUpdateInput({ type: 'autonomous' }))
-      .toEqual({ type: 'autonomous', governanceModel: 'no_admin' });
+      // Turning autonomous dissolves the admin team, so a restriction that
+      // named it is cleared in the same patch rather than left dangling.
+      .toEqual({ type: 'autonomous', governanceModel: 'no_admin', proposalPolicy: 'all_members' });
     expect(sanitizeCommunityUpdateInput({ governanceModel: 'admin_team' })).toEqual({});
   });
 

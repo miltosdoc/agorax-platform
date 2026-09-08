@@ -8,6 +8,7 @@ import type { Express, Request, Response } from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
 import { isThumbnailKey } from '../../shared/thumbnails';
+import { canSubmitProposal, effectiveProposalPolicy } from '../../shared/community-settings';
 import { db, voteDb } from '../db';
 import { awardPoints } from '../economy/points';
 import { eq, and, desc, sql, inArray, or, count } from 'drizzle-orm';
@@ -141,6 +142,32 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch proposals" });
     }
   });
+  /**
+   * May this member put a proposal into this community?
+   *
+   * A managed community can reserve proposal-writing for its admin team or
+   * for the founder alone. Nothing else narrows: the same member still
+   * debates, amends and votes on whatever is proposed.
+   *
+   * Returns null when allowed, or the message to refuse with.
+   */
+  const proposalGate = async (communityId: number, userId: number): Promise<string | null> => {
+    const community = await communityRepo.getCommunity(communityId);
+    if (!community) return "Community not found";
+    const policy = effectiveProposalPolicy(community as any);
+    if (policy === 'all_members') return null;
+    const role = await communityRepo.getCommunityMemberRole(communityId, userId);
+    const allowed = canSubmitProposal({
+      policy,
+      role,
+      isCreator: (community as any).creatorId === userId,
+    });
+    if (allowed) return null;
+    return policy === 'founder'
+      ? "Only the founder may submit proposals in this community"
+      : "Only the founder and administrators may submit proposals in this community";
+  };
+
   app.post("/api/communities/:communityId/proposals", requireAuth, requireConsent, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.communityId);
@@ -150,6 +177,8 @@ export function registerProposalsRoutes(app: Express): void {
       if (!isMember) {
         return res.status(403).json({ message: "Must be a community member to submit proposals" });
       }
+      const gate = await proposalGate(communityId, userId);
+      if (gate) return res.status(403).json({ message: gate });
       const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions, thumbnailKey } = req.body;
       if (!question || !solution) {
         return res.status(400).json({ message: "Question and solution are required" });
@@ -328,6 +357,11 @@ export function registerProposalsRoutes(app: Express): void {
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
       if (proposal.authorId !== req.user.id) return res.status(403).json({ message: "Not the author" });
       if (proposal.status !== 'draft') return res.status(409).json({ message: "Already submitted" });
+      // Re-checked here and not only on create: a draft written while anyone
+      // could propose must not become submittable after the community closed
+      // proposal-writing.
+      const submitGate = await proposalGate(proposal.communityId, req.user.id);
+      if (submitGate) return res.status(403).json({ message: submitGate });
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
       const { storage: storageInstance } = await import('../storage');
 

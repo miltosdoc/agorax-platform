@@ -277,6 +277,10 @@ export const communities = pgTable("communities", {
   // Apply-to-join policy: 'open' adds members directly, 'approval' creates a
   // pending community_join_requests row, 'invite_only' rejects unsolicited
   // applications outright — the only way in is a community_invites token.
+  // Who may submit a proposal: all_members | admins | founder (migration 0049).
+  // Only the submission is gated — forum, deliberation, amendments and voting
+  // stay open to every member whatever this says.
+  proposalPolicy: text("proposal_policy").notNull().default("all_members"),
   joinPolicy: text("join_policy").notNull().default("open"),
 
   // Visibility toggles ('public' | 'members'). The community row itself

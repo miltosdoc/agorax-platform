@@ -1,4 +1,5 @@
 import type { Community, Proposal } from './schema';
+import { canSubmitProposal, effectiveProposalPolicy, type CommunityProposalPolicy } from './community-settings';
 
 export type CommunityUserRole = 'founder' | 'admin' | 'member' | string | undefined;
 
@@ -20,6 +21,14 @@ export interface CommunitySummary {
   memberCount: number;
   currentUserRole?: string;
   canManageSettings: boolean;
+  /** Who may submit proposals here — always 'all_members' when autonomous. */
+  proposalPolicy: CommunityProposalPolicy;
+  /**
+   * Whether THIS viewer may submit one. The client hides the compose action
+   * on this rather than re-deriving the rule, so the page and the server
+   * cannot disagree about who is allowed.
+   */
+  viewerCanPropose: boolean;
   proposals: CommunityProposalSummary[];
 }
 
@@ -80,8 +89,16 @@ export function buildCommunitySummary(
   proposals: Pick<Proposal, 'id' | 'question' | 'status' | 'authorId' | 'createdAt'>[],
   memberCount: number,
   currentUserRole?: string,
+  viewerId?: number,
 ): CommunitySummary {
   const permissions = getCommunitySummaryPermissions(currentUserRole);
+  const proposalPolicy = effectiveProposalPolicy(community as any);
+  // A member of some kind is a precondition; the policy narrows from there.
+  const viewerCanPropose = Boolean(currentUserRole) && canSubmitProposal({
+    policy: proposalPolicy,
+    role: currentUserRole,
+    isCreator: viewerId !== undefined && (community as any).creatorId === viewerId,
+  });
   const normalizedCommunity = {
     ...community,
     governanceModel: getGovernanceTranslationKey(community.type),
@@ -93,6 +110,8 @@ export function buildCommunitySummary(
     memberCount,
     currentUserRole,
     canManageSettings: permissions.canManageSettings,
+    proposalPolicy,
+    viewerCanPropose,
     proposals: proposals.map(mapProposalToCommunitySummary),
   };
 }

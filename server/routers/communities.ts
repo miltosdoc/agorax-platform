@@ -20,7 +20,10 @@ import {
   users,
   castProposalVoteSchema,
 } from '@shared/schema';
-import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommunityRanges } from '@shared/community-settings';
+import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommunityRanges,
+  canSubmitProposal,
+  effectiveProposalPolicy,
+} from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
 import {
   isActiveGovernableSettingKey,
@@ -118,18 +121,20 @@ export function registerCommunitiesRoutes(app: Express): void {
       // Which of these the viewer belongs to. One query for the whole list —
       // the rails ask "my communities" of this same response rather than
       // calling isCommunityMember once per row.
-      const memberOf = userId
-        ? new Set(
-            (await db
-              .select({ communityId: communityMembers.communityId })
-              .from(communityMembers)
-              .where(and(
-                eq(communityMembers.userId, userId),
-                inArray(communityMembers.communityId, ids),
-              ))
-            ).map((r) => r.communityId),
-          )
-        : new Set<number>();
+      // The role comes back with the membership, not from a second pass:
+      // the proposal policy needs it, and one query per row would turn the
+      // directory into N queries.
+      const viewerMemberRows = userId
+        ? await db
+            .select({ communityId: communityMembers.communityId, role: communityMembers.role })
+            .from(communityMembers)
+            .where(and(
+              eq(communityMembers.userId, userId),
+              inArray(communityMembers.communityId, ids),
+            ))
+        : [];
+      const roleOf = new Map(viewerMemberRows.map((r) => [r.communityId, r.role ?? 'member']));
+      const memberOf = new Set(viewerMemberRows.map((r) => r.communityId));
 
       // Members-only content stays out of the public directory: the row is
       // listed (name, description, member count), but proposal teasers are
@@ -142,6 +147,13 @@ export function registerCommunitiesRoutes(app: Express): void {
         proposalCount: proposalCounts.get(c.id) ?? 0,
         savedByViewer: savedIds.has(c.id),
         viewerIsMember: memberOf.has(c.id),
+        // So the compose picker can leave out communities that would refuse
+        // the proposal after it was written.
+        viewerCanPropose: memberOf.has(c.id) && canSubmitProposal({
+          policy: effectiveProposalPolicy(c as any),
+          role: roleOf.get(c.id),
+          isCreator: (c as any).creatorId === userId,
+        }),
         contentHidden: !visibleContent.has(c.id),
         latestProposal: visibleContent.has(c.id) && latestByCommunity.get(c.id)
           ? {
@@ -202,7 +214,7 @@ export function registerCommunitiesRoutes(app: Express): void {
         (p) => p.status !== 'draft' || p.authorId === req.user?.id,
       );
       res.json({
-        ...buildCommunitySummary(community, visibleProposals, members.length, currentUserRole),
+        ...buildCommunitySummary(community, visibleProposals, members.length, currentUserRole, req.user?.id),
         contentHidden: !canViewContent,
       });
     } catch (error) {

@@ -298,6 +298,11 @@ export default function CommunityDashboardPage() {
 
   const adminCount = Array.isArray(community.adminIds) ? (community.adminIds as number[]).length : 0;
 
+  // Both come from the server's summary rather than being re-derived here, so
+  // the button and the route that refuses it can never disagree.
+  const viewerCanPropose = !!summary?.viewerCanPropose;
+  const proposalPolicy = summary?.proposalPolicy ?? 'all_members';
+
   // The join control lives with the page (it owns joinState), but the comps
   // put it at the foot of the identity card, so it is handed to the rail.
   const joinAction = user && !isMember && community.joinPolicy !== 'invite_only' && joinState !== 'pending' ? (
@@ -306,11 +311,21 @@ export default function CommunityDashboardPage() {
         ? (t('community.apply_to_join') || 'Apply to join')
         : (t('community.join') || 'Join')}
     </Button>
-  ) : user && isMember ? (
+  ) : user && isMember && viewerCanPropose ? (
     <Button size="sm" className="w-full" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
       <Plus className="w-4 h-4 mr-2" />
       {t('home.submitProposal')}
     </Button>
+  ) : user && isMember ? (
+    // A member who cannot propose is still a full member: the forum, the
+    // debate and the ballot are all open to them. Saying who may propose,
+    // rather than showing nothing, keeps that legible instead of looking
+    // like a page that failed to load a button.
+    <p className="text-xs leading-relaxed text-ink-faint" data-testid="community-propose-restricted">
+      {proposalPolicy === 'founder'
+        ? t('community.proposeFounderOnly')
+        : t('community.proposeAdminsOnly')}
+    </p>
   ) : undefined;
 
   return (

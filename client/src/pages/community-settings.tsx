@@ -24,6 +24,7 @@ import type { Community } from '@shared/schema';
 import type { CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
 import { useAuth } from '@/hooks/use-auth';
+import { type CommunityProposalPolicy, effectiveProposalPolicy } from '@shared/community-settings';
 
 interface CommunitySettingsForm {
   name: string;
@@ -38,6 +39,7 @@ interface CommunitySettingsForm {
   amendmentThreshold: string;
   amendmentInclusionThreshold: string;
   maxAmendmentsPerProposal: number;
+  proposalPolicy: CommunityProposalPolicy;
   joinPolicy: CommunityJoinPolicy;
   memberListVisibility: CommunityVisibilityLevel;
   contentVisibility: CommunityVisibilityLevel;
@@ -65,6 +67,7 @@ function toForm(community: Community): CommunitySettingsForm {
     amendmentThreshold: String(community.amendmentThreshold ?? '0.5'),
     amendmentInclusionThreshold: String((community as any).amendmentInclusionThreshold ?? '0.6'),
     maxAmendmentsPerProposal: community.maxAmendmentsPerProposal ?? -1,
+    proposalPolicy: effectiveProposalPolicy(community as any),
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
     memberListVisibility: ((community as any).memberListVisibility as CommunityVisibilityLevel) || 'public',
     contentVisibility: ((community as any).contentVisibility as CommunityVisibilityLevel) || 'public',
@@ -212,6 +215,54 @@ export default function CommunitySettingsPage() {
                     <h2 className="text-lg font-semibold">{t('community.settings_governance')}</h2>
                     <p className="text-sm text-muted-foreground">{t('community.settings_governance_help')}</p>
                   </div>
+
+                  {/* Managed only: an autonomous community has no admin team to
+                      reserve anything for, so the choice would be a fiction. */}
+                  {form.type === 'managed' && (
+                    <div className="space-y-4 rounded-sm border border-line p-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-ink">{t('community.proposal_policy_label')}</h3>
+                        <p className="mt-1 text-xs leading-relaxed text-ink-soft">{t('community.proposal_policy_help')}</p>
+                      </div>
+
+                      <div className="flex items-start justify-between gap-4">
+                        <Label htmlFor="membersMayPropose" className="flex-1 cursor-pointer font-normal">
+                          <span className="block text-sm text-ink">{t('community.proposal_policy_members')}</span>
+                          <span className="mt-0.5 block text-xs text-ink-faint">{t('community.proposal_policy_members_help')}</span>
+                        </Label>
+                        <Switch
+                          id="membersMayPropose"
+                          data-testid="toggle-members-propose"
+                          checked={form.proposalPolicy === 'all_members'}
+                          onCheckedChange={(on) => update('proposalPolicy', on ? 'all_members' : 'admins')}
+                        />
+                      </div>
+
+                      {/* Only meaningful while members are excluded: if everyone
+                          may propose, so may the admins, and a switch that
+                          changed nothing would be a lie. */}
+                      {form.proposalPolicy !== 'all_members' && (
+                        <div className="flex items-start justify-between gap-4 border-t border-line pt-4">
+                          <Label htmlFor="adminsMayPropose" className="flex-1 cursor-pointer font-normal">
+                            <span className="block text-sm text-ink">{t('community.proposal_policy_admins')}</span>
+                            <span className="mt-0.5 block text-xs text-ink-faint">{t('community.proposal_policy_admins_help')}</span>
+                          </Label>
+                          <Switch
+                            id="adminsMayPropose"
+                            data-testid="toggle-admins-propose"
+                            checked={form.proposalPolicy === 'admins'}
+                            onCheckedChange={(on) => update('proposalPolicy', on ? 'admins' : 'founder')}
+                          />
+                        </div>
+                      )}
+
+                      {form.proposalPolicy !== 'all_members' && (
+                        <p className="rounded-sm bg-warn-wash px-3 py-2 text-xs leading-relaxed text-warn" data-testid="proposal-policy-warning">
+                          {t('community.proposal_policy_cost')}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">

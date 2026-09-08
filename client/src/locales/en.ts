@@ -1434,6 +1434,17 @@ const en: TranslationDictionary = {
   'community.pending_requests_title':'Pending join requests',
   'community.pending_requests_count': 'pending',
   'community.join_policy_label': 'Join policy',
+
+  // Who may submit a proposal (managed communities only)
+  'community.proposal_policy_label': 'Who may submit proposals',
+  'community.proposal_policy_help': 'This narrows only the writing of proposals. Every member keeps the forum, the deliberation, amendments and the vote whatever you choose here.',
+  'community.proposal_policy_members': 'Members may submit proposals',
+  'community.proposal_policy_members_help': 'Anyone who has joined can put an issue to the community.',
+  'community.proposal_policy_admins': 'Administrators may submit proposals',
+  'community.proposal_policy_admins_help': 'Turn this off to leave proposals to the founder alone.',
+  'community.proposal_policy_cost': 'Restricting who may propose concentrates the agenda in fewer hands, and lowers this community\u2019s democracy score. Members can see the score and what it costs.',
+  'community.proposeFounderOnly': 'Only the founder submits proposals in this community. You can still take part in the forum, the deliberation and every vote.',
+  'community.proposeAdminsOnly': 'The founder and administrators submit proposals in this community. You can still take part in the forum, the deliberation and every vote.',
   'community.join_policy_help': 'How prospective members get into the community.',
   'community.join_policy_open': 'Open — anyone can join',
   'community.join_policy_approval': 'Approval — admins approve each request',
