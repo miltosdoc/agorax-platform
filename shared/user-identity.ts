@@ -101,15 +101,22 @@ export function publicLabel(user: { name?: string | null; username?: string | nu
 }
 
 /**
- * The handle shown beside the name where attribution matters.
+ * The handle shown beside the name, or null when it would add nothing.
  *
  * Names are not unique and the platform does not make them so. Two members
  * called Γιώργος Παπαδόπουλος next to two different positions is a real
  * problem on a page whose purpose is attributing arguments, so the unique
- * handle rides along wherever the label is doing identification rather than
- * decoration.
+ * handle rides along where the label is identifying rather than decorating.
+ *
+ * It is suppressed when it is merely the name with the spaces taken out,
+ * which is exactly what Google sign-up generates: rendering
+ * "sokratis panagopoulos @sokratispanagopoulos" tells the reader nothing
+ * twice. A handle earns its place by distinguishing someone.
  */
-export function publicHandle(user: { username?: string | null } | null | undefined): string | null {
+export function publicHandle(user: { name?: string | null; username?: string | null } | null | undefined): string | null {
   const username = user?.username?.trim();
-  return username ? `@${username}` : null;
+  if (!username) return null;
+  const squashed = user?.name?.trim().toLowerCase().replace(/\s+/g, '');
+  if (squashed && squashed === username.toLowerCase()) return null;
+  return `@${username}`;
 }

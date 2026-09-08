@@ -34,6 +34,7 @@ import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
 import { ORDERED_STATES } from '@/lib/proposal-status';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
+import { publicHandle } from '@shared/user-identity';
 
 type SortOption = 'created_desc' | 'created_asc' | 'score_desc' | 'score_asc';
 
@@ -328,8 +329,10 @@ export default function ProposalsPage() {
                       <span>
                         {t('proposal.by')}{' '}
                         {proposal.authorName ?? proposal.authorUsername ?? t('proposal.userWithId', { id: proposal.authorId })}
-                        {proposal.authorUsername && proposal.authorName && (
-                          <span className="ml-1 text-ink-faint">@{proposal.authorUsername}</span>
+                        {publicHandle({ name: proposal.authorName, username: proposal.authorUsername }) && (
+                          <span className="ml-1.5 text-ink-faint">
+                            {publicHandle({ name: proposal.authorName, username: proposal.authorUsername })}
+                          </span>
                         )}
                       </span>
                       {score !== null && (

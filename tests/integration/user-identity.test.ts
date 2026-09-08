@@ -120,6 +120,18 @@ describe('the handle shown beside the name', () => {
     expect(publicHandle({ username: 'miltos' })).toBe('@miltos');
   });
 
+  it('is suppressed when it is just the name with the spaces removed', () => {
+    // What Google sign-up generates. Showing both would tell the reader the
+    // same thing twice; a handle earns its place by distinguishing someone.
+    expect(publicHandle({ name: 'sokratis panagopoulos', username: 'sokratispanagopoulos' })).toBeNull();
+    expect(publicHandle({ name: 'Sokratis Panagopoulos', username: 'sokratispanagopoulos' })).toBeNull();
+  });
+
+  it('is shown when it actually distinguishes', () => {
+    expect(publicHandle({ name: 'Γιώργος Παπαδόπουλος', username: 'gpapa' })).toBe('@gpapa');
+    expect(publicHandle({ name: 'sokratis panagopoulos', username: 'sokratispanagopoulos2' })).toBe('@sokratispanagopoulos2');
+  });
+
   it('is absent rather than empty when there is none', () => {
     // Names are not unique, so the handle is what separates two members who
     // share one; a caller must be able to tell it is missing.
