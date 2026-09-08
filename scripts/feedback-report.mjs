@@ -47,6 +47,42 @@ const STATUS = {
   noise: { label: '⚪ Εκτός', rank: 4 },
 };
 
+// ── Διαλογή από τη σελίδα ────────────────────────────────────────────────────
+// Το TRIAGE παρακάτω ήταν επί χρόνια το μόνο σημείο που γραφόταν με το χέρι:
+// για να μπει μια καινούργια καταχώρηση σε θέμα, έπρεπε να ανοίξει κανείς
+// αυτό το αρχείο. Πλέον ο διαχειριστής κάνει την ίδια δουλειά μέσα από το
+// /admin/feedback-review, και η επιλογή του γράφεται στο feedback/triage.json.
+//
+// Το αρχείο κρατάει τρία πράγματα ανά καταχώρηση: σε ποια θέματα ανήκει, τι
+// προτεραιότητα της έδωσε ο διαχειριστής, και ποιος το έκανε πότε. Κρατάει
+// επίσης όσα θέματα φτιάχτηκαν από τη σελίδα, γιατί μια νέα αναφορά συχνά δεν
+// χωράει σε κανένα από τα υπάρχοντα.
+//
+// Ό,τι λέει το αρχείο υπερισχύει του TRIAGE για το ίδιο κλειδί — ώστε μια
+// διόρθωση από τη σελίδα να μη γυρίζει πίσω στην επόμενη νυχτερινή παραγωγή.
+const PRIO = {
+  1: { label: 'Άμεσα', short: 'Π1' },
+  2: { label: 'Σε σειρά', short: 'Π2' },
+  3: { label: 'Αργότερα', short: 'Π3' },
+};
+const STORE_FILE = 'triage.json';
+const STORE = (() => {
+  const empty = { entries: {}, topics: {} };
+  const f = path.join(DIR, STORE_FILE);
+  if (!fs.existsSync(f)) return empty;
+  try {
+    const p = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return {
+      entries: (p && typeof p.entries === 'object' && p.entries) || {},
+      topics: (p && typeof p.topics === 'object' && p.topics) || {},
+    };
+  } catch {
+    // Χαλασμένο αρχείο δεν ρίχνει την παραγωγή: γυρνάμε στη διαλογή του
+    // script, που είναι πάντα συντακτικά έγκυρη γιατί ζει μέσα στον κώδικα.
+    return empty;
+  }
+})();
+
 // ── Topics ───────────────────────────────────────────────────────────────────
 // slug: [label, theme, status, note?]
 const TOPICS = {
@@ -176,6 +212,15 @@ const TOPICS = {
   junk: ['Δοκιμαστική καταχώρηση', 'NOISE', 'noise'],
 };
 
+// Θέματα που έφτιαξε ο διαχειριστής από τη σελίδα. Μπαίνουν δίπλα στα
+// παραπάνω και συμπεριφέρονται ολόιδια· η μόνη διαφορά είναι ότι ζουν στο
+// triage.json αντί για εδώ, γιατί κανείς δεν θα άνοιγε το script στις 11 το
+// βράδυ για να καταχωρήσει ένα καινούργιο αίτημα.
+for (const [slug, t] of Object.entries(STORE.topics)) {
+  if (TOPICS[slug] || !t || !t.label || !THEMES[t.theme]) continue;
+  TOPICS[slug] = [String(t.label), t.theme, STATUS[t.status] ? t.status : 'open', t.note ? String(t.note) : undefined];
+}
+
 // ── Triage: createdAt (μέχρι δευτερόλεπτο) → topics ──────────────────────────
 const TRIAGE = {
   '2026-07-03T07:13:51': ['ai-amendment-writing'],
@@ -282,9 +327,24 @@ const TRIAGE = {
   '2026-08-13T06:38:10': ['counter-proposal-regression'],
 };
 
+// Η διαλογή που ισχύει πραγματικά: ό,τι όρισε ο διαχειριστής από τη σελίδα,
+// αλλιώς ό,τι λέει το TRIAGE. Άδεια λίστα από τη σελίδα σημαίνει «το ξε-όρισα»
+// και το στέλνει πίσω στα αδιαλογάριαστα — γι' αυτό ελέγχουμε Array.isArray
+// και όχι απλώς αν υπάρχει κάτι.
+const adminTopics = key => {
+  const rec = STORE.entries[key];
+  return Array.isArray(rec?.topics) ? rec.topics.filter(s => TOPICS[s]) : null;
+};
+const topicsFor = key => adminTopics(key) ?? TRIAGE[key] ?? null;
+const prioOf = key => (PRIO[STORE.entries[key]?.prio] ? STORE.entries[key].prio : 0);
+const triagedBy = key => STORE.entries[key] || null;
+
 // ── Load ─────────────────────────────────────────────────────────────────────
 const entries = fs.readdirSync(DIR)
-  .filter(f => f.endsWith('.json'))
+  // Ο φάκελος κρατάει και το triage.json, που δεν είναι καταχώρηση αλλά η
+  // διαλογή του διαχειριστή: χωρίς αυτή την εξαίρεση περνούσε ως
+  // ανατροφοδότηση χωρίς createdAt και έριχνε ολόκληρη την παραγωγή.
+  .filter(f => f.endsWith('.json') && f !== STORE_FILE)
   .map(f => {
     const j = JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8'));
     return { file: f, key: (j.createdAt || '').slice(0, 19), ...j };
@@ -297,8 +357,11 @@ const when = e => (e.createdAt || '').slice(0, 10);
 const untriaged = [];
 const byTopic = new Map();
 for (const e of entries) {
-  const slugs = TRIAGE[e.key];
-  if (!slugs) { untriaged.push(e); continue; }
+  const slugs = topicsFor(e.key);
+  // Άγνωστο slug από το TRIAGE είναι λάθος του κώδικα και πρέπει να ουρλιάξει.
+  // Από το triage.json όμως το έχει ήδη κόψει το adminTopics(): εκεί ένα slug
+  // που έσβησε από το TOPICS σημαίνει απλώς παλιά διαλογή, όχι σφάλμα.
+  if (!slugs || !slugs.length) { untriaged.push(e); continue; }
   for (const s of slugs) {
     if (!TOPICS[s]) throw new Error(`Άγνωστο topic "${s}" στο ${e.file}`);
     if (!byTopic.has(s)) byTopic.set(s, []);
@@ -336,6 +399,28 @@ for (const [u, n] of perUser) L.push(`| ${u} | ${n} | ${Math.round(n / entries.l
 L.push('');
 L.push(`> Οι μισές καταχωρήσεις προέρχονται από έναν χρήστη. Ό,τι αναφέρεται από **πολλούς διαφορετικούς** ανθρώπους αξίζει βαρύτερα από ό,τι αναφέρεται πολλές φορές από τον ίδιο — γι' αυτό η κατάταξη παρακάτω μετράει διακριτούς αναφέροντες.`);
 L.push('');
+
+// Χειροκίνητη προτεραιότητα — πρώτο πράγμα στην αναφορά, γιατί είναι το μόνο
+// κομμάτι της που είναι απόφαση και όχι μέτρηση.
+const flaggedEntries = entries.filter(e => prioOf(e.key))
+  .sort((a, b) => prioOf(a.key) - prioOf(b.key) || (a.createdAt || '').localeCompare(b.createdAt || ''));
+if (flaggedEntries.length) {
+  const cell = t => String(t).replace(/\s+/g, ' ').replace(/\|/g, '\\|').trim();
+  L.push('## Προτεραιότητα κατά τον διαχειριστή');
+  L.push('');
+  L.push('Ορισμένη ανά καταχώρηση μέσα από το `/admin/feedback-review`, όχι από την κατάταξη ζήτησης.');
+  L.push('');
+  L.push('| # | Ανατροφοδότηση | Θέμα | Από | Διαλογή |');
+  L.push('| --- | --- | --- | --- | --- |');
+  for (const e of flaggedEntries) {
+    const lv = prioOf(e.key);
+    const msg = cell(e.message || '');
+    const topics = (topicsFor(e.key) || []).map(s => TOPICS[s][0]).join(' · ');
+    L.push(`| ${PRIO[lv].short} ${PRIO[lv].label} | ${msg.length > 90 ? msg.slice(0, 90) + '…' : msg} `
+      + `| ${cell(topics) || '—'} | ${cell(who(e))} | ${cell(triagedBy(e.key)?.by || '—')} |`);
+  }
+  L.push('');
+}
 
 // Κατάταξη
 L.push('## Τι ζητήθηκε περισσότερο');
@@ -473,8 +558,10 @@ const activity = [];
   }
 }
 
+// Το key (createdAt μέχρι δευτερόλεπτο) είναι η διεύθυνση της καταχώρησης: με
+// αυτό η σελίδα λέει στον διακομιστή ποια ακριβώς διαλογεί.
 const publicEntry = e => ({
-  date: when(e), who: whoPublic(e), page: e.page || '', shot: e.screenshot || '',
+  key: e.key, date: when(e), who: whoPublic(e), page: e.page || '', shot: e.screenshot || '',
   message: (e.message || '').trim(),
 });
 
@@ -492,14 +579,19 @@ const payload = {
   statuses: Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v.label])),
   reporters: perUser.map(([u, n]) => ({ name: u === '«<redacted-email>»' ? 'χρήστης χωρίς λογαριασμό' : u, n })),
   activity,
-  topics: ranked.concat(slugs.filter(s => TOPICS[s][2] === 'noise')).map(s => ({
-    slug: s, label: TOPICS[s][0], theme: TOPICS[s][1], status: TOPICS[s][2], note: TOPICS[s][3] || '',
-    reporters: [...new Set(byTopic.get(s).map(whoPublic))],
-    entries: byTopic.get(s).map(publicEntry),
-  })),
-  // Η σελίδα τα έδειχνε ποτέ: μόνο το REVIEW.md. Με ημερήσιο cron οι νέες
-  // καταχωρήσεις είναι ακριβώς αυτές που θέλει κανείς να δει, οπότε μπαίνουν.
-  untriaged: untriaged.map(publicEntry),
+  // Η σελίδα δεν παίρνει πια έτοιμη ομαδοποίηση: παίρνει τις καταχωρήσεις
+  // επίπεδα, τη διαλογή του script και τη διαλογή του διαχειριστή, και τις
+  // ομαδοποιεί μόνη της με τον ίδιο κανόνα. Έτσι, μόλις ο διαχειριστής βάλει
+  // μια καταχώρηση σε θέμα, μετακομίζει μπροστά στα μάτια του αντί να περιμένει
+  // τη νυχτερινή παραγωγή — και η σελίδα δεν μπορεί να διαφωνήσει με το
+  // REVIEW.md, γιατί ο κανόνας είναι γραμμένος μία φορά.
+  allEntries: entries.map(publicEntry),
+  baseTriage: Object.fromEntries(entries.map(e => [e.key, TRIAGE[e.key]]).filter(([, v]) => v)),
+  store: STORE.entries,
+  topicMeta: Object.fromEntries(Object.entries(TOPICS).map(([slug, t]) => (
+    [slug, { label: t[0], theme: t[1], status: t[2], note: t[3] || '' }]
+  ))),
+  prioLabels: PRIO,
   thumbs,
 };
 
@@ -686,6 +778,44 @@ input[type=search]:focus-visible,select:focus-visible,button:focus-visible{outli
   margin:0 0 10px; padding:10px 14px; border-left:3px solid var(--kyanos);
   background:var(--kyanos-wash); border-radius:0 var(--radius) var(--radius) 0; font-size:.86rem;
 }
+/* Χειροκίνητη προτεραιότητα: η σημαία μπαίνει και ως χρωματιστή ράβδος στο
+   αριστερό χείλος της κάρτας, ώστε τα καρφιτσωμένα θέματα να ξεχωρίζουν με το
+   μάτι μέσα σε μια στήλη από δεκάδες. */
+.card[data-prio]{border-left:3px solid var(--pc)}
+.card[data-prio="1"]{--pc:#A11B1B}
+.card[data-prio="2"]{--pc:#8A5A00}
+.card[data-prio="3"]{--pc:#5B6470}
+.prio-flag{
+  font-size:.7rem; font-weight:600; white-space:nowrap; color:#fff;
+  background:var(--pc); border-radius:var(--radius); padding:2px 7px;
+}
+.tri{
+  margin:10px 0 2px; padding:8px 10px; background:var(--sunken);
+  border:1px solid var(--line); border-radius:var(--radius); font-size:.76rem;
+}
+.tri-row{display:flex; flex-wrap:wrap; gap:5px 7px; align-items:center}
+.tri-row + .tri-row{margin-top:6px}
+.tri-h{color:var(--ink-faint); font-weight:600; min-width:5.5rem}
+.tri button,.tri select,.tri input{
+  font:inherit; padding:2px 8px; border-radius:var(--radius);
+  border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-soft);
+}
+.tri button{cursor:pointer}
+.tri button:hover{border-color:var(--kyanos); color:var(--kyanos)}
+.tri [data-eprio][aria-pressed="true"]{background:var(--kyanos); border-color:var(--kyanos); color:#fff}
+.tri [disabled]{opacity:.5; cursor:progress}
+.tri select{max-width:17rem}
+.tchip{
+  display:inline-flex; align-items:center; gap:3px; padding:1px 3px 1px 8px;
+  background:var(--kyanos-wash); border:1px solid var(--kyanos);
+  color:var(--kyanos-deep); border-radius:var(--radius); font-weight:600;
+}
+.tchip button{border:0; background:none; color:inherit; padding:0 3px; font-size:1rem; line-height:1}
+.tri-none{color:var(--ink-faint); font-style:italic}
+.tri-new{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
+.tri-new input{flex:1 1 14rem}
+.tri-by{color:var(--ink-faint); margin-left:auto}
+.tri-err{display:block; margin-top:6px; color:#A11B1B; font-weight:600}
 .card[open] summary{border-bottom:1px solid var(--line)}
 .body{padding:4px 16px 16px}
 .note{
@@ -835,11 +965,16 @@ const ago = iso => {
   return m <= 1 ? 'πριν έναν μήνα' : 'πριν ' + m + ' μήνες';
 };
 
-document.getElementById('stats').innerHTML = [
-  [D.meta.total, 'καταχωρήσεις'], [D.topics.length, 'θέματα'], [D.meta.users, 'χρήστες'],
-  [D.meta.open, 'ανοιχτά'], [D.meta.done, 'έγιναν'], [D.meta.untriaged, 'αδιαλογάριαστα'],
-  [D.meta.shots, 'στιγμιότυπα'],
-].map(([n, l]) => '<div class="stat"><b class="mono">' + n + '</b><span>' + l + '</span></div>').join('');
+// Τα πλήθη θεμάτων και αδιαλογάριαστων αλλάζουν με κάθε κατάταξη, οπότε τα
+// πλακίδια ξαναγράφονται αντί να ψηθούν μία φορά στην παραγωγή.
+function renderStats() {
+  const st = k => TV.filter(t => t.status === k).length;
+  document.getElementById('stats').innerHTML = [
+    [D.meta.total, 'καταχωρήσεις'], [TV.length, 'θέματα'], [D.meta.users, 'χρήστες'],
+    [st('open'), 'ανοιχτά'], [st('done'), 'έγιναν'], [UN.length, 'αδιαλογάριαστα'],
+    [D.meta.shots, 'στιγμιότυπα'],
+  ].map(([n, l]) => '<div class="stat"><b class="mono">' + n + '</b><span>' + l + '</span></div>').join('');
+}
 
 document.getElementById('generated').textContent =
   'Τελευταία παραγωγή: ' + new Date(D.meta.generatedAt).toLocaleString('el-GR') +
@@ -867,6 +1002,10 @@ let fStatus = 'all', fReporter = 'all', fTheme = 'all', fQuery = '', fFrom = '',
 
 const SORTS = [
   ['demand',  'Ζήτηση, ανά περιοχή', (a, b) => b.people - a.people || b.es.length - a.es.length],
+  // Τα ακαρφίτσωτα πάνε στο 99 ώστε να πέφτουν κάτω από κάθε καρφιτσωμένο,
+  // και μεταξύ τους ξανακρίνονται με ζήτηση.
+  ['priority', 'Χειροκίνητη προτεραιότητα', (a, b) =>
+    (topicPrio(a) || 99) - (topicPrio(b) || 99) || b.people - a.people || b.es.length - a.es.length],
   ['recent',  'Πιο πρόσφατα πρώτα',  (a, b) => b.last.localeCompare(a.last) || b.people - a.people],
   ['oldest',  'Παλαιότερα πρώτα',    (a, b) => a.first.localeCompare(b.first) || b.people - a.people],
   ['reports', 'Περισσότερες αναφορές', (a, b) => b.es.length - a.es.length || b.people - a.people],
@@ -874,14 +1013,105 @@ const SORTS = [
 ];
 const sortFn = () => (SORTS.find(x => x[0] === fSort) || SORTS[0])[2];
 
+// ── Διαλογή: ζωντανή κατάσταση ───────────────────────────────────────────────
+// S είναι η διαλογή του διαχειριστή. Ξεκινάει με ό,τι ήξερε η νυχτερινή
+// παραγωγή και αντικαθίσταται από ό,τι λέει ο διακομιστής μόλις απαντήσει,
+// ώστε δουλειά άλλου διαχειριστή μετά τις 03:20 να μη χαθεί από τα μάτια.
+let S = D.store || {};
+const TM = D.topicMeta;
+
+const effTopics = key => {
+  const rec = S[key];
+  if (Array.isArray(rec?.topics)) return rec.topics.filter(sl => TM[sl]);
+  return D.baseTriage[key] || null;
+};
+const prioOfKey = key => (D.prioLabels[S[key]?.prio] ? S[key].prio : 0);
+// Το 1 είναι το ισχυρότερο, άρα ένα θέμα κληρονομεί την πιο επείγουσα σημαία
+// που κουβαλάει οποιαδήποτε καταχώρησή του.
+const topicPrio = t => (t.es || t.entries).reduce((m, e) => {
+  const l = prioOfKey(e.key);
+  return l && (!m || l < m) ? l : m;
+}, 0);
+
+// Η ομαδοποίηση ξαναγίνεται μετά από κάθε αλλαγή: ο κανόνας είναι ο ίδιος με
+// του script, γραμμένος εδώ μία φορά.
+let TV = [], UN = [];
+function regroup() {
+  const map = new Map();
+  UN = [];
+  for (const e of D.allEntries) {
+    const ts = effTopics(e.key);
+    if (!ts || !ts.length) { UN.push(e); continue; }
+    for (const sl of ts) {
+      if (!TM[sl]) continue;
+      if (!map.has(sl)) map.set(sl, []);
+      map.get(sl).push(e);
+    }
+  }
+  TV = [...map].map(([slug, es]) => ({
+    slug, ...TM[slug], entries: es, reporters: [...new Set(es.map(e => e.who))],
+  }));
+}
+regroup();
+
+const csrf = () => (document.cookie.match(/(?:^|; )agorax_csrf=([^;]*)/) || [, ''])[1];
+
+async function api(url, method, body) {
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': decodeURIComponent(csrf()) },
+    credentials: 'same-origin',
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+// Στέλνει ολόκληρη την εγγραφή της καταχώρησης, όχι διαφορά: ο διακομιστής
+// κρατάει ό,τι του δώσαμε και δεν χρειάζεται να συμφιλιώσει τίποτα.
+async function saveTriage(key, topics, prio) {
+  const data = await api('/api/admin/feedback-triage/' + encodeURIComponent(key), 'PUT', { topics, prio });
+  if (data.entry) S[key] = data.entry; else delete S[key];
+  regroup();
+}
+
+async function createTopic(label, theme) {
+  const data = await api('/api/admin/feedback-topics', 'POST', { label, theme });
+  TM[data.slug] = data.topic;
+  return data.slug;
+}
+
+fetch('/api/admin/feedback-triage', { credentials: 'same-origin' })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    if (!d) return;
+    if (d.topics) Object.assign(TM, d.topics);
+    S = d.entries || {};
+    regroup(); sync(); render();
+  })
+  .catch(() => {});
+
 // ── Έλεγχοι ──────────────────────────────────────────────────────────────────
-const STATUS_ORDER = ['all', 'untriaged', 'decision', 'open', 'partial', 'done', 'noise'];
-const statusLabel = k => k === 'all' ? 'Όλα' : k === 'untriaged' ? 'Αδιαλογάριαστα' : D.statuses[k];
-document.getElementById('statusPills').innerHTML = STATUS_ORDER
-  .filter(k => k !== 'untriaged' || D.untriaged.length)
-  .map(k => '<button class="pill" type="button" data-s="' + k + '" aria-pressed="' + (k === 'all') + '">' +
-    esc(statusLabel(k)) + (k === 'untriaged' ? ' <span class="mono">' + D.untriaged.length + '</span>' : '') +
-    '</button>').join('');
+const STATUS_ORDER = ['all', 'flagged', 'untriaged', 'decision', 'open', 'partial', 'done', 'noise'];
+const statusLabel = k => k === 'all' ? 'Όλα' : k === 'flagged' ? 'Με προτεραιότητα'
+  : k === 'untriaged' ? 'Αδιαλογάριαστα' : D.statuses[k];
+// Το πλήθος των καρφιτσωμένων αλλάζει με κάθε κλικ, οπότε τα pills
+// ξαναγράφονται από τη sync() αντί να ψηθούν μία φορά.
+function renderPills() {
+  // Μετριούνται τα θέματα που όντως φέρουν σημαία, όχι τα κλειδιά του αρχείου:
+  // ένα καρφίτσωμα σε slug που μετονομάστηκε στο TOPICS επιβιώνει στο
+  // priorities.json και θα φούσκωνε τον μετρητή δείχνοντας θέματα που δεν
+  // εμφανίζονται πουθενά.
+  const n = TV.filter(t => topicPrio(t)).length + UN.filter(e => prioOfKey(e.key)).length;
+  document.getElementById('statusPills').innerHTML = STATUS_ORDER
+    .filter(k => (k !== 'untriaged' || UN.length) && (k !== 'flagged' || n))
+    .map(k => '<button class="pill" type="button" data-s="' + k + '" aria-pressed="' + (k === fStatus) + '">' +
+      esc(statusLabel(k)) +
+      (k === 'untriaged' ? ' <span class="mono">' + UN.length + '</span>' : '') +
+      (k === 'flagged' ? ' <span class="mono">' + n + '</span>' : '') +
+      '</button>').join('');
+}
+renderPills();
 document.getElementById('statusPills').addEventListener('click', ev => {
   const b = ev.target.closest('.pill'); if (!b) return;
   fStatus = b.dataset.s;
@@ -893,11 +1123,11 @@ document.getElementById('sort').innerHTML = SORTS
 document.getElementById('sort').addEventListener('change', e => { fSort = e.target.value; render(); });
 
 document.getElementById('theme').innerHTML = '<option value="all">Όλες οι περιοχές</option>' +
-  D.themeOrder.filter(th => D.topics.some(t => t.theme === th))
+  D.themeOrder.filter(th => TV.some(t => t.theme === th))
     .map(th => '<option value="' + th + '">' + esc(D.themes[th]) + '</option>').join('');
 document.getElementById('theme').addEventListener('change', e => { fTheme = e.target.value; render(); });
 
-const names = [...new Set(D.topics.flatMap(t => t.reporters).concat(D.untriaged.map(e => e.who)))]
+const names = [...new Set(D.allEntries.map(e => e.who))]
   .sort((a, b) => a.localeCompare(b, 'el'));
 document.getElementById('reporter').innerHTML = '<option value="all">Όλοι οι αναφέροντες</option>' +
   names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
@@ -954,8 +1184,9 @@ document.getElementById('weeks').addEventListener('click', ev => {
 });
 
 function sync() {
-  document.querySelectorAll('#statusPills .pill').forEach(p =>
-    p.setAttribute('aria-pressed', String(p.dataset.s === fStatus)));
+  // Ξαναγράφει και τα pills: το πλήθος των καρφιτσωμένων αλλάζει με το κλικ,
+  // και το ίδιο το «Με προτεραιότητα» εμφανίζεται μόλις υπάρξει το πρώτο.
+  renderPills();
   document.querySelectorAll('#presets .pill').forEach(p =>
     p.setAttribute('aria-pressed', String(fTo === today() && fFrom === shift(today(), 1 - Number(p.dataset.d)))));
   document.querySelectorAll('.wk').forEach(p =>
@@ -979,11 +1210,14 @@ function entryPass(e, labelHit) {
 function visibleTopics() {
   if (fStatus === 'untriaged') return [];
   const out = [];
-  for (const t of D.topics) {
-    if (fStatus !== 'all' && t.status !== fStatus) continue;
+  for (const t of TV) {
+    if (fStatus !== 'all' && fStatus !== 'flagged' && t.status !== fStatus) continue;
     if (fTheme !== 'all' && t.theme !== fTheme) continue;
     const labelHit = fQuery ? (t.label + ' ' + t.note).toLowerCase().includes(fQuery) : false;
-    const es = t.entries.filter(e => entryPass(e, labelHit));
+    let es = t.entries.filter(e => entryPass(e, labelHit));
+    // Στο «Με προτεραιότητα» κρατάμε μόνο τις σημαιοδοτημένες καταχωρήσεις:
+    // αλλιώς ένα θέμα με μία επείγουσα αναφορά θα εμφάνιζε και τις άλλες δέκα.
+    if (fStatus === 'flagged') es = es.filter(e => prioOfKey(e.key));
     if (!es.length) continue;
     const ds = es.map(e => e.date).slice().sort();
     out.push({ ...t, es, first: ds[0], last: ds[ds.length - 1], people: new Set(es.map(e => e.who)).size });
@@ -1002,7 +1236,7 @@ function entryHTML(e) {
     '<p class="quote">' + esc(e.message) + '</p>' +
     (e.shot && D.thumbs[e.shot]
       ? '<figure class="shot"><img loading="lazy" alt="Στιγμιότυπο από ' + esc(e.who) + '" src="' + D.thumbs[e.shot] + '"><figcaption>Στιγμιότυπο που επισύναψε ο χρήστης</figcaption></figure>'
-      : '') + '</div>';
+      : '') + triageHTML(e) + '</div>';
 }
 
 function topicHTML(t, withTheme) {
@@ -1010,8 +1244,13 @@ function topicHTML(t, withTheme) {
     ? t.es.slice().sort((a, b) => b.date.localeCompare(a.date))
     : t.es.slice().sort((a, b) => a.date.localeCompare(b.date));
   const span = t.first === t.last ? fmt(t.first) : 'από ' + fmt(t.first) + ' έως ' + fmt(t.last);
-  return '<details class="card" style="--sc:var(' + SC[t.status] + ')"' + (narrowed() && es.length <= 4 ? ' open' : '') +
+  const lv = topicPrio(t);
+  return '<details class="card" data-slug="' + esc(t.slug) + '" style="--sc:var(' + SC[t.status] + ')"' +
+    (lv ? ' data-prio="' + lv + '"' : '') +
+    (narrowed() && es.length <= 4 ? ' open' : '') +
     '><summary><span class="t-label">' + esc(t.label) + '</span>' +
+    (lv ? '<span class="prio-flag" title="Η ισχυρότερη σημαία που έχει καταχώρηση αυτού του θέματος">' +
+      esc(D.prioLabels[lv].short + ' ' + D.prioLabels[lv].label) + '</span>' : '') +
     (withTheme ? '<span class="chip">' + esc(D.themes[t.theme]) + '</span>' : '') +
     '<span class="t-status">' + esc(D.statuses[t.status]) + '</span>' +
     '<span class="t-meta mono">' + t.people + ' άτομα · ' + es.length + ' αναφ.</span>' +
@@ -1021,12 +1260,141 @@ function topicHTML(t, withTheme) {
     es.map(entryHTML).join('') + '</div></details>';
 }
 
+// ── Ο διαλογέας μιας καταχώρησης ─────────────────────────────────────────────
+// Κρέμεται κάτω από κάθε σχόλιο, και στα θέματα και στα αδιαλογάριαστα: η
+// διαλογή γίνεται εκεί που διαβάζεις τα λόγια του χρήστη, όχι σε άλλη οθόνη.
+let newTopicFor = null;
+
+const topicOptions = () => D.themeOrder.map(th => {
+  const os = Object.keys(TM).filter(sl => TM[sl].theme === th)
+    .sort((a, b) => TM[a].label.localeCompare(TM[b].label, 'el'))
+    .map(sl => '<option value="' + esc(sl) + '">' + esc(TM[sl].label) + '</option>').join('');
+  return os ? '<optgroup label="' + esc(D.themes[th]) + '">' + os + '</optgroup>' : '';
+}).join('');
+
+function triageHTML(e) {
+  const ts = effTopics(e.key) || [];
+  const lv = prioOfKey(e.key);
+  const rec = S[e.key];
+  const btn = (l, label) => '<button type="button" data-eprio="' + esc(e.key) + '" data-l="' + l +
+    '" aria-pressed="' + (lv === l) + '">' + esc(label) + '</button>';
+  // Το «νέο θέμα» ανοίγει μέσα στην ίδια καταχώρηση: μια καινούργια αναφορά
+  // συχνά δεν χωράει σε κανένα υπάρχον θέμα, και χωρίς αυτό η διαλογή θα
+  // κολλούσε ξανά στο να ανοίξει κανείς το script.
+  const form = newTopicFor === e.key
+    ? '<div class="tri-new"><input type="text" data-tnew-label="' + esc(e.key) +
+        '" placeholder="Τίτλος νέου θέματος" maxlength="160">' +
+      '<select data-tnew-theme="' + esc(e.key) + '">' +
+        D.themeOrder.map(th => '<option value="' + esc(th) + '">' + esc(D.themes[th]) + '</option>').join('') +
+      '</select>' +
+      '<button type="button" data-tnew-ok="' + esc(e.key) + '">Δημιουργία</button>' +
+      '<button type="button" data-tnew-cancel="' + esc(e.key) + '">Άκυρο</button></div>'
+    : '';
+  return '<div class="tri">' +
+    '<div class="tri-row"><span class="tri-h">Θέμα</span>' +
+    (ts.length
+      ? ts.map(sl => '<span class="tchip">' + esc(TM[sl] ? TM[sl].label : sl) +
+          '<button type="button" title="Αφαίρεση από το θέμα" data-tdel="' + esc(e.key) +
+          '" data-slug="' + esc(sl) + '">×</button></span>').join('')
+      : '<span class="tri-none">αταξινόμητη</span>') +
+    '<select data-tadd="' + esc(e.key) + '">' +
+      '<option value="">+ Κατάταξη σε θέμα…</option>' +
+      '<option value="__new__">+ Νέο θέμα…</option>' + topicOptions() + '</select>' +
+    '</div>' + form +
+    '<div class="tri-row"><span class="tri-h">Προτεραιότητα</span>' +
+    btn(1, D.prioLabels[1].short + ' ' + D.prioLabels[1].label) +
+    btn(2, D.prioLabels[2].short + ' ' + D.prioLabels[2].label) +
+    btn(3, D.prioLabels[3].short + ' ' + D.prioLabels[3].label) +
+    btn(0, 'Καμία') +
+    (rec ? '<span class="tri-by">' + esc(rec.by || 'διαχειριστής') + ' · ' +
+      fmt((rec.at || '').slice(0, 10)) + '</span>' : '') +
+    '</div></div>';
+}
+
+// Κλειδώνει τον διαλογέα όσο ταξιδεύει το αίτημα, ώστε δύο γρήγορα κλικ να μη
+// στείλουν δύο αντικρουόμενες εκδοχές της ίδιας καταχώρησης.
+async function withBusy(el, fn) {
+  const box = el.closest('.tri');
+  const lock = box.querySelectorAll('button, select, input');
+  lock.forEach(x => { x.disabled = true; });
+  try {
+    await fn();
+    sync(); render();
+  } catch {
+    lock.forEach(x => { x.disabled = false; });
+    if (!box.querySelector('.tri-err')) {
+      const w = document.createElement('span');
+      w.className = 'tri-err';
+      w.textContent = 'Δεν αποθηκεύτηκε — δοκιμάστε ξανά.';
+      box.appendChild(w);
+    }
+  }
+}
+
+const list = document.getElementById('list');
+
+list.addEventListener('click', ev => {
+  // Ο διαλογέας ζει μέσα σε <summary>/<details>: χωρίς preventDefault το κλικ
+  // ανεβαίνει και κλείνει την κάρτα κάτω από το δάχτυλο.
+  const pr = ev.target.closest('[data-eprio]');
+  if (pr) {
+    ev.preventDefault();
+    const key = pr.dataset.eprio;
+    return withBusy(pr, () => saveTriage(key, effTopics(key) || [], Number(pr.dataset.l)));
+  }
+  const del = ev.target.closest('[data-tdel]');
+  if (del) {
+    ev.preventDefault();
+    const key = del.dataset.tdel;
+    return withBusy(del, () => saveTriage(key,
+      (effTopics(key) || []).filter(x => x !== del.dataset.slug), prioOfKey(key)));
+  }
+  const ok = ev.target.closest('[data-tnew-ok]');
+  if (ok) {
+    ev.preventDefault();
+    const key = ok.dataset.tnewOk;
+    const box = ok.closest('.tri');
+    const label = box.querySelector('[data-tnew-label]').value.trim();
+    const theme = box.querySelector('[data-tnew-theme]').value;
+    if (!label) return;
+    return withBusy(ok, async () => {
+      const slug = await createTopic(label, theme);
+      newTopicFor = null;
+      await saveTriage(key, [...(effTopics(key) || []), slug], prioOfKey(key));
+    });
+  }
+  const cancel = ev.target.closest('[data-tnew-cancel]');
+  if (cancel) {
+    ev.preventDefault();
+    newTopicFor = null;
+    render();
+  }
+});
+
+list.addEventListener('change', ev => {
+  const sel = ev.target.closest('[data-tadd]');
+  if (!sel) return;
+  const key = sel.dataset.tadd;
+  const v = sel.value;
+  if (!v) return;
+  if (v === '__new__') {
+    newTopicFor = key;
+    render();
+    list.querySelector('.tri-new input')?.focus();
+    return;
+  }
+  const cur = effTopics(key) || [];
+  // Ήδη εκεί: μηδενίζουμε το select και δεν ενοχλούμε τον διακομιστή.
+  if (cur.includes(v)) { sel.value = ''; return; }
+  withBusy(sel, () => saveTriage(key, [...cur, v], prioOfKey(key)));
+});
+
 function render() {
   const shown = visibleTopics().sort(sortFn());
   // Τα αδιαλογάριαστα δεν ανήκουν σε περιοχή, οπότε φεύγουν μόλις φιλτράρεις κατά περιοχή.
-  const un = ((fStatus === 'all' || fStatus === 'untriaged') && fTheme === 'all')
-    ? D.untriaged.filter(e => entryPass(e, false)).sort((a, b) =>
-        fSort === 'oldest' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date))
+  const un = ((fStatus === 'all' || fStatus === 'untriaged' || fStatus === 'flagged') && fTheme === 'all')
+    ? UN.filter(e => entryPass(e, false) && (fStatus !== 'flagged' || prioOfKey(e.key)))
+        .sort((a, b) => fSort === 'oldest' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date))
     : [];
   const reports = shown.reduce((n, t) => n + t.es.length, 0);
 
@@ -1041,7 +1409,8 @@ function render() {
     out.push('<div class="theme-h"><h3>Αδιαλογάριαστα</h3><span class="mono">' + un.length + '</span></div>' +
       '<p class="untriaged-note">Καταχωρήσεις που δεν έχουν μπει ακόμη στη διαλογή του <code>scripts/feedback-report.mjs</code>. ' +
       'Εμφανίζονται αυτούσιες ώστε τίποτα καινούργιο να μη χάνεται μεταξύ δύο διαλογών.</p><div class="cards">' +
-      '<div class="card" style="--sc:var(--kyanos)"><div class="body">' + un.map(entryHTML).join('') + '</div></div></div>');
+      '<div class="card" data-slug="__untriaged__" style="--sc:var(--kyanos)"><div class="body">' +
+      un.map(entryHTML).join('') + '</div></div></div>');
   }
 
   if (fSort === 'demand') {
@@ -1061,8 +1430,18 @@ function render() {
     out.push('</div>');
   }
 
-  document.getElementById('list').innerHTML = out.join('') ||
+  // Κάθε βάψιμο ξαναγράφει όλο το #list. Χωρίς αυτό, η κάρτα που μόλις
+  // διαλογούσες κλείνει μόλις πατήσεις οτιδήποτε μέσα της.
+  const wasOpen = new Set([...list.querySelectorAll('details.card[open]')]
+    .map(d => d.dataset.slug).filter(Boolean));
+  list.innerHTML = out.join('') ||
     '<p class="empty">Κανένα θέμα δεν ταιριάζει με αυτά τα φίλτρα.</p>';
+  if (wasOpen.size) {
+    list.querySelectorAll('details.card').forEach(d => {
+      if (wasOpen.has(d.dataset.slug)) d.open = true;
+    });
+  }
+  renderStats();
 }
 
 sync();

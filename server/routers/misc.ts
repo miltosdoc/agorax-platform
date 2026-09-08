@@ -8,7 +8,7 @@ import type { Express, Request, Response } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { votingRepo, proposalRepo } from '../storage';
-import { requireAuth } from '../auth';
+import { requireAuth, requireAdmin } from '../auth';
 import { db } from '../db';
 import { eq } from 'drizzle-orm';
 import { surveyPolls, communities } from '@shared/schema';
@@ -427,6 +427,124 @@ export function registerMiscRoutes(app: Express): void {
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.type('html').sendFile(file);
+  });
+
+  // ── Διαλογή ανατροφοδότησης (admins only) ──────────────────────────────
+  // Μέχρι τώρα η διαλογή γινόταν μόνο με το χέρι, μέσα στο
+  // scripts/feedback-report.mjs: για να μπει ένα σχόλιο σε θέμα έπρεπε να
+  // ανοίξει κανείς τον κώδικα. Εδώ ο διαχειριστής κάνει την ίδια δουλειά από
+  // τη σελίδα — κατατάσσει κάθε σχόλιο σε θέματα και του δίνει προτεραιότητα.
+  //
+  // Ζει σε feedback/triage.json και όχι στη βάση, γιατί το script τρέχει από
+  // το cron χωρίς σύνδεση στη βάση και πρέπει να διαβάζει τις ίδιες αποφάσεις.
+  //
+  // Οι περιοχές είναι αντίγραφο του THEMES του script. Είναι σκόπιμη
+  // επανάληψη: προτιμότερο να χτυπήσει εδώ ένα 400 παρά να δεχτεί ο
+  // διακομιστής θέμα που η αναφορά θα πετούσε σιωπηλά.
+  const FEEDBACK_THEMES = ['STRUCT', 'PHASE', 'TALK', 'VOTE', 'NOTIF', 'COMM',
+    'DISC', 'UI', 'ACCT', 'AI', 'DOC', 'NOISE'];
+  const ENTRY_KEY_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
+  const SLUG_RE = /^[a-z0-9-]{1,80}$/;
+
+  const triagePath = async () => {
+    const path = await import('path');
+    return path.resolve(process.cwd(), 'feedback', 'triage.json');
+  };
+
+  type TriageStore = { entries: Record<string, any>; topics: Record<string, any> };
+
+  const readTriage = async (): Promise<TriageStore> => {
+    const fs = await import('fs');
+    const file = await triagePath();
+    if (!fs.existsSync(file)) return { entries: {}, topics: {} };
+    try {
+      const p = JSON.parse(fs.readFileSync(file, 'utf8'));
+      return {
+        entries: (p && typeof p.entries === 'object' && p.entries) || {},
+        topics: (p && typeof p.topics === 'object' && p.topics) || {},
+      };
+    } catch {
+      // Χαλασμένο αρχείο δεν ρίχνει τη σελίδα: η διαλογή ξαναγίνεται, ένα 500
+      // σε κάθε φόρτωση δεν επανορθώνεται.
+      return { entries: {}, topics: {} };
+    }
+  };
+
+  const writeTriage = async (store: TriageStore) => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const file = await triagePath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    // Γράψε-και-μετονόμασε: το cron μπορεί να διαβάζει αυτή τη στιγμή και δεν
+    // πρέπει ποτέ να πετύχει μισογραμμένο JSON.
+    const tmp = `${file}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, ...store }, null, 2));
+    fs.renameSync(tmp, file);
+  };
+
+  app.get('/api/admin/feedback-triage', requireAdmin, async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await readTriage());
+  });
+
+  app.put('/api/admin/feedback-triage/:key', requireAdmin, async (req: any, res) => {
+    // Το κλειδί είναι το createdAt της καταχώρησης μέχρι δευτερόλεπτο — η
+    // διεύθυνσή της και στο script και εδώ.
+    const key = String(req.params.key || '');
+    if (!ENTRY_KEY_RE.test(key)) {
+      return res.status(400).json({ message: 'invalid entry key' });
+    }
+    const topics = req.body?.topics;
+    if (!Array.isArray(topics) || topics.length > 12
+      || !topics.every((t: unknown) => typeof t === 'string' && SLUG_RE.test(t))) {
+      return res.status(400).json({ message: 'topics must be an array of up to 12 slugs' });
+    }
+    const prio = Number(req.body?.prio ?? 0);
+    if (!Number.isInteger(prio) || prio < 0 || prio > 3) {
+      return res.status(400).json({ message: 'prio must be 0, 1, 2 or 3' });
+    }
+
+    const store = await readTriage();
+    // Η εγγραφή κρατιέται ακόμη κι όταν αδειάζει: «ο διαχειριστής το έβγαλε
+    // από κάθε θέμα» είναι απόφαση, και δεν πρέπει στην επόμενη παραγωγή να
+    // ξαναγυρίσει σιωπηλά στη διαλογή που έχει καρφωμένη το script.
+    store.entries[key] = {
+      topics: [...new Set(topics)],
+      prio,
+      by: req.user?.username ?? '—',
+      at: new Date().toISOString(),
+    };
+    await writeTriage(store);
+    res.json({ ok: true, key, entry: store.entries[key] });
+  });
+
+  app.post('/api/admin/feedback-topics', requireAdmin, async (req: any, res) => {
+    const label = String(req.body?.label ?? '').trim();
+    const theme = String(req.body?.theme ?? '');
+    if (label.length < 3 || label.length > 160) {
+      return res.status(400).json({ message: 'label must be 3–160 characters' });
+    }
+    if (!FEEDBACK_THEMES.includes(theme)) {
+      return res.status(400).json({ message: 'unknown theme' });
+    }
+
+    const store = await readTriage();
+    // Ίδιος τίτλος δύο φορές δεν φτιάχνει δεύτερο θέμα: επιστρέφουμε το
+    // υπάρχον, αλλιώς η διαλογή γεμίζει διπλοεγγραφές που μοιάζουν ίδιες.
+    const existing = Object.entries(store.topics)
+      .find(([, t]: [string, any]) => String(t?.label ?? '').toLowerCase() === label.toLowerCase());
+    if (existing) {
+      return res.json({ ok: true, slug: existing[0], topic: existing[1] });
+    }
+
+    const { randomBytes } = await import('crypto');
+    let slug = '';
+    do { slug = `t-${randomBytes(4).toString('hex')}`; } while (store.topics[slug]);
+
+    const topic = { label, theme, status: 'open', by: req.user?.username ?? '—', at: new Date().toISOString() };
+    store.topics[slug] = topic;
+    await writeTriage(store);
+    res.status(201).json({ ok: true, slug, topic });
   });
 
   // Legacy poll/survey HTTP routes have been retired — proposals are the
