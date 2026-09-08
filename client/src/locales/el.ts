@@ -942,6 +942,7 @@ const el: TranslationDictionary = {
 
   // Platform Settings
   'platformSettings.title': 'Ρυθμίσεις Πλατφόρμας',
+  'platformSettings.adminOnly': 'Πρόκειται για ρυθμίσεις όλης της πλατφόρμας. Μόνο οι διαχειριστές μπορούν να τις δουν και να τις αλλάξουν. Οι ρυθμίσεις του λογαριασμού σου βρίσκονται στο προφίλ σου.',
   'platformSettings.save': 'Αποθήκευση',
   'platformSettings.saving': 'Αποθήκευση...',
   'platformSettings.saved': 'Οι ρυθμίσεις αποθηκεύτηκαν',

@@ -121,6 +121,19 @@ export function PlatformSettingsPage() {
     setValues(prev => ({ ...prev, [key]: value }));
   }
 
+  // These are platform-wide settings, not account ones, so a member who
+  // reaches the URL directly is told plainly rather than shown a form whose
+  // every save the server will refuse.
+  if (!user?.isAdmin) {
+    return (
+      <AppShell title={t("platformSettings.title")}>
+        <div className="max-w-xl rounded-sm border border-line bg-surface p-6" data-testid="platform-settings-denied">
+          <p className="text-sm leading-relaxed text-ink-soft">{t('platformSettings.adminOnly')}</p>
+        </div>
+      </AppShell>
+    );
+  }
+
   if (loading) {
     return (
       <AppShell title={t("platformSettings.title")}>

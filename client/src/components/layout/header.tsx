@@ -295,12 +295,16 @@ export default function Header() {
                       <HelpCircle className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.help')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer" data-testid="menu-settings">
-                      <Settings className="mr-2.5 h-4 w-4 text-ink-faint" />
-                      {t('nav.settings')}
-                    </DropdownMenuItem>
 
                     {user.isAdmin && <DropdownMenuSeparator />}
+                    {/* Platform-wide settings, not account ones — the account
+                        equivalent is Profile at the top of this menu. */}
+                    {user.isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer" data-testid="menu-settings">
+                        <Settings className="mr-2.5 h-4 w-4 text-ink-faint" />
+                        {t('nav.settings')}
+                      </DropdownMenuItem>
+                    )}
                     {user.isAdmin && (
                       <DropdownMenuItem onClick={() => navigate("/analytics")} className="cursor-pointer" data-testid="menu-analytics">
                         <BarChart3 className="mr-2.5 h-4 w-4 text-ink-faint" />

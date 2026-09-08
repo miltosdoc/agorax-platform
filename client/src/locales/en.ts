@@ -942,6 +942,7 @@ const en: TranslationDictionary = {
 
   // Platform Settings
   'platformSettings.title': 'Platform Settings',
+  'platformSettings.adminOnly': 'These are platform-wide settings. Only administrators can view and change them. Your own account settings are on your profile.',
   'platformSettings.save': 'Save Changes',
   'platformSettings.saving': 'Saving...',
   'platformSettings.saved': 'Settings saved successfully',
