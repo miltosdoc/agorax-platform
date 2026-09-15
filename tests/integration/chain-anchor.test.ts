@@ -7,15 +7,19 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   GitHubAnchorPublisher,
   anchorFilePath,
   canonicalizeAnchor,
   hashAnchor,
+  isOtsEnabled,
+  otsProofPath,
   readAnchorConfig,
   renderAnchorLine,
   type AnchorRecord,
 } from '../../server/utils/chain-anchor';
+import { realOtsClient } from '../../server/utils/ots';
 
 const record: AnchorRecord = {
   v: 1,
@@ -165,5 +169,50 @@ describe('GitHubAnchorPublisher', () => {
     const init = (gh.fetchImpl as any).mock.calls[0][1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
     for (const c of gh.calls) expect(JSON.stringify(c.body ?? {})).not.toContain('tok');
+  });
+});
+
+describe('GitHubAnchorPublisher.putFile', () => {
+  it('creates a binary file, then replaces it with the current sha', async () => {
+    const gh = fakeGitHub({ branchExists: true });
+    const pub = new GitHubAnchorPublisher(cfg, gh.fetchImpl);
+    const path = otsProofPath('ab'.repeat(32));
+    expect(path).toBe('anchors/ots/' + 'ab'.repeat(32) + '.ots');
+    const pending = Buffer.from([0, 1, 2, 255]);
+    await pub.putFile(path, pending, 'pending');
+    expect(Buffer.from(gh.files[path], 'utf8')).toBeDefined();
+    const first = gh.calls.filter(c => c.method === 'PUT');
+    expect(first).toHaveLength(1);
+    expect(first[0].body.sha).toBeUndefined();
+    expect(Buffer.from(first[0].body.content, 'base64')).toEqual(pending);
+
+    const complete = Buffer.from([9, 9, 9]);
+    await pub.putFile(path, complete, 'complete');
+    const puts = gh.calls.filter(c => c.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    expect(puts[1].body.sha).toBe('sha-' + path);
+    expect(Buffer.from(puts[1].body.content, 'base64')).toEqual(complete);
+  });
+});
+
+describe('OpenTimestamps', () => {
+  it('is on by default when anchoring is configured and can be switched off alone', () => {
+    const env = { ANCHOR_GITHUB_REPO: 'o/r', ANCHOR_GITHUB_TOKEN: 't' };
+    expect(isOtsEnabled(env)).toBe(true);
+    expect(isOtsEnabled({ ...env, ANCHOR_OTS: 'off' })).toBe(false);
+    expect(isOtsEnabled({})).toBe(false);
+  });
+
+  it('reads a pending proof offline: not complete, calendars listed, no block yet', async () => {
+    const proof = Buffer.from(readFileSync('tests/fixtures/ots-pending.b64', 'utf8').trim(), 'base64');
+    const info = await realOtsClient.inspect(proof);
+    expect(info.complete).toBe(false);
+    expect(info.height).toBeNull();
+    expect(info.pendingCalendars.length).toBeGreaterThan(0);
+    for (const uri of info.pendingCalendars) expect(uri).toMatch(/^https:\/\//);
+  });
+
+  it('rejects a malformed digest before touching the network', async () => {
+    await expect(realOtsClient.stamp('not-hex')).rejects.toThrow(/32 bytes hex/);
   });
 });

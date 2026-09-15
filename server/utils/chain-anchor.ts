@@ -13,10 +13,11 @@
  * docs/VOTE_CHAIN_ANCHORING.md for the third-party verification procedure.
  */
 import { createHash } from 'node:crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { proposals, voteChainAnchors, type VoteChainAnchor } from '@shared/schema';
 import { GENESIS_PREV_HASH, getChainHead, verifyChain } from './vote-chain';
+import { realOtsClient, type OtsClient } from './ots';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -46,6 +47,11 @@ export function readAnchorConfig(env: NodeJS.ProcessEnv = process.env): AnchorCo
 
 export function isAnchoringConfigured(): boolean {
   return readAnchorConfig() !== null;
+}
+
+/** Bitcoin timestamping rides on anchoring; ANCHOR_OTS=off switches it off alone. */
+export function isOtsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return readAnchorConfig(env) !== null && !/^(off|0|false|no)$/i.test(env.ANCHOR_OTS?.trim() ?? '');
 }
 
 // ─── Record format ──────────────────────────────────────────────────────────
@@ -98,6 +104,11 @@ export function anchorFilePath(proposalId: number): string {
   return `anchors/proposal-${proposalId}.jsonl`;
 }
 
+/** Where a completed OpenTimestamps proof for an anchor is published. */
+export function otsProofPath(anchorHash: string): string {
+  return `anchors/ots/${anchorHash}.ots`;
+}
+
 // ─── Publisher ──────────────────────────────────────────────────────────────
 
 export interface PublishResult {
@@ -110,6 +121,8 @@ export interface AnchorPublisher {
   readonly remote: string;
   /** Append `line` to the proposal's anchor file. Must be append-only. */
   publish(proposalId: number, line: string, message: string): Promise<PublishResult>;
+  /** Create or replace a file (used for .ots proofs, which are replaced once complete). */
+  putFile(path: string, bytes: Buffer, message: string): Promise<PublishResult>;
 }
 
 type FetchLike = typeof fetch;
@@ -184,38 +197,56 @@ export class GitHubAnchorPublisher implements AnchorPublisher {
     this.branchReady = true;
   }
 
-  async publish(proposalId: number, line: string, message: string): Promise<PublishResult> {
+  /**
+   * Create or update `path` on the anchor branch. `mutate` receives the
+   * current bytes (empty when the file does not exist) and returns the next
+   * contents. One retry covers a concurrent write (sha conflict → 409).
+   */
+  private async writeFile(path: string, message: string, mutate: (current: Buffer) => Buffer): Promise<PublishResult> {
     await this.ensureBranch();
-    const path = anchorFilePath(proposalId);
-    // One retry covers a concurrent append (sha conflict → 409).
     for (let attempt = 0; attempt < 2; attempt++) {
       const current = await this.api('GET', `/contents/${path}?ref=${encodeURIComponent(this.cfg.branch)}`);
-      let existing = '';
+      let existing = Buffer.alloc(0);
       let sha: string | undefined;
       if (current.ok) {
         const body = await current.json() as { content?: string; sha?: string };
         sha = body.sha;
-        existing = Buffer.from((body.content ?? '').replace(/\n/g, ''), 'base64').toString('utf8');
+        existing = Buffer.from((body.content ?? '').replace(/\n/g, ''), 'base64');
       } else if (current.status !== 404) {
-        await this.fail(current, 'read anchor file failed');
+        await this.fail(current, 'read file failed');
       }
-      if (existing.length > 0 && !existing.endsWith('\n')) existing += '\n';
-      const next = existing + line + '\n';
-
       const put = await this.api('PUT', `/contents/${path}`, {
         message,
-        content: Buffer.from(next, 'utf8').toString('base64'),
+        content: mutate(existing).toString('base64'),
         branch: this.cfg.branch,
         ...(sha ? { sha } : {}),
       });
       if (put.ok) {
-        const body = await put.json() as { commit?: { sha?: string; html_url?: string } };
-        return { remote: this.remote, commit: body.commit?.sha ?? null, url: body.commit?.html_url ?? null };
+        const body = await put.json() as { commit?: { sha?: string; html_url?: string }; content?: { html_url?: string } };
+        return {
+          remote: this.remote,
+          commit: body.commit?.sha ?? null,
+          url: body.content?.html_url ?? body.commit?.html_url ?? null,
+        };
       }
       if (put.status === 409 && attempt === 0) continue;
-      await this.fail(put, 'append anchor failed');
+      await this.fail(put, `write ${path} failed`);
     }
     throw new Error('[chain-anchor] unreachable');
+  }
+
+  async publish(proposalId: number, line: string, message: string): Promise<PublishResult> {
+    const result = await this.writeFile(anchorFilePath(proposalId), message, (current) => {
+      let existing = current.toString('utf8');
+      if (existing.length > 0 && !existing.endsWith('\n')) existing += '\n';
+      return Buffer.from(existing + line + '\n', 'utf8');
+    });
+    // For the anchor line the commit is the interesting link, not the file.
+    return { ...result, url: result.commit ? `https://github.com/${this.cfg.repo}/commit/${result.commit}` : result.url };
+  }
+
+  async putFile(path: string, bytes: Buffer, message: string): Promise<PublishResult> {
+    return this.writeFile(path, message, () => bytes);
   }
 }
 
@@ -256,9 +287,15 @@ export async function listAnchors(proposalId: number): Promise<VoteChainAnchor[]
 
 export interface AnchorOptions {
   publisher?: AnchorPublisher;
+  ots?: OtsClient | null;
   now?: () => Date;
   /** Anchor even if the head has not moved since the last anchor. */
   force?: boolean;
+}
+
+function otsClientFor(opts: AnchorOptions): OtsClient | null {
+  if (opts.ots !== undefined) return opts.ots;
+  return isOtsEnabled() ? realOtsClient : null;
 }
 
 /**
@@ -322,7 +359,142 @@ export async function anchorProposal(proposalId: number, opts: AnchorOptions = {
   if (!verification.ok) {
     console.error(`[chain-anchor] proposal ${proposalId}: chain FAILED verification at anchor time`, verification.firstBreakAt);
   }
+  // Bitcoin timestamp, best effort: a calendar outage must not undo the
+  // anchor. The OTS sweep retries anything left unstamped.
+  const ots = otsClientFor(opts);
+  if (row && ots) {
+    const stamped = await stampAnchor(row, ots, opts.now);
+    if (stamped) return stamped;
+  }
   return row ?? null;
+}
+
+// ─── OpenTimestamps ─────────────────────────────────────────────────────────
+
+/** Submit an anchor's hash to the calendars and store the pending proof. */
+export async function stampAnchor(row: VoteChainAnchor, ots: OtsClient, now: () => Date = () => new Date()): Promise<VoteChainAnchor | null> {
+  try {
+    const proof = await ots.stamp(row.anchorHash);
+    const [updated] = await db
+      .update(voteChainAnchors)
+      .set({
+        otsProof: proof,
+        otsStatus: 'pending',
+        otsStampedAt: now(),
+        otsAttempts: sql`${voteChainAnchors.otsAttempts} + 1`,
+        otsLastError: null,
+      })
+      .where(eq(voteChainAnchors.id, row.id))
+      .returning();
+    return updated ?? null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[chain-anchor] ots stamp failed for anchor ${row.id}: ${message}`);
+    await db
+      .update(voteChainAnchors)
+      .set({ otsStatus: 'failed', otsAttempts: sql`${voteChainAnchors.otsAttempts} + 1`, otsLastError: message.slice(0, 500) })
+      .where(eq(voteChainAnchors.id, row.id));
+    return null;
+  }
+}
+
+/**
+ * Ask the calendars whether a pending proof has reached Bitcoin. When it
+ * has, publish the completed .ots next to the anchors and record the block.
+ */
+export async function upgradeAnchor(
+  row: VoteChainAnchor,
+  ots: OtsClient,
+  publisher: AnchorPublisher,
+  now: () => Date = () => new Date(),
+): Promise<'complete' | 'pending' | 'failed'> {
+  if (!row.otsProof) return 'failed';
+  try {
+    const { proof, changed } = await ots.upgrade(row.otsProof);
+    const info = await ots.inspect(proof);
+    if (info.complete) {
+      const published = await publisher.putFile(
+        otsProofPath(row.anchorHash),
+        proof,
+        `OpenTimestamps proof for anchor ${row.anchorHash.slice(0, 12)} (proposal ${row.proposalId}, block ${info.height ?? '?'})`,
+      );
+      await db
+        .update(voteChainAnchors)
+        .set({
+          otsProof: proof,
+          otsStatus: 'complete',
+          otsUpgradedAt: now(),
+          otsBitcoinHeight: info.height,
+          otsRemoteUrl: published.url,
+          otsAttempts: sql`${voteChainAnchors.otsAttempts} + 1`,
+          otsLastError: null,
+        })
+        .where(eq(voteChainAnchors.id, row.id));
+      return 'complete';
+    }
+    await db
+      .update(voteChainAnchors)
+      .set({
+        ...(changed ? { otsProof: proof } : {}),
+        otsAttempts: sql`${voteChainAnchors.otsAttempts} + 1`,
+      })
+      .where(eq(voteChainAnchors.id, row.id));
+    return 'pending';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[chain-anchor] ots upgrade failed for anchor ${row.id}: ${message}`);
+    await db
+      .update(voteChainAnchors)
+      .set({ otsAttempts: sql`${voteChainAnchors.otsAttempts} + 1`, otsLastError: message.slice(0, 500) })
+      .where(eq(voteChainAnchors.id, row.id));
+    return 'failed';
+  }
+}
+
+export interface OtsSweepResult { stamped: number; completed: number; pending: number; failed: number }
+
+/**
+ * Stamp anchors that have no proof yet and try to complete pending ones.
+ * Upgrades are spaced out: the first try 30 minutes after stamping, then
+ * 20 minutes later per attempt, since Bitcoin confirmation takes an hour or
+ * more and every try is four calendar round-trips.
+ */
+export async function runOtsSweep(opts: AnchorOptions & { stampLimit?: number; upgradeLimit?: number } = {}): Promise<OtsSweepResult> {
+  const result: OtsSweepResult = { stamped: 0, completed: 0, pending: 0, failed: 0 };
+  const ots = otsClientFor(opts);
+  const publisher = opts.publisher ?? getPublisher();
+  if (!ots || !publisher) return result;
+  const now = opts.now ?? (() => new Date());
+
+  const toStamp = await db
+    .select()
+    .from(voteChainAnchors)
+    .where(or(
+      isNull(voteChainAnchors.otsStatus),
+      and(eq(voteChainAnchors.otsStatus, 'failed'), lt(voteChainAnchors.otsAttempts, 10)),
+    ))
+    .orderBy(voteChainAnchors.id)
+    .limit(opts.stampLimit ?? 20);
+  for (const row of toStamp) {
+    if (await stampAnchor(row, ots, now)) result.stamped++; else result.failed++;
+  }
+
+  const nowMs = now().getTime();
+  const toUpgrade = await db
+    .select()
+    .from(voteChainAnchors)
+    .where(and(
+      eq(voteChainAnchors.otsStatus, 'pending'),
+      // stamped_at + 30min + 20min * (attempts - 1) <= now
+      sql`${voteChainAnchors.otsStampedAt} + make_interval(mins => 30 + 20 * greatest(${voteChainAnchors.otsAttempts} - 1, 0)) <= ${new Date(nowMs)}`,
+    ))
+    .orderBy(voteChainAnchors.id)
+    .limit(opts.upgradeLimit ?? 20);
+  for (const row of toUpgrade) {
+    const outcome = await upgradeAnchor(row, ots, publisher, now);
+    result[outcome === 'complete' ? 'completed' : outcome]++;
+  }
+  return result;
 }
 
 /**

@@ -21,6 +21,16 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
 
 ---
 
+## Transparency of the vote
+
+Three layers protect every ballot box, in plain terms:
+
+1. **Sealed chain.** Each ballot is hashed onto the previous one. Alter or remove any ballot and every later seal breaks. Anyone can check a ballot receipt at `/verify`.
+2. **Public anchors.** Every ten minutes the fingerprint of each open ballot box is published to the [`anchors` branch](https://github.com/miltosdoc/agorax-platform/tree/anchors/anchors) of this repository, and once more as a final seal when the vote closes.
+3. **Bitcoin timestamps.** Every published fingerprint is committed to the Bitcoin blockchain through [OpenTimestamps](https://opentimestamps.org), so its time and content are locked into a network nobody controls, the operator included. Completed proofs are published next to the anchors.
+
+Details and the third-party verification procedure: [docs/VOTE_CHAIN_ANCHORING.md](docs/VOTE_CHAIN_ANCHORING.md).
+
 ## What AgoraX does
 
 - **Structured deliberation** — every proposal follows the same eight-state

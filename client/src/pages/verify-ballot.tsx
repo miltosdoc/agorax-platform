@@ -31,6 +31,11 @@ interface AnchorEntry {
   anchoredAt: string;
   commit: string | null;
   url: string | null;
+  bitcoin?: {
+    status: 'none' | 'pending' | 'complete' | 'failed';
+    blockHeight: number | null;
+    proofUrl: string | null;
+  };
 }
 interface AnchorInfo {
   configured: boolean;
@@ -61,6 +66,13 @@ const L: Record<Lang, Record<string, string>> = {
     anchorsView: 'Δείτε το δημόσιο αρχείο',
     anchorsNone: 'Δεν έχει δημοσιευθεί ακόμη αγκύρωση για αυτή την πρόταση.',
     anchorsOff: 'Η εξωτερική αγκύρωση δεν είναι ενεργή σε αυτή την εγκατάσταση.',
+    btcConfirmed: 'Χρονοσήμανση Bitcoin: επιβεβαιωμένη στο block',
+    btcPending: 'Χρονοσήμανση Bitcoin: αναμένεται επιβεβαίωση (συνήθως 1–3 ώρες)',
+    btcProof: 'απόδειξη',
+    howTitle: 'Πώς προστατεύεται η κάλπη',
+    how1: 'Κάθε ψηφοδέλτιο σφραγίζεται πάνω στο προηγούμενο. Αν αλλάξει ή αφαιρεθεί έστω ένα, η σφραγίδα όλων των επόμενων σπάει.',
+    how2: 'Το αποτύπωμα της κάλπης δημοσιεύεται κάθε 10 λεπτά σε δημόσιο αποθετήριο στο GitHub, ορατό σε όλους.',
+    how3: 'Κάθε αποτύπωμα καταχωρείται και στο Bitcoin μέσω OpenTimestamps. Έτσι η ώρα και το περιεχόμενο κλειδώνουν σε ένα δίκτυο που κανείς δεν ελέγχει — ούτε εμείς.',
   },
   en: {
     title: 'Ballot verification',
@@ -85,6 +97,13 @@ const L: Record<Lang, Record<string, string>> = {
     anchorsView: 'View the public record',
     anchorsNone: 'No anchor has been published for this proposal yet.',
     anchorsOff: 'External anchoring is not enabled on this installation.',
+    btcConfirmed: 'Bitcoin timestamp: confirmed in block',
+    btcPending: 'Bitcoin timestamp: awaiting confirmation (usually 1–3 hours)',
+    btcProof: 'proof',
+    howTitle: 'How the ballot box is protected',
+    how1: 'Every ballot is sealed onto the previous one. Change or remove a single one and the seal on every later ballot breaks.',
+    how2: 'The fingerprint of the ballot box is published every 10 minutes to a public GitHub repository, visible to everyone.',
+    how3: 'Every fingerprint is also recorded in Bitcoin through OpenTimestamps, locking its time and content into a network nobody controls — not even us.',
   },
 };
 
@@ -216,6 +235,15 @@ export default function VerifyBallotPage() {
             <p>{s.what2}</p>
           </div>
 
+          <div className="mt-6 rounded-md border p-4 text-sm" data-testid="verify-how">
+            <p className="font-semibold">{s.howTitle}</p>
+            <ol className="mt-2 space-y-1.5 text-xs text-muted-foreground list-decimal pl-4">
+              <li>{s.how1}</li>
+              <li>{s.how2}</li>
+              <li>{s.how3}</li>
+            </ol>
+          </div>
+
           {anchors && (
             <div className="mt-6 rounded-md border p-4 text-sm" data-testid="verify-anchors">
               <p className="font-semibold flex items-center gap-2">
@@ -239,6 +267,24 @@ export default function VerifyBallotPage() {
                       {' · '}{anchors.anchors.length} {s.anchorsCount}
                     </p>
                     <p className="font-mono break-all text-muted-foreground">{last.headHash}</p>
+                    {(() => {
+                      const confirmed = anchors.anchors.filter(a => a.bitcoin?.status === 'complete');
+                      const latestConfirmed = confirmed[confirmed.length - 1];
+                      if (latestConfirmed) {
+                        return (
+                          <p data-testid="verify-anchors-bitcoin">
+                            {s.btcConfirmed} {latestConfirmed.bitcoin!.blockHeight}
+                            {latestConfirmed.bitcoin!.proofUrl && (
+                              <> · <a href={latestConfirmed.bitcoin!.proofUrl} target="_blank" rel="noopener noreferrer" className="underline">{s.btcProof}</a></>
+                            )}
+                          </p>
+                        );
+                      }
+                      if (last.bitcoin?.status === 'pending') {
+                        return <p data-testid="verify-anchors-bitcoin">{s.btcPending}</p>;
+                      }
+                      return null;
+                    })()}
                     {(last.url || anchors.file) && (
                       <a
                         href={last.url ?? anchors.file ?? '#'}

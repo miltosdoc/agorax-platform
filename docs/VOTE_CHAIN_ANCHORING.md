@@ -1,5 +1,13 @@
 # Vote-chain anchoring
 
+**In one paragraph.** Every ballot is hashed onto the previous one, so the
+ballot box is a chain whose last hash fingerprints everything in it. Every
+ten minutes that fingerprint is published to a public GitHub branch, and
+each published fingerprint is committed to the Bitcoin blockchain through
+OpenTimestamps. Together: the chain shows *what* is in the box, GitHub shows
+*that* we published it and *when*, and Bitcoin makes that time and content
+impossible to move afterwards, for anyone.
+
 Every proposal's final vote is an append-only SHA-256 hash chain
 (`server/utils/vote-chain.ts`). Each row's `row_hash` binds the previous
 row's hash, the ballot and the cast time, so editing or deleting a row
@@ -58,6 +66,30 @@ At most ten proposals are anchored per sweep, so a large backlog spreads
 over a few sweeps rather than hammering the GitHub API. The finalize route
 also enqueues a sweep, so a closed vote is sealed within moments.
 
+## Bitcoin timestamps (OpenTimestamps)
+
+Right after an anchor line is published, its `anchorHash` is submitted to
+the public OpenTimestamps calendar servers. They aggregate digests into one
+Bitcoin transaction, so stamping is free and needs no wallet. The result is
+a small `.ots` proof that starts out *pending* and becomes *complete* once
+the transaction is confirmed, usually within one to three hours.
+
+The sweep keeps pending proofs in the `vote_chain_anchors` table, asks the
+calendars to upgrade them on a widening schedule, and when a proof is
+complete publishes it as `anchors/ots/<anchorHash>.ots` on the anchor branch
+and records the Bitcoin block height. `ANCHOR_OTS=off` disables this layer
+while keeping GitHub anchoring.
+
+To check a proof independently, take the anchor line without its
+`anchorHash` field, in canonical form, and run:
+
+```
+ots verify anchors/ots/<anchorHash>.ots -f <canonical-line-file>
+```
+
+The client confirms the digest existed at the reported block and time,
+against a Bitcoin node or a public block explorer.
+
 ## Verifying as a third party
 
 1. Fetch the anchor file, e.g.
@@ -87,10 +119,6 @@ backdate, that is evidence rather than suspicion.
 
 ## Limits
 
-- Anchoring shows *that* a chain changed after publication, not *who*
-  changed it, and cannot restore the original.
-- The window between two anchors, up to ten minutes, is unprotected.
-- If the operator also controls the anchor repository they can delete or
-  force-push it, but not without leaving traces in GitHub's event history,
-  and anyone who cloned or watched the branch keeps the earlier record.
-  Mirroring the branch elsewhere strengthens this further.
+Anchoring makes tampering visible; it cannot undo it or name who did it.
+The window between two anchors, up to ten minutes, is covered only by the
+chain itself.

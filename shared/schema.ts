@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex, index, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, uniqueIndex, index, numeric, customType } from "drizzle-orm/pg-core";
 import { InferSelectModel, InferInsertModel } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -722,6 +722,16 @@ export const voteChainAnchors = pgTable("vote_chain_anchors", {
   remoteCommit: text("remote_commit"),
   remoteUrl: text("remote_url"),
   anchoredAt: timestamp("anchored_at").notNull().defaultNow(),
+  // OpenTimestamps: the anchor hash committed to a Bitcoin block. GitHub
+  // proves we published; Bitcoin proves nobody, us included, can move it.
+  otsStatus: text("ots_status"),                        // 'pending' | 'complete' | 'failed' | null
+  otsProof: customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })("ots_proof"),
+  otsStampedAt: timestamp("ots_stamped_at"),
+  otsUpgradedAt: timestamp("ots_upgraded_at"),
+  otsBitcoinHeight: integer("ots_bitcoin_height"),
+  otsAttempts: integer("ots_attempts").notNull().default(0),
+  otsLastError: text("ots_last_error"),
+  otsRemoteUrl: text("ots_remote_url"),
 }, (table) => ({
   headUnique: uniqueIndex('vote_chain_anchors_head_unique').on(table.proposalId, table.phase, table.headHash),
   proposalIdx: index('vote_chain_anchors_proposal_idx').on(table.proposalId, table.id),

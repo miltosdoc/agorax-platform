@@ -396,11 +396,16 @@ async function handleConferenceReminder(_payload: JobPayload): Promise<void> {
  * docs/VOTE_CHAIN_ANCHORING.md. A no-op when ANCHOR_GITHUB_* is unset.
  */
 async function handleChainAnchor(_payload: JobPayload): Promise<void> {
-  const { runAnchorSweep, isAnchoringConfigured } = await import('./chain-anchor');
+  const { runAnchorSweep, runOtsSweep, isAnchoringConfigured } = await import('./chain-anchor');
   if (!isAnchoringConfigured()) return;
   const result = await runAnchorSweep();
   if (result.anchored > 0 || result.failed > 0) {
     console.log(`[chain-anchor] anchored=${result.anchored} skipped=${result.skipped} failed=${result.failed}`);
+  }
+  // Bitcoin timestamps for the anchors: stamp new ones, complete pending ones.
+  const ots = await runOtsSweep();
+  if (ots.stamped > 0 || ots.completed > 0 || ots.failed > 0) {
+    console.log(`[chain-anchor] ots stamped=${ots.stamped} completed=${ots.completed} pending=${ots.pending} failed=${ots.failed}`);
   }
 }
 

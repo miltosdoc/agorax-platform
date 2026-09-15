@@ -963,6 +963,13 @@ export function registerProposalsRoutes(app: Express): void {
           commit: a.remoteCommit,
           url: a.remoteUrl,
           anchoredAt: a.anchoredAt,
+          bitcoin: {
+            status: a.otsStatus ?? 'none',
+            blockHeight: a.otsBitcoinHeight,
+            stampedAt: a.otsStampedAt,
+            confirmedAt: a.otsUpgradedAt,
+            proofUrl: a.otsRemoteUrl,
+          },
         })),
       });
     } catch (error) {

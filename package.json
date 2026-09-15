@@ -116,6 +116,7 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.13",
+    "opentimestamps": "^0.4.9",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-local": "^1.0.0",
