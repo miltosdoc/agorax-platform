@@ -158,7 +158,7 @@ function fallbackResult(): LLMValidationResult {
   return {
     score: 50,
     feedback:
-      'Αυτόματος έλεγχος ανενεργός — η πρόταση προωθείται σε διαβούλευση. (Gate disabled — proposal routed to deliberation.)',
+      'Ο αυτόματος έλεγχος δεν ήταν προσωρινά διαθέσιμος — η πρόταση προωθείται κανονικά σε διαβούλευση χωρίς αυτόματη βαθμολόγηση. (Automatic review temporarily unavailable — proposal routed to deliberation without an AI score.)',
     category: 'sortition',
     abuse: null,
     details: { clarity: 5, structure: 5, civic: 5 },
