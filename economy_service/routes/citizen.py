@@ -340,7 +340,7 @@ async def get_referral_link(
         raise HTTPException(status_code=404, detail="Citizen not found")
 
     referral_code = str(citizen_id)[:8]
-    referral_link = f"https://agorax.gr/ref/{referral_code}"
+    referral_link = f"https://agoraxdemocracy.com/ref/{referral_code}"
 
     return ReferralLinkResponse(
         citizen_id=str(citizen_id),

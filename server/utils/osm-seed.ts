@@ -49,7 +49,7 @@ async function searchOSM(query: string, limit: number = 50): Promise<OSMResult[]
 
   const response = await fetch(url.toString(), {
     headers: {
-      'User-Agent': 'AgoraX/1.0 (https://agorax.gr)',
+      'User-Agent': 'AgoraX/1.0 (https://agoraxdemocracy.com)',
     },
   });
 

@@ -81,7 +81,7 @@ npx cap sync android   # copies the new config into the native project
 cd android && ./gradlew assembleDebug
 ```
 
-For a stable production build, use a real HTTPS domain (e.g. `https://agorax.gr`).
+For a stable production build, use a real HTTPS domain (e.g. `https://agoraxdemocracy.com`).
 ngrok free URLs rotate on every restart, which is fine for development demos
 but means each rebuild ships a different target.
 
