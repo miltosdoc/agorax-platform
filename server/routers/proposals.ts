@@ -934,6 +934,41 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to fetch election proof" });
     }
   });
+  // External anchors: every publication of this proposal's head hash to the
+  // anchor repository, with commit links, so a third party can compare the
+  // server's claim with the public record. See docs/VOTE_CHAIN_ANCHORING.md.
+  app.get("/api/proposals/:id/election/anchors", async (req, res) => {
+    try {
+      const proposalId = parseInt(req.params.id);
+      if (!Number.isFinite(proposalId)) {
+        return res.status(400).json({ message: "Invalid proposal id" });
+      }
+      const proposal = await proposalRepo.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ message: "Proposal not found" });
+      const { listAnchors, readAnchorConfig } = await import('../utils/chain-anchor');
+      const cfg = readAnchorConfig();
+      const anchors = await listAnchors(proposalId);
+      res.json({
+        configured: cfg !== null,
+        remote: cfg ? `github:${cfg.repo}@${cfg.branch}` : null,
+        file: cfg ? `https://github.com/${cfg.repo}/blob/${cfg.branch}/anchors/proposal-${proposalId}.jsonl` : null,
+        anchors: anchors.map(a => ({
+          phase: a.phase,
+          headHash: a.headHash,
+          total: a.total,
+          verifyOk: a.verifyOk,
+          capturedAt: a.capturedAt,
+          prevAnchorHash: a.prevAnchorHash,
+          anchorHash: a.anchorHash,
+          commit: a.remoteCommit,
+          url: a.remoteUrl,
+          anchoredAt: a.anchoredAt,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch anchors" });
+    }
+  });
   // Backend-internal consistency check. Returns ok=false with the first
   // inconsistency if tampering is detected.
   app.get("/api/proposals/:id/election/verify", async (req, res) => {
@@ -1012,6 +1047,11 @@ export function registerProposalsRoutes(app: Express): void {
         updated = await storage.updateProposal(proposalId, { winningOption: results.winner });
       }
       await triggerSideEffects(proposal.status, nextState, updated);
+      // Seal the closed chain in the external anchor record right away rather
+      // than waiting for the next ten-minute sweep.
+      import('../utils/job-queue')
+        .then(({ enqueueJob }) => enqueueJob({ type: 'chain_anchor', data: { proposalId }, priority: 'low' }))
+        .catch(() => {});
       res.json({ proposal: updated, results });
     } catch (error) {
       res.status(500).json({ message: "Failed to finalize proposal" });

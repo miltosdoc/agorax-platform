@@ -18,10 +18,25 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, ShieldX, Loader2 } from 'lucide-react';
+import { ShieldCheck, ShieldX, Loader2, Anchor } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 
 type Lang = 'el' | 'en';
+
+interface AnchorEntry {
+  phase: 'open' | 'final';
+  headHash: string;
+  total: number;
+  verifyOk: boolean;
+  anchoredAt: string;
+  commit: string | null;
+  url: string | null;
+}
+interface AnchorInfo {
+  configured: boolean;
+  file: string | null;
+  anchors: AnchorEntry[];
+}
 const L: Record<Lang, Record<string, string>> = {
   el: {
     title: 'Επαλήθευση ψηφοδελτίου',
@@ -37,6 +52,15 @@ const L: Record<Lang, Record<string, string>> = {
     error: 'Ο έλεγχος απέτυχε — δοκιμάστε ξανά.',
     what1: 'Τι αποδεικνύει ο έλεγχος: ότι το συγκεκριμένο σφραγισμένο ψηφοδέλτιο βρίσκεται στην κάλπη και μετρήθηκε.',
     what2: 'Τι ΔΕΝ αποδεικνύει: ούτε ποιος το έριξε (η κατοχή του πιστοποιητικού δεν αποδεικνύει ιδιοκτησία — αυτό προστατεύει τους ψηφοφόρους από πιέσεις), ούτε τι ψήφισε.',
+    anchorsTitle: 'Εξωτερική αγκύρωση της κάλπης',
+    anchorsBody: 'Το αποτύπωμα ολόκληρης της κάλπης δημοσιεύεται περιοδικά σε δημόσιο αποθετήριο εκτός του διακομιστή. Αν η κάλπη αλλοιωθεί εκ των υστέρων, το δημοσιευμένο αποτύπωμα παύει να ταιριάζει.',
+    anchorsLatest: 'Τελευταία δημοσίευση:',
+    anchorsCount: 'δημοσιεύσεις συνολικά',
+    anchorsFinal: 'σφραγισμένη μετά το κλείσιμο',
+    anchorsOpen: 'ψηφοφορία σε εξέλιξη',
+    anchorsView: 'Δείτε το δημόσιο αρχείο',
+    anchorsNone: 'Δεν έχει δημοσιευθεί ακόμη αγκύρωση για αυτή την πρόταση.',
+    anchorsOff: 'Η εξωτερική αγκύρωση δεν είναι ενεργή σε αυτή την εγκατάσταση.',
   },
   en: {
     title: 'Ballot verification',
@@ -52,6 +76,15 @@ const L: Record<Lang, Record<string, string>> = {
     error: 'Verification failed — try again.',
     what1: 'What this check proves: that this exact sealed ballot is in the ballot box and was counted.',
     what2: 'What it does NOT prove: who cast it (possession of a certificate is not authorship — that deniability protects voters from pressure), nor what it chose.',
+    anchorsTitle: 'External anchoring of the ballot box',
+    anchorsBody: 'The fingerprint of the whole ballot box is published periodically to a public repository outside this server. If the box is altered afterwards, the published fingerprint no longer matches.',
+    anchorsLatest: 'Latest publication:',
+    anchorsCount: 'publications in total',
+    anchorsFinal: 'sealed after close',
+    anchorsOpen: 'vote in progress',
+    anchorsView: 'View the public record',
+    anchorsNone: 'No anchor has been published for this proposal yet.',
+    anchorsOff: 'External anchoring is not enabled on this installation.',
   },
 };
 
@@ -61,6 +94,7 @@ export default function VerifyBallotPage() {
 
   const params = new URLSearchParams(window.location.search);
   const [proposalId, setProposalId] = useState(params.get('proposal') ?? '');
+  const [anchors, setAnchors] = useState<AnchorInfo | null>(null);
   const [hash, setHash] = useState(params.get('hash') ?? '');
   const [state, setState] = useState<'idle' | 'loading' | 'genuine' | 'notfound' | 'error'>('idle');
   const [castAt, setCastAt] = useState<string | null>(null);
@@ -83,6 +117,20 @@ export default function VerifyBallotPage() {
       setState('error');
     }
   }
+
+  // Once a proposal has been checked, show how its whole ballot box is
+  // anchored outside this server — context for the single-ballot result.
+  useEffect(() => {
+    if (state !== 'genuine' && state !== 'notfound') { setAnchors(null); return; }
+    const pid = Number(proposalId);
+    if (!Number.isFinite(pid)) return;
+    let cancelled = false;
+    fetch(`/api/proposals/${pid}/election/anchors`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: AnchorInfo | null) => { if (!cancelled) setAnchors(data); })
+      .catch(() => { if (!cancelled) setAnchors(null); });
+    return () => { cancelled = true; };
+  }, [state, proposalId]);
 
   // Auto-verify when arriving from a certificate link with both params.
   useEffect(() => {
@@ -167,6 +215,46 @@ export default function VerifyBallotPage() {
             <p>{s.what1}</p>
             <p>{s.what2}</p>
           </div>
+
+          {anchors && (
+            <div className="mt-6 rounded-md border p-4 text-sm" data-testid="verify-anchors">
+              <p className="font-semibold flex items-center gap-2">
+                <Anchor className="w-4 h-4" /> {s.anchorsTitle}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{s.anchorsBody}</p>
+              {!anchors.configured && (
+                <p className="text-xs mt-2">{s.anchorsOff}</p>
+              )}
+              {anchors.configured && anchors.anchors.length === 0 && (
+                <p className="text-xs mt-2">{s.anchorsNone}</p>
+              )}
+              {anchors.anchors.length > 0 && (() => {
+                const last = anchors.anchors[anchors.anchors.length - 1];
+                return (
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p>
+                      {s.anchorsLatest}{' '}
+                      {new Date(last.anchoredAt).toLocaleString(locale === 'en' ? 'en-GB' : 'el-GR')}
+                      {' · '}{last.phase === 'final' ? s.anchorsFinal : s.anchorsOpen}
+                      {' · '}{anchors.anchors.length} {s.anchorsCount}
+                    </p>
+                    <p className="font-mono break-all text-muted-foreground">{last.headHash}</p>
+                    {(last.url || anchors.file) && (
+                      <a
+                        href={last.url ?? anchors.file ?? '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                        data-testid="verify-anchors-link"
+                      >
+                        {s.anchorsView}
+                      </a>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </main>
       <Footer />

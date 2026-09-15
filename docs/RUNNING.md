@@ -16,7 +16,7 @@ Python ballot-validation service.
 ## 2. Install
 
 ```bash
-git clone https://github.com/miltosdoc/agoraxdemocracy.git
+git clone https://github.com/miltosdoc/agorax-platform.git
 cd agoraxdemocracy
 
 # Node app + the @agorax/voting workspace package

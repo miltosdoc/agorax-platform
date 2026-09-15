@@ -14,7 +14,7 @@ import { useTranslation } from "@/hooks/use-translation";
  */
 
 const SPONSOR_URL = "https://github.com/sponsors/miltosdoc";
-const REPO_URL = "https://github.com/miltosdoc/agoraxdemocracy";
+const REPO_URL = "https://github.com/miltosdoc/agorax-platform";
 
 function SupportCard({
   icon,

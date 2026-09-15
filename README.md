@@ -1,6 +1,6 @@
 # AgoraX
 
-[![CI](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml/badge.svg)](https://github.com/miltosdoc/agoraxdemocracy/actions/workflows/ci.yml)
+[![CI](https://github.com/miltosdoc/agorax-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/miltosdoc/agorax-platform/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](tsconfig.json)
 [![License](https://img.shields.io/badge/license-CC--BY--NC--4.0-yellow)](LICENSE)
 
@@ -83,7 +83,7 @@ count anyone can re-verify. It is built for Greek civic communities, bilingual
 - **Android app** — a thin Capacitor wrapper around the web client that
   installs as a real app and surfaces notifications as native Android system
   toasts. Debug APKs are published on every `v*` tag to
-  [GitHub Releases](https://github.com/miltosdoc/agoraxdemocracy/releases);
+  [GitHub Releases](https://github.com/miltosdoc/agorax-platform/releases);
   see [docs/ANDROID_APP.md](docs/ANDROID_APP.md) for install, build, and the
   future FCM background-push path.
 - **Polling platform (`/surveys`)** — a self-serve civic measurement tool:
@@ -246,7 +246,7 @@ phase and on identity verification. The earning schedule is fixed and public.
 **Prerequisites:** Node.js 20+, Python 3.11+, PostgreSQL 14+.
 
 ```bash
-git clone https://github.com/miltosdoc/agoraxdemocracy.git
+git clone https://github.com/miltosdoc/agorax-platform.git
 cd agoraxdemocracy
 npm install                       # Node app + the @agorax/voting workspace
 createdb agorax

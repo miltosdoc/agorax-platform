@@ -701,6 +701,32 @@ export const blindSigIssuance = pgTable("blind_sig_issuance", {
   unique: uniqueIndex('blind_sig_issuance_unique').on(table.proposalId, table.userId),
 }));
 
+// External anchoring of the vote hash chain. The chain is only tamper-evident
+// if someone OUTSIDE the server knows what the head hash was at a given time;
+// otherwise the operator can rewrite the whole chain and recompute every hash.
+// Each row records one publication of a proposal's head hash to an external
+// repository, and binds the previous row (prev_anchor_hash → anchor_hash) so
+// the anchor sequence is itself a chain. See docs/VOTE_CHAIN_ANCHORING.md.
+export const voteChainAnchors = pgTable("vote_chain_anchors", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  phase: text("phase").notNull(),                       // 'open' | 'final'
+  headHash: text("head_hash").notNull(),
+  total: integer("total").notNull(),
+  verifyOk: boolean("verify_ok").notNull(),
+  capturedAt: timestamp("captured_at").notNull(),
+  prevAnchorHash: text("prev_anchor_hash").notNull(),
+  anchorHash: text("anchor_hash").notNull(),
+  record: text("record").notNull(),                     // the exact published line
+  remote: text("remote").notNull(),                     // e.g. github:owner/repo@branch
+  remoteCommit: text("remote_commit"),
+  remoteUrl: text("remote_url"),
+  anchoredAt: timestamp("anchored_at").notNull().defaultNow(),
+}, (table) => ({
+  headUnique: uniqueIndex('vote_chain_anchors_head_unique').on(table.proposalId, table.phase, table.headHash),
+  proposalIdx: index('vote_chain_anchors_proposal_idx').on(table.proposalId, table.id),
+}));
+
 // ─── ElectionGuard verifiable voting (@agorax/voting backend) ───────────────
 // Used only when VOTING_BACKEND=electionguard. One election per proposal,
 // created lazily when the voting phase opens or the first ballot is cast.
@@ -1576,6 +1602,7 @@ export type User = typeof users.$inferSelect;
 export type UserConsent = typeof userConsents.$inferSelect;
 export type InsertUserConsent = typeof userConsents.$inferInsert;
 export type BlindSigKey = typeof blindSigKeys.$inferSelect;
+export type VoteChainAnchor = typeof voteChainAnchors.$inferSelect;
 export type InsertBlindSigKey = typeof blindSigKeys.$inferInsert;
 export type BlindSigIssuance = typeof blindSigIssuance.$inferSelect;
 export type InsertBlindSigIssuance = typeof blindSigIssuance.$inferInsert;

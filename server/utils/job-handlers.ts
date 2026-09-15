@@ -387,6 +387,23 @@ async function handleConferenceReminder(_payload: JobPayload): Promise<void> {
   }
 }
 
+// ─── Vote-chain anchoring ───────────────────────────────────────────────────
+
+/**
+ * Publish the current head hash of every proposal whose chain moved since its
+ * last anchor. Without an external copy of the head, the chain is only
+ * tamper-evident to someone who already trusts the server — see
+ * docs/VOTE_CHAIN_ANCHORING.md. A no-op when ANCHOR_GITHUB_* is unset.
+ */
+async function handleChainAnchor(_payload: JobPayload): Promise<void> {
+  const { runAnchorSweep, isAnchoringConfigured } = await import('./chain-anchor');
+  if (!isAnchoringConfigured()) return;
+  const result = await runAnchorSweep();
+  if (result.anchored > 0 || result.failed > 0) {
+    console.log(`[chain-anchor] anchored=${result.anchored} skipped=${result.skipped} failed=${result.failed}`);
+  }
+}
+
 // ─── Register all handlers ──────────────────────────────────────────────────
 
 export function registerAllHandlers(): void {
@@ -400,6 +417,7 @@ export function registerAllHandlers(): void {
   registerHandler('phase_auto_advance', handlePhaseAutoAdvance);
   registerHandler('conference_reminder', handleConferenceReminder);
   registerHandler('send_email', handleSendEmail);
+  registerHandler('chain_anchor', handleChainAnchor);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────
@@ -456,8 +474,21 @@ export function startJobQueue(): () => void {
     enqueueJob({ type: 'cleanup_expired', data: {}, priority: 'low' }).catch(() => {});
   }, 60_000);
 
+  // Vote-chain anchoring. Publishes moved head hashes to the external anchor
+  // repository. Ten minutes bounds how far behind the public record can lag
+  // the live chain; the first pass runs two minutes after boot so a restart
+  // is enough to catch up anything missed while down.
+  const anchorSweepId = setInterval(() => {
+    enqueueJob({ type: 'chain_anchor', data: {}, priority: 'low' }).catch(() => {});
+  }, 10 * 60_000);
+  const firstAnchorId = setTimeout(() => {
+    enqueueJob({ type: 'chain_anchor', data: {}, priority: 'low' }).catch(() => {});
+  }, 2 * 60_000);
+
   return () => {
     stopWorker();
+    clearInterval(anchorSweepId);
+    clearTimeout(firstAnchorId);
     clearInterval(autoAdvanceId);
     clearInterval(sortitionSweepId);
     clearInterval(reminderSweepId);

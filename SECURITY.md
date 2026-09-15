@@ -13,7 +13,7 @@ We take security seriously. If you discover a security vulnerability, please rep
 
 ### How to Report
 
-1. **Report privately**: Use [GitHub Security Advisories](https://github.com/miltosdoc/agoraxdemocracy/security/advisories/new)
+1. **Report privately**: Use [GitHub Security Advisories](https://github.com/miltosdoc/agorax-platform/security/advisories/new)
 2. **Subject**: `[AgoraX Security] Brief description`
 3. **Include**:
    - Description of the vulnerability
@@ -71,6 +71,6 @@ A comprehensive security audit checklist is available in `docs/SECURITY_AUDIT.md
 ### Contact
 
 For security-related inquiries, contact:
-- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/miltosdoc/agoraxdemocracy/security/advisories/new)
+- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/miltosdoc/agorax-platform/security/advisories/new)
 
 Thank you for helping keep AgoraX secure! 🔒
