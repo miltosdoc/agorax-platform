@@ -154,7 +154,21 @@ export default function FAQPage() {
                 {t('faq.q15_title')}
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground pb-4">
-                {t('faq.q15_answer')}
+                <ol className="space-y-3 list-decimal pl-5">
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <li key={n}>
+                      <span className="font-medium text-foreground">{t(`faq.q15_p${n}_title`)}</span>{' '}
+                      {t(`faq.q15_p${n}_body`)}
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-4">
+                  <span className="font-medium text-foreground">{t('faq.q15_summary_title')}:</span>{' '}
+                  {t('faq.q15_summary')}
+                </p>
+                <p className="mt-3">
+                  <a href="/verify" className="underline text-foreground" data-testid="faq-verify-link">{t('faq.q15_verify')}</a>
+                </p>
               </AccordionContent>
             </AccordionItem>
 
