@@ -169,6 +169,7 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <FooterColumn title={t('footer.useful')}>
               <FooterLink href="/how-it-works">{t('footer.about')}</FooterLink>
+              <FooterLink href="/verify">{t('footer.verify')}</FooterLink>
               <FooterLink href="/terms">{t('footer.terms')}</FooterLink>
               <FooterLink href="/privacy">{t('footer.privacy')}</FooterLink>
               <FooterLink href="/faq">{t('footer.faq')}</FooterLink>

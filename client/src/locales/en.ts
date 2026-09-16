@@ -1900,6 +1900,7 @@ const en: TranslationDictionary = {
   'footer.useful': 'USEFUL',
   'footer.support': 'SUPPORT',
   'footer.about': 'About us',
+  'footer.verify': 'Verify a vote',
   'footer.helpCentre': 'Help',
   'footer.userGuide': 'User guide',
   'footer.reportProblem': 'Report a problem',

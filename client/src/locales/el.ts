@@ -1902,6 +1902,7 @@ const el: TranslationDictionary = {
   'footer.useful': 'ΧΡΗΣΙΜΑ',
   'footer.support': 'ΥΠΟΣΤΗΡΙΞΗ',
   'footer.about': 'Σχετικά με εμάς',
+  'footer.verify': 'Επαλήθευση ψηφοφορίας',
   'footer.helpCentre': 'Βοήθεια',
   'footer.userGuide': 'Οδηγός χρήσης',
   'footer.reportProblem': 'Αναφορά προβλήματος',
