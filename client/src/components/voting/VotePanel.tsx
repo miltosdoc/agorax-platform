@@ -16,6 +16,9 @@ import {
   Lock,
   ShieldCheck,
   Eye,
+  Copy,
+  Check,
+  Fingerprint,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
@@ -115,7 +118,7 @@ export default function VotePanel({
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   const [results, setResults] = useState<VoteResults>(EMPTY_RESULTS);
   const [loading, setLoading] = useState(true);
@@ -141,6 +144,14 @@ export default function VotePanel({
   const [finalReviewLoading, setFinalReviewLoading] = useState(false);
   const [finalReviewError, setFinalReviewError] = useState(false);
 
+  // Ballot-box fingerprint: the live chain head plus its latest external
+  // anchor, so a voter can copy the fingerprint or jump to the public audit.
+  const [box, setBox] = useState<{
+    headHash: string; total: number;
+    anchoredAt: string | null; anchorPhase: 'open' | 'final' | null; bitcoinHeight: number | null;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const isAnonymous = votingMode === 'anonymous';
   const isVoting = proposalStatus === 'voting';
   const isClosed = proposalStatus === 'decided' || proposalStatus === 'archived';
@@ -151,6 +162,31 @@ export default function VotePanel({
     ? !!localReceipt
     : (results.hasVoted ?? results.userVote !== null);
   const userIsAuthor = !!user && proposalAuthorId !== undefined && user.id === proposalAuthorId;
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api.get<{ payload?: { headHash?: string; total?: number } }>(`/api/proposals/${proposalId}/election/proof`),
+      api.get<{ anchors?: Array<{ phase: 'open' | 'final'; anchoredAt: string; bitcoin?: { status: string; blockHeight: number | null } }> }>(`/api/proposals/${proposalId}/election/anchors`),
+    ])
+      .then(([proof, anchors]) => {
+        if (cancelled) return;
+        const head = proof.data.payload?.headHash;
+        if (!head) { setBox(null); return; }
+        const list = anchors.data.anchors ?? [];
+        const last = list[list.length - 1];
+        const confirmed = [...list].reverse().find(a => a.bitcoin?.status === 'complete');
+        setBox({
+          headHash: head,
+          total: proof.data.payload?.total ?? 0,
+          anchoredAt: last?.anchoredAt ?? null,
+          anchorPhase: last?.phase ?? null,
+          bitcoinHeight: confirmed?.bitcoin?.blockHeight ?? null,
+        });
+      })
+      .catch(() => { if (!cancelled) setBox(null); });
+    return () => { cancelled = true; };
+  }, [proposalId, proposalStatus, results.total]);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,6 +325,8 @@ export default function VotePanel({
           if (/already|duplicate/i.test(message)) {
             clearPendingBallot(proposalId);
             setPendingBallot(undefined);
+            // The app-level sweep may have cast it first and saved the receipt.
+            setLocalReceipt(getReceipt(proposalId));
             await refresh();
           } else {
             setError(message);
@@ -655,6 +693,51 @@ export default function VotePanel({
               isOptionBallot && isClosed && results.total > 0 ? results.winner ?? null : null
             }
           />
+        )}
+
+        {/* Ballot-box fingerprint — copyable, with a link to the public audit. */}
+        {box && (
+          <div className="rounded-md border bg-muted/20 p-3 space-y-1.5" data-testid="ballot-box-fingerprint">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Fingerprint className="w-4 h-4 text-muted-foreground" />
+              <span>{t('vote.boxTitle')}</span>
+              <span className="text-xs text-muted-foreground font-normal">
+                · {t('proposal.totalVotes', { count: box.total })}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="text-[11px] font-mono break-all text-muted-foreground flex-1" title={box.headHash}>
+                {box.headHash}
+              </code>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 shrink-0"
+                aria-label={t('vote.boxCopy')}
+                data-testid="ballot-box-copy"
+                onClick={() => {
+                  navigator.clipboard?.writeText(box.headHash).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  }).catch(() => {});
+                }}
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
+            <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
+              {box.anchoredAt && (
+                <span>
+                  {t('vote.boxAnchored')} {new Date(box.anchoredAt).toLocaleString(locale === 'en' ? 'en-GB' : 'el-GR')}
+                  {box.anchorPhase === 'final' ? ` · ${t('vote.boxSealed')}` : ''}
+                </span>
+              )}
+              {box.bitcoinHeight && <span>{t('vote.boxBitcoin')} {box.bitcoinHeight}</span>}
+              <a href={`/verify?proposal=${proposalId}`} className="underline" data-testid="ballot-box-verify">
+                {t('vote.boxVerify')}
+              </a>
+            </div>
+          </div>
         )}
 
         {isVoting && userIsAuthor && (

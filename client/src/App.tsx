@@ -104,9 +104,19 @@ function CommunityFormPage() {
 // was closed — opening AgoraX anywhere finishes the vote.
 function usePendingBallotSweep() {
   useEffect(() => {
-    import('@/lib/anonymous-vote')
-      .then(m => m.castMaturedPendingBallots())
-      .catch(() => { /* best-effort */ });
+    const sweep = () => {
+      import('@/lib/anonymous-vote')
+        .then(m => m.castMaturedPendingBallots())
+        .catch(() => { /* best-effort */ });
+    };
+    // At startup, then every 30 seconds while the app is open, and whenever
+    // the tab comes back into view: a ballot that matures while the voter is
+    // on any page should land without them returning to the proposal.
+    sweep();
+    const id = setInterval(sweep, 30_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') sweep(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 }
 

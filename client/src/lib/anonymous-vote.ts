@@ -74,11 +74,15 @@ function saveReceipt(r: AnonymousReceipt): void {
 // two requests by timestamp and defeat unlinkability.
 // See docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md §G2
 // Overridable for local testing via VITE_VOTE_DECOUPLE_MS.
-export const MIN_CAST_DELAY_MS = Number((import.meta as any).env?.VITE_VOTE_DECOUPLE_MS ?? 30 * 60 * 1000);
+// 90 seconds (2026-09-16, was 30 minutes): the long delay lost about one in
+// nine ballots to voters who never reopened the app before the vote closed.
+// A short delay still breaks second-level pairing of the two requests while
+// keeping the cast inside the session the voter is already in.
+export const MIN_CAST_DELAY_MS = Number((import.meta as any).env?.VITE_VOTE_DECOUPLE_MS ?? 90 * 1000);
 // Random jitter ADDED to the minimum delay. A fixed delay defeats itself:
 // cast time would equal issuance + exactly 30:00, restoring the timing
 // correlation the delay exists to break. With uniform jitter the cast time
-// only reveals "issued somewhere in the last 30-60 minutes" — a window, not
+// only reveals "issued somewhere in the last 90-180 seconds" — a window, not
 // a point. Drawn with crypto randomness; overridable via VITE_VOTE_JITTER_MS.
 export const CAST_JITTER_MS = Number((import.meta as any).env?.VITE_VOTE_JITTER_MS ?? MIN_CAST_DELAY_MS);
 
