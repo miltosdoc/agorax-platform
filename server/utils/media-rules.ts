@@ -41,6 +41,21 @@ export const LIMITS = {
 
 export type Kind = keyof typeof LIMITS;
 
+/**
+ * Extra document extensions accepted by the community library only (not
+ * proposal media). `.apkg` is an Anki flashcard deck — a zip archive, so
+ * the library router also checks the zip signature. Browsers report no
+ * consistent mime for it, so the mime allow-list is skipped for these.
+ */
+export const LIBRARY_EXTRA_DOCUMENT_EXTS: ReadonlySet<string> = new Set(['.apkg']);
+
+const NO_EXTRA_EXTS: ReadonlySet<string> = new Set();
+
+/** True when the buffer starts with a zip local-file header ("PK\x03\x04"). */
+export function isZip(buf: Buffer): boolean {
+  return buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+}
+
 export function isKind(v: unknown): v is Kind {
   return v === 'podcast' || v === 'video' || v === 'document';
 }
@@ -76,21 +91,24 @@ export function validateUpload(
   byteLength: number,
   ext: string,
   mimeType: string,
+  extraDocumentExts: ReadonlySet<string> = NO_EXTRA_EXTS,
 ): { status: number; message: string } | null {
   const limits = LIMITS[kind];
+  const isExtraExt = kind === 'document' && extraDocumentExts.has(ext);
   if (byteLength > limits.maxBytes) {
     return {
       status: 413,
       message: `file too large; ${kind} max is ${Math.round(limits.maxBytes / 1024 / 1024)}MB`,
     };
   }
-  if (!limits.exts.has(ext as never)) {
+  if (!limits.exts.has(ext as never) && !isExtraExt) {
+    const expected = kind === 'document' ? [...limits.exts, ...extraDocumentExts] : [...limits.exts];
     return {
       status: 415,
-      message: `unsupported extension ${ext || '(none)'}; expected one of ${[...limits.exts].join(', ')}`,
+      message: `unsupported extension ${ext || '(none)'}; expected one of ${expected.join(', ')}`,
     };
   }
-  if (mimeType && !limits.mimes.has(mimeType as never) && mimeType !== 'application/octet-stream') {
+  if (mimeType && !isExtraExt && !limits.mimes.has(mimeType as never) && mimeType !== 'application/octet-stream') {
     const prefixOk = kind !== 'document'
       && (mimeType.startsWith('audio/') || mimeType.startsWith('video/'));
     if (!prefixOk) {

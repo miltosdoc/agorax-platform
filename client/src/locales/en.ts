@@ -440,7 +440,7 @@ const en: TranslationDictionary = {
   // Community library (media posted inside a community, not in the feed)
   'library.membersOnly': 'This community\'s library is visible to members only. Join to see it.',
   'library.uploadTitle': 'Add to the library',
-  'library.uploadHint': 'Audio, video or documents for this community — visible here only, never in the global feed. Admins can pin important items to the top.',
+  'library.uploadHint': 'Audio, video, documents or Anki decks (.apkg) for this community — visible here only, never in the global feed. Admins can pin important items to the top.',
   'library.itemTitle': 'Title',
   'library.itemTitlePlaceholder': 'e.g. How the platform works (video)',
   'library.file': 'File',

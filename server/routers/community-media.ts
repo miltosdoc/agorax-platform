@@ -25,7 +25,7 @@ import { communityRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
 import { canViewCommunityContentById } from '../utils/community-visibility';
-import { MEDIA_ROOT, isKind, hashId, safeDecodeHeader, validateUpload, type Kind } from '../utils/media-rules';
+import { MEDIA_ROOT, LIBRARY_EXTRA_DOCUMENT_EXTS, isKind, isZip, hashId, safeDecodeHeader, validateUpload, type Kind } from '../utils/media-rules';
 import { logger } from '../utils/logger';
 
 async function ensureCommunityDir(communityId: number): Promise<string> {
@@ -84,8 +84,11 @@ export function registerCommunityMediaRoutes(app: Express): void {
       }
 
       const ext = path.extname(rawName).toLowerCase();
-      const invalid = validateUpload(kind, buffer.length, ext, mimeType);
+      const invalid = validateUpload(kind, buffer.length, ext, mimeType, LIBRARY_EXTRA_DOCUMENT_EXTS);
       if (invalid) return res.status(invalid.status).json({ message: invalid.message });
+      if (ext === '.apkg' && !isZip(buffer)) {
+        return res.status(415).json({ message: 'not a valid Anki deck (.apkg must be a zip archive)' });
+      }
 
       const dir = await ensureCommunityDir(communityId);
       const id = hashId(buffer) + '-' + randomBytes(4).toString('hex');

@@ -41,6 +41,13 @@ function kindForFile(file: File): LibraryKind {
   return 'document';
 }
 
+/** Download name keeps the stored file's extension, so e.g. an Anki deck
+ *  saves as "Title.apkg" and opens in Anki on double-click. */
+function downloadName(item: LibraryItem): string {
+  const ext = item.filePath.slice(item.filePath.lastIndexOf('.'));
+  return item.title.toLowerCase().endsWith(ext.toLowerCase()) ? item.title : item.title + ext;
+}
+
 const KIND_ICON: Record<LibraryKind, typeof FileAudio> = {
   podcast: FileAudio,
   video: FileVideo,
@@ -164,7 +171,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
                   id="library-file"
                   type="file"
                   ref={fileRef}
-                  accept="audio/*,video/*,.mp3,.m4a,.mp4,.mov,.pdf,.doc,.docx,.odt,.txt"
+                  accept="audio/*,video/*,.mp3,.m4a,.mp4,.mov,.pdf,.doc,.docx,.odt,.txt,.apkg"
                   className="hidden"
                   onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
                   data-testid="library-file-input"
@@ -255,7 +262,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
                   {item.kind === 'document' && (
                     <a
                       href={src}
-                      download={item.title}
+                      download={downloadName(item)}
                       className="inline-flex items-center gap-1.5 text-sm text-primary underline underline-offset-2"
                     >
                       <FileText className="h-4 w-4" /> {t('library.download')}
