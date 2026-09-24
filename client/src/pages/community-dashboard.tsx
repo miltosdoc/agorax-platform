@@ -30,6 +30,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
 import { CommunityLibrary } from '@/components/community/CommunityLibrary';
+import { CommunityConstitution } from '@/components/community/CommunityConstitution';
 import { CommunityForum } from '@/components/community/CommunityForum';
 import ShareButton from '@/components/ShareButton';
 import {
@@ -79,7 +80,7 @@ export default function CommunityDashboardPage() {
   // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return ['forum', 'proposals', 'library', 'members', 'merge'].includes(tab ?? '') ? tab! : 'forum';
+    return ['forum', 'proposals', 'constitution', 'library', 'members', 'merge'].includes(tab ?? '') ? tab! : 'forum';
   });
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
@@ -435,6 +436,7 @@ export default function CommunityDashboardPage() {
         <TabsList className="flex w-full justify-start overflow-x-auto">
           <TabsTrigger value="forum">{t('community.tab_forum')}</TabsTrigger>
           <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
+          <TabsTrigger value="constitution">{t('community.tab_constitution')}</TabsTrigger>
           <TabsTrigger value="library">{t('community.tab_library')}</TabsTrigger>
           <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
           <TabsTrigger value="merge">{t('community.tab_merge')}</TabsTrigger>
@@ -446,6 +448,10 @@ export default function CommunityDashboardPage() {
             isMember={isMember}
             canManage={!!canManageSettings}
           />
+        </TabsContent>
+
+        <TabsContent value="constitution">
+          <CommunityConstitution communityId={parseInt(communityId!, 10)} />
         </TabsContent>
 
         <TabsContent value="library">

@@ -38,6 +38,7 @@ import { registerAnalyticsRoutes } from "./routers/analytics";
 import { registerEconomyRoutes } from "./routers/economy";
 import { registerMediaRoutes } from "./routers/media";
 import { registerCommunityMediaRoutes } from "./routers/community-media";
+import { registerConstitutionRoutes } from "./routers/constitution";
 import { registerCommunityForumRoutes } from "./routers/community-forum";
 import { registerLivekitRoutes } from "./routers/livekit";
 import { setupLiveKitProxy } from "./utils/livekit-proxy";
@@ -70,6 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEconomyRoutes(app);
   registerMediaRoutes(app);
   registerCommunityMediaRoutes(app);
+  registerConstitutionRoutes(app);
   registerCommunityForumRoutes(app);
   registerLivekitRoutes(app);
   registerPushRoutes(app);

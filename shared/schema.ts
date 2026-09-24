@@ -707,6 +707,22 @@ export const blindSigIssuance = pgTable("blind_sig_issuance", {
 // Each row records one publication of a proposal's head hash to an external
 // repository, and binds the previous row (prev_anchor_hash → anchor_hash) so
 // the anchor sequence is itself a chain. See docs/VOTE_CHAIN_ANCHORING.md.
+// AI-written constitution articles, one per passed proposal and language
+// (migration 0053). A cache: regenerated when source_hash no longer matches
+// the adopted text. The adopted text itself stays authoritative.
+export const constitutionArticles = pgTable("constitution_articles", {
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  lang: text("lang").notNull(),                 // 'el' | 'en'
+  sourceHash: text("source_hash").notNull(),
+  normative: boolean("normative").notNull(),    // false = poll/test/call for ideas, not a rule
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  model: text("model"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  pk: uniqueIndex("constitution_articles_pkey").on(table.proposalId, table.lang),
+}));
+
 export const voteChainAnchors = pgTable("vote_chain_anchors", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
