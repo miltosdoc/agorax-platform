@@ -11,16 +11,9 @@ import { useTranslation } from '@/hooks/use-translation';
 import { GreekKeyRule } from './GreekKeyRule';
 
 interface Props {
-  /**
-   * 'yes' | 'no' | 'abstain' for classic ballots, or an option id
-   * ('final', 'counter_12', 'status_quo') for option ballots.
-   */
-  choice: string;
   rowHash: string;
   castAt: string;
-  /** Option ballots: id → label lookup; unknown ids fall back to the raw id. */
-  ballotOptions?: Array<{ id: string; label: string }> | null;
-  /** Enables the downloadable inclusion certificate (choice deliberately omitted). */
+  /** Enables the downloadable inclusion certificate. */
   proposalId?: number;
 }
 
@@ -34,10 +27,10 @@ function formatHash(hash: string): string[] {
   return lines;
 }
 
-export function BallotReceipt({ choice, rowHash, castAt, ballotOptions, proposalId }: Props) {
-  // The exported certificate proves INCLUSION, never the choice: a portable
-  // "how I voted" would make votes coercible and sellable. The choice stays
-  // on-screen only, on this device.
+export function BallotReceipt({ rowHash, castAt, proposalId }: Props) {
+  // Neither the receipt nor the exported certificate shows the choice: a
+  // screenshot or file proving "how I voted" would make votes coercible and
+  // sellable. They prove INCLUSION only.
   function downloadCertificate() {
     if (!proposalId) return;
     const base = window.location.origin;
@@ -73,16 +66,6 @@ export function BallotReceipt({ choice, rowHash, castAt, ballotOptions, proposal
   }
 
   const { t, locale } = useTranslation();
-  const choiceColor =
-    choice === 'yes' ? 'var(--yper)'
-    : choice === 'no' ? 'var(--kata)'
-    : choice === 'abstain' ? 'var(--apochi)'
-    : 'var(--ink)'; // option ballots carry no valence — neutral ink
-  const choiceLabel =
-    choice === 'yes' ? t('proposal.support')
-    : choice === 'no' ? t('proposal.oppose')
-    : choice === 'abstain' ? t('proposal.abstain')
-    : ballotOptions?.find(o => o.id === choice)?.label ?? choice;
   const when = new Date(castAt);
   const stamp = when.toLocaleString(locale === 'en' ? 'en-GB' : 'el-GR', {
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -123,14 +106,8 @@ export function BallotReceipt({ choice, rowHash, castAt, ballotOptions, proposal
           </p>
         </div>
 
-        {/* Choice + timestamp */}
+        {/* Timestamp — the choice is deliberately not shown (see above). */}
         <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--sp-2) var(--sp-4)', fontSize: '.875rem' }}>
-          <dt style={{ color: 'var(--ink-faint)', fontSize: '.75rem', letterSpacing: '.1em', textTransform: 'uppercase', paddingTop: 3 }}>
-            {t('vote.anonConfirmChoice') || 'Επιλογή'}
-          </dt>
-          <dd style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: choiceColor }}>
-            {choiceLabel}
-          </dd>
           <dt style={{ color: 'var(--ink-faint)', fontSize: '.75rem', letterSpacing: '.1em', textTransform: 'uppercase', paddingTop: 3 }}>
             {t('proposal.by') === 'by' ? 'Cast' : 'Καταχώρηση'}
           </dt>
@@ -158,6 +135,20 @@ export function BallotReceipt({ choice, rowHash, castAt, ballotOptions, proposal
           {t('vote.receiptVerifyNote') ||
             'Το αποτύπωμα αποθηκεύεται μόνο σε αυτή τη συσκευή. Επαληθεύστε την καταμέτρησή του ανά πάσα στιγμή — κανείς δεν γνωρίζει ότι είναι δικό σας.'}
         </p>
+
+        <p style={{ margin: '0 auto', maxWidth: '46ch', textAlign: 'center', fontSize: '.75rem', color: 'var(--ink-soft)', lineHeight: 1.6 }} data-testid="receipt-no-choice">
+          {t('receipt.noChoice')}
+        </p>
+
+        {proposalId && (
+          <a
+            href={`/verify?proposal=${proposalId}&hash=${rowHash}`}
+            style={{ margin: '0 auto', fontSize: '.8125rem', color: 'var(--bronze-deep)', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+            data-testid="receipt-verify-link"
+          >
+            {t('receipt.verifyLink')}
+          </a>
+        )}
 
         {proposalId && (
           <button

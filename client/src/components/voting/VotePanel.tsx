@@ -622,10 +622,8 @@ export default function VotePanel({
         {/* Ceremony I — the ballot receipt (anonymous voter, one-shot). */}
         {userVoted && !showVoteButtons && isAnonymous && localReceipt && (
           <BallotReceipt proposalId={proposalId}
-            choice={localReceipt.choice}
             rowHash={localReceipt.rowHash}
             castAt={localReceipt.castAt}
-            ballotOptions={ballotOptions}
           />
         )}
 

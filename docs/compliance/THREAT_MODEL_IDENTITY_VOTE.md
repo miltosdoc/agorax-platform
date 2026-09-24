@@ -98,7 +98,7 @@ A deceased person's AFM could theoretically be used if someone possesses their l
 
 Blind signatures protect against server-side linkage but not against a coerced voter showing their receipt to the coercer. The client stores the receipt in `localStorage`, which the voter can screenshot.
 
-**Mitigation:** This is a physical-world threat, not a cryptographic one. Deniable receipt verification (`/verify-receipt`) is designed so anyone holding a token can verify it — the result cannot be used to prove how a specific person voted. At bench scale with a trusted operator, coercion is a social, not technical, problem.
+**Mitigation:** This is a physical-world threat, not a cryptographic one. Receipts prove inclusion only: `/verify-receipt`, `/receipt-inclusion`, the on-screen receipt and the stored receipt never carry the choice (the choice is kept on the device only while the ballot waits out its privacy delay, and is deleted once cast), so a voter has nothing that proves how they voted. At bench scale with a trusted operator, coercion is a social, not technical, problem.
 
 ---
 

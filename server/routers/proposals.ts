@@ -907,12 +907,15 @@ export function registerProposalsRoutes(app: Express): void {
       const { proposalVotes: pvTable } = await import('@shared/schema');
       const { eq, and } = await import('drizzle-orm');
       const [row] = await db
-        .select({ choice: pvTable.choice, castAt: pvTable.castAt, rowHash: pvTable.rowHash })
+        .select({ castAt: pvTable.castAt, rowHash: pvTable.rowHash })
         .from(pvTable)
         .where(and(eq(pvTable.proposalId, proposalId), eq(pvTable.voteToken, token)))
         .limit(1);
       if (!row) return res.json({ found: false });
-      res.json({ found: true, choice: row.choice, castAt: row.castAt, rowHash: row.rowHash });
+      // Never the choice: the token sits on the voter's device, and a
+      // token → choice lookup would let a coercer demand the token and
+      // learn the vote. Inclusion only, same as /receipt-inclusion.
+      res.json({ found: true, castAt: row.castAt, rowHash: row.rowHash });
     } catch (error) {
       res.status(500).json({ message: "Failed to verify receipt" });
     }

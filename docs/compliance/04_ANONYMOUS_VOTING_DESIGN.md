@@ -140,7 +140,7 @@ This preserves tamper-evidence for both modes. The chain's purpose (a published 
 
 ### 5.3 `GET /api/proposals/:id/verify-receipt?token=<base64>`
 - Auth: none.
-- Returns whether that token appears in the vote table for that proposal, and what choice it carries. Lets a voter verify their vote was counted, but anyone with the token can do so — that's intentional (deniable receipts; you can show "I cast a vote" without proving which way you cast it, because you could publish someone else's token+signature equally well).
+- Returns whether that token appears in the vote table for that proposal (plus its cast time and chain row hash) — never the choice. It used to return the choice, on the theory that receipts were deniable because "anyone with the token can do the lookup". That does not hold: a voter has no way to obtain someone else's token, so a coercer who demands the voter's token would learn the real vote. Since 2026-09 the endpoint, the on-screen receipt and the locally stored receipt all omit the choice.
 
 ### 5.4 Pseudonymous fallback
 The existing `POST /api/proposals/:id/vote` continues to work for proposals where `voting_mode='pseudonymous'`. The proposal-creation UI surfaces the mode choice.
@@ -174,7 +174,7 @@ For proposals where the operator wants re-voting (e.g. straw polls), they can pi
 
 After voting, the client stores `(token, signature, choice, receipt)` in localStorage under the proposal id. The profile page surfaces a "My votes" view that displays these (client-only, never sent back to the server).
 
-The voter can use `verify-receipt?token=…` to confirm their token landed in the DB and matches their recollection. They cannot prove this to anyone else (anyone holding the token can do the same lookup). This is the *deniable receipt* property — it defends against vote-selling because a buyer can't verify the seller actually voted as instructed.
+The voter can use `verify-receipt?token=…` (or the receipt's fingerprint on `/verify`) to confirm their ballot landed in the ballot box. Neither reveals the choice, and the device no longer stores it after the ballot is cast, so there is nothing a vote buyer or coercer can demand to see that proves how the voter voted.
 
 If the voter clears their localStorage, the receipt is gone. They can still confirm "did I vote?" via `blind_sig_issuance`, but not "how did I vote?". This is the price.
 

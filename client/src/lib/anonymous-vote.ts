@@ -36,7 +36,9 @@ export interface AnonymousReceipt {
   preparedMsg: string; // base64 of the prepared message (RFC 9474 Randomized)
   signature: string;   // base64 RSA-PSS signature
   publicKey: PublicKey;
-  choice: AnonymousChoice;
+  // No `choice`: a stored "how I voted" is exactly what a coercer or vote
+  // buyer would ask to see. The receipt proves the ballot was counted
+  // (rowHash → /verify), never what it chose.
   rowHash: string;     // server-returned chain row hash
   castAt: string;      // ISO timestamp from the server
   storedAt: string;    // when this receipt was saved client-side
@@ -50,7 +52,14 @@ export function loadReceipts(): AnonymousReceipt[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return [];
+    // Receipts saved before the choice was dropped still carry it — strip
+    // it and rewrite storage so it stops existing on this device.
+    if (arr.some((r) => r && typeof r === 'object' && 'choice' in r)) {
+      for (const r of arr) if (r && typeof r === 'object') delete r.choice;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+    return arr;
   } catch {
     return [];
   }
@@ -226,14 +235,14 @@ export async function castPendingBallot(pending: PendingBallot): Promise<Anonymo
   }
   const result = (await voteResp.json()) as { rowHash: string; castAt: string };
 
-  // Persist the receipt locally — the only record of HOW the voter voted.
+  // Persist the receipt locally — proof of inclusion, deliberately without
+  // the choice (see AnonymousReceipt).
   const receipt: AnonymousReceipt = {
     proposalId,
     token: pending.token,
     preparedMsg: pending.preparedMsg,
     signature: pending.signature,
     publicKey: pending.publicKey,
-    choice,
     rowHash: result.rowHash,
     castAt: result.castAt,
     storedAt: new Date().toISOString(),
@@ -243,11 +252,6 @@ export async function castPendingBallot(pending: PendingBallot): Promise<Anonymo
   return receipt;
 }
 
-/**
- * Ask the server whether a given token has been counted, and what choice
- * it carries. The deniable property: anyone holding the token can do this
- * lookup, so the result cannot be used to coerce the voter.
- */
 /**
  * Cast every pending ballot whose privacy delay has elapsed — called once on
  * app start so a voter who closed the browser mid-delay completes their vote
@@ -277,12 +281,18 @@ export async function castMaturedPendingBallots(): Promise<number> {
   return cast;
 }
 
+/**
+ * Ask the server whether a given token has been counted. The answer never
+ * includes the choice: the token lives on the voter's device, so a lookup
+ * that returned the choice would let anyone who demands the token prove
+ * how the voter voted.
+ */
 export async function verifyReceipt(
   proposalId: number,
   token: string,
-): Promise<{ found: false } | { found: true; choice: AnonymousChoice; castAt: string; rowHash: string }> {
+): Promise<{ found: false } | { found: true; castAt: string; rowHash: string }> {
   const resp = await api.get<
-    { found: false } | { found: true; choice: AnonymousChoice; castAt: string; rowHash: string }
+    { found: false } | { found: true; castAt: string; rowHash: string }
   >(`/api/proposals/${proposalId}/verify-receipt?token=${encodeURIComponent(token)}`);
   return resp.data;
 }

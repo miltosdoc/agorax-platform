@@ -1804,6 +1804,8 @@ const en: TranslationDictionary = {
   'proposal.deleteOrWithdraw': 'Delete / Withdraw',
   'community.show_archived': 'Show archived',
   'receipt.download': 'Download inclusion certificate (your choice is omitted)',
+  'receipt.noChoice': 'Your choice is deliberately not shown here, so nobody can ask you to prove how you voted.',
+  'receipt.verifyLink': 'Check that your vote was counted →',
   'livekit.startCta': 'Start a conference',
   'livekit.startCtaHint': 'Video, chat and screen sharing — members are notified automatically.',
   'conference.connect_failed': 'Could not connect to the video server.',

@@ -1806,6 +1806,8 @@ const el: TranslationDictionary = {
   'proposal.deleteOrWithdraw': 'Διαγραφή / Απόσυρση',
   'community.show_archived': 'Εμφάνιση αρχειοθετημένων',
   'receipt.download': 'Λήψη πιστοποιητικού καταχώρησης (χωρίς την επιλογή σας)',
+  'receipt.noChoice': 'Η επιλογή σου δεν εμφανίζεται εδώ, σκόπιμα: έτσι κανείς δεν μπορεί να σου ζητήσει να αποδείξεις τι ψήφισες.',
+  'receipt.verifyLink': 'Έλεγξε ότι η ψήφος σου μετρήθηκε →',
   'livekit.startCta': 'Έναρξη συνδιάσκεψης',
   'livekit.startCtaHint': 'Βίντεο, συνομιλία και κοινή χρήση οθόνης — τα μέλη ειδοποιούνται αυτόματα.',
   'conference.connect_failed': 'Η σύνδεση με τον διακομιστή βίντεο απέτυχε.',
