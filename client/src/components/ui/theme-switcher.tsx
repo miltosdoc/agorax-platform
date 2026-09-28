@@ -1,6 +1,9 @@
 /**
  * Colour theme picker for the header: one of the four logo accents.
  *
+ * On the public landing page it offers only the two looks that page is
+ * designed in (LANDING_THEMES) and marks the one actually showing.
+ *
  * Applies instantly and locally, then saves to the account when signed in —
  * the same fire-and-forget contract as the language switcher, and for the
  * same reason: the interface has already changed, so a failed save costs
@@ -21,13 +24,16 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/hooks/use-translation';
 import { api } from '@/lib/api';
-import { ACCENT_THEMES, THEME_SWATCH, type AccentTheme } from '@shared/theme';
+import { ACCENT_THEMES, LANDING_THEMES, THEME_SWATCH, landingThemeOf, type AccentTheme } from '@shared/theme';
 
 export function ThemeSwitcher({ className = '' }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const onLanding = location === '/' && !user;
+  const options = onLanding ? LANDING_THEMES : ACCENT_THEMES;
+  const shown = onLanding ? landingThemeOf(theme) : theme;
 
   const choose = (next: AccentTheme) => {
     setTheme(next);
@@ -50,7 +56,7 @@ export function ThemeSwitcher({ className = '' }: { className?: string }) {
           <span
             aria-hidden
             className="absolute bottom-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-paper"
-            style={{ backgroundColor: THEME_SWATCH[theme] }}
+            style={{ backgroundColor: THEME_SWATCH[shown] }}
           />
         </button>
       </DropdownMenuTrigger>
@@ -59,7 +65,7 @@ export function ThemeSwitcher({ className = '' }: { className?: string }) {
           {t('theme.label')}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {ACCENT_THEMES.map((option) => (
+        {options.map((option) => (
           <DropdownMenuItem
             key={option}
             onClick={() => choose(option)}
@@ -72,14 +78,18 @@ export function ThemeSwitcher({ className = '' }: { className?: string }) {
               style={{ backgroundColor: THEME_SWATCH[option] }}
             />
             <span className="flex-1">{t(`theme.${option}`)}</span>
-            {theme === option && <Check className="h-4 w-4 text-kyanos" />}
+            {shown === option && <Check className="h-4 w-4 text-kyanos" />}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate('/appearance')} className="cursor-pointer gap-2.5" data-testid="theme-all">
-          <LayoutGrid className="h-3.5 w-3.5 text-ink-faint" />
-          <span>{t('theme.allThemes')}</span>
-        </DropdownMenuItem>
+        {!onLanding && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/appearance')} className="cursor-pointer gap-2.5" data-testid="theme-all">
+              <LayoutGrid className="h-3.5 w-3.5 text-ink-faint" />
+              <span>{t('theme.allThemes')}</span>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

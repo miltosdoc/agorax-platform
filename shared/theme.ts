@@ -40,3 +40,15 @@ export const THEME_SWATCH: Record<AccentTheme, string> = {
 
 /** Which themes paint a dark ground; the picker groups by audience, not by this. */
 export const DARK_THEMES: readonly AccentTheme[] = ['parliament', 'spray'];
+
+/**
+ * The public landing page is designed in two looks only: navy, the ceremony
+ * look of the promo film, and spray, the youth look. Any other theme a
+ * visitor has picked shows the landing page in navy, without changing their
+ * choice for the rest of the app.
+ */
+export const LANDING_THEMES: readonly AccentTheme[] = ['navy', 'spray'];
+
+export function landingThemeOf(theme: AccentTheme): AccentTheme {
+  return LANDING_THEMES.includes(theme) ? theme : DEFAULT_THEME;
+}
