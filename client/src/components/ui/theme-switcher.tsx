@@ -21,10 +21,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
-import { useTheme } from '@/hooks/use-theme';
+import { useLandingTheme, useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/hooks/use-translation';
 import { api } from '@/lib/api';
-import { ACCENT_THEMES, LANDING_THEMES, THEME_SWATCH, landingThemeOf, type AccentTheme } from '@shared/theme';
+import { ACCENT_THEMES, LANDING_THEMES, THEME_SWATCH, type AccentTheme } from '@shared/theme';
 
 export function ThemeSwitcher({ className = '' }: { className?: string }) {
   const { theme, setTheme } = useTheme();
@@ -33,7 +33,8 @@ export function ThemeSwitcher({ className = '' }: { className?: string }) {
   const [location, navigate] = useLocation();
   const onLanding = location === '/' && !user;
   const options = onLanding ? LANDING_THEMES : ACCENT_THEMES;
-  const shown = onLanding ? landingThemeOf(theme) : theme;
+  const landingLook = useLandingTheme();
+  const shown = onLanding ? landingLook : theme;
 
   const choose = (next: AccentTheme) => {
     setTheme(next);

@@ -55,6 +55,9 @@ export default function ProcessFilm({ copy }: { copy: FilmCopy }) {
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const typedRef = useRef<HTMLSpanElement>(null);
+  const steps = useRef<HTMLLIElement[] | null>(null);
+  const scenes = useRef<HTMLElement[] | null>(null);
+  const written = useRef(new Map<string, string>());
 
   useScrollFrame(() => {
     const section = sectionRef.current;
@@ -65,17 +68,33 @@ export default function ProcessFilm({ copy }: { copy: FilmCopy }) {
     const raw = RM ? n - 0.001 : sectionProgress(section) * n;
     const i = Math.min(n - 1, Math.floor(raw));
     const t = RM ? 1 : clamp(raw - i);
-    section.querySelectorAll<HTMLLIElement>('.film-steps li').forEach((li, k) => {
-      li.classList.toggle('on', k === i);
-      li.style.setProperty('--sp', String(k < i ? 1 : k === i ? t : 0));
-    });
-    stage.querySelectorAll<HTMLElement>('.scene').forEach((s, k) => s.classList.toggle('on', RM || k === i));
-    const set = (k: string, v: number) => stage.style.setProperty(k, v.toFixed(3));
+    // Only what changed since the last frame is written back.
+    const done = written.current;
+    const put = (el: HTMLElement, key: string, name: string, value: string) => {
+      if (done.get(key) === value) return;
+      el.style.setProperty(name, value);
+      done.set(key, value);
+    };
+    if (!steps.current) {
+      steps.current = [...section.querySelectorAll<HTMLLIElement>('.film-steps li')];
+      scenes.current = [...stage.querySelectorAll<HTMLElement>('.scene')];
+    }
+    if (done.get('scene') !== String(i)) {
+      steps.current.forEach((li, k) => li.classList.toggle('on', k === i));
+      scenes.current!.forEach((sc, k) => sc.classList.toggle('on', RM || k === i));
+      done.set('scene', String(i));
+    }
+    steps.current.forEach((li, k) => put(li, `sp${k}`, '--sp', (k < i ? 1 : k === i ? t : 0).toFixed(3)));
+    const set = (k: string, v: number) => put(stage, k, k, v.toFixed(3));
     // How far each scene has played: 0 before it, its own t while on, 1 after.
     const at = (k: number) => (RM ? 1 : i === k ? t : i > k ? 1 : 0);
 
     const u = at(0);
-    if (typedRef.current) typedRef.current.textContent = copy.typed.slice(0, Math.round(copy.typed.length * clamp(u * 2.2)));
+    const typed = copy.typed.slice(0, Math.round(copy.typed.length * clamp(u * 2.2)));
+    if (typedRef.current && done.get('typed') !== typed) {
+      typedRef.current.textContent = typed;
+      done.set('typed', typed);
+    }
     set('--ai', ease(span(u, 0.48, 0.6)));
     set('--fill', ease(span(u, 0.58, 0.88)));
 

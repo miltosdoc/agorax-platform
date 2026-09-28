@@ -28,6 +28,20 @@
     <script>
       try {
         var agoraTheme = localStorage.getItem('agorax-theme');
+        // The landing page comes in navy or spray only (shared/theme.ts):
+        // another chosen theme shows as navy there, and a visitor who never
+        // chose is dealt one of the two at random, kept for later visits.
+        if (location.pathname === '/' && agoraTheme !== 'navy' && agoraTheme !== 'spray') {
+          if (agoraTheme) {
+            agoraTheme = 'navy';
+          } else {
+            agoraTheme = localStorage.getItem('agorax-landing-look');
+            if (agoraTheme !== 'navy' && agoraTheme !== 'spray') {
+              agoraTheme = Math.random() < 0.5 ? 'navy' : 'spray';
+              localStorage.setItem('agorax-landing-look', agoraTheme);
+            }
+          }
+        }
         if (agoraTheme && agoraTheme !== 'navy' && /^[a-z]{1,16}$/.test(agoraTheme)) {
           document.documentElement.setAttribute('data-accent', agoraTheme);
         }

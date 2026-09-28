@@ -11,12 +11,13 @@
  * real votes and the way in. Authenticated visitors go to /feed.
  *
  * The page is designed in two looks: navy (the promo film's ceremony
- * palette) and spray (the youth theme). A visitor on spray gets the spray
- * tour; any other theme shows the whole page, header included, in navy for
- * as long as the visitor stays here, without changing their choice.
+ * palette) and spray (the youth theme). A visitor who never chose a theme
+ * is dealt one of the two at random and keeps it; one who chose spray or
+ * navy gets it; any other theme shows the whole page, header included, in
+ * navy for as long as the visitor stays here, without changing their choice.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/header';
@@ -24,10 +25,9 @@ import Footer from '@/components/layout/footer';
 import { EntityCard } from '@/components/cards/entity-card';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { useAuth } from '@/hooks/use-auth';
-import { previewTheme, useTheme } from '@/hooks/use-theme';
+import { previewTheme, useLandingTheme, useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/hooks/use-translation';
 import { proposalEyebrow } from '@/lib/proposal-kind';
-import { landingThemeOf } from '@shared/theme';
 import logoImage from '@/assets/logo.png';
 import HeroAssembly from '@/components/landing/HeroAssembly';
 import NoiseToOrder from '@/components/landing/NoiseToOrder';
@@ -37,7 +37,7 @@ import ProcessFilm from '@/components/landing/ProcessFilm';
 import SealedChainDemo from '@/components/landing/SealedChainDemo';
 import RulesDemo from '@/components/landing/RulesDemo';
 import { TOUR_COPY } from '@/components/landing/copy';
-import { headerHeight, useScrollFrame } from '@/components/landing/scroll';
+import { headerHeight, pageHeight, pageTop, useScrollFrame } from '@/components/landing/scroll';
 import '@/components/landing/tour.css';
 
 interface LiveProposal {
@@ -74,15 +74,15 @@ export default function LandingPage() {
   const copy = TOUR_COPY[lang];
   const rootRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
-  const skin = landingThemeOf(theme);
+  const skin = useLandingTheme();
 
   useEffect(() => {
     if (user) navigate('/feed');
   }, [user, navigate]);
 
-  // Paint the page in its look while the visitor is here; leaving restores
-  // the theme they chose.
-  useEffect(() => {
+  // Paint the page in its look while the visitor is here, before the first
+  // paint; leaving restores the theme they chose.
+  useLayoutEffect(() => {
     if (theme === skin) return;
     previewTheme(skin);
     return () => previewTheme(null);
@@ -132,18 +132,31 @@ export default function LandingPage() {
 
   // Progress rail, the active chapter mark, and the header's height (pinned
   // scenes sit just below it).
+  const chapter = useRef('');
+  const hdrWritten = useRef('');
+  const barRef = useRef<HTMLSpanElement>(null);
   useScrollFrame(() => {
     const root = rootRef.current;
     if (!root) return;
-    root.style.setProperty('--hdr', `${headerHeight()}px`);
-    const doc = document.documentElement.scrollHeight - window.innerHeight;
-    root.style.setProperty('--p', String(doc > 0 ? window.scrollY / doc : 0));
+    // A variable set on the tour's root restyles the whole page, so the
+    // header height is written only when it changes and the progress goes
+    // straight onto the bar.
+    const hdr = `${headerHeight()}px`;
+    if (hdr !== hdrWritten.current) {
+      root.style.setProperty('--hdr', hdr);
+      hdrWritten.current = hdr;
+    }
+    const doc = pageHeight() - window.innerHeight;
+    if (barRef.current) barRef.current.style.transform = `scaleX(${doc > 0 ? Math.round((window.scrollY / doc) * 1000) / 1000 : 0})`;
     let current = CHAPTER_IDS[0];
     for (const id of CHAPTER_IDS) {
       const el = document.getElementById(id);
-      if (el && el.getBoundingClientRect().top < window.innerHeight * 0.45) current = id;
+      if (el && pageTop(el) - window.scrollY < window.innerHeight * 0.45) current = id;
     }
-    root.querySelectorAll<HTMLAnchorElement>('.tour-chapters a').forEach((a) => a.classList.toggle('on', a.dataset.ch === current));
+    if (current !== chapter.current) {
+      root.querySelectorAll<HTMLAnchorElement>('.tour-chapters a').forEach((a) => a.classList.toggle('on', a.dataset.ch === current));
+      chapter.current = current;
+    }
   });
 
   if (user) return null;
@@ -152,7 +165,7 @@ export default function LandingPage() {
     <div className="flex min-h-screen flex-col">
       <Header />
       <main ref={rootRef} className="tour flex-grow" data-skin={skin} data-testid="landing-tour">
-        <div className="tour-progress" aria-hidden="true"><span /></div>
+        <div className="tour-progress" aria-hidden="true"><span ref={barRef} /></div>
         <nav className="tour-chapters" aria-label={lang === 'el' ? 'Ενότητες περιήγησης' : 'Tour chapters'}>
           {CHAPTER_IDS.map((id, i) => (
             <a key={id} href={`#${id}`} data-ch={id} aria-label={copy.chapters[i]}>

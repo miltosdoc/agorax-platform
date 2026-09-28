@@ -121,7 +121,7 @@
 
 /* ── progress rail + chapter marks ───────────────────────── */
 .tour-progress { position: fixed; left: 0; right: 0; top: var(--hdr); height: 2px; z-index: 40; pointer-events: none; }
-.tour-progress span { display: block; height: 100%; background: var(--gold-deep); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }
+.tour-progress span { display: block; height: 100%; background: var(--gold-deep); transform-origin: 0 50%; transform: scaleX(0); will-change: transform; }
 .tour-chapters { position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 30; display: flex; flex-direction: column; gap: 14px; }
 .tour-chapters a { position: relative; display: block; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gold-deep); background: rgba(255, 255, 255, 0.4); transition: background 0.25s, transform 0.25s; }
 .tour-chapters a.on { background: var(--gold-deep); transform: scale(1.3); }
@@ -152,7 +152,7 @@
 @keyframes tour-cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
 
 /* ── the problem ─────────────────────────────────────── */
-.tour-noise { position: relative; height: 320svh; }
+.tour-noise { position: relative; height: 240svh; }
 .tour-beats { position: relative; min-height: 290px; }
 .tour-beat { position: absolute; inset: 0 0 auto 0; opacity: 0; transform: translateY(18px); transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
 .tour-beat.on { opacity: 1; transform: none; }
@@ -168,7 +168,7 @@
 .tour-noise-art .outlines { opacity: var(--bc, 0); }
 .tour-noise-art .outlines path, .tour-noise-art .outlines rect, .tour-noise-art .outlines circle { fill: none; stroke: var(--bronze-ink); stroke-width: 1; stroke-dasharray: 3 3; }
 .tour-noise-art .grp { font: 400 17px var(--display); fill: var(--parch-ink); }
-.tour-noise-art .counter { font: 600 10.5px var(--font-ui); letter-spacing: 0.16em; fill: var(--bronze-ink); text-transform: uppercase; }
+.tour-noise-art .counter { font: 700 16px var(--font-ui); letter-spacing: 0.1em; fill: var(--bronze-ink); text-transform: uppercase; }
 
 /* ── the film ────────────────────────────────────────── */
 .tour-film { position: relative; height: 580svh; }
@@ -636,6 +636,7 @@
   .tour-beats { min-height: 250px; }
   .tour-beat h3 { font-size: 1.9rem; margin-bottom: 12px; }
   .tour-beat p { font-size: 0.93rem; line-height: 1.65; }
+  .tour-noise-art .counter { font-size: 24px; letter-spacing: 0.06em; }
   .tour-film { height: 620svh; }
   .film-split { grid-template-rows: auto minmax(0, 1fr); gap: 10px; padding-bottom: 14px; height: calc(100svh - var(--hdr)); }
   .film-copy h2 { font-size: 1.7rem; margin-bottom: 8px; }

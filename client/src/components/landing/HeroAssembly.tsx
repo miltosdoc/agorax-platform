@@ -64,6 +64,7 @@ export default function HeroAssembly({
     const cv = canvasRef.current!;
     const section = sectionRef.current!;
     const cx = cv.getContext('2d')!;
+    const glow = document.createElement('canvas');
     const s = state.current;
     const RM = reducedMotion();
 
@@ -73,6 +74,16 @@ export default function HeroAssembly({
       s.dot = css.getPropertyValue('--dot-rgb').trim() || s.dot;
       s.lead = css.getPropertyValue('--lead-rgb').trim() || s.lead;
       s.bema = css.getPropertyValue('--bema-rgb').trim() || s.bema;
+      // The lead seats' glow, drawn once and stamped, since a canvas blur per
+      // dot per frame is what slows a weak machine down.
+      const gctx = glow.getContext('2d')!;
+      glow.width = glow.height = 32;
+      const gg = gctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gg.addColorStop(0, `rgba(${s.lead},0.75)`);
+      gg.addColorStop(1, `rgba(${s.lead},0)`);
+      gctx.clearRect(0, 0, 32, 32);
+      gctx.fillStyle = gg;
+      gctx.fillRect(0, 0, 32, 32);
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const box = cv.parentElement!.getBoundingClientRect();
       s.w = box.width;
@@ -135,18 +146,17 @@ export default function HeroAssembly({
         const r = 1.4 + g.z * 1.5 + p * (g.lead ? 1.3 : 0.9);
         const a = 0.25 + 0.35 * g.z + 0.4 * p;
         if (g.lead && p > 0.5) {
-          cx.shadowColor = `rgba(${s.lead},0.9)`;
-          cx.shadowBlur = 10 * p;
+          cx.globalAlpha = (p - 0.5) * 2 * a;
+          cx.drawImage(glow, x - 16, y - 16);
+          cx.globalAlpha = 1;
           cx.fillStyle = `rgba(${s.lead},${a})`;
         } else {
-          cx.shadowBlur = 0;
           cx.fillStyle = `rgba(${s.dot},${a * (0.7 + 0.3 * p)})`;
         }
         cx.beginPath();
         cx.arc(x, y, r, 0, 6.283);
         cx.fill();
       }
-      cx.shadowBlur = 0;
       if (lit > 0) {
         cx.fillStyle = `rgba(${s.bema},${lit})`;
         cx.beginPath();
@@ -174,9 +184,9 @@ export default function HeroAssembly({
       if (RM) draw(0);
     };
     const onMove = (e: PointerEvent) => {
-      const r = section.getBoundingClientRect();
-      s.mx = (e.clientX - r.left) / r.width - 0.5;
-      s.my = (e.clientY - r.top) / r.height - 0.5;
+      // The pinned hero fills the viewport, so the viewport is its frame.
+      s.mx = e.clientX / window.innerWidth - 0.5;
+      s.my = e.clientY / window.innerHeight - 0.5;
     };
     const io = new IntersectionObserver(([e]) => (s.visible = e.isIntersecting), { threshold: 0 });
     io.observe(section);
