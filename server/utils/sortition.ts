@@ -13,13 +13,16 @@
  * - Cryptographically secure random selection (crypto.getRandomValues)
  * - Excludes users already serving in active sortition bodies
  * - Configurable panel size
- * - Transparent selection process (seed is recorded for verification)
+ *
+ * The draw is not reproducible: the shuffle takes fresh randomness and no
+ * seed is stored, so nobody can re-run it to check the outcome.
  */
 
 import type { IStorage } from '../storage';
 import { db } from '../db';
 import { sortitionBodies, sortitionMembers } from '@shared/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
+import { cryptoShuffle } from './crypto-shuffle';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,37 +43,14 @@ export interface EligibleMember {
 // ─── Cryptographically Secure Random Selection ──────────────────────────────
 
 /**
- * Generate a cryptographically secure random seed.
- * Used to ensure the selection process is verifiable and unbiased.
+ * Generate a random hex string returned as `seed` in SortitionResult.
+ * It does not drive the shuffle and is not stored, so it cannot be used
+ * to verify a draw.
  */
 function generateSeed(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-/**
- * Fisher-Yates shuffle using cryptographically secure random numbers.
- * 
- * Uses rejection sampling to avoid modulo bias — when the random byte
- * would introduce bias (byte > 256 - 256 % (i+1)), we reject it and
- * draw again. This guarantees uniform distribution.
- */
-function cryptoShuffle<T>(array: T[]): T[] {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    // Rejection sampling to avoid modulo bias
-    const limit = 256 - (256 % (i + 1));
-    let j: number;
-    do {
-      const bytes = new Uint8Array(1);
-      crypto.getRandomValues(bytes);
-      j = bytes[0];
-    } while (j >= limit);
-    j = j % (i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
 }
 
 // ─── Eligibility ────────────────────────────────────────────────────────────
@@ -187,7 +167,7 @@ export async function getActiveSortitionMembers(
  * @param proposalId - Optional proposal to associate
  * @param excludeUserIds - Optional set of user IDs to exclude (e.g., currently serving)
  * 
- * @returns SortitionResult with selected user IDs and verification seed
+ * @returns SortitionResult with selected user IDs
  */
 export async function createSortitionBody(
   communityId: number,

@@ -13,6 +13,7 @@ import { storage } from '../storage';
 import { sortitionBodies, sortitionMembers, proposals } from '@shared/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { getEligibleMembers } from './sortition';
+import { cryptoShuffle } from './crypto-shuffle';
 import { logOverrideSortitionTimeout } from './admin-action-logger';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -66,24 +67,14 @@ export async function replaceNonRespondingMembers(
 
   if (candidates.length === 0) return 0;
 
-  // Cryptographically secure shuffle for fairness, mirroring sortition.ts
-  for (let i = candidates.length - 1; i > 0; i--) {
-    const limit = 256 - (256 % (i + 1));
-    let j: number;
-    do {
-      const bytes = new Uint8Array(1);
-      crypto.getRandomValues(bytes);
-      j = bytes[0];
-    } while (j >= limit);
-    j = j % (i + 1);
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-  }
+  // Cryptographically secure shuffle for fairness, same as the initial draw
+  const shuffled = cryptoShuffle(candidates);
 
-  const replaceCount = Math.min(maxReplacements, nonResponders.length, candidates.length);
+  const replaceCount = Math.min(maxReplacements, nonResponders.length, shuffled.length);
   let replaced = 0;
   for (let i = 0; i < replaceCount; i++) {
     const drop = nonResponders[i];
-    const pick = candidates[i];
+    const pick = shuffled[i];
 
     // Remove the non-responder, add the replacement.
     await db

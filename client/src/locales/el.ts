@@ -990,10 +990,12 @@ const el: TranslationDictionary = {
   'sortition.attendance.status.declined': 'Απορρίφθηκε',
   'sortition.attendance.status.no-show': 'Δεν εμφανίστηκε',
   'sortition.drawTitle': 'Η κλήρωση',
-  'sortition.drawRule': 'Κρυπτογραφικά ασφαλής, αμερόληπτη τυχαία επιλογή. Ο σπόρος καταγράφεται για έλεγχο.',
-  'sortition.drawSeed': 'Καταγεγραμμένος σπόρος',
+  'sortition.drawRule': 'Κρυπτογραφικά ασφαλής, αμερόληπτη τυχαία επιλογή.',
   'sortition.drawChosen': 'Εκλέχθηκαν {n} από {size}',
   'sortition.drawSelected': 'Εκλέγεται',
+  'sortition.ceremony.fingerprintTitle': 'Αποτύπωμα όσων κληρώθηκαν',
+  'sortition.ceremony.fingerprintBody': 'Η κλήρωση έγινε με κρυπτογραφικά ασφαλή τυχαιότητα. Ο κωδικός είναι αποτύπωμα (SHA-256) της λίστας των πολιτών που επιλέχθηκαν.',
+  'sortition.ceremony.drawnAt': 'Κλήρωση: {date}',
   'sortition.attendance.status.completed': 'Ολοκληρώθηκε',
 
   // Sortition role card

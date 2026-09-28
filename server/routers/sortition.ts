@@ -103,7 +103,9 @@ export function registerSortitionRoutes(app: Express): void {
           };
         })
       );
-      // Deterministic verification hash from immutable identifiers.
+      // Fingerprint of who is currently on the body. It identifies the list;
+      // it cannot prove the draw was random, and it changes if a
+      // non-responder is replaced.
       const { createHash } = await import('crypto');
       const sortedIds = [...members.map(m => m.userId)].sort((a, b) => a - b);
       const seedSource = `${body.id}|${body.selectedAt?.toISOString() ?? ''}|${sortedIds.join(',')}`;

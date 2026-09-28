@@ -990,10 +990,12 @@ const en: TranslationDictionary = {
   'sortition.attendance.status.declined': 'Declined',
   'sortition.attendance.status.no-show': 'No-show',
   'sortition.drawTitle': 'The draw',
-  'sortition.drawRule': 'Cryptographically secure, unbiased random selection. The seed is recorded for audit.',
-  'sortition.drawSeed': 'Recorded seed',
+  'sortition.drawRule': 'Cryptographically secure, unbiased random selection.',
   'sortition.drawChosen': 'Chosen {n} of {size}',
   'sortition.drawSelected': 'Drawn',
+  'sortition.ceremony.fingerprintTitle': 'Fingerprint of who was selected',
+  'sortition.ceremony.fingerprintBody': 'The draw used cryptographically secure randomness. This code is a fingerprint (SHA-256) of the list of people selected.',
+  'sortition.ceremony.drawnAt': 'Drawn: {date}',
   'sortition.attendance.status.completed': 'Completed',
 
   // Sortition role card

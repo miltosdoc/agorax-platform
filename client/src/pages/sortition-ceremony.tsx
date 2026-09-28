@@ -2,8 +2,12 @@
  * Selection Ceremony
  *
  * The democratic moment: shown immediately after a sortition body is created.
- * Frames the random draw as civic duty, displays the cryptographic
- * verification hash, and lists every selected member.
+ * Frames the random draw as civic duty, shows a SHA-256 fingerprint of the
+ * list of selected members, and lists every one of them.
+ *
+ * The fingerprint only identifies who was picked. It cannot prove the pick
+ * was random (the draw is not reproducible and no seed is stored), so the
+ * copy must not invite anyone to "verify the draw" with it.
  */
 
 import { useEffect, useState } from 'react';
@@ -14,9 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
+import { Fingerprint, Sparkles, ArrowRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
+import { useTranslation } from '@/hooks/use-translation';
 
 interface CeremonyMember {
   assignmentId: number;
@@ -53,6 +58,7 @@ export default function SortitionCeremonyPage() {
   const params = useParams();
   const bodyId = params.bodyId;
   const { user } = useAuth();
+  const { t, locale } = useTranslation();
   const [data, setData] = useState<CeremonyData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,11 +111,11 @@ export default function SortitionCeremonyPage() {
             <Card className="mb-4 border-amber-200 bg-amber-50/60">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm">
-                  <ShieldCheck className="w-4 h-4 text-amber-700" />
-                  Ψηφιακή σφραγίδα επαλήθευσης
+                  <Fingerprint className="w-4 h-4 text-amber-700" />
+                  {t('sortition.ceremony.fingerprintTitle')}
                 </CardTitle>
                 <CardDescription>
-                  Hash που μπορεί κάθε πολίτης να ξανατρέξει για να επαληθεύσει την κλήρωση.
+                  {t('sortition.ceremony.fingerprintBody')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -118,7 +124,9 @@ export default function SortitionCeremonyPage() {
                 </div>
                 {data.selectedAt && (
                   <div className="text-xs text-muted-foreground mt-2">
-                    Κλήρωση: {new Date(data.selectedAt).toLocaleString('el-GR')}
+                    {t('sortition.ceremony.drawnAt', {
+                      date: new Date(data.selectedAt).toLocaleString(locale === 'en' ? 'en-GB' : 'el-GR'),
+                    })}
                   </div>
                 )}
               </CardContent>

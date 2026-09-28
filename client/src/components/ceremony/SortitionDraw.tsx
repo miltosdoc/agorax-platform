@@ -5,12 +5,12 @@
  * members surface one by one in bronze — the moment of the draw.
  *
  * HONEST FRAMING: the server selects by a cryptographically-secure,
- * rejection-sampled Fisher–Yates shuffle (crypto.getRandomValues), with
- * the seed recorded for audit. It is unbiased random selection — NOT a
- * deterministic seed→member function the public can recompute. The copy
- * here reflects exactly that; it does not claim recompute-to-verify.
+ * rejection-sampled Fisher–Yates shuffle (crypto.getRandomValues). It is
+ * unbiased random selection — NOT a deterministic seed→member function the
+ * public can recompute, and no seed is stored. The copy here reflects
+ * exactly that; it does not claim recompute-to-verify or show a seed.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/hooks/use-translation';
 import { GreekKeyRule } from './GreekKeyRule';
 
@@ -22,7 +22,6 @@ interface Member {
 }
 
 interface Props {
-  seed: string | null;
   size: number;
   members: Member[];
   /** Draw is settled (selectedAt present) → reveal on view; else quiet. */
@@ -41,17 +40,11 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-export function SortitionDraw({ seed, size, members, settled }: Props) {
+export function SortitionDraw({ size, members, settled }: Props) {
   const { t } = useTranslation();
   const reduced = usePrefersReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [revealed, setRevealed] = useState(reduced || !settled ? members.length : 0);
-
-  const seedGroups = useMemo(() => {
-    if (!seed) return null;
-    const clean = seed.replace(/[^a-f0-9]/gi, '');
-    return (clean.match(/.{1,8}/g) ?? [clean]).slice(0, 4).join(' ');
-  }, [seed]);
 
   useEffect(() => {
     if (!settled || reduced) { setRevealed(members.length); return; }
@@ -87,20 +80,9 @@ export function SortitionDraw({ seed, size, members, settled }: Props) {
           </span>
           <p style={{ margin: 0, fontSize: '.875rem', color: 'var(--ink-soft)', maxWidth: '60ch' }}>
             {t('sortition.drawRule') ||
-              'Κρυπτογραφικά ασφαλής, αμερόληπτη τυχαία επιλογή. Ο σπόρος καταγράφεται για έλεγχο.'}
+              'Κρυπτογραφικά ασφαλής, αμερόληπτη τυχαία επιλογή.'}
           </p>
         </div>
-
-        {seedGroups && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
-            <span style={{ fontSize: '.7rem', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
-              {t('sortition.drawSeed') || 'Καταγεγραμμένος σπόρος'}
-            </span>
-            <code style={{ fontFamily: 'var(--font-data)', fontSize: '.8rem', color: 'var(--bronze-deep)', background: 'var(--bronze-wash)', border: '1px solid var(--line)', padding: 'var(--sp-2) var(--sp-3)', wordBreak: 'break-all' }}>
-              {seedGroups}
-            </code>
-          </div>
-        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
           <span style={{ fontSize: '.7rem', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>

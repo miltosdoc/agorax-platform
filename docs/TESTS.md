@@ -20,6 +20,7 @@ tests/
 │   ├── community-dashboard.test.ts     # Dashboard view model
 │   ├── community-settings.test.ts      # Community configuration
 │   ├── community-summary.test.ts       # Community metrics
+│   ├── crypto-shuffle.test.ts          # Sortition shuffle (secure, unbiased, terminates)
 │   ├── demo-seed-contract.test.ts      # Demo data validation
 │   ├── product-navigation.test.ts      # UI navigation contracts
 │   ├── profile-page-contract.test.ts   # User profile page
@@ -31,8 +32,7 @@ tests/
     ├── amendment-merger.test.ts        # TF-IDF + cosine similarity
     ├── democracy-score.test.ts         # Community health metric
     ├── proposal-repository.test.ts     # Proposal CRUD operations
-    ├── proposal-state-machine.test.ts  # 8-state lifecycle
-    └── sortition-algorithm.test.ts     # Cryptographic random selection
+    └── proposal-state-machine.test.ts  # 8-state lifecycle
 ```
 
 ## Test Categories
@@ -49,12 +49,13 @@ Validates the 8-state proposal lifecycle:
 - Invalid transitions are rejected
 - Terminal states (decided, archived, rejected) have no outgoing transitions
 
-### 2. Sortition Algorithm Tests (6 tests)
+### 2. Sortition Shuffle Tests (`tests/integration/crypto-shuffle.test.ts`)
 
-Validates the cryptographic random selection algorithm:
-- **Modulo Bias Prevention:** Rejection sampling (`limit = 256 - (256 % (n+1))`)
-- **Fisher-Yates Shuffle:** Uniform distribution
-- **Edge Cases:** Single element, two elements, n=255
+Validates the shared shuffle in `server/utils/crypto-shuffle.ts`:
+- **Termination:** A 1,000-element pool shuffles into a permutation (the old one-byte shuffle hung above 256)
+- **Modulo Bias Prevention:** 32-bit draws with rejection sampling (`limit = 2**32 - (2**32 % n)`)
+- **Fisher-Yates Shuffle:** Every ordering of three items appears about equally often
+- **Edge Cases:** Empty and single-element arrays, n = 1, invalid n
 
 **Key Assertions:**
 - Rejection sampling eliminates modulo bias
@@ -122,7 +123,7 @@ npx vitest run --root . tests/
 npx vitest run --root . tests/ --coverage
 
 # Run specific test file
-npx vitest run tests/unit/sortition-algorithm.test.ts
+npx vitest run tests/integration/crypto-shuffle.test.ts
 
 # Watch mode
 npx vitest watch tests/

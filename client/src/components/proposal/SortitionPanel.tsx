@@ -170,7 +170,6 @@ export function SortitionPanel({ proposalId, proposalStatus }: SortitionPanelPro
 
         {/* Ceremony III — the sortition draw. */}
         <SortitionDraw
-          seed={snap.baseline}
           size={total}
           members={snap.members.map((m) => ({
             memberId: m.memberId,
