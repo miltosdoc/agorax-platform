@@ -54,7 +54,7 @@ export function GuideCard() {
         ))}
       </div>
       <Link href="/walkthrough" className="inline-flex items-center gap-1 text-sm text-primary hover:underline mt-3">
-        {el ? 'Δες το με ένα παράδειγμα (1 λεπτό)' : 'See it with an example (1 minute)'}
+        {el ? 'Δες τον οδηγό χρήσης (2 λεπτά)' : 'See the user guide (2 minutes)'}
         <ArrowRight className="w-3.5 h-3.5" />
       </Link>
     </div>

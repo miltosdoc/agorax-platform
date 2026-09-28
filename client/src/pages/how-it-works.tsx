@@ -149,13 +149,11 @@ export default function HowItWorksPage() {
                       )}
 
                       {phase.step === 1 && (
-                        <div className="mt-6 grid grid-cols-5 gap-2">
+                        <div className="mt-6 grid grid-cols-3 gap-2">
                           {[
+                            { label: t('walkthrough.hiw_score_clarity'), score: "9/10" },
                             { label: t('walkthrough.hiw_score_structure'), score: "8/10" },
-                            { label: t('walkthrough.hiw_score_specificity'), score: "9/10" },
-                            { label: t('walkthrough.hiw_score_feasibility'), score: "7/10" },
-                            { label: t('walkthrough.hiw_score_completeness'), score: "8/10" },
-                            { label: t('walkthrough.hiw_score_transparency'), score: "9/10" },
+                            { label: t('walkthrough.hiw_score_relevance'), score: "8/10" },
                           ].map((item, i) => (
                             <div key={i} className="text-center p-2 bg-muted/30 rounded border">
                               <div className="text-xs text-muted-foreground mb-1">{item.label}</div>

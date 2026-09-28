@@ -1,0 +1,41 @@
+/* The user guide's player. Colours come from the app's theme tokens, so the
+   guide follows the member's theme like every other page. */
+
+.guide:focus { outline: none; }
+.guide:focus-visible { outline: 2px solid var(--kyanos); outline-offset: 6px; }
+
+/* each shot fades in */
+.guide-shot { animation: guide-in 0.35s ease; }
+@keyframes guide-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* the element the shot is about */
+.guide-screen .guide-hot { outline: 2px solid var(--kyanos); outline-offset: 3px; border-radius: 4px; transition: outline-color 0.3s; }
+
+/* the pointer: glides to its target, then taps */
+.guide-finger {
+  position: absolute; z-index: 5; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: color-mix(in srgb, var(--kyanos) 35%, transparent); border: 2px solid var(--kyanos);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); pointer-events: none;
+  transition: left 0.7s cubic-bezier(0.3, 0.8, 0.3, 1), top 0.7s cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+.guide-tap { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--kyanos); opacity: 0; animation: guide-tap 0.9s ease-out 0.75s; }
+@keyframes guide-tap { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(2.6); } }
+
+/* the controls */
+.guide-ctl { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); transition: background 0.2s, border-color 0.2s; }
+.guide-ctl:hover:not(:disabled) { border-color: var(--line-strong); background: var(--sunken); }
+.guide-ctl:disabled { opacity: 0.4; }
+.guide-play { width: 46px; height: 46px; border: 0; background: var(--ink); color: var(--paper); }
+.guide-play:hover:not(:disabled) { background: var(--kyanos-deep); color: var(--paper); }
+
+/* the playhead of the current step */
+.guide-fill { width: var(--to); animation-name: guide-fill; animation-timing-function: linear; animation-fill-mode: both; }
+@keyframes guide-fill { from { width: var(--from); } to { width: var(--to); } }
+
+.guide-steps { scrollbar-width: none; }
+.guide-steps::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-shot, .guide-tap, .guide-fill { animation: none; }
+  .guide-finger { transition: none; }
+}

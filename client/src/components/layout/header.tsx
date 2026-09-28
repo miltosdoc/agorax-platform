@@ -390,7 +390,7 @@ export default function Header() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/walkthrough")} className="cursor-pointer">
                     <MessageSquare className="mr-2 h-4 w-4" />
-                    {t('nav.process')}
+                    {t('footer.userGuide')}
                   </DropdownMenuItem>
                 </>
               )}
