@@ -29,8 +29,9 @@ import {
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
 import {
-  DEFAULT_PROPOSAL_KIND, isBindingKind, isProposalKind, kindAllowsDeliberation,
-  kindRequiresOptions, kindRequiresText, proposalKindOf, refusalOptionLabel,
+  DEFAULT_PROPOSAL_KIND, MAX_COLLECTED_OPTIONS, isBindingKind, isProposalKind, kindCollectsOptions,
+  kindRequiresOptions, kindRequiresText, majorityFraction, meetsMajority, proposalKindOf,
+  refusalOptionLabel, voteRulesFor, enabledKinds,
 } from '@shared/proposal-kinds';
 import { validBallotChoices } from '@shared/schema';
 import {
@@ -53,12 +54,20 @@ export async function computeVoteResults(
   proposal: { communityId: number; ballotOptions?: unknown; kind?: string | null },
   view: VoterView,
 ) {
+  const kind = proposalKindOf(proposal.kind);
   const [community] = await db
-    .select({ minParticipationPct: communities.minParticipationPct, votePassThreshold: communities.votePassThreshold })
+    .select()
     .from(communities)
     .where(eq(communities.id, proposal.communityId));
-  const minParticipationPct = Number(community?.minParticipationPct ?? 0);
-  const votePassThreshold = Number(community?.votePassThreshold ?? 0.5);
+  // The community's terms for this kind of vote. Quorum is stored as a
+  // percentage of members (0–100) and compared as a share: comparing the
+  // raw 40 against a turnout of 0.4 meant no vote in such a community could
+  // ever reach quorum.
+  const rules = voteRulesFor(community as unknown as Record<string, unknown>, kind);
+  const minParticipationPct = (rules.quorumPct ?? 0) / 100;
+  const majority = rules.majority ?? 'simple';
+  const [num, den] = majorityFraction(majority);
+  const votePassThreshold = num / den;
 
   const [memberRow] = await db
     .select({ c: count() })
@@ -95,16 +104,14 @@ export async function computeVoteResults(
     // "Passes" = a change wins: any option other than the status quo.
     passes = !!tally && meetsQuorum && hasDecisive && winner !== 'status_quo';
   } else {
-    const yesRatio = yes + no > 0 ? yes / (yes + no) : 0;
     hasDecisive = yes + no > 0;
-    passes = !!tally && meetsQuorum && hasDecisive && yesRatio > votePassThreshold;
+    passes = !!tally && meetsQuorum && hasDecisive && meetsMajority(yes, no, majority);
     winner = passes ? 'yes' : null;
   }
 
   // A poll is reported, never "passed", and quorum is a condition for a
   // binding decision — so a poll that anyone answered closes as decided
   // (its result stays on view) instead of being archived for turnout.
-  const kind = proposalKindOf(proposal.kind);
   const binding = isBindingKind(kind);
   const concludes = binding ? meetsQuorum && hasDecisive : total > 0;
   return {
@@ -114,7 +121,7 @@ export async function computeVoteResults(
     sealed: view.tallySealed || !tally,
     hasVoted: view.hasVoted,
     ballotCount: view.ballotCount,
-    participants, participationPct, meetsQuorum, passes, minParticipationPct, votePassThreshold,
+    participants, participationPct, meetsQuorum, passes, minParticipationPct, votePassThreshold, majority,
     userVote: view.userChoice,
   };
 }
@@ -231,12 +238,6 @@ export function registerProposalsRoutes(app: Express): void {
       if (track !== undefined && !PROPOSAL_TRACKS.includes(track)) {
         return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
       }
-      // Deliberation amends a text. Candidates and poll answers have none,
-      // and the server default track is still 'deliberation' for callers
-      // that predate the kind, so an election must name its track.
-      if ((track ?? 'deliberation') === 'deliberation' && !kindAllowsDeliberation(kind)) {
-        return res.status(400).json({ message: `A ${kind} goes straight to a vote (track: 'vote')` });
-      }
       // The community owns the range an author may choose within. Rejecting
       // out-of-range values here rather than clamping silently is what makes
       // the bound visible: the author learns the community's rule instead of
@@ -258,15 +259,49 @@ export function registerProposalsRoutes(app: Express): void {
           });
         }
       }
-      if (track === 'vote') {
+      // The community's terms for this kind: whether members may start it
+      // at all, and the range its voting period must fall in. The form only
+      // offers what these allow; this is where they are actually held.
+      const rules = voteRulesFor(community as unknown as Record<string, unknown>, kind);
+      if (!rules.enabled) {
+        return res.status(403).json({ message: `This community does not hold ${kind} votes` });
+      }
+      // Co-drafting an election or a poll collects candidacies or answers;
+      // a community may switch that off for either. (The server default
+      // track is still 'deliberation' for callers that predate the kind.)
+      const codrafted = (track ?? 'deliberation') === 'deliberation';
+      if (codrafted && kindCollectsOptions(kind) && !rules.codrafting) {
+        return res.status(403).json({ message: `This community does not open a co-drafting phase for a ${kind}` });
+      }
+      // The voting length is the author's on either track: required on a
+      // direct vote, optional after co-drafting (the community default then
+      // applies), and inside the kind's range either way.
+      if (track === 'vote' || (votingDurationHours !== undefined && votingDurationHours !== null && votingDurationHours !== '')) {
         durationHours = Number(votingDurationHours);
-        const min = (community as any)?.votingMinHours;
-        const max = (community as any)?.votingMaxHours;
+        const min = rules.minHours;
+        const max = rules.maxHours;
         if (!Number.isInteger(durationHours) || !inRange(durationHours, min, max)) {
           return res.status(400).json({
-            message: `votingDurationHours must be ${min ?? 1}–${max ?? 8760} in this community`,
+            message: `votingDurationHours must be ${min}–${max} for a ${kind} in this community`,
           });
         }
+      }
+      // An election or a poll that collects its options may start with some
+      // of its own; they go into the collected list, not straight onto the
+      // ballot, which is built when the phase ends.
+      let seedOptions: string[] = [];
+      if (codrafted && kindCollectsOptions(kind) && Array.isArray(ballotOptions)) {
+        seedOptions = ballotOptions
+          .map((o: unknown) => (typeof o === 'string' ? o.replace(/\s+/g, ' ').trim() : ''))
+          .filter((o: string) => o.length > 0);
+        if (seedOptions.length > MAX_COLLECTED_OPTIONS || seedOptions.some((o) => o.length > 200)) {
+          return res.status(400).json({ message: `Provide at most ${MAX_COLLECTED_OPTIONS} options of up to 200 characters` });
+        }
+        if (new Set(seedOptions.map((o) => o.toLowerCase())).size !== seedOptions.length) {
+          return res.status(400).json({ message: "Ballot options must be distinct" });
+        }
+      }
+      if (track === 'vote') {
         // Optional author-defined multiple choice. Empty/absent = classic
         // yes/no/abstain. A refusal option («Καμία αλλαγή», «Λευκό» on an
         // election) is always appended so voters can reject every option —
@@ -323,6 +358,12 @@ export function registerProposalsRoutes(app: Express): void {
         // be filed.
         thumbnailKey: isThumbnailKey(thumbnailKey) ? thumbnailKey : null,
       });
+      if (seedOptions.length > 0) {
+        const { addOption } = await import('../utils/option-collection');
+        for (const label of seedOptions) {
+          await addOption({ proposalId: proposal.id, userId, label, isAuthorSeed: true });
+        }
+      }
       // Members are notified on submit (draft → deliberation), not here —
       // a draft is private to its author and shouldn't be announced.
       res.status(201).json(proposal);
@@ -401,7 +442,12 @@ export function registerProposalsRoutes(app: Express): void {
       return res.status(503).json({ message: 'AI drafting is not available' });
     }
     try {
-      const draft = await compileProposal(intent);
+      // Drafting for a community: only the kinds it holds.
+      const communityId = Number.isInteger(req.body?.communityId) ? req.body.communityId : null;
+      const community = communityId ? await communityRepo.getCommunity(communityId) : null;
+      const draft = await compileProposal(intent, {
+        allowedKinds: community ? enabledKinds(community as unknown as Record<string, unknown>) : undefined,
+      });
       res.json(draft);
     } catch (err: any) {
       res.status(502).json({ message: 'AI drafting failed, please try again' });
@@ -420,6 +466,13 @@ export function registerProposalsRoutes(app: Express): void {
       // proposal-writing.
       const submitGate = await proposalGate(proposal.communityId, req.user.id);
       if (submitGate) return res.status(403).json({ message: submitGate });
+      // Same for the kind: a draft written before the community switched
+      // this kind of vote off must not open a ballot anyway.
+      const submitKind = proposalKindOf((proposal as any).kind);
+      const submitCommunity = await communityRepo.getCommunity(proposal.communityId);
+      if (!voteRulesFor(submitCommunity as unknown as Record<string, unknown>, submitKind).enabled) {
+        return res.status(403).json({ message: `This community does not hold ${submitKind} votes` });
+      }
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
       const { storage: storageInstance } = await import('../storage');
 
@@ -445,6 +498,24 @@ export function registerProposalsRoutes(app: Express): void {
           console.error('notifyNewProposal failed:', notifyErr);
         }
         return res.json({ ...live, validation: null });
+      }
+      // An election or a poll with co-drafting has no text for the AI to
+      // check: it opens straight into collecting candidacies or answers.
+      if (kindCollectsOptions(submitKind)) {
+        if (!voteRulesFor(submitCommunity as unknown as Record<string, unknown>, submitKind).codrafting) {
+          return res.status(403).json({ message: `This community does not open a co-drafting phase for a ${submitKind}` });
+        }
+        const open = await transitionProposal(proposal, 'community_signal', storage);
+        await triggerSideEffects('draft', 'community_signal', open);
+        try {
+          const { notifyNewProposal } = await import('../utils/notifications');
+          await notifyNewProposal(proposal.id, proposal.communityId, proposal.question, proposal.authorId, {
+            kind: submitKind, collecting: true,
+          });
+        } catch (notifyErr) {
+          console.error('notifyNewProposal failed:', notifyErr);
+        }
+        return res.json({ ...open, validation: null });
       }
       // draft → review (validated by the state machine; archived states blocked).
       const inReview = await transitionProposal(proposal, 'review', storage);      await triggerSideEffects(proposal.status, 'review', inReview);

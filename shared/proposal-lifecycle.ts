@@ -38,9 +38,11 @@ export const INITIAL_PROPOSAL_STATE: ProposalState = 'draft';
 export const TERMINAL_PROPOSAL_STATES = ['decided', 'archived'] as const satisfies readonly ProposalState[];
 
 export const VALID_PROPOSAL_TRANSITIONS: Record<ProposalState, readonly ProposalState[]> = {
-  // draft → voting is the direct-vote track only; transitionProposal
-  // enforces the track guard (the static map can't express per-proposal rules).
-  draft: ['review', 'voting', 'archived'],
+  // draft → voting is the direct-vote track only; draft → community_signal
+  // is an election or a poll opening its candidacies/answers (no text to
+  // review). transitionProposal enforces both guards — the static map can't
+  // express per-proposal rules.
+  draft: ['review', 'voting', 'community_signal', 'archived'],
   // review → voting is the LLM auto-approve fast path (score > 90): the
   // proposal is high-confidence enough to skip deliberation and go straight
   // to ratification.

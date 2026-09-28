@@ -13,7 +13,7 @@
  */
 import { z } from 'zod';
 import { chatCompletion } from './llm-client';
-import { PROPOSAL_KINDS, kindAllowsDeliberation, kindRequiresText } from '../../shared/proposal-kinds';
+import { PROPOSAL_KINDS, kindRequiresText, type ProposalKind } from '../../shared/proposal-kinds';
 
 export const PROPOSAL_CATEGORIES = [
   'education', 'healthcare', 'infrastructure', 'environment',
@@ -39,15 +39,16 @@ const compiledProposalSchema = z.object({
   // Author-enumerated alternatives for a multiple-choice vote, or an
   // election's candidates (implies the vote track). The platform appends
   // the refusal option itself. null = yes/no.
-  ballotOptions: z.array(z.string().min(1).max(200)).min(2).max(10).nullable().optional(),
+  // During co-drafting an election may start from a single named candidate.
+  ballotOptions: z.array(z.string().min(1).max(200)).min(1).max(10).nullable().optional(),
 }).superRefine((draft, ctx) => {
   if (kindRequiresText(draft.kind) && draft.solution.trim().length < 30) {
     ctx.addIssue({ code: 'custom', path: ['solution'], message: `a ${draft.kind} needs a solution of at least 30 characters` });
   }
-}).transform((draft) => (
-  // Deliberation amends a text; an election or a poll has none to amend.
-  kindAllowsDeliberation(draft.kind) ? draft : { ...draft, track: 'vote' as const }
-));
+  if (draft.track === 'vote' && draft.ballotOptions && draft.ballotOptions.length < 2) {
+    ctx.addIssue({ code: 'custom', path: ['ballotOptions'], message: 'a direct vote needs 2–10 options, or null' });
+  }
+});
 
 export type CompiledProposal = z.infer<typeof compiledProposalSchema>;
 
@@ -62,7 +63,7 @@ Rules:
 Kind — "kind" says what the vote is. Pick exactly one:
 - "election": the members choose a PERSON or people for a role (εκλογή προέδρου, ταμία, γραμματέα, ΔΣ, εκπροσώπου, συντονιστή, αντιπροσώπου).
   "question" = the role being filled, as a short title, e.g. «Εκλογή Προέδρου του Συλλόγου».
-  "ballotOptions" = the candidates' names exactly as the user wrote them, one per entry, 2–10. Never invent candidates: if the user names fewer than two, use null.
+  "ballotOptions" = the candidates' names exactly as the user wrote them, one per entry. Never invent candidates. With "track" "vote" there must be 2–10, else use null; with "deliberation" (candidacies collected first) list whoever was named, even one, or null.
   "solution" = optional short context (term, duties, how the vote works), or "" if the user gave none.
 - "statute": adopting or amending the community's statute, charter, bylaws or internal rules (καταστατικό, κανονισμός λειτουργίας, τροποποίηση άρθρου, εσωτερικός κανονισμός).
   "question" = a short title, e.g. «Τροποποίηση του άρθρου 5 του καταστατικού».
@@ -76,7 +77,10 @@ Kind — "kind" says what the vote is. Pick exactly one:
   "solution" = a concrete, actionable proposal in 2–5 short paragraphs: what should be done, how, and the expected effect. Plain text, no markdown headers.
 
 Track:
-- "track" is "vote" by default: the draft goes straight to the ballot. Use "deliberation" ONLY when the user explicitly asks for discussion, amendments or διαβούλευση before the vote, and only for "decision" or "statute".
+- "track" is "vote" by default: the draft goes straight to the ballot. Use "deliberation" (co-drafting before the vote) ONLY when the user explicitly asks for it:
+  - "decision" / "statute": the user wants discussion, amendments, συνδιαμόρφωση or διαβούλευση before the vote.
+  - "election": the user wants candidacies collected first (e.g. «να δηλώσουν υποψηφιότητα όσοι θέλουν», «ανοιχτές υποψηφιότητες», «προτάσεις υποψηφίων»). The candidates they already named still go in "ballotOptions" (it may then have fewer than two, or be null).
+  - "poll": the user wants members to add their own answers before it opens (e.g. «να προτείνουν κι άλλες επιλογές»).
 - "votingDurationHours": extract a stated duration (μέρες→×24, εβδομάδα→168); default 72 when the user gives none. null for deliberation.
 - "ballotOptions" (for "decision" and "statute"): only when the user enumerates concrete alternatives (e.g. «πράσινο, μπλε ή φυσικό ξύλο») — short labels, 2–10, ≤200 chars each, no duplicates. null for a plain yes/no.
 - NEVER include a "no change", «Καμία αλλαγή», «Λευκό» or «Κανένα από τα παραπάνω» option; the platform appends the refusal option automatically.
@@ -91,12 +95,22 @@ Safety:
 
 Respond with ONLY a JSON object: {"kind": "decision"|"statute"|"election"|"poll", "question": "...", "solution": "...", "category": "...", "track": "vote"|"deliberation", "votingDurationHours": number|null, "ballotOptions": ["..."]|null}`;
 
-export async function compileProposal(intent: string): Promise<CompiledProposal> {
+export async function compileProposal(
+  intent: string,
+  opts: { allowedKinds?: readonly ProposalKind[] } = {},
+): Promise<CompiledProposal> {
+  // The community may have switched some kinds off. The model is told, and
+  // anything it returns outside the list becomes a plain decision, which
+  // every community holds.
+  const allowed = opts.allowedKinds && opts.allowedKinds.length > 0 ? opts.allowedKinds : PROPOSAL_KINDS;
+  const system = allowed.length < PROPOSAL_KINDS.length
+    ? `${SYSTEM_PROMPT}\n\nThis community only holds these kinds of vote: ${allowed.join(', ')}. Never return any other "kind"; when the intent fits none of them, use "decision".`
+    : SYSTEM_PROMPT;
   let lastErrors = '';
   for (let round = 1; round <= 2; round++) {
     const raw = await chatCompletion({
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: system },
         {
           role: 'user',
           content: round === 1
@@ -122,7 +136,9 @@ export async function compileProposal(intent: string): Promise<CompiledProposal>
       continue;
     }
     const result = compiledProposalSchema.safeParse(parsed);
-    if (result.success) return result.data;
+    if (result.success) {
+      return allowed.includes(result.data.kind) ? result.data : { ...result.data, kind: 'decision' };
+    }
     lastErrors = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
   }
   throw new Error(`Proposal compilation failed schema validation: ${lastErrors}`);

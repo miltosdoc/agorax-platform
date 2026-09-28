@@ -20,6 +20,9 @@ import { createHash } from 'crypto';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { communities, proposalAmendments, proposals } from '@shared/schema';
+import {
+  PROPOSAL_KINDS, majorityFraction, voteRulesFor, type MajorityRule, type ProposalKind,
+} from '@shared/proposal-kinds';
 import { canViewCommunityContentById } from './community-visibility';
 import { aiAvailable, ensureArticles, getCachedArticles, pendingCount, type AiArticle } from './constitution-ai';
 
@@ -138,8 +141,6 @@ type CommunityRow = typeof communities.$inferSelect;
 
 function buildArticles(c: CommunityRow, lang: Lang): Article[] {
   const el = lang === 'el';
-  const threshold = Number(c.votePassThreshold ?? 0.5);
-  const quorum = Number(c.minParticipationPct ?? 0);
   const inclusion = Number(c.amendmentInclusionThreshold ?? 0.6);
   const maxAm = c.maxAmendmentsPerProposal ?? -1;
 
@@ -172,22 +173,60 @@ function buildArticles(c: CommunityRow, lang: Lang): Article[] {
     ? (el ? 'μόνο τα μέλη' : 'members only')
     : (el ? 'όλοι' : 'everyone');
 
-  const decisionRule = el
-    ? `Μια πρόταση εγκρίνεται όταν τα «Ναι» ξεπερνούν το ${pct(threshold)} των ψήφων «Ναι» και «Όχι» (οι αποχές δεν μετρούν). `
-      + (quorum > 0 ? `Για να είναι έγκυρη η ψηφοφορία πρέπει να ψηφίσει τουλάχιστον το ${pct(quorum)} των μελών.` : 'Δεν απαιτείται ελάχιστη συμμετοχή.')
-      + ' Όταν το ψηφοδέλτιο έχει εναλλακτικές (αντιπροτάσεις), νικά η επιλογή με τις περισσότερες ψήφους.'
-    : `A proposal is approved when "Yes" exceeds ${pct(threshold)} of the Yes and No votes (abstentions do not count). `
-      + (quorum > 0 ? `For the vote to be valid, at least ${pct(quorum)} of members must vote.` : 'No minimum participation is required.')
-      + ' When the ballot offers alternatives (counter-proposals), the option with the most votes wins.';
+  // One sentence per kind of vote, from the same terms the form and the
+  // server enforce (voteRulesFor), so the charter can never promise a rule
+  // the platform does not apply.
+  const kindName = (k: ProposalKind) => ({
+    decision: el ? 'Απόφαση' : 'Decision',
+    statute: el ? 'Καταστατικό' : 'Statute',
+    election: el ? 'Εκλογή' : 'Election',
+    poll: el ? 'Δημοσκόπηση κοινότητας' : 'Community poll',
+  }[k]);
+  const majorityText = (m: MajorityRule) => {
+    const [num, den] = majorityFraction(m);
+    return m === 'simple'
+      ? (el ? 'περισσότερα από τα μισά «Ναι»' : 'more than half Yes')
+      : (el ? `τουλάχιστον ${num}/${den} «Ναι»` : `at least ${num}/${den} Yes`);
+  };
+  const quorumText = (q: number | null) => !q
+    ? ''
+    : (el ? `, με απαρτία το ${q}% των μελών` : `, with a quorum of ${q}% of members`);
+  const kindRule = (k: ProposalKind): string | null => {
+    const r = voteRulesFor(c as unknown as Record<string, unknown>, k);
+    if (!r.enabled) return null;
+    const span = el
+      ? `διαρκεί από ${hours(r.minHours, lang)} έως ${hours(r.maxHours, lang)}`
+      : `runs ${hours(r.minHours, lang)} to ${hours(r.maxHours, lang)}`;
+    const outcome = k === 'election'
+      ? (el ? 'εκλέγεται όποιος πάρει τις περισσότερες ψήφους' : 'the candidate with the most votes is elected')
+      : k === 'poll'
+        ? (el ? 'δεν δεσμεύει την κοινότητα' : 'does not bind the community')
+        : (el ? `εγκρίνεται με ${majorityText(r.majority ?? 'simple')} (οι αποχές δεν μετρούν)` : `passes with ${majorityText(r.majority ?? 'simple')} (abstentions do not count)`);
+    // An election or a poll may open by collecting its options.
+    const phase = r.codrafting && k === 'election'
+      ? (el ? ' Μπορεί να προηγηθεί φάση υποψηφιοτήτων, όπου τα μέλη δηλώνουν ή προτείνουν υποψηφίους.' : ' It may open with a candidacy phase, in which members stand or put someone forward.')
+      : r.codrafting && k === 'poll'
+        ? (el ? ' Μπορεί να προηγηθεί φάση όπου τα μέλη προτείνουν απαντήσεις.' : ' It may open with a phase in which members suggest answers.')
+        : '';
+    return `${kindName(k)}: ${span}· ${outcome}${quorumText(r.quorumPct)}.${phase}`;
+  };
+  const off = PROPOSAL_KINDS.filter((k) => !voteRulesFor(c as unknown as Record<string, unknown>, k).enabled);
+  const decisionRule = [
+    ...PROPOSAL_KINDS.map(kindRule).filter(Boolean),
+    ...(off.length
+      ? [el ? `Δεν επιτρέπεται: ${off.map(kindName).join(', ')}.` : `Not allowed: ${off.map(kindName).join(', ')}.`]
+      : []),
+    el
+      ? 'Όταν το ψηφοδέλτιο έχει επιλογές ή αντιπροτάσεις, νικά η επιλογή με τις περισσότερες ψήφους.'
+      : 'When the ballot offers options or counter-proposals, the option with the most votes wins.',
+  ].join(' ');
 
   const timeline = el
-    ? `Ο συντάκτης επιλέγει διάρκεια συζήτησης από ${hours(c.deliberationMinHours, lang)} έως ${hours(c.deliberationMaxHours, lang)} `
-      + `και διάρκεια ψηφοφορίας από ${hours(c.votingMinHours, lang)} έως ${hours(c.votingMaxHours, lang)} `
-      + `(προεπιλογή: ${hours(c.votingHours, lang)}). Ο συντάκτης έχει ${hours(c.authorReviewHours, lang)} για να κρίνει τις τροποποιήσεις `
+    ? `Ο συντάκτης επιλέγει διάρκεια συνδιαμόρφωσης από ${hours(c.deliberationMinHours, lang)} έως ${hours(c.deliberationMaxHours, lang)} `
+      + `και διάρκεια ψηφοφορίας μέσα στα όρια κάθε τύπου. Ο συντάκτης έχει ${hours(c.authorReviewHours, lang)} για να κρίνει τις τροποποιήσεις `
       + `και ${hours(c.finalReviewHours, lang)} για να δει το τελικό κείμενο πριν ανοίξει η κάλπη.`
-    : `The author chooses a discussion period of ${hours(c.deliberationMinHours, lang)} to ${hours(c.deliberationMaxHours, lang)} `
-      + `and a voting period of ${hours(c.votingMinHours, lang)} to ${hours(c.votingMaxHours, lang)} `
-      + `(default: ${hours(c.votingHours, lang)}). The author has ${hours(c.authorReviewHours, lang)} to judge amendments `
+    : `The author chooses a co-drafting period of ${hours(c.deliberationMinHours, lang)} to ${hours(c.deliberationMaxHours, lang)} `
+      + `and a voting period within the limits of each kind. The author has ${hours(c.authorReviewHours, lang)} to judge amendments `
       + `and ${hours(c.finalReviewHours, lang)} to review the final text before the ballot opens.`;
 
   // Mirrors ai-merger.ts: unjudged amendments enter at >= inclusion
@@ -224,7 +263,7 @@ function buildArticles(c: CommunityRow, lang: Lang): Article[] {
     { title: el ? 'Τροποποιήσεις' : 'Amendments', body: amendments },
     { title: el ? 'Τελικό κείμενο' : 'Final text', body: synthesis },
     { title: el ? 'Χρόνοι' : 'Timelines', body: timeline },
-    { title: el ? 'Κανόνας απόφασης' : 'Decision rule', body: decisionRule },
+    { title: el ? 'Κανόνες ψηφοφορίας' : 'Voting rules', body: decisionRule },
     { title: el ? 'Μυστικότητα ψήφου' : 'Secret ballot', body: secrecy },
   ];
 }
@@ -253,7 +292,8 @@ async function buildDecisions(communityId: number, lang: Lang): Promise<Decision
   for (const p of rows) {
     const view = await backend.getVoterView({ proposalId: p.id });
     const r = await computeVoteResults(p, view);
-    if (!r.passes) continue;
+    // A poll records opinion; it never becomes a rule of the community.
+    if (!r.passes || !r.binding) continue;
 
     let text = p.finalText || p.solution;
     let result: string;

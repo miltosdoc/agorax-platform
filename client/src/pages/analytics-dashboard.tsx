@@ -72,7 +72,7 @@ const L: Record<Lang, Record<string, string>> = {
 
 const STATUS_LABELS: Record<Lang, Record<string, string>> = {
   el: {
-    review: 'Έλεγχος', author_review: 'Κρίση συγγραφέα', community_signal: 'Διαβούλευση',
+    review: 'Έλεγχος', author_review: 'Κρίση συγγραφέα', community_signal: 'Συνδιαμόρφωση',
     sortition_synthesis: 'Κλήρωση', final_review: 'Τελικό κείμενο', voting: 'Ψηφοφορία',
     decided: 'Αποφασίστηκε', archived: 'Αρχειοθετήθηκε',
   },

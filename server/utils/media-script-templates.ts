@@ -63,7 +63,7 @@ export function podcastScript(ctx: ScriptContext): string {
 
   const againstBlock = againstArgs.length
     ? againstArgs.map((t, i) => `Α: Επιχείρημα ${i + 1} κατά. ${t}`).join('\n\n')
-    : `Α: Δεν έχουν κατατεθεί ακόμη επιχειρήματα κατά. Η εικόνα μπορεί να αλλάξει καθώς προχωρά η διαβούλευση.`;
+    : `Α: Δεν έχουν κατατεθεί ακόμη επιχειρήματα κατά. Η εικόνα μπορεί να αλλάξει καθώς προχωρά η συνδιαμόρφωση.`;
 
   const amendmentsBlock = ctx.amendments && ctx.amendments.length
     ? [
@@ -107,7 +107,7 @@ export function podcastScript(ctx: ScriptContext): string {
     `Β: «${trim(proposal.question, 600)}»`,
     ``,
     `## Η προτεινόμενη λύση`,
-    `Α: Η πρόταση που έχει τεθεί υπό διαβούλευση προτείνει:`,
+    `Α: Η πρόταση που έχει τεθεί υπό συνδιαμόρφωση προτείνει:`,
     `Β: ${trim(proposal.solution, 900)}`,
     ``,
     `## Τι λένε όσοι υποστηρίζουν την πρόταση`,
@@ -141,7 +141,7 @@ export function teaserScript(ctx: ScriptContext): string {
     ``,
     `## Σκηνή 1 — Hook (0:00–0:05)`,
     `Πλάνο: τίτλος στην οθόνη.`,
-    `Αφήγηση: Μια καινούργια πρόταση είναι σε διαβούλευση ${hookCommunity}.`,
+    `Αφήγηση: Μια καινούργια πρόταση είναι σε συνδιαμόρφωση ${hookCommunity}.`,
     ``,
     `## Σκηνή 2 — Το ερώτημα (0:05–0:15)`,
     `Πλάνο: κάρτα κειμένου με το ερώτημα.`,

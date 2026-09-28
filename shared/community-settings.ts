@@ -1,3 +1,5 @@
+import { MAJORITY_RULES, type MajorityRule } from './proposal-kinds';
+
 export const COMMUNITY_TYPES = ['autonomous', 'managed'] as const;
 export type CommunityType = typeof COMMUNITY_TYPES[number];
 
@@ -109,6 +111,21 @@ export interface CommunitySettingsInput {
   deliberationMaxHours?: unknown;
   votingMinHours?: unknown;
   votingMaxHours?: unknown;
+  decisionMajority?: unknown;
+  statuteEnabled?: unknown;
+  statuteMinHours?: unknown;
+  statuteMaxHours?: unknown;
+  statuteMajority?: unknown;
+  statuteMinParticipationPct?: unknown;
+  electionEnabled?: unknown;
+  electionMinHours?: unknown;
+  electionMaxHours?: unknown;
+  electionMinParticipationPct?: unknown;
+  electionNominationsEnabled?: unknown;
+  pollEnabled?: unknown;
+  pollSuggestionsEnabled?: unknown;
+  pollMinHours?: unknown;
+  pollMaxHours?: unknown;
 }
 
 // Sanitized community settings — narrow literal types instead of the wide
@@ -141,6 +158,21 @@ export interface CommunityCreateSettings {
   deliberationMaxHours: number;
   votingMinHours: number;
   votingMaxHours: number;
+  decisionMajority: MajorityRule;
+  statuteEnabled: boolean;
+  statuteMinHours: number;
+  statuteMaxHours: number;
+  statuteMajority: MajorityRule;
+  statuteMinParticipationPct: string;
+  electionEnabled: boolean;
+  electionMinHours: number;
+  electionMaxHours: number;
+  electionMinParticipationPct: string;
+  electionNominationsEnabled: boolean;
+  pollEnabled: boolean;
+  pollSuggestionsEnabled: boolean;
+  pollMinHours: number;
+  pollMaxHours: number;
 }
 
 export type CommunityUpdateSettings = Partial<CommunityCreateSettings>;
@@ -170,6 +202,22 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   deliberationMaxHours: 336,
   votingMinHours: 24,
   votingMaxHours: 720,
+  // Per-kind terms — see DEFAULT_VOTE_RULES in shared/proposal-kinds.ts.
+  decisionMajority: 'simple',
+  statuteEnabled: true,
+  statuteMinHours: 72,
+  statuteMaxHours: 720,
+  statuteMajority: 'two_thirds',
+  statuteMinParticipationPct: '0',
+  electionEnabled: true,
+  electionMinHours: 48,
+  electionMaxHours: 336,
+  electionMinParticipationPct: '0',
+  electionNominationsEnabled: true,
+  pollEnabled: true,
+  pollSuggestionsEnabled: true,
+  pollMinHours: 24,
+  pollMaxHours: 336,
 } as const;
 
 /**
@@ -322,7 +370,22 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
       deliberationMaxHours: integerValue(input.deliberationMaxHours, DEFAULT_COMMUNITY_SETTINGS.deliberationMaxHours, 1, 8760, 'deliberationMaxHours must be 1–8760'),
       votingMinHours: integerValue(input.votingMinHours, DEFAULT_COMMUNITY_SETTINGS.votingMinHours, 1, 8760, 'votingMinHours must be 1–8760'),
       votingMaxHours: integerValue(input.votingMaxHours, DEFAULT_COMMUNITY_SETTINGS.votingMaxHours, 1, 8760, 'votingMaxHours must be 1–8760'),
+      statuteMinHours: integerValue(input.statuteMinHours, DEFAULT_COMMUNITY_SETTINGS.statuteMinHours, 1, 8760, 'statuteMinHours must be 1–8760'),
+      statuteMaxHours: integerValue(input.statuteMaxHours, DEFAULT_COMMUNITY_SETTINGS.statuteMaxHours, 1, 8760, 'statuteMaxHours must be 1–8760'),
+      electionMinHours: integerValue(input.electionMinHours, DEFAULT_COMMUNITY_SETTINGS.electionMinHours, 1, 8760, 'electionMinHours must be 1–8760'),
+      electionMaxHours: integerValue(input.electionMaxHours, DEFAULT_COMMUNITY_SETTINGS.electionMaxHours, 1, 8760, 'electionMaxHours must be 1–8760'),
+      pollMinHours: integerValue(input.pollMinHours, DEFAULT_COMMUNITY_SETTINGS.pollMinHours, 1, 8760, 'pollMinHours must be 1–8760'),
+      pollMaxHours: integerValue(input.pollMaxHours, DEFAULT_COMMUNITY_SETTINGS.pollMaxHours, 1, 8760, 'pollMaxHours must be 1–8760'),
     }),
+    decisionMajority: enumValue(input.decisionMajority, MAJORITY_RULES, DEFAULT_COMMUNITY_SETTINGS.decisionMajority, 'Invalid decision majority'),
+    statuteEnabled: booleanValue(input.statuteEnabled, DEFAULT_COMMUNITY_SETTINGS.statuteEnabled),
+    statuteMajority: enumValue(input.statuteMajority, MAJORITY_RULES, DEFAULT_COMMUNITY_SETTINGS.statuteMajority, 'Invalid statute majority'),
+    statuteMinParticipationPct: decimalString(input.statuteMinParticipationPct, DEFAULT_COMMUNITY_SETTINGS.statuteMinParticipationPct, 0, 100, 'statuteMinParticipationPct must be between 0 and 100'),
+    electionEnabled: booleanValue(input.electionEnabled, DEFAULT_COMMUNITY_SETTINGS.electionEnabled),
+    electionMinParticipationPct: decimalString(input.electionMinParticipationPct, DEFAULT_COMMUNITY_SETTINGS.electionMinParticipationPct, 0, 100, 'electionMinParticipationPct must be between 0 and 100'),
+    pollEnabled: booleanValue(input.pollEnabled, DEFAULT_COMMUNITY_SETTINGS.pollEnabled),
+    electionNominationsEnabled: booleanValue(input.electionNominationsEnabled, DEFAULT_COMMUNITY_SETTINGS.electionNominationsEnabled),
+    pollSuggestionsEnabled: booleanValue(input.pollSuggestionsEnabled, DEFAULT_COMMUNITY_SETTINGS.pollSuggestionsEnabled),
   };
 }
 
@@ -330,16 +393,22 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
  * A range whose minimum exceeds its maximum admits no valid author choice, so
  * it is rejected at the edge rather than silently ignored later.
  */
-function assertAuthoredRanges<T extends Partial<Record<
-  'deliberationMinHours' | 'deliberationMaxHours' | 'votingMinHours' | 'votingMaxHours', number
->>>(values: T): T {
-  if (values.deliberationMinHours !== undefined && values.deliberationMaxHours !== undefined
-    && values.deliberationMinHours > values.deliberationMaxHours) {
-    throw new Error('deliberationMinHours cannot exceed deliberationMaxHours');
-  }
-  if (values.votingMinHours !== undefined && values.votingMaxHours !== undefined
-    && values.votingMinHours > values.votingMaxHours) {
-    throw new Error('votingMinHours cannot exceed votingMaxHours');
+const AUTHORED_RANGES = [
+  ['deliberationMinHours', 'deliberationMaxHours'],
+  ['votingMinHours', 'votingMaxHours'],
+  ['statuteMinHours', 'statuteMaxHours'],
+  ['electionMinHours', 'electionMaxHours'],
+  ['pollMinHours', 'pollMaxHours'],
+] as const;
+type AuthoredRangeKey = typeof AUTHORED_RANGES[number][number];
+
+function assertAuthoredRanges<T extends Partial<Record<AuthoredRangeKey, number>>>(values: T): T {
+  for (const [min, max] of AUTHORED_RANGES) {
+    const lo = values[min];
+    const hi = values[max];
+    if (lo !== undefined && hi !== undefined && lo > hi) {
+      throw new Error(`${min} cannot exceed ${max}`);
+    }
   }
   return values;
 }
@@ -427,6 +496,23 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
   const votingMaxHours = optionalIntegerValue(input.votingMaxHours, 1, 8760, 'votingMaxHours must be 1–8760');
   if (votingMaxHours !== undefined) updates.votingMaxHours = votingMaxHours;
 
+  for (const key of ['statuteMinHours', 'statuteMaxHours', 'electionMinHours', 'electionMaxHours', 'pollMinHours', 'pollMaxHours'] as const) {
+    const value = optionalIntegerValue(input[key], 1, 8760, `${key} must be 1–8760`);
+    if (value !== undefined) updates[key] = value;
+  }
+  for (const key of ['decisionMajority', 'statuteMajority'] as const) {
+    const value = optionalEnumValue(input[key], MAJORITY_RULES, `Invalid ${key}`);
+    if (value !== undefined) updates[key] = value;
+  }
+  for (const key of ['statuteEnabled', 'electionEnabled', 'pollEnabled', 'electionNominationsEnabled', 'pollSuggestionsEnabled'] as const) {
+    const value = optionalBoolean(input[key]);
+    if (value !== undefined) updates[key] = value;
+  }
+  for (const key of ['statuteMinParticipationPct', 'electionMinParticipationPct'] as const) {
+    const value = optionalDecimalString(input[key], 0, 100, `${key} must be between 0 and 100`);
+    if (value !== undefined) updates[key] = value;
+  }
+
   // Only catches a self-contradictory pair sent together. A partial update
   // that crosses the *stored* bound is caught by assertCommunityRanges(),
   // which the route runs against the merged result.
@@ -441,16 +527,13 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
  * sent, so a PATCH of one half of a range has to be judged against the other
  * half as stored.
  */
-export function assertCommunityRanges(merged: {
-  deliberationMinHours?: number | null;
-  deliberationMaxHours?: number | null;
-  votingMinHours?: number | null;
-  votingMaxHours?: number | null;
-}): void {
-  assertAuthoredRanges({
-    deliberationMinHours: merged.deliberationMinHours ?? undefined,
-    deliberationMaxHours: merged.deliberationMaxHours ?? undefined,
-    votingMinHours: merged.votingMinHours ?? undefined,
-    votingMaxHours: merged.votingMaxHours ?? undefined,
-  });
+export function assertCommunityRanges(merged: Partial<Record<AuthoredRangeKey, number | null>>): void {
+  const values: Partial<Record<AuthoredRangeKey, number>> = {};
+  for (const pair of AUTHORED_RANGES) {
+    for (const key of pair) {
+      const value = merged[key];
+      if (value !== null && value !== undefined) values[key] = value;
+    }
+  }
+  assertAuthoredRanges(values);
 }

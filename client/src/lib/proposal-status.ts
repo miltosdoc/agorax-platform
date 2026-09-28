@@ -34,7 +34,7 @@ export const STATUS_MAP: Record<ProposalState, StatusEntry> = {
   community_signal: {
     color: 'bg-purple-100 text-purple-800 border-purple-200',
     icon: '📢',
-    greekLabel: 'Διαβούλευση & Τροπολογίες',
+    greekLabel: 'Συνδιαμόρφωση & Τροπολογίες',
     englishLabel: 'Deliberation & Amendments',
     nextAction: 'Vote on amendments',
   },

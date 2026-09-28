@@ -361,7 +361,7 @@ export default function LandingPage() {
                 <EntityCard
                   key={proposal.id}
                   subject="proposal"
-                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind, t('nav.proposals'))}
+                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind)}
                   id={proposal.id}
                   title={proposal.question}
                   excerpt={proposal.solution}

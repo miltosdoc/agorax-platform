@@ -200,7 +200,8 @@ export class ProposalRepository {
       .select({ minParticipationPct: communities.minParticipationPct })
       .from(communities)
       .where(eq(communities.id, proposal.communityId));
-    const minParticipationPct = Number(community?.minParticipationPct ?? 0);
+    // Stored as a percentage (0–100); compared and returned as a share.
+    const minParticipationPct = Number(community?.minParticipationPct ?? 0) / 100;
 
     const [memberRow] = await db
       .select({ count: count() })

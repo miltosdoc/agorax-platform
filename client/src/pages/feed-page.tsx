@@ -112,7 +112,7 @@ function ProposalFeedRow({ item }: { item: ProposalFeedItem }) {
   return (
     <EntityCard
       subject="proposal"
-      kindLabel={proposalEyebrow(t, (item as { kind?: string }).kind, t('feed.newProposal'))}
+      kindLabel={proposalEyebrow(t, (item as { kind?: string }).kind)}
       id={item.id}
       title={item.question}
       excerpt={item.solution}

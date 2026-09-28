@@ -160,6 +160,7 @@ export async function notifyNewProposal(
   communityId: number,
   proposalQuestion: string,
   authorUserId: number,
+  opts: { kind?: string | null; collecting?: boolean } = {},
 ): Promise<number> {
   const members = await db.execute(sql`
     SELECT cm.user_id FROM community_members cm
@@ -174,7 +175,12 @@ export async function notifyNewProposal(
     await createNotification({
       userId,
       type: 'new_proposal',
-      title: 'Νέα πρόταση στην κοινότητά σου',
+      // An election or a poll opening its list asks members to add to it.
+      title: opts.collecting && opts.kind === 'election'
+        ? 'Άνοιξαν οι υποψηφιότητες — δηλώστε ή προτείνετε'
+        : opts.collecting && opts.kind === 'poll'
+          ? 'Νέα δημοσκόπηση — προτείνετε απαντήσεις'
+          : 'Νέα πρόταση στην κοινότητά σου',
       message: short,
       proposalId,
       communityId,
@@ -504,7 +510,7 @@ async function remindAuthorsOfPendingAmendments(): Promise<number> {
       message:
         `${pending} ${pending === 1 ? 'τροπολογία δεν έχει κριθεί' : 'τροπολογίες δεν έχουν κριθεί'}. `
         + 'Όσες δεν αποδεχτείτε δεν θα ενσωματωθούν στο τελικό κείμενο. '
-        + 'Η διαβούλευση κλείνει σε λιγότερο από 12 ώρες.',
+        + 'Η συνδιαμόρφωση κλείνει σε λιγότερο από 12 ώρες.',
       proposalId,
       communityId: (row.community_id as number) || undefined,
       actionUrl: `/proposals/${proposalId}/amendments/review`,

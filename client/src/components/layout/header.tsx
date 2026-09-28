@@ -17,7 +17,7 @@ import {
 import {
   UserCircle, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare,
   MessageSquarePlus, Menu, Coins, Home, Smartphone, Check, Bookmark, X,
-  Settings, HelpCircle, PlusCircle,
+  Settings, HelpCircle, PlusCircle, Plus,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import logoImage from "../../assets/logo.png";
@@ -92,17 +92,17 @@ export default function Header() {
   const unreadCount = unreadCountData?.count || 0;
   const notifications = notificationsData?.notifications || [];
 
-  // The primary nav of the comps. Shown to everyone: a signed-out visitor can
-  // browse proposals, surveys and the media shelves, and hits the auth wall
-  // only where the route itself is protected.
+  // The primary nav: Αρχική · Κοινότητες · Ψηφοφορίες · Podcasts · Βίντεο.
+  // Shown to everyone: a signed-out visitor can browse the votes and the
+  // media shelves, and hits the auth wall only where the route itself is
+  // protected. The profile is in the account menu; the panel surveys wait
+  // for their own release and stay reachable from there too.
   const navItems: { label: string; href: string; match: (l: string) => boolean }[] = [
     { label: t('nav.home'), href: user ? "/feed" : "/", match: (l) => l === "/" || l === "/feed" || l === "/home" },
     { label: t('nav.communities'), href: "/communities", match: (l) => l.startsWith("/communities") },
     { label: t('nav.proposals'), href: "/proposals", match: (l) => l.startsWith("/proposals") },
-    { label: t('nav.surveys'), href: "/surveys", match: (l) => l.startsWith("/surveys") },
     { label: t('nav.podcasts'), href: "/podcasts", match: (l) => l.startsWith("/podcasts") },
     { label: t('nav.videos'), href: "/videos", match: (l) => l.startsWith("/videos") },
-    { label: t('nav.profile'), href: "/profile", match: (l) => l.startsWith("/profile") },
   ];
 
   const navLinkClass = (active: boolean) =>
@@ -163,7 +163,7 @@ export default function Header() {
         {/* ── Icon cluster ── */}
         <div className="ml-auto flex flex-shrink-0 items-center gap-1 lg:ml-0">
           {user && (
-            <div className="hidden w-44 xl:block xl:w-56">
+            <div className="hidden w-56 2xl:block">
               <SearchBar />
             </div>
           )}
@@ -235,8 +235,8 @@ export default function Header() {
                 className="hidden h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep md:inline-flex"
                 data-testid="button-new-proposal"
               >
-                <PlusCircle className="h-4 w-4" />
-                <span className="hidden lg:inline">{t('nav.newProposal')}</span>
+                <span>{t('nav.newProposal')}</span>
+                <Plus className="h-4 w-4" aria-hidden="true" />
               </button>
 
               {/* Avatar + account panel. The comps put the initials disc and the
@@ -419,9 +419,10 @@ export default function Header() {
       {/* Ornament slot: empty in every theme but Marble, which draws a meander here. */}
       <div className="theme-rule" aria-hidden="true" />
 
-      {/* Search drops to its own line below xl so it never squeezes the nav. */}
+      {/* Search drops to its own line below 2xl so it never squeezes the nav
+          or pushes «Νέο» off the edge on a laptop screen. */}
       {user && (
-        <div className="border-t border-line px-4 py-2 xl:hidden">
+        <div className="border-t border-line px-4 py-2 2xl:hidden">
           <SearchBar />
         </div>
       )}

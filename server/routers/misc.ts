@@ -68,7 +68,7 @@ export function registerMiscRoutes(app: Express): void {
       if (!proposal) return next();
       const [community] = await db.select().from(communities).where(eq(communities.id, proposal.communityId)).limit(1);
       const base = `${req.protocol}://${req.get('host')}`;
-      const description = `${(proposal.solution ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)} — Πρόταση στην κοινότητα ${community?.name ?? 'AgoraX'}. Συμμετοχή στη διαβούλευση στο AgoraX.`;
+      const description = `${(proposal.solution ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)} — Πρόταση στην κοινότητα ${community?.name ?? 'AgoraX'}. Συμμετοχή στη συνδιαμόρφωση στο AgoraX.`;
       res.send(renderOgPage({
         url: `${base}/proposals/${id}`,
         title: proposal.question,
@@ -111,7 +111,7 @@ export function registerMiscRoutes(app: Express): void {
       const [community] = await db.select().from(communities).where(eq(communities.id, id)).limit(1);
       if (!community) return next();
       const base = `${req.protocol}://${req.get('host')}`;
-      const description = `${(community.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)} — Κοινότητα στο AgoraX. Συμμετοχή στη διαβούλευση, τις προτάσεις και τις τηλεδιασκέψεις.`.trim();
+      const description = `${(community.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)} — Κοινότητα στο AgoraX. Συμμετοχή στη συνδιαμόρφωση, τις προτάσεις και τις τηλεδιασκέψεις.`.trim();
       res.send(renderOgPage({
         url: `${base}/communities/${id}`,
         title: community.name,

@@ -5,7 +5,9 @@
  * Import this module during server startup to wire up the job queue.
  */
 
-import { registerHandler, startWorker, enqueueJob, enqueueSortitionTimeout, type JobPayload } from './job-queue';
+import { registerHandler, startWorker, enqueueJob, enqueueSortitionTimeout, enqueueNotification, type JobPayload } from './job-queue';
+import { isCollecting, lockCollectedOptions } from './option-collection';
+import { proposalKindOf } from '@shared/proposal-kinds';
 import { handleSortitionCompletion, transitionToValidation } from './proposal-state-machine';
 import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembers } from './sortition-timeout';
 import { db } from '../db';
@@ -232,8 +234,9 @@ async function handleRefreshFinalText(payload: JobPayload): Promise<void> {
 /**
  * Auto-advance proposals whose phase deadline has passed.
  * Runs periodically. Handles author_review, community_signal, and voting.
+ * Exported so it can be run by hand (npx tsx) when a queue is not running.
  */
-async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
+export async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
   const now = new Date();
 
   // Find proposals in timed phases where deadline has passed.
@@ -256,6 +259,26 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
       if (proposal.status === 'author_review') {
         const updated = await transitionProposal(proposal as any, 'community_signal', storage);
         await triggerSideEffects('author_review', 'community_signal', updated);
+
+      } else if (proposal.status === 'community_signal' && isCollecting(proposal as any)) {
+        // An election or a poll: the collected list becomes the ballot and
+        // locks, then the vote opens. An election with no candidate at all
+        // has nothing to vote on; a poll with no answer runs as Yes/No.
+        const collected = await lockCollectedOptions(proposal as any);
+        if (collected === 0 && proposalKindOf((proposal as any).kind) === 'election') {
+          const archived = await transitionProposal(proposal as any, 'archived', storage);
+          await triggerSideEffects('community_signal', 'archived', archived);
+          await enqueueNotification(
+            proposal.authorId,
+            'proposal_advanced',
+            'Η εκλογή δεν ξεκίνησε: δεν δηλώθηκε καμία υποψηφιότητα.',
+          ).catch(() => {});
+        } else {
+          const { proposalRepo } = await import('../storage');
+          const locked = await proposalRepo.getProposal(proposal.id);
+          const updated = await transitionProposal(locked as any, 'voting', storage);
+          await triggerSideEffects('community_signal', 'voting', updated);
+        }
 
       } else if (proposal.status === 'community_signal') {
         // The final text merges LIVE throughout the phase (refresh_final_text
@@ -325,7 +348,7 @@ async function rescueStalledReviews(now: Date): Promise<void> {
       if (!proposal.llmFeedback) {
         await storage.updateProposal(proposal.id, {
           llmFeedback:
-            'Ο αυτόματος έλεγχος ποιότητας δεν ολοκληρώθηκε. Η πρόταση προωθήθηκε σε διαβούλευση '
+            'Ο αυτόματος έλεγχος ποιότητας δεν ολοκληρώθηκε. Η πρόταση προωθήθηκε σε συνδιαμόρφωση '
             + 'για ανθρώπινη αξιολόγηση.',
         });
       }

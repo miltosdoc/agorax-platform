@@ -6,17 +6,31 @@ import { Check } from 'lucide-react';
 
 interface LifecycleStepperProps {
   status: string;
+  /** 'vote' skips co-drafting, so its path has two steps instead of three. */
+  track?: string;
+  /** An election or a poll co-drafts its options, not a text. */
+  kind?: string;
   interactive?: boolean;
 }
 
-// 3-step macro view: submission (instant), deliberation (one phase),
-// vote & decision. Internal states map onto the macro step that contains
-// them so legacy proposals in author_review/sortition still render.
-const MACRO_STEPS: Array<{ key: string; labelEl: string; labelEn: string; states: ProposalState[] }> = [
-  { key: 'submit', labelEl: 'Υποβολή & Έλεγχος', labelEn: 'Submit & Check', states: ['draft', 'review'] },
-  { key: 'deliberate', labelEl: 'Διαβούλευση', labelEn: 'Deliberation', states: ['author_review', 'community_signal', 'sortition_synthesis', 'final_review'] },
-  { key: 'vote', labelEl: 'Ψηφοφορία & Απόφαση', labelEn: 'Vote & Decision', states: ['voting', 'decided'] },
-];
+// The stages a member sees (see proposalStageOf):
+//   without co-drafting: Σε ψηφοφορία → Ολοκληρωμένο
+//   with co-drafting:    Σε συνδιαμόρφωση → Σε ψηφοφορία → Ολοκληρωμένο
+// Internal states map onto the step that contains them, so legacy proposals
+// in author_review/sortition still render. A draft sits before the first.
+type MacroStep = { key: string; labelEl: string; labelEn: string; states: ProposalState[] };
+const CODRAFTING_STEP: MacroStep = {
+  key: 'codrafting', labelEl: 'Σε συνδιαμόρφωση', labelEn: 'Co-drafting',
+  states: ['review', 'author_review', 'community_signal', 'sortition_synthesis', 'final_review'],
+};
+const VOTING_STEP: MacroStep = { key: 'vote', labelEl: 'Σε ψηφοφορία', labelEn: 'Voting', states: ['voting'] };
+const COMPLETED_STEP: MacroStep = { key: 'completed', labelEl: 'Ολοκληρωμένο', labelEn: 'Completed', states: ['decided'] };
+
+function macroSteps(track?: string): MacroStep[] {
+  return track === 'vote'
+    ? [VOTING_STEP, COMPLETED_STEP]
+    : [CODRAFTING_STEP, VOTING_STEP, COMPLETED_STEP];
+}
 
 // Per-phase accent color. Only applied to the CURRENT step so the rest of
 // the stepper stays neutral and the app keeps a serious tone.
@@ -48,7 +62,7 @@ const STATE_GUIDE: Record<string, { el: string; en: string }> = {
     en: 'The author is reviewing the submitted amendments.',
   },
   community_signal: {
-    el: 'Διαβούλευση σε εξέλιξη: τα μέλη προτείνουν τροπολογίες και αντιπροτάσεις, ο συγγραφέας αποφασίζει, και το τελικό κείμενο του AI ενημερώνεται ζωντανά. Στη λήξη ανοίγει αυτόματα η ψηφοφορία.',
+    el: 'Συνδιαμόρφωση σε εξέλιξη: τα μέλη προτείνουν τροπολογίες και αντιπροτάσεις, ο συγγραφέας αποφασίζει, και το τελικό κείμενο του AI ενημερώνεται ζωντανά. Στη λήξη ανοίγει αυτόματα η ψηφοφορία.',
     en: 'Deliberation in progress: members propose amendments and counter-proposals, the author decides, and the AI final text updates live. Voting opens automatically at the deadline.',
   },
   sortition_synthesis: {
@@ -73,8 +87,25 @@ const STATE_GUIDE: Record<string, { el: string; en: string }> = {
   },
 };
 
-export default function LifecycleStepper({ status, interactive = true }: LifecycleStepperProps) {
+// What co-drafting is, for a kind that collects options rather than
+// amending a text.
+const COLLECTING: Record<string, { labelEl: string; labelEn: string; guideEl: string; guideEn: string }> = {
+  election: {
+    labelEl: 'Υποψηφιότητες', labelEn: 'Candidacies',
+    guideEl: 'Τα μέλη δηλώνουν υποψηφιότητα ή προτείνουν κάποιον. Στη λήξη η λίστα κλειδώνει και ανοίγει αυτόματα η κάλπη.',
+    guideEn: 'Members stand or put someone forward. At the deadline the list locks and the ballot opens by itself.',
+  },
+  poll: {
+    labelEl: 'Προτάσεις απαντήσεων', labelEn: 'Answer suggestions',
+    guideEl: 'Τα μέλη προσθέτουν απαντήσεις που λείπουν. Στη λήξη η λίστα κλειδώνει και ανοίγει αυτόματα η δημοσκόπηση.',
+    guideEn: 'Members add answers that are missing. At the deadline the list locks and the poll opens by itself.',
+  },
+};
+
+export default function LifecycleStepper({ status, track, kind, interactive = true }: LifecycleStepperProps) {
   const { locale } = useTranslation();
+  const MACRO_STEPS = macroSteps(track);
+  const collecting = kind ? COLLECTING[kind] : undefined;
 
   const currentIndex = MACRO_STEPS.findIndex((m) => m.states.includes(status as ProposalState));
   const isArchived = status === 'archived';
@@ -117,9 +148,11 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                 >
                   {label}
                 </span>
-                {isCurrent && currentEntry && (
+                {isCurrent && currentEntry && step.key === 'codrafting' && (
                   <span className="text-[10px] text-muted-foreground truncate max-w-[9rem]">
-                    {locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel}
+                    {collecting
+                      ? (locale === 'el' ? collecting.labelEl : collecting.labelEn)
+                      : (locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel)}
                   </span>
                 )}
               </div>
@@ -179,9 +212,11 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
                 >
                   {label}
                 </span>
-                {isCurrent && currentEntry && (
+                {isCurrent && currentEntry && step.key === 'codrafting' && (
                   <div className="text-xs text-muted-foreground">
-                    {currentEntry.icon} {locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel}
+                    {collecting
+                      ? (locale === 'el' ? collecting.labelEl : collecting.labelEn)
+                      : `${currentEntry.icon} ${locale === 'el' ? currentEntry.greekLabel : currentEntry.englishLabel}`}
                   </div>
                 )}
               </div>
@@ -192,7 +227,9 @@ export default function LifecycleStepper({ status, interactive = true }: Lifecyc
 
       {STATE_GUIDE[status] && !isArchived && (
         <p className="mt-3 text-xs text-muted-foreground text-center max-w-xl mx-auto" data-testid="stepper-guide">
-          {locale === 'el' ? STATE_GUIDE[status].el : STATE_GUIDE[status].en}
+          {collecting && status === 'community_signal'
+            ? (locale === 'el' ? collecting.guideEl : collecting.guideEn)
+            : (locale === 'el' ? STATE_GUIDE[status].el : STATE_GUIDE[status].en)}
         </p>
       )}
 

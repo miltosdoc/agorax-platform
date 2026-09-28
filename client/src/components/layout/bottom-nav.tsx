@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, PlusCircle, BarChart3, Users, User } from "lucide-react";
+import { Home, PlusCircle, Users, User, Vote } from "lucide-react";
 import { SafeUser } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
@@ -17,9 +17,9 @@ export default function BottomNav({ user }: BottomNavProps) {
   }
 
   // «Αρχική» is the feed — the same place login lands and the logo points to.
-  // Strategic order: the two spaces (communities, polls) flank the one
-  // creative action (new proposal, elevated dead-center). The flat proposals
-  // list stays reachable from the header menu — it earns no thumb slot.
+  // Strategic order: the two spaces (communities, votes) flank the one
+  // creative action («Νέο», elevated dead-center) — the same places the
+  // header offers.
   const navItems = [
     {
       label: t('nav.home'),
@@ -41,10 +41,10 @@ export default function BottomNav({ user }: BottomNavProps) {
       primary: true,
     },
     {
-      label: t('nav.surveys'),
-      icon: BarChart3,
-      path: "/surveys",
-      testId: "nav-surveys",
+      label: t('nav.proposals'),
+      icon: Vote,
+      path: "/proposals",
+      testId: "nav-proposals",
     },
     {
       label: t('nav.profile'),
@@ -55,7 +55,10 @@ export default function BottomNav({ user }: BottomNavProps) {
   ];
 
   const isActive = (path: string) =>
-    location === path || (path !== '/feed' && location.startsWith(path + '/'));
+    location === path
+    || (path !== '/feed' && location.startsWith(path + '/')
+      // Creating is «Νέο», not browsing the votes.
+      && !(path === '/proposals' && location.startsWith('/proposals/new')));
 
   return (
     <nav

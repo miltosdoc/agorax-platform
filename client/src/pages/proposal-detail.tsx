@@ -34,7 +34,8 @@ import VotePanel from '@/components/voting/VotePanel';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { useTranslation } from '@/hooks/use-translation';
 import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
-import { proposalKindOf } from '@shared/proposal-kinds';
+import { kindAllowsDeliberation, kindCollectsOptions, proposalKindOf } from '@shared/proposal-kinds';
+import { OptionCollectionPanel } from '@/components/proposal/OptionCollectionPanel';
 
 interface Proposal {
   id: number;
@@ -184,7 +185,8 @@ export default function ProposalDetailPage() {
   // final_review: fetch the AI-merged text and the ballot alternatives.
   // If the endpoint fails we fall back to proposal.finalText for display.
   useEffect(() => {
-    if (!proposalId || (proposal?.status !== 'final_review' && !(proposal?.status === 'community_signal' && proposal?.track !== 'vote'))) return;
+    if (!proposalId || !kindAllowsDeliberation(proposalKindOf(proposal?.kind))) return;
+    if (proposal?.status !== 'final_review' && !(proposal?.status === 'community_signal' && proposal?.track !== 'vote')) return;
     let cancelled = false;
     setFinalReviewLoading(true);
     api.get<FinalReviewData>(`/api/proposals/${proposalId}/final-review`)
@@ -328,6 +330,12 @@ export default function ProposalDetailPage() {
   // sortition/AI-validation widgets, no "final text" copy.
   const isDirectVote = proposal.track === 'vote';
   const kind = proposalKindOf(proposal.kind);
+  // Co-drafting an election or a poll collects its options instead of
+  // amending a text: it gets the list and the ballot in the main column, and
+  // none of the amendment/final-text/AI-score apparatus.
+  const collectsOptions = !isDirectVote && kindCollectsOptions(kind);
+  const isTextCodrafting = !isDirectVote && !collectsOptions;
+  const ballotInMain = isDirectVote || collectsOptions;
   // A poll or an election may be nothing but its question and options.
   const hasText = proposal.solution.trim() !== '';
   const hasDistinctFinalText = !!proposal.finalText
@@ -380,7 +388,7 @@ export default function ProposalDetailPage() {
 
       {/* Slim lifecycle strip — the one piece of process chrome above the fold */}
       <div className="mb-6 rounded-lg border bg-background px-4 py-3">
-        <LifecycleStepper status={proposal.status} />
+        <LifecycleStepper status={proposal.status} track={proposal.track} kind={kind} />
       </div>
 
       {/* Two-column deliberation layout: the proposal text and the people
@@ -457,16 +465,9 @@ export default function ProposalDetailPage() {
                 {t('proposal.by')} {proposal.authorName || proposal.authorUsername || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
               </span>
               <StatusBadge status={proposal.status} />
-              {kind !== 'decision' && (
-                <Badge variant="outline" data-testid="proposal-kind-badge">
-                  {t(`proposal.kind_${kind}`)}
-                </Badge>
-              )}
-              {proposal.track === 'vote' && (
-                <Badge variant="outline" data-testid="proposal-track-badge">
-                  {t('proposal.final_review_track_vote_badge') || 'Άμεση ψηφοφορία'}
-                </Badge>
-              )}
+              <Badge variant="outline" data-testid="proposal-kind-badge">
+                {t(`proposal.kind_${kind}`)}
+              </Badge>
               {proposal.category && <Badge variant="secondary">{proposal.category}</Badge>}
             </div>
           </header>
@@ -624,7 +625,7 @@ export default function ProposalDetailPage() {
                 <div className="mt-4 p-4 border rounded space-y-3" data-testid="final-review-author-actions">
                   {proposal.status === 'community_signal' && finalReview?.authorAcceptedFinalAt ? (
                     <Badge variant="secondary" data-testid="final-review-accepted-badge">
-                      {t('proposal.final_review_accepted_badge') || 'Αποδεχθήκατε το τρέχον κείμενο — η ψηφοφορία ανοίγει στη λήξη της διαβούλευσης'}
+                      {t('proposal.final_review_accepted_badge') || 'Αποδεχθήκατε το τρέχον κείμενο — η ψηφοφορία ανοίγει στη λήξη της συνδιαμόρφωσης'}
                     </Badge>
                   ) : (
                     <Button
@@ -669,8 +670,13 @@ export default function ProposalDetailPage() {
             </section>
           )}
 
+          {/* An election or a poll building its list: the list is the page */}
+          {collectsOptions && proposal.status === 'community_signal' && (
+            <OptionCollectionPanel proposalId={proposal.id} kind={kind as 'election' | 'poll'} />
+          )}
+
           {/* Direct vote: the ballot is the main event, right under the text */}
-          {isDirectVote && ['voting', 'decided', 'archived'].includes(proposal.status) && (
+          {ballotInMain && ['voting', 'decided', 'archived'].includes(proposal.status) && (
             <section className="mb-8" data-testid="direct-vote-panel">
               <VotePanel
                 proposalId={proposal.id}
@@ -688,13 +694,13 @@ export default function ProposalDetailPage() {
 
           {/* Participation — the people's surface, always visible */}
           <section>
-            <Tabs defaultValue={!isDirectVote && ['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
-              <TabsList className={`grid w-full ${isDirectVote ? 'grid-cols-2' : 'grid-cols-3'} h-auto gap-1`}>
+            <Tabs defaultValue={isTextCodrafting && ['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
+              <TabsList className={`grid w-full ${isTextCodrafting ? 'grid-cols-3' : 'grid-cols-2'} h-auto gap-1`}>
                 <TabsTrigger value="debate" className="gap-1 py-2">
                   <MessageSquare className="w-4 h-4 sm:mr-1" />
                   <span className="text-xs sm:text-sm">{t('workspace.tabs.debate')}</span>
                 </TabsTrigger>
-                {!isDirectVote && (
+                {isTextCodrafting && (
                   <TabsTrigger value="amendments" className="gap-1 py-2">
                     <FileText className="w-4 h-4 sm:mr-1" />
                     <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
@@ -710,7 +716,7 @@ export default function ProposalDetailPage() {
                 <DebatePanel proposalId={proposal.id} proposalStatus={proposal.status} />
               </TabsContent>
 
-              {!isDirectVote && (
+              {isTextCodrafting && (
                 <TabsContent value="amendments">
                   <AmendmentsPanel
                     proposalId={proposal.id}
@@ -734,7 +740,7 @@ export default function ProposalDetailPage() {
             {['author_review', 'community_signal'].includes(proposal.status) && (proposal as any).phaseDeadline && (
               <PhaseCountdown deadline={(proposal as any).phaseDeadline} />
             )}
-            {(!isDirectVote || proposal.status === 'draft') && (
+            {(isTextCodrafting || proposal.status === 'draft') && (
               <NextActionPanel
                 status={proposal.status}
                 proposalId={proposal.id}
@@ -742,7 +748,7 @@ export default function ProposalDetailPage() {
               />
             )}
 
-            {!isDirectVote && ['voting', 'decided', 'archived'].includes(proposal.status) && (
+            {isTextCodrafting && ['voting', 'decided', 'archived'].includes(proposal.status) && (
               <div>
                 <VotePanel
                   proposalId={proposal.id}
@@ -761,14 +767,14 @@ export default function ProposalDetailPage() {
             {/* Sortition is dormant: the panel appears only while a jury is
                 actually convened (manual dispute path), never as a "skipped"
                 explainer on ordinary proposals. */}
-            {!isDirectVote && proposal.status === 'sortition_synthesis' && (
+            {isTextCodrafting && proposal.status === 'sortition_synthesis' && (
               <SortitionPanel
                 proposalId={proposal.id}
                 proposalStatus={proposal.status}
               />
             )}
 
-            {!isDirectVote && (() => {
+            {isTextCodrafting && (() => {
               const numericScore = proposal.llmScore != null ? Number(proposal.llmScore) : null;
               const score = Number.isFinite(numericScore) ? (numericScore as number) : null;
               if (score === null) {

@@ -23,15 +23,16 @@ import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
 import type { CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
+import { VoteRulesSection, type VoteRulesForm } from '@/components/community/VoteRulesSection';
+import { voteRulesFor } from '@shared/proposal-kinds';
 import { useAuth } from '@/hooks/use-auth';
 import { type CommunityProposalPolicy, effectiveProposalPolicy } from '@shared/community-settings';
 
-interface CommunitySettingsForm {
+interface CommunitySettingsForm extends VoteRulesForm {
   name: string;
   description: string;
   type: CommunityType;
   maxConcurrentVotes: number;
-  minParticipationPct: string;
   sortitionSize: number;
   sortitionMode: CommunitySortitionMode;
   sortitionResponseHours: number;
@@ -49,17 +50,21 @@ interface CommunitySettingsForm {
   finalReviewHours: number;
   deliberationMinHours: number;
   deliberationMaxHours: number;
-  votingMinHours: number;
-  votingMaxHours: number;
 }
 
 function toForm(community: Community): CommunitySettingsForm {
+  // Every kind's terms through the same reader the form and the server use,
+  // so defaults and crossed ranges look here exactly as they behave there.
+  const row = community as unknown as Record<string, unknown>;
+  const decision = voteRulesFor(row, 'decision');
+  const statute = voteRulesFor(row, 'statute');
+  const election = voteRulesFor(row, 'election');
+  const poll = voteRulesFor(row, 'poll');
   return {
     name: community.name ?? '',
     description: community.description ?? '',
     type: (community.type as CommunityType) || 'autonomous',
     maxConcurrentVotes: community.maxConcurrentVotes ?? -1,
-    minParticipationPct: String(community.minParticipationPct ?? '0'),
     sortitionSize: community.sortitionSize ?? 12,
     sortitionMode: (community.sortitionMode as CommunitySortitionMode) || 'absolute',
     sortitionResponseHours: community.sortitionResponseHours ?? 72,
@@ -77,8 +82,24 @@ function toForm(community: Community): CommunitySettingsForm {
     finalReviewHours: (community as any).finalReviewHours ?? 24,
     deliberationMinHours: (community as any).deliberationMinHours ?? 24,
     deliberationMaxHours: (community as any).deliberationMaxHours ?? 336,
-    votingMinHours: (community as any).votingMinHours ?? 24,
-    votingMaxHours: (community as any).votingMaxHours ?? 720,
+    votingMinHours: decision.minHours,
+    votingMaxHours: decision.maxHours,
+    decisionMajority: decision.majority ?? 'simple',
+    minParticipationPct: String(decision.quorumPct ?? 0),
+    statuteEnabled: statute.enabled,
+    statuteMinHours: statute.minHours,
+    statuteMaxHours: statute.maxHours,
+    statuteMajority: statute.majority ?? 'two_thirds',
+    statuteMinParticipationPct: String(statute.quorumPct ?? 0),
+    electionEnabled: election.enabled,
+    electionMinHours: election.minHours,
+    electionMaxHours: election.maxHours,
+    electionMinParticipationPct: String(election.quorumPct ?? 0),
+    electionNominationsEnabled: election.codrafting,
+    pollEnabled: poll.enabled,
+    pollMinHours: poll.minHours,
+    pollMaxHours: poll.maxHours,
+    pollSuggestionsEnabled: poll.codrafting,
   };
 }
 
@@ -133,6 +154,8 @@ export default function CommunitySettingsPage() {
       const payload = {
         ...form,
         minParticipationPct: form.minParticipationPct.trim(),
+        statuteMinParticipationPct: form.statuteMinParticipationPct.trim(),
+        electionMinParticipationPct: form.electionMinParticipationPct.trim(),
         amendmentThreshold: form.amendmentThreshold.trim(),
         amendmentInclusionThreshold: form.amendmentInclusionThreshold.trim(),
       };
@@ -272,13 +295,6 @@ export default function CommunitySettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="minParticipationPct">{t('community.min_participation_pct')}</Label>
-                      <Input id="minParticipationPct" type="number" min="0" max="100" value={form.minParticipationPct} onChange={(e) => update('minParticipationPct', e.target.value)} />
-                    </div>
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="joinPolicy">{t('community.join_policy_label') || 'Join policy'}</Label>
                     <Select value={form.joinPolicy} onValueChange={(value) => update('joinPolicy', value as CommunityJoinPolicy)}>
@@ -317,6 +333,11 @@ export default function CommunitySettingsPage() {
                     </div>
                   </div>
                 </section>
+
+                <VoteRulesSection
+                  form={form}
+                  update={(key: keyof VoteRulesForm, value: unknown) => update(key, value as never)}
+                />
 
                 <section className="space-y-4">
                   <div>
@@ -360,7 +381,7 @@ export default function CommunitySettingsPage() {
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       {t('community.synthesis_mode_help')
-                        || 'Ποιος συνθέτει το τελικό κείμενο μετά τη διαβούλευση. Με «Κληρωτό σώμα», αν δεν μπορεί να συγκροτηθεί ή δεν απαντήσει εγκαίρως, η σύνθεση γίνεται αυτόματα από το AI ώστε η πρόταση να μην κολλήσει ποτέ.'}
+                        || 'Ποιος συνθέτει το τελικό κείμενο μετά τη συνδιαμόρφωση. Με «Κληρωτό σώμα», αν δεν μπορεί να συγκροτηθεί ή δεν απαντήσει εγκαίρως, η σύνθεση γίνεται αυτόματα από το AI ώστε η πρόταση να μην κολλήσει ποτέ.'}
                     </p>
                   </div>
 
@@ -442,7 +463,7 @@ export default function CommunitySettingsPage() {
                         onChange={(e) => update('finalReviewHours', Number(e.target.value))}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Μετά τη λήξη της διαβούλευσης ο συγγραφέας βλέπει το συγχωνευμένο κείμενο και προλαβαίνει να κρίνει
+                        Μετά τη λήξη της συνδιαμόρφωσης ο συγγραφέας βλέπει το συγχωνευμένο κείμενο και προλαβαίνει να κρίνει
                         ό,τι εκκρεμεί. Η σιωπή αποδέχεται το κείμενο. Προεπιλογή: 24 ώρες.
                       </p>
                     </div>
@@ -450,15 +471,15 @@ export default function CommunitySettingsPage() {
 
                   <div className="space-y-3 pt-2">
                     <div>
-                      <h3 className="text-sm font-medium">Όρια που μπορεί να επιλέξει ο συγγραφέας</h3>
+                      <h3 className="text-sm font-medium">Διάρκεια συνδιαμόρφωσης που μπορεί να επιλέξει ο συντάκτης</h3>
                       <p className="text-xs text-muted-foreground">
-                        Ο συγγραφέας κάθε πρότασης μπορεί να ορίσει τη δική του διάρκεια, αλλά μόνο μέσα σε αυτό το εύρος.
-                        Το ρολόι καθορίζει ποιος προλαβαίνει να συμμετάσχει, γι' αυτό το εύρος το ορίζει η κοινότητα.
+                        Ο συντάκτης ορίζει τη δική του διάρκεια, αλλά μόνο μέσα σε αυτό το εύρος. Η διάρκεια της ψηφοφορίας
+                        ορίζεται για κάθε τύπο στους «Κανόνες ψηφοφορίας».
                       </p>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="deliberationMinHours">Διαβούλευση: ελάχιστο</Label>
+                        <Label htmlFor="deliberationMinHours">Συνδιαμόρφωση: ελάχιστο</Label>
                         <Input
                           id="deliberationMinHours"
                           type="number"
@@ -469,7 +490,7 @@ export default function CommunitySettingsPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="deliberationMaxHours">Διαβούλευση: μέγιστο</Label>
+                        <Label htmlFor="deliberationMaxHours">Συνδιαμόρφωση: μέγιστο</Label>
                         <Input
                           id="deliberationMaxHours"
                           type="number"
@@ -477,28 +498,6 @@ export default function CommunitySettingsPage() {
                           max="8760"
                           value={form.deliberationMaxHours}
                           onChange={(e) => update('deliberationMaxHours', Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="votingMinHours">Ψηφοφορία: ελάχιστο</Label>
-                        <Input
-                          id="votingMinHours"
-                          type="number"
-                          min="1"
-                          max="8760"
-                          value={form.votingMinHours}
-                          onChange={(e) => update('votingMinHours', Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="votingMaxHours">Ψηφοφορία: μέγιστο</Label>
-                        <Input
-                          id="votingMaxHours"
-                          type="number"
-                          min="1"
-                          max="8760"
-                          value={form.votingMaxHours}
-                          onChange={(e) => update('votingMaxHours', Number(e.target.value))}
                         />
                       </div>
                     </div>

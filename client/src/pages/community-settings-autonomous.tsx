@@ -20,8 +20,10 @@ import { useTranslation } from '@/hooks/use-translation';
 import {
   ACTIVE_GOVERNABLE_SETTING_KEYS,
   GOVERNABLE_SETTING_DESCRIPTORS,
+  GOVERNABLE_SETTING_KIND,
   type GovernableSettingKey,
 } from '@shared/governable-settings';
+import { PROPOSAL_KINDS } from '@shared/proposal-kinds';
 import { RATIO_SETTINGS, settingHelp, settingLabel, settingValueLabel } from '@/lib/governable-setting-labels';
 
 interface SettingRow {
@@ -81,6 +83,120 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
     }
   }
 
+  function renderRow(key: GovernableSettingKey) {
+    const row = rows?.find((r) => r.key === key);
+    if (!row) return null;
+    const desc = GOVERNABLE_SETTING_DESCRIPTORS[key];
+    const total = row.tally.reduce((sum, entry) => sum + entry.count, 0);
+    const draft = drafts[key] ?? row.yourVote ?? row.currentValue;
+    const help = settingHelp(t, key);
+
+    return (
+      <Card key={key}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">{settingLabel(t, key)}</CardTitle>
+              <CardDescription className="mt-1">
+                {t('community.current_value') || 'Current'}:{' '}
+                <span className="font-medium">{settingValueLabel(t, key, row.currentValue)}</span>
+              </CardDescription>
+              {help && <p className="mt-2 text-sm text-muted-foreground">{help}</p>}
+            </div>
+            {row.yourVote !== null && (
+              <Badge variant="secondary">
+                {t('community.you_voted') || 'You voted'}:{' '}
+                <span className="ml-1 font-medium">{settingValueLabel(t, key, row.yourVote)}</span>
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {row.tally.length > 0 && (
+            <ul className="space-y-1">
+              {row.tally.map((tallyRow) => {
+                const pct = total > 0 ? Math.round((tallyRow.count / total) * 100) : 0;
+                const isWinner = tallyRow.value === row.currentValue;
+                return (
+                  <li key={tallyRow.value} className="flex items-center gap-2 text-sm">
+                    <span className="w-40 shrink-0 truncate" title={settingValueLabel(t, key, tallyRow.value)}>
+                      {settingValueLabel(t, key, tallyRow.value)}
+                    </span>
+                    <div className="flex-1 h-2 bg-muted rounded">
+                      <div className={`h-full rounded ${isWinner ? 'bg-primary' : 'bg-muted-foreground/40'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="w-16 text-right text-muted-foreground">{tallyRow.count} · {pct}%</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {row.tally.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('community.no_votes_yet') || 'No votes yet.'}</p>
+          )}
+
+          {isMember && (
+            <div className="flex flex-wrap items-end gap-2 pt-2 border-t">
+              <div className="flex-1 min-w-[180px] space-y-1">
+                <Label htmlFor={`vote-${key}`}>{t('community.your_vote') || 'Your vote'}</Label>
+                {desc.type === 'enum' && (
+                  <Select value={draft} onValueChange={(v) => setDrafts((d) => ({ ...d, [key]: v }))}>
+                    <SelectTrigger id={`vote-${key}`}><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      {(desc.allowed || []).map((opt) => (
+                        <SelectItem key={opt} value={opt}>{settingValueLabel(t, key, opt)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {desc.type === 'boolean' && (
+                  <div className="flex items-center gap-2 h-10">
+                    <Switch
+                      id={`vote-${key}`}
+                      checked={draft === 'true'}
+                      onCheckedChange={(checked) => setDrafts((d) => ({ ...d, [key]: checked ? 'true' : 'false' }))}
+                    />
+                    <span className="text-sm">{settingValueLabel(t, key, draft || 'false')}</span>
+                  </div>
+                )}
+                {(desc.type === 'integer' || desc.type === 'unlimited_or_positive_integer' || desc.type === 'decimal') && (
+                  <Input
+                    id={`vote-${key}`}
+                    type="number"
+                    value={draft}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
+                    step={desc.type === 'decimal' ? '0.01' : '1'}
+                    min={desc.min}
+                    max={desc.max}
+                  />
+                )}
+                {RATIO_SETTINGS.includes(key) && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('community.ratio_input_hint')}
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                disabled={!!pending[key] || draft === '' || draft === row.yourVote}
+                onClick={() => castVote(key, draft)}
+              >
+                {row.yourVote === null ? (t('community.cast_vote') || 'Cast vote') : (t('community.update_vote') || 'Update vote')}
+              </Button>
+              {row.yourVote !== null && (
+                <Button size="sm" variant="outline" disabled={!!pending[key]} onClick={() => clearVote(key)}>
+                  {t('community.clear_vote') || 'Clear'}
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const generalKeys = ACTIVE_GOVERNABLE_SETTING_KEYS.filter((key) => !GOVERNABLE_SETTING_KIND[key]);
+
   if (error) return <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>;
   if (!rows) return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
 
@@ -96,117 +212,24 @@ export function AutonomousSettingsView({ communityId, isMember }: Props) {
         </CardHeader>
       </Card>
 
-      {ACTIVE_GOVERNABLE_SETTING_KEYS.map((key) => {
-        const row = rows.find((r) => r.key === key);
-        if (!row) return null;
-        const desc = GOVERNABLE_SETTING_DESCRIPTORS[key];
-        const total = row.tally.reduce((sum, entry) => sum + entry.count, 0);
-        const draft = drafts[key] ?? row.yourVote ?? row.currentValue;
-        const help = settingHelp(t, key);
+      {generalKeys.map(renderRow)}
 
-        return (
-          <Card key={key}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base">{settingLabel(t, key)}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {t('community.current_value') || 'Current'}:{' '}
-                    <span className="font-medium">{settingValueLabel(t, key, row.currentValue)}</span>
-                  </CardDescription>
-                  {help && <p className="mt-2 text-sm text-muted-foreground">{help}</p>}
-                </div>
-                {row.yourVote !== null && (
-                  <Badge variant="secondary">
-                    {t('community.you_voted') || 'You voted'}:{' '}
-                    <span className="ml-1 font-medium">{settingValueLabel(t, key, row.yourVote)}</span>
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {row.tally.length > 0 && (
-                <ul className="space-y-1">
-                  {row.tally.map((tallyRow) => {
-                    const pct = total > 0 ? Math.round((tallyRow.count / total) * 100) : 0;
-                    const isWinner = tallyRow.value === row.currentValue;
-                    return (
-                      <li key={tallyRow.value} className="flex items-center gap-2 text-sm">
-                        <span className="w-40 shrink-0 truncate" title={settingValueLabel(t, key, tallyRow.value)}>
-                          {settingValueLabel(t, key, tallyRow.value)}
-                        </span>
-                        <div className="flex-1 h-2 bg-muted rounded">
-                          <div className={`h-full rounded ${isWinner ? 'bg-primary' : 'bg-muted-foreground/40'}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="w-16 text-right text-muted-foreground">{tallyRow.count} · {pct}%</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {row.tally.length === 0 && (
-                <p className="text-sm text-muted-foreground">{t('community.no_votes_yet') || 'No votes yet.'}</p>
-              )}
-
-              {isMember && (
-                <div className="flex flex-wrap items-end gap-2 pt-2 border-t">
-                  <div className="flex-1 min-w-[180px] space-y-1">
-                    <Label htmlFor={`vote-${key}`}>{t('community.your_vote') || 'Your vote'}</Label>
-                    {desc.type === 'enum' && (
-                      <Select value={draft} onValueChange={(v) => setDrafts((d) => ({ ...d, [key]: v }))}>
-                        <SelectTrigger id={`vote-${key}`}><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          {(desc.allowed || []).map((opt) => (
-                            <SelectItem key={opt} value={opt}>{settingValueLabel(t, key, opt)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {desc.type === 'boolean' && (
-                      <div className="flex items-center gap-2 h-10">
-                        <Switch
-                          id={`vote-${key}`}
-                          checked={draft === 'true'}
-                          onCheckedChange={(checked) => setDrafts((d) => ({ ...d, [key]: checked ? 'true' : 'false' }))}
-                        />
-                        <span className="text-sm">{settingValueLabel(t, key, draft || 'false')}</span>
-                      </div>
-                    )}
-                    {(desc.type === 'integer' || desc.type === 'unlimited_or_positive_integer' || desc.type === 'decimal') && (
-                      <Input
-                        id={`vote-${key}`}
-                        type="number"
-                        value={draft}
-                        onChange={(e) => setDrafts((d) => ({ ...d, [key]: e.target.value }))}
-                        step={desc.type === 'decimal' ? '0.01' : '1'}
-                        min={desc.min}
-                        max={desc.max}
-                      />
-                    )}
-                    {RATIO_SETTINGS.includes(key) && (
-                      <p className="text-xs text-muted-foreground">
-                        {t('community.ratio_input_hint')}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={!!pending[key] || draft === '' || draft === row.yourVote}
-                    onClick={() => castVote(key, draft)}
-                  >
-                    {row.yourVote === null ? (t('community.cast_vote') || 'Cast vote') : (t('community.update_vote') || 'Update vote')}
-                  </Button>
-                  {row.yourVote !== null && (
-                    <Button size="sm" variant="outline" disabled={!!pending[key]} onClick={() => clearVote(key)}>
-                      {t('community.clear_vote') || 'Clear'}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+      {/* The terms for each kind of vote, laid out the way the creation form
+          offers the kinds — what members vote here is what an author can
+          then choose within. */}
+      <div className="pt-4" data-testid="autonomous-vote-rules">
+        <h2 className="text-lg font-semibold">{t('community.rules_title')}</h2>
+        <p className="text-sm text-muted-foreground">{t('community.rules_help_autonomous')}</p>
+      </div>
+      {PROPOSAL_KINDS.map((kind) => (
+        <div key={kind} className="space-y-3">
+          <h3 className="pt-2 text-sm font-semibold uppercase tracking-[0.12em] text-ink-faint">{t(`proposal.kind_${kind}`)}</h3>
+          {/* In the map's order — durations, majority, quorum — as the form has them. */}
+          {(Object.keys(GOVERNABLE_SETTING_KIND) as GovernableSettingKey[])
+            .filter((key) => GOVERNABLE_SETTING_KIND[key] === kind && ACTIVE_GOVERNABLE_SETTING_KEYS.includes(key))
+            .map(renderRow)}
+        </div>
+      ))}
     </div>
   );
 }

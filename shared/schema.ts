@@ -232,7 +232,9 @@ export const communities = pgTable("communities", {
   // Deliberation parameters (per-community config)
   maxConcurrentVotes: integer("max_concurrent_votes").default(-1), // -1 = unlimited
   minParticipationPct: numeric("min_participation_pct").default("0"),
-  votePassThreshold: numeric("vote_pass_threshold").default("0.5"), // yes votes / (yes+no) must exceed this to pass
+  // Superseded by decisionMajority (migration 0055), which took its value.
+  // Kept so old rows keep their meaning; nothing reads it for new results.
+  votePassThreshold: numeric("vote_pass_threshold").default("0.5"),
   sortitionSize: integer("sortition_size").default(20),
   sortitionMode: text("sortition_mode").default("absolute"), // 'absolute' | 'percentage'
   sortitionResponseHours: integer("sortition_response_hours").default(72),
@@ -274,6 +276,28 @@ export const communities = pgTable("communities", {
   deliberationMaxHours: integer("deliberation_max_hours").default(336),
   votingMinHours: integer("voting_min_hours").default(24),
   votingMaxHours: integer("voting_max_hours").default(720),
+
+  // The terms for each kind of vote (migration 0055) — read them through
+  // voteRulesFor() in shared/proposal-kinds.ts, never column by column. A
+  // decision uses votingMin/MaxHours, decisionMajority and
+  // minParticipationPct above; the other kinds have their own columns.
+  // Quorums are percentages (0–100); majorities are named rules.
+  decisionMajority: text("decision_majority").notNull().default("simple"),
+  statuteEnabled: boolean("statute_enabled").notNull().default(true),
+  statuteMinHours: integer("statute_min_hours").notNull().default(72),
+  statuteMaxHours: integer("statute_max_hours").notNull().default(720),
+  statuteMajority: text("statute_majority").notNull().default("two_thirds"),
+  statuteMinParticipationPct: numeric("statute_min_participation_pct").notNull().default("0"),
+  electionEnabled: boolean("election_enabled").notNull().default(true),
+  electionMinHours: integer("election_min_hours").notNull().default(48),
+  electionMaxHours: integer("election_max_hours").notNull().default(336),
+  electionMinParticipationPct: numeric("election_min_participation_pct").notNull().default("0"),
+  // May an election open a candidacy phase / a poll an answers phase first.
+  electionNominationsEnabled: boolean("election_nominations_enabled").notNull().default(true),
+  pollEnabled: boolean("poll_enabled").notNull().default(true),
+  pollMinHours: integer("poll_min_hours").notNull().default(24),
+  pollMaxHours: integer("poll_max_hours").notNull().default(336),
+  pollSuggestionsEnabled: boolean("poll_suggestions_enabled").notNull().default(true),
 
   // Democracy score (computed, shows how democratic the community governance is)
   democracyScore: numeric("democracy_score"),
@@ -450,6 +474,24 @@ export const proposals = pgTable("proposals", {
   authorAcceptedFinalAt: timestamp("author_accepted_final_at"),
   // Catalogue key for the card picture — see shared/thumbnails.ts.
   thumbnailKey: text("thumbnail_key"),
+});
+
+// ─── Collected options (migration 0056) ──────────────────────────
+// Co-drafting for an election or a poll: members put candidates or answers
+// forward before the ballot opens. At the end of the phase the active rows,
+// in the order they came, become proposals.ballotOptions and the list locks.
+// See server/utils/option-collection.ts.
+export const proposalOptionSuggestions = pgTable("proposal_option_suggestions", {
+  id: serial("id").primaryKey(),
+  proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  // Set when a member stood themselves, so they alone (with the author) can
+  // withdraw it and cannot stand twice.
+  nomineeUserId: integer("nominee_user_id").references(() => users.id, { onDelete: "set null" }),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  removedAt: timestamp("removed_at"),
+  removedBy: integer("removed_by").references(() => users.id, { onDelete: "set null" }),
 });
 
 // ─── Amendments (Αντιπροτάσεις & Βελτιώσεις) ──────────────────────

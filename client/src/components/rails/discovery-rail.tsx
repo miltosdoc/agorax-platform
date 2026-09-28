@@ -6,6 +6,7 @@ import { PagedRailSection, RailCard, Chip } from "@/components/rails/rail-sectio
 import { Thumbnail } from "@/components/thumbnails/Thumbnail";
 import { SaveButton, ShareButton } from "@/components/cards/card-actions";
 import { mediaUrl, type CommunityCardData } from "@/components/cards/community-card";
+import { proposalStageOf } from '@shared/proposal-kinds';
 
 interface ProposalRow {
   id: number;
@@ -108,7 +109,7 @@ function ProposalRailCard({ proposal }: { proposal: ProposalRow }) {
     <RailCard>
       <div className="mb-2 flex items-center justify-between gap-2">
         {proposal.communityName ? <Chip tone="accent">{proposal.communityName}</Chip> : <span />}
-        <span className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-faint">{proposal.status}</span>
+        <span className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-faint">{t(`stage.${proposalStageOf(proposal.status)}`)}</span>
       </div>
 
       <div className="flex gap-3">

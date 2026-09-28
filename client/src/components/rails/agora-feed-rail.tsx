@@ -10,9 +10,11 @@ import { RailSection, RailCard, Chip, CARD_STACK } from "@/components/rails/rail
 import { Thumbnail } from "@/components/thumbnails/Thumbnail";
 import { SaveButton, ShareButton } from "@/components/cards/card-actions";
 import { mediaUrl } from "@/components/cards/community-card";
+import { proposalEyebrow } from '@/lib/proposal-kind';
+import { proposalStageOf } from '@shared/proposal-kinds';
 
 type FeedItem =
-  | { feedType: "proposal"; id: number; question: string; solution: string; status: string; createdAt: string; communityId: number; communityName: string; authorName: string }
+  | { feedType: "proposal"; id: number; question: string; solution: string; status: string; kind?: string; createdAt: string; communityId: number; communityName: string; authorName: string }
   | { feedType: "survey"; id: number; title: string; topicTag: string | null; tier: string; status: string; createdAt: string }
   | { feedType: "media"; id: number; kind: "podcast" | "video" | "document"; title: string | null; description: string | null; thumbPath: string | null; durationS: string | null; createdAt: string; proposalId: number; proposalQuestion: string; communityId: number; communityName: string };
 
@@ -52,7 +54,7 @@ function FeedRow({ item }: { item: FeedItem }) {
     switch (item.feedType) {
       case "proposal":
         return {
-          kindLabel: t('nav.proposals'),
+          kindLabel: proposalEyebrow(t, item.kind),
           icon: <FileText className="h-3 w-3" />,
           tag: item.communityName,
           title: item.question,
@@ -61,7 +63,7 @@ function FeedRow({ item }: { item: FeedItem }) {
           bookmarkKind: "proposal" as const,
           thumb: null as string | null,
           lines: [
-            item.status ? { icon: <MessageSquare className="h-3 w-3" />, text: item.status } : null,
+            item.status ? { icon: <MessageSquare className="h-3 w-3" />, text: t(`stage.${proposalStageOf(item.status)}`) } : null,
             { icon: <CalendarDays className="h-3 w-3" />, text: ago(item.createdAt) },
           ],
         };

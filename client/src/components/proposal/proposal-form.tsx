@@ -36,9 +36,10 @@ import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
 import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/upload-media';
 import {
-  PROPOSAL_KINDS, kindAllowsDeliberation, kindRequiresOptions, kindRequiresText,
-  proposalKindOf, refusalOptionLabel, type ProposalKind,
+  enabledKinds, kindAllowsDeliberation, kindCollectsOptions, kindRequiresOptions, kindRequiresText, majorityFraction,
+  proposalKindOf, refusalOptionLabel, voteRulesFor, type ProposalKind,
 } from '@shared/proposal-kinds';
+import { hoursLabel } from '@/lib/governable-setting-labels';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
@@ -55,15 +56,23 @@ interface MemberCommunity {
   id: number;
   name: string;
   isGeneral?: boolean;
-  // Bounds the community sets on the durations an author may choose.
+  // Bounds the community sets on the co-drafting length an author may choose.
   deliberationMinHours?: number | null;
   deliberationMaxHours?: number | null;
-  votingMinHours?: number | null;
-  votingMaxHours?: number | null;
   communitySignalHours?: number | null;
   /** False when this community reserves proposal-writing for its admins or founder. */
   viewerCanPropose?: boolean;
+  // …and the terms for each kind of vote, read through voteRulesFor().
+  [column: string]: unknown;
 }
+
+// Only the grid classes Tailwind can see at build time.
+const KIND_GRID: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-2 sm:grid-cols-4',
+};
 
 const KIND_ICONS: Record<ProposalKind, LucideIcon> = {
   decision: Vote,
@@ -113,13 +122,13 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   const lockedCommunity = communityId || editProposalId
     ? memberCommunities.find((c) => c.id === targetCommunityId)
     : null;
-  // Duration bounds come from the community the proposal is being filed in.
-  // The server re-checks them; these only keep the picker honest.
+  // The community sets the terms: which kinds its members may start, and for
+  // each kind the voting range, majority and quorum. The server re-checks
+  // every one of them; these only keep the form from offering what it would
+  // refuse.
   const targetCommunity = memberCommunities.find((c) => c.id === targetCommunityId);
-  const deliberationMin = targetCommunity?.deliberationMinHours ?? 24;
-  const deliberationMax = targetCommunity?.deliberationMaxHours ?? 336;
-  const votingMin = targetCommunity?.votingMinHours ?? 24;
-  const votingMax = targetCommunity?.votingMaxHours ?? 720;
+  const deliberationMin = Number(targetCommunity?.deliberationMinHours ?? 24);
+  const deliberationMax = Number(targetCommunity?.deliberationMaxHours ?? 336);
   const [formData, setFormData] = useState({
     question: '',
     solution: '',
@@ -138,19 +147,36 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
 
   // What is being voted. Chosen at creation; a draft keeps its kind.
   const [kind, setKind] = useState<ProposalKind>('decision');
+  const kinds = useMemo(() => enabledKinds(targetCommunity), [targetCommunity]);
+  const rules = voteRulesFor(targetCommunity, kind);
+  const votingMin = rules.minHours;
+  const votingMax = rules.maxHours;
+  // Switching to a community that does not hold this kind falls back to a
+  // decision, which every community holds.
+  useEffect(() => {
+    if (!editProposalId && targetCommunity && !kinds.includes(kind)) setKind('decision');
+  }, [editProposalId, targetCommunity, kinds, kind]);
   // Deliberation is opt-in. The track follows from the switch *and* the
   // kind, so switching to an election can never leave a deliberation track
   // behind that the server would refuse.
   const [deliberate, setDeliberate] = useState(false);
   const [editTrack, setEditTrack] = useState<'deliberation' | 'vote' | null>(null);
+  // Co-drafting means amending a text for a decision or a statute, and
+  // collecting candidacies or answers for an election or a poll — the
+  // latter only where the community allows it.
+  const canCodraft = kindAllowsDeliberation(kind) || (kindCollectsOptions(kind) && rules.codrafting);
   const track: 'deliberation' | 'vote' = editTrack
-    ?? (deliberate && kindAllowsDeliberation(kind) ? 'deliberation' : 'vote');
+    ?? (deliberate && canCodraft ? 'deliberation' : 'vote');
+  // An election or a poll that collects its options starts from an optional
+  // list of its own; members add the rest before the ballot opens.
+  const collecting = track === 'deliberation' && kindCollectsOptions(kind);
 
   // Yes/no or the author's own options. An election always has options (its
   // candidates); a poll starts with them because most polls are a choice.
   const [useOptions, setUseOptions] = useState(false);
   const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
   const optionBallot = kindRequiresOptions(kind) || useOptions;
+  const showsOptions = optionBallot || collecting;
 
   const [votingHours, setVotingHours] = useState(72);
   const [customVoting, setCustomVoting] = useState(false);
@@ -279,7 +305,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
       const resp = await api.post<{
         kind?: string; question: string; solution?: string; category: string;
         track?: string; votingDurationHours?: number | null; ballotOptions?: unknown[] | null;
-      }>('/api/proposals/compile', { intent: aiIntent.trim() });
+      }>('/api/proposals/compile', {
+        intent: aiIntent.trim(),
+        ...(targetCommunityId ? { communityId: targetCommunityId } : {}),
+      });
       const d = resp.data;
       setFormData({
         question: d.question,
@@ -290,17 +319,19 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
       // and the options — applied to the controls in create mode only; the
       // author can still change every one of them.
       if (!editProposalId) {
-        const k = proposalKindOf(d.kind);
+        const k = kinds.includes(proposalKindOf(d.kind)) ? proposalKindOf(d.kind) : 'decision';
         setKind(k);
-        const wantsDeliberation = d.track === 'deliberation' && kindAllowsDeliberation(k);
+        const kRules = voteRulesFor(targetCommunity, k);
+        const wantsDeliberation = d.track === 'deliberation'
+          && (kindAllowsDeliberation(k) || (kindCollectsOptions(k) && kRules.codrafting));
         setDeliberate(wantsDeliberation);
         if (wantsDeliberation) setMoreOpen(true);
         if (Number.isInteger(d.votingDurationHours) && (d.votingDurationHours as number) > 0) {
-          const hours = clamp(d.votingDurationHours as number, votingMin, votingMax);
+          const hours = clamp(d.votingDurationHours as number, kRules.minHours, kRules.maxHours);
           setVotingHours(hours);
           setCustomVoting(false);
         }
-        if (Array.isArray(d.ballotOptions) && d.ballotOptions.length >= 2) {
+        if (Array.isArray(d.ballotOptions) && d.ballotOptions.length >= (wantsDeliberation ? 1 : 2)) {
           setVoteOptions(d.ballotOptions.map((o) => String(o)));
           setUseOptions(true);
         } else {
@@ -326,17 +357,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     { value: 'other', label: t('proposal.category_other') },
   ];
 
-  function durationLabel(hours: number): string {
-    if (hours % 168 === 0) {
-      const weeks = hours / 168;
-      return weeks === 1 ? t('proposal.dur_week') : t('proposal.dur_weeks', { n: weeks });
-    }
-    if (hours % 24 === 0) {
-      const days = hours / 24;
-      return days === 1 ? t('proposal.dur_day') : t('proposal.dur_days', { n: days });
-    }
-    return t('proposal.dur_hours', { n: hours });
-  }
+  const durationLabel = (hours: number) => hoursLabel(t, hours);
 
   // When the vote would close if it started now — concrete where "72 ώρες"
   // is arithmetic.
@@ -362,6 +383,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         return;
       }
     }
+    if (!editProposalId && collecting && new Set(options.map((o) => o.toLowerCase())).size !== options.length) {
+      setError(t('proposal.form_options_distinct'));
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -373,14 +398,14 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
             kind,
             track,
             ...(thumbnailKey ? { thumbnailKey } : {}),
+            // The voting length is the author's on either track.
+            votingDurationHours: votingHours,
             ...(track === 'vote'
-              ? {
-                  votingDurationHours: votingHours,
-                  ballotOptions: optionBallot ? options : [],
-                }
-              : deliberationHours !== null
-                ? { deliberationDurationHours: deliberationHours }
-                : {}),
+              ? { ballotOptions: optionBallot ? options : [] }
+              : {
+                  ...(collecting ? { ballotOptions: options } : {}),
+                  ...(deliberationHours !== null ? { deliberationDurationHours: deliberationHours } : {}),
+                }),
           });
 
       if (!res.ok) {
@@ -437,17 +462,36 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     }
   }
 
-  const textRequired = kindRequiresText(kind) || track === 'deliberation';
+  const textRequired = kindRequiresText(kind);
+  // The community's terms for this kind, in one line, so the author sees the
+  // rules they are choosing within rather than discovering them on submit.
+  const rulesSummary = [
+    t('proposal.form_rules_duration', {
+      min: hoursLabel(t, rules.minHours),
+      max: hoursLabel(t, rules.maxHours),
+    }),
+    rules.majority
+      ? rules.majority === 'simple'
+        ? t('proposal.form_rules_majority_simple')
+        : t('proposal.form_rules_majority', { fraction: majorityFraction(rules.majority).join('/') })
+      : kind === 'election' ? t('proposal.form_rules_plurality') : null,
+    rules.quorumPct ? t('proposal.form_rules_quorum', { pct: rules.quorumPct }) : null,
+  ].filter(Boolean).join(' · ');
   // A community whose range excludes the presets (or a length the AI read
   // from the description) gets the number field, never a row with nothing
   // selected.
   const votingPresets = VOTING_PRESETS.filter((h) => h >= votingMin && h <= votingMax);
   const showCustomVoting = customVoting || !votingPresets.includes(votingHours);
+  // What co-drafting is called for this kind: the toggle, its hint, the
+  // phase-length label and the start button all follow it.
+  const codraftKey = kind === 'election' ? 'nominations' : kind === 'poll' ? 'suggestions' : 'codrafting';
+  const phaseLength = hoursLabel(t, deliberationHours
+    ?? clamp(Number(targetCommunity?.communitySignalHours ?? 48), deliberationMin, deliberationMax));
   const startLabel = track === 'deliberation'
-    ? t('proposal.form_start_deliberation')
+    ? t(`proposal.form_start_${codraftKey}`)
     : kind === 'poll' ? t('proposal.form_start_poll') : t('proposal.form_start_vote');
   const startHint = track === 'deliberation'
-    ? t('proposal.form_hint_deliberation')
+    ? t(`proposal.form_hint_${codraftKey}`, { duration: phaseLength })
     : t(kind === 'poll' ? 'proposal.form_hint_poll' : 'proposal.form_hint_vote');
 
   const sectionLabel = 'font-sans text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint';
@@ -566,8 +610,8 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
           ) : (
             <fieldset className="space-y-3">
               <legend className={`${sectionLabel} mb-3`}>{t('proposal.form_kind_label')}</legend>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
-                {PROPOSAL_KINDS.map((k) => {
+              <div className={`grid gap-2 ${KIND_GRID[kinds.length] ?? KIND_GRID[4]}`} role="radiogroup">
+                {kinds.map((k) => {
                   const Icon = KIND_ICONS[k];
                   const selected = k === kind;
                   return (
@@ -594,6 +638,11 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
               {kind === 'poll' && (
                 <p className="text-xs text-muted-foreground">{t('proposal.form_poll_note')}</p>
               )}
+              {targetCommunity && (
+                <p className="text-xs text-muted-foreground" data-testid="proposal-kind-rules">
+                  {rulesSummary}
+                </p>
+              )}
             </fieldset>
           )}
 
@@ -615,16 +664,19 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
             </div>
 
             {/* The ballot — candidates for an election, otherwise yes/no or
-                the author's own options. Deliberation builds its own ballot
-                from the amendments, so there is nothing to set here. */}
-            {!editProposalId && track === 'vote' && (
+                the author's own options. Co-drafting a text builds its ballot
+                from the amendments, so there is nothing to set here; an
+                election or a poll collecting its options starts from these. */}
+            {!editProposalId && (track === 'vote' || collecting) && (
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label>
                     {kind === 'election' ? t('proposal.form_candidates') : t('proposal.form_answers')}
-                    {kind === 'election' && <span className="text-red-500"> *</span>}
+                    {collecting
+                      ? <span className="font-normal text-muted-foreground"> ({t('proposal.form_optional')})</span>
+                      : kind === 'election' && <span className="text-red-500"> *</span>}
                   </Label>
-                  {!kindRequiresOptions(kind) && (
+                  {!kindRequiresOptions(kind) && !collecting && (
                     <div className="inline-flex rounded-md border p-0.5 text-sm" role="radiogroup">
                       {[false, true].map((withOptions) => (
                         <button
@@ -647,7 +699,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                   )}
                 </div>
 
-                {optionBallot ? (
+                {collecting && (
+                  <p className="text-xs text-muted-foreground">{t(`proposal.form_${codraftKey}_seed_hint`)}</p>
+                )}
+                {showsOptions ? (
                   <div className="space-y-2">
                     {voteOptions.map((opt, i) => (
                       <div key={i} className="flex gap-2">
@@ -762,7 +817,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
           </div>
 
           {/* How long the vote stays open. */}
-          {!editProposalId && track === 'vote' && (
+          {!editProposalId && (
             <fieldset className="space-y-3">
               <legend className={`${sectionLabel} mb-3`}>{t('proposal.form_duration')}</legend>
               <div className="flex flex-wrap gap-2">
@@ -828,9 +883,11 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 data-testid="proposal-more-toggle"
               >
                 <span>
-                  <span className="block text-sm font-medium">{t('proposal.form_more')}</span>
+                  <span className="block text-sm font-medium">
+                    {canCodraft ? t('proposal.form_more_codrafting') : t('proposal.form_more')}
+                  </span>
                   <span className="block text-xs text-muted-foreground">
-                    {kindAllowsDeliberation(kind) ? t('proposal.form_more_hint') : t('proposal.form_more_hint_short')}
+                    {canCodraft ? t(`proposal.form_more_hint_${codraftKey}`) : t('proposal.form_more_hint_short')}
                   </span>
                 </span>
                 <ChevronDown
@@ -839,12 +896,12 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 />
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-6 border-t px-4 py-4">
-                {kindAllowsDeliberation(kind) && (
+                {canCodraft && (
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <Label htmlFor="deliberate" className="space-y-1 font-normal">
-                        <span className="block text-sm font-medium">{t('proposal.form_deliberate')}</span>
-                        <span className="block text-xs text-muted-foreground">{t('proposal.form_deliberate_hint')}</span>
+                        <span className="block text-sm font-medium">{t(`proposal.form_${codraftKey}_toggle`)}</span>
+                        <span className="block text-xs text-muted-foreground">{t(`proposal.form_${codraftKey}_toggle_hint`)}</span>
                       </Label>
                       <Switch
                         id="deliberate"
@@ -855,8 +912,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                     </div>
                     {deliberate && (
                       <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">{t('proposal.form_deliberation_ballot_note')}</p>
-                        <p className="text-sm">{t('proposal.form_deliberation_duration')}</p>
+                        {kindAllowsDeliberation(kind) && (
+                          <p className="text-xs text-muted-foreground">{t('proposal.form_deliberation_ballot_note')}</p>
+                        )}
+                        <p className="text-sm">{t(`proposal.form_${codraftKey}_duration`)}</p>
                         <div className="flex flex-wrap gap-2">
                           {[null, ...DELIBERATION_PRESETS.filter((h) => h >= deliberationMin && h <= deliberationMax)].map((h) => {
                             const selected = deliberationHours === h;

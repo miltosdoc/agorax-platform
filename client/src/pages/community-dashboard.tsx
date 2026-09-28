@@ -28,7 +28,7 @@ import { ArrowLeft, Users, FileText, Vote, Shield, Settings, CheckCircle2, Merge
 import { CommunityRoomsSection } from '@/components/livekit/CommunityRoomsSection';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
-import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
+import { useTranslation } from '@/hooks/use-translation';
 import { CommunityLibrary } from '@/components/community/CommunityLibrary';
 import { CommunityConstitution } from '@/components/community/CommunityConstitution';
 import { CommunityForum } from '@/components/community/CommunityForum';
@@ -39,6 +39,7 @@ import {
   hasDemocracyScore,
   type CommunitySummary,
 } from '@shared/community-summary';
+import StatusBadge from '@/components/proposal/StatusBadge';
 
 interface CommunityForMerge {
   id: number;
@@ -495,19 +496,11 @@ export default function CommunityDashboardPage() {
                       <div>
                         <div className="font-medium">{proposal.question}</div>
                         <div className="text-sm text-muted-foreground">
-                          {proposal.kind && proposal.kind !== 'decision' && (
-                            <>{t(`proposal.kind_${proposal.kind}`)} · </>
-                          )}
+                          {t(`proposal.kind_${proposal.kind || 'decision'}`)} · 
                           {t('common.by')} {proposal.authorLabel} · {new Date(proposal.createdAt).toLocaleDateString()}
                         </div>
                       </div>
-                      <Badge variant={
-                        proposal.status === 'voting' ? 'default' :
-                        proposal.status === 'community_signal' || proposal.status === 'sortition_synthesis' ? 'secondary' :
-                        'outline'
-                      }>
-                        {getStatusLabel(proposal.status, t)}
-                      </Badge>
+                      <StatusBadge status={proposal.status} />
                     </div>
                   ))}
                   {!showArchived && proposals.some((p) => p.status === 'archived') && (

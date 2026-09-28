@@ -68,6 +68,21 @@ describe('community settings contract', () => {
       deliberationMaxHours: 336,
       votingMinHours: 24,
       votingMaxHours: 720,
+      decisionMajority: 'simple',
+      statuteEnabled: true,
+      statuteMinHours: 72,
+      statuteMaxHours: 720,
+      statuteMajority: 'two_thirds',
+      statuteMinParticipationPct: '0',
+      electionEnabled: true,
+      electionMinHours: 48,
+      electionMaxHours: 336,
+      electionMinParticipationPct: '0',
+      pollEnabled: true,
+      pollMinHours: 24,
+      pollMaxHours: 336,
+      electionNominationsEnabled: true,
+      pollSuggestionsEnabled: true,
     });
   });
 
@@ -98,6 +113,21 @@ describe('community settings contract', () => {
       deliberationMaxHours: 336,
       votingMinHours: 24,
       votingMaxHours: 720,
+      decisionMajority: 'simple',
+      statuteEnabled: true,
+      statuteMinHours: 72,
+      statuteMaxHours: 720,
+      statuteMajority: 'two_thirds',
+      statuteMinParticipationPct: '0',
+      electionEnabled: true,
+      electionMinHours: 48,
+      electionMaxHours: 336,
+      electionMinParticipationPct: '0',
+      pollEnabled: true,
+      pollMinHours: 24,
+      pollMaxHours: 336,
+      electionNominationsEnabled: true,
+      pollSuggestionsEnabled: true,
     });
   });
 
@@ -150,6 +180,10 @@ describe('community settings contract', () => {
       .toThrow('deliberationMinHours cannot exceed deliberationMaxHours');
     expect(() => sanitizeCommunityUpdateInput({ votingMinHours: 400, votingMaxHours: 200 }))
       .toThrow('votingMinHours cannot exceed votingMaxHours');
+    expect(() => sanitizeCommunityUpdateInput({ pollMinHours: 400, pollMaxHours: 200 }))
+      .toThrow('pollMinHours cannot exceed pollMaxHours');
+    expect(() => sanitizeCommunityUpdateInput({ statuteMajority: 'most' }))
+      .toThrow('Invalid statuteMajority');
   });
 
   it('checks a half-sent range against the settings the row will hold', () => {

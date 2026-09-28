@@ -90,6 +90,12 @@ export function registerAmendmentsRoutes(app: Express): void {
           current_status: proposal.status,
         });
       }
+      // An election or a poll is co-drafted by adding candidates or answers
+      // (/options), not by amending a text it does not have.
+      const { kindCollectsOptions, proposalKindOf } = await import('@shared/proposal-kinds');
+      if (kindCollectsOptions(proposalKindOf((proposal as any).kind))) {
+        return res.status(409).json({ message: "Αυτή η ψηφοφορία δεν έχει κείμενο για τροπολογίες." });
+      }
       // Check amendment cap
       const community = await communityRepo.getCommunity(proposal.communityId);
       const cap = community?.maxAmendmentsPerProposal ?? -1;

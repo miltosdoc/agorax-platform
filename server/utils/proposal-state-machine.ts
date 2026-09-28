@@ -117,12 +117,27 @@ export async function computePhaseDeadline(
     const authored = AUTHORED_PHASES[newState];
     if (authored) {
       const { resolveAuthoredPhaseHours } = await import('@shared/community-settings');
+      // The voting range depends on the kind: a statute and a poll need not
+      // share one. The co-drafting range is the same for every kind.
+      let min = (community as any)?.[authored.min];
+      let max = (community as any)?.[authored.max];
+      if (newState === 'voting') {
+        const { voteRulesFor, proposalKindOf } = await import('@shared/proposal-kinds');
+        const rules = voteRulesFor(community as any, proposalKindOf((proposal as any).kind));
+        min = rules.minHours;
+        max = rules.maxHours;
+      }
       hours = resolveAuthoredPhaseHours({
         requested: (proposal as any)[authored.field],
-        min: (community as any)?.[authored.min],
-        max: (community as any)?.[authored.max],
+        min,
+        max,
         communityDefault: hours,
       });
+      // A co-drafted statute arrives with no length of its own and takes the
+      // community's general default, which may sit outside the statute range.
+      if (newState === 'voting' && hours > 0) {
+        hours = Math.min(Math.max(hours, Number(min)), Number(max));
+      }
     }
   } catch (err: any) {
     console.warn(`[phase-deadline] lookup failed for proposal ${proposal.id}: ${err?.message}`);
@@ -168,6 +183,16 @@ export async function transitionProposal(
   }
   if (newState === 'final_review' && track === 'vote') {
     throw new Error('Direct-vote proposals have no final_review phase');
+  }
+  // An election or a poll collects options while co-drafting; it has no
+  // text to review on the way in, and none to merge on the way out.
+  const { kindCollectsOptions, proposalKindOf } = await import('@shared/proposal-kinds');
+  const collects = kindCollectsOptions(proposalKindOf((proposal as any).kind));
+  if (currentState === 'draft' && newState === 'community_signal' && (track === 'vote' || !collects)) {
+    throw new Error('Only an election or a poll opens its co-drafting straight from draft');
+  }
+  if (newState === 'final_review' && collects) {
+    throw new Error('An election or a poll has no final text to review');
   }
 
   const phaseDeadline = await computePhaseDeadline(proposal, newState);
@@ -367,6 +392,13 @@ export async function triggerSideEffects(
       break;
 
     case 'community_signal->voting':
+      // An election or a poll locked its collected options into the ballot
+      // before this transition (see option-collection.ts); there is no text
+      // to merge.
+      {
+        const { kindCollectsOptions, proposalKindOf } = await import('@shared/proposal-kinds');
+        if (kindCollectsOptions(proposalKindOf((proposal as any).kind))) break;
+      }
       // 3-step flow freeze: final re-merge (accepted + promoted amendments,
       // standing author refine re-applied), restyle counters, then lock the
       // option ballot. What everyone watched during deliberation is exactly
@@ -676,7 +708,7 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
       await enqueueNotification(
         proposal.authorId,
         'proposal_validated',
-        `Η πρόταση πέρασε στην κοινοτική διαβούλευση (βαθμός ${Math.round(result.score)}/100).`,
+        `Η πρόταση πέρασε στην κοινοτική συνδιαμόρφωση (βαθμός ${Math.round(result.score)}/100).`,
         { proposalId, score: result.score },
       );
       break;
@@ -688,7 +720,7 @@ export async function transitionToValidation(proposalId: number): Promise<Valida
       await enqueueNotification(
         proposal.authorId,
         'proposal_validated',
-        `Η πρόταση πέρασε τον έλεγχο ποιότητας με βαθμό ${Math.round(result.score)}/100 και άνοιξε σε κοινοτική διαβούλευση.`,
+        `Η πρόταση πέρασε τον έλεγχο ποιότητας με βαθμό ${Math.round(result.score)}/100 και άνοιξε σε κοινοτική συνδιαμόρφωση.`,
         { proposalId, score: result.score },
       );
       break;

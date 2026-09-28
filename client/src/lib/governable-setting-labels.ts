@@ -35,6 +35,23 @@ export const SETTING_LABEL_KEYS: Record<GovernableSettingKey, string> = {
   amendmentThreshold: 'community.amendment_threshold',
   amendmentInclusionThreshold: 'community.amendment_inclusion_threshold',
   maxAmendmentsPerProposal: 'community.max_amendments_per_proposal',
+  votingMinHours: 'community.rule_decision_min_hours',
+  votingMaxHours: 'community.rule_decision_max_hours',
+  decisionMajority: 'community.rule_decision_majority',
+  statuteEnabled: 'community.rule_statute_enabled',
+  statuteMinHours: 'community.rule_statute_min_hours',
+  statuteMaxHours: 'community.rule_statute_max_hours',
+  statuteMajority: 'community.rule_statute_majority',
+  statuteMinParticipationPct: 'community.rule_statute_quorum',
+  electionEnabled: 'community.rule_election_enabled',
+  electionMinHours: 'community.rule_election_min_hours',
+  electionMaxHours: 'community.rule_election_max_hours',
+  electionMinParticipationPct: 'community.rule_election_quorum',
+  pollEnabled: 'community.rule_poll_enabled',
+  pollMinHours: 'community.rule_poll_min_hours',
+  pollMaxHours: 'community.rule_poll_max_hours',
+  electionNominationsEnabled: 'community.rule_election_nominations',
+  pollSuggestionsEnabled: 'community.rule_poll_suggestions',
 };
 
 /**
@@ -65,6 +82,8 @@ export const SETTING_VALUE_KEY_PREFIXES: Partial<Record<GovernableSettingKey, st
   contentVisibility: 'community.visibility_',
   sortitionMode: 'community.sortition_mode_',
   synthesisMode: 'community.synthesis_mode_',
+  decisionMajority: 'community.majority_',
+  statuteMajority: 'community.majority_',
 };
 
 /**
@@ -100,7 +119,15 @@ export function settingValueLabel(t: Translate, key: GovernableSettingKey, value
     if (Number.isFinite(ratio)) return `${Math.round(ratio * 100)}%`;
   }
 
-  const { type } = GOVERNABLE_SETTING_DESCRIPTORS[key];
+  const { type, unit } = GOVERNABLE_SETTING_DESCRIPTORS[key];
+  if (unit === 'percent') {
+    const pct = Number(value);
+    if (Number.isFinite(pct)) return `${pct}%`;
+  }
+  if (unit === 'hours') {
+    const hours = Number(value);
+    if (Number.isInteger(hours)) return hoursLabel(t, hours);
+  }
   if (type === 'boolean') return translated(t, `community.value_${value}`) ?? value;
   // -1 is the sentinel the parser accepts for "no ceiling"; showing it raw
   // reads like a bug rather than a setting.
@@ -108,4 +135,20 @@ export function settingValueLabel(t: Translate, key: GovernableSettingKey, value
     return translated(t, 'community.value_unlimited') ?? value;
   }
   return value;
+}
+
+/**
+ * A duration in the words people use: "3 ημέρες", "1 εβδομάδα", "12 ώρες".
+ * Shared by the rules ballot and the settings form so both say the same.
+ */
+export function hoursLabel(t: Translate, hours: number): string {
+  if (hours > 0 && hours % 168 === 0) {
+    const weeks = hours / 168;
+    return weeks === 1 ? t('proposal.dur_week') : t('proposal.dur_weeks').replace('{n}', String(weeks));
+  }
+  if (hours > 0 && hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? t('proposal.dur_day') : t('proposal.dur_days').replace('{n}', String(days));
+  }
+  return hours === 1 ? t('proposal.dur_hour') : t('proposal.dur_hours').replace('{n}', String(hours));
 }

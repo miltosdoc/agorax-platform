@@ -9,6 +9,7 @@
 // Keys NOT in this list (name, description, type) are lifecycle/identity
 // changes; only the founder can flip them, never the community at large.
 
+import { MAJORITY_RULES, type ProposalKind } from './proposal-kinds';
 import {
   COMMUNITY_GOVERNANCE_MODELS,
   COMMUNITY_SORTITION_MODES,
@@ -35,6 +36,25 @@ export const GOVERNABLE_SETTING_KEYS = [
   'amendmentThreshold',
   'amendmentInclusionThreshold',
   'maxAmendmentsPerProposal',
+  // The terms for each kind of vote (migration 0055). An autonomous
+  // community has no admins, so its members set these by vote like the rest.
+  'votingMinHours',
+  'votingMaxHours',
+  'decisionMajority',
+  'statuteEnabled',
+  'statuteMinHours',
+  'statuteMaxHours',
+  'statuteMajority',
+  'statuteMinParticipationPct',
+  'electionEnabled',
+  'electionMinHours',
+  'electionMaxHours',
+  'electionMinParticipationPct',
+  'electionNominationsEnabled',
+  'pollEnabled',
+  'pollMinHours',
+  'pollMaxHours',
+  'pollSuggestionsEnabled',
 ] as const;
 export type GovernableSettingKey = typeof GOVERNABLE_SETTING_KEYS[number];
 
@@ -46,6 +66,8 @@ export interface GovernableSettingDescriptor {
   allowed?: readonly string[];
   min?: number;
   max?: number;
+  /** How an integer or decimal reads to a member: a duration or a share. */
+  unit?: 'hours' | 'percent';
 }
 
 export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, GovernableSettingDescriptor> = {
@@ -59,12 +81,55 @@ export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, Govern
   synthesisMode:                 { key: 'synthesisMode',                 type: 'enum',    allowed: COMMUNITY_SYNTHESIS_MODES },
   requireGovgrVerification:      { key: 'requireGovgrVerification',      type: 'boolean' },
   maxConcurrentVotes:            { key: 'maxConcurrentVotes',            type: 'unlimited_or_positive_integer' },
-  minParticipationPct:           { key: 'minParticipationPct',           type: 'decimal', min: 0,    max: 100 },
+  minParticipationPct:           { key: 'minParticipationPct',           type: 'decimal', min: 0,    max: 100, unit: 'percent' },
   sortitionSize:                 { key: 'sortitionSize',                 type: 'integer', min: 3,    max: 500 },
   sortitionResponseHours:        { key: 'sortitionResponseHours',        type: 'integer', min: 1,    max: 720 },
   amendmentThreshold:            { key: 'amendmentThreshold',            type: 'decimal', min: 0,    max: 1 },
   amendmentInclusionThreshold:   { key: 'amendmentInclusionThreshold',   type: 'decimal', min: 0,    max: 1 },
   maxAmendmentsPerProposal:      { key: 'maxAmendmentsPerProposal',      type: 'unlimited_or_positive_integer' },
+  votingMinHours:                { key: 'votingMinHours',                type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  votingMaxHours:                { key: 'votingMaxHours',                type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  decisionMajority:              { key: 'decisionMajority',              type: 'enum',    allowed: MAJORITY_RULES },
+  statuteEnabled:                { key: 'statuteEnabled',                type: 'boolean' },
+  statuteMinHours:               { key: 'statuteMinHours',               type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  statuteMaxHours:               { key: 'statuteMaxHours',               type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  statuteMajority:               { key: 'statuteMajority',               type: 'enum',    allowed: MAJORITY_RULES },
+  statuteMinParticipationPct:    { key: 'statuteMinParticipationPct',    type: 'decimal', min: 0, max: 100, unit: 'percent' },
+  electionEnabled:               { key: 'electionEnabled',               type: 'boolean' },
+  electionMinHours:              { key: 'electionMinHours',              type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  electionMaxHours:              { key: 'electionMaxHours',              type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  electionMinParticipationPct:   { key: 'electionMinParticipationPct',   type: 'decimal', min: 0, max: 100, unit: 'percent' },
+  pollEnabled:                   { key: 'pollEnabled',                   type: 'boolean' },
+  pollMinHours:                  { key: 'pollMinHours',                  type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  pollMaxHours:                  { key: 'pollMaxHours',                  type: 'integer', min: 1, max: 8760, unit: 'hours' },
+  electionNominationsEnabled:    { key: 'electionNominationsEnabled',    type: 'boolean' },
+  pollSuggestionsEnabled:        { key: 'pollSuggestionsEnabled',        type: 'boolean' },
+};
+
+/**
+ * Which kind of vote a setting belongs to, so the members' ballot on the
+ * rules can be laid out the way the form offers the kinds, in this order.
+ * General settings are absent.
+ */
+export const GOVERNABLE_SETTING_KIND: Partial<Record<GovernableSettingKey, ProposalKind>> = {
+  votingMinHours: 'decision',
+  votingMaxHours: 'decision',
+  decisionMajority: 'decision',
+  minParticipationPct: 'decision',
+  statuteEnabled: 'statute',
+  statuteMinHours: 'statute',
+  statuteMaxHours: 'statute',
+  statuteMajority: 'statute',
+  statuteMinParticipationPct: 'statute',
+  electionEnabled: 'election',
+  electionMinHours: 'election',
+  electionMaxHours: 'election',
+  electionMinParticipationPct: 'election',
+  electionNominationsEnabled: 'election',
+  pollEnabled: 'poll',
+  pollMinHours: 'poll',
+  pollMaxHours: 'poll',
+  pollSuggestionsEnabled: 'poll',
 };
 
 /**

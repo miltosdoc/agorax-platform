@@ -1,15 +1,21 @@
 /**
- * Proposal Index Page (/proposals)
+ * Votes Index Page (/proposals) — «Ψηφοφορίες»
  *
- * Lists all proposals across communities with client-side filtering by
- * status, community, date range, and a free-text search across the
- * question + solution. Sorting is client-side (the API only exposes a
- * `limit` parameter today). Pagination uses a simple "load more" cursor
- * over an in-memory list.
+ * Every vote across the viewer's communities, filtered by what matters to a
+ * member and in any combination:
  *
- * Composition: a legislative docket — one hairline-bounded toolbar
- * (search line, filter grid, mono result-count strip) over a single
- * bordered register of divided rows.
+ *   Τύπος      — decision, statute, election, community poll
+ *   Στάδιο     — in co-drafting, in voting, completed (derived from the
+ *                lifecycle, so it moves on by itself)
+ *   Κοινότητα  — which community it belongs to
+ *   Κατηγορία  — the subject it concerns
+ *
+ * e.g. elections + in voting + one community. The filters live in the URL,
+ * so a filtered view can be shared as a link. The viewer's own drafts are
+ * not part of the register — they are listed apart, above it.
+ *
+ * Filtering and sorting are client-side (the API only exposes a `limit`
+ * parameter today); pagination is a "load more" cursor over the list.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -28,14 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FileText, Plus, Search } from 'lucide-react';
+import { FileText, Pencil, Plus, Search } from 'lucide-react';
 import { api } from '@/lib/api';
-import { useTranslation, getStatusLabel } from '@/hooks/use-translation';
-import { ORDERED_STATES } from '@/lib/proposal-status';
+import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/hooks/use-auth';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { publicHandle } from '@shared/user-identity';
 import { proposalEyebrow } from '@/lib/proposal-kind';
+import { PROPOSAL_KINDS, PROPOSAL_STAGES, proposalKindOf, proposalStageOf } from '@shared/proposal-kinds';
 
 type SortOption = 'created_desc' | 'created_asc' | 'score_desc' | 'score_asc';
 
@@ -44,6 +51,7 @@ interface Proposal {
   question: string;
   solution: string;
   status: string;
+  kind?: string;
   authorId: number;
   authorName?: string | null;
   authorUsername?: string | null;
@@ -60,8 +68,8 @@ interface Community {
 }
 
 const PAGE_SIZE = 12;
-const STATUS_ALL = '__all__';
-const COMMUNITY_ALL = '__all__';
+const ALL = '__all__';
+const CATEGORIES = ['education', 'healthcare', 'infrastructure', 'environment', 'economy', 'governance', 'other'] as const;
 
 /* Toolbar vocabulary: tracked eyebrow labels, flat token-bound controls. */
 const FIELD_LABEL = 'text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint';
@@ -73,8 +81,20 @@ function parseScore(value: Proposal['llmScore']): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+/** The filters as they stand in the address bar. */
+function readFilters() {
+  const q = new URLSearchParams(window.location.search);
+  return {
+    type: q.get('type') ?? ALL,
+    stage: q.get('stage') ?? ALL,
+    community: q.get('community') ?? ALL,
+    category: q.get('category') ?? ALL,
+  };
+}
+
 export default function ProposalsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -82,11 +102,12 @@ export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [pageLimit, setPageLimit] = useState(PAGE_SIZE);
 
+  const initial = useMemo(readFilters, []);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>(STATUS_ALL);
-  const [communityFilter, setCommunityFilter] = useState<string>(COMMUNITY_ALL);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>(initial.type);
+  const [stageFilter, setStageFilter] = useState<string>(initial.stage);
+  const [communityFilter, setCommunityFilter] = useState<string>(initial.community);
+  const [categoryFilter, setCategoryFilter] = useState<string>(initial.category);
   const [sort, setSort] = useState<SortOption>('created_desc');
 
   useEffect(() => {
@@ -100,35 +121,42 @@ export default function ProposalsPage() {
     });
   }, []);
 
+  // Keep the address bar in step, without adding a history entry per click.
+  useEffect(() => {
+    const q = new URLSearchParams();
+    if (typeFilter !== ALL) q.set('type', typeFilter);
+    if (stageFilter !== ALL) q.set('stage', stageFilter);
+    if (communityFilter !== ALL) q.set('community', communityFilter);
+    if (categoryFilter !== ALL) q.set('category', categoryFilter);
+    const qs = q.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  }, [typeFilter, stageFilter, communityFilter, categoryFilter]);
+
   const communityName = useMemo(() => {
     const byId = new Map<number, string>();
     for (const c of communities) byId.set(c.id, c.name);
     return (id: number, fallback?: string) => byId.get(id) ?? fallback ?? `#${id}`;
   }, [communities]);
 
+  // The viewer's drafts are theirs alone and not part of the register.
+  const myDrafts = useMemo(
+    () => proposals.filter((p) => p.status === 'draft' && user && p.authorId === user.id),
+    [proposals, user],
+  );
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
-    // Include the whole "to" day by adding 24h.
-    const toTs = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 : null;
 
     const matches = proposals.filter((p) => {
-      if (statusFilter !== STATUS_ALL && p.status !== statusFilter) return false;
-      // Archived proposals are record, not feed: they appear only when the
-      // archived filter is explicitly selected.
-      if (statusFilter === STATUS_ALL && p.status === 'archived') return false;
-      if (communityFilter !== COMMUNITY_ALL && String(p.communityId) !== communityFilter) return false;
+      const stage = proposalStageOf(p.status);
+      if (stage === 'draft') return false;
+      if (typeFilter !== ALL && proposalKindOf(p.kind) !== typeFilter) return false;
+      if (stageFilter !== ALL && stage !== stageFilter) return false;
+      if (communityFilter !== ALL && String(p.communityId) !== communityFilter) return false;
+      if (categoryFilter !== ALL && p.category !== categoryFilter) return false;
       if (term) {
         const hay = `${p.question ?? ''} ${p.solution ?? ''}`.toLowerCase();
         if (!hay.includes(term)) return false;
-      }
-      if (fromTs !== null) {
-        const created = new Date(p.createdAt).getTime();
-        if (Number.isFinite(created) && created < fromTs) return false;
-      }
-      if (toTs !== null) {
-        const created = new Date(p.createdAt).getTime();
-        if (Number.isFinite(created) && created >= toTs) return false;
       }
       return true;
     });
@@ -141,24 +169,48 @@ export default function ProposalsPage() {
     };
     matches.sort(sorter[sort]);
     return matches;
-  }, [proposals, search, statusFilter, communityFilter, dateFrom, dateTo, sort]);
+  }, [proposals, search, typeFilter, stageFilter, communityFilter, categoryFilter, sort]);
 
   // Reset pagination whenever filters change.
   useEffect(() => {
     setPageLimit(PAGE_SIZE);
-  }, [search, statusFilter, communityFilter, dateFrom, dateTo, sort]);
+  }, [search, typeFilter, stageFilter, communityFilter, categoryFilter, sort]);
 
   const visible = filtered.slice(0, pageLimit);
   const hasMore = filtered.length > visible.length;
 
   const clearFilters = () => {
     setSearch('');
-    setStatusFilter(STATUS_ALL);
-    setCommunityFilter(COMMUNITY_ALL);
-    setDateFrom('');
-    setDateTo('');
+    setTypeFilter(ALL);
+    setStageFilter(ALL);
+    setCommunityFilter(ALL);
+    setCategoryFilter(ALL);
     setSort('created_desc');
   };
+
+  const filterSelect = (
+    testId: string,
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    allLabel: string,
+    options: Array<{ value: string; label: string }>,
+  ) => (
+    <div className="space-y-1.5">
+      <Label className={FIELD_LABEL}>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger data-testid={testId} className={FIELD_CONTROL}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>{allLabel}</SelectItem>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   return (
     <AppShell
@@ -173,11 +225,35 @@ export default function ProposalsPage() {
           data-testid="proposals-new-button"
           className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
           {t('home.submitProposal')}
+          <Plus className="h-4 w-4" aria-hidden="true" />
         </button>
       }
     >
+      {/* ── The viewer's own drafts, apart from the register ── */}
+      {myDrafts.length > 0 && (
+        <section className="mb-8 rounded border border-dashed border-line bg-surface p-4" data-testid="proposals-my-drafts">
+          <h2 className={`${FIELD_LABEL} mb-3`}>{t('proposals.myDrafts')}</h2>
+          <ul className="space-y-2">
+            {myDrafts.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 text-sm">
+                <Link href={`/proposals/${d.id}`} className="min-w-0 flex-1 truncate text-ink hover:text-kyanos">
+                  <span className="text-ink-faint">{proposalEyebrow(t, d.kind)} · </span>
+                  {d.question}
+                </Link>
+                <Link
+                  href={`/proposals/${d.id}/edit`}
+                  className="inline-flex shrink-0 items-center gap-1 text-xs text-kyanos hover:underline"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('proposal.edit')}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* ── Toolbar: search line / filter grid / result strip ── */}
       <section className="mb-8 rounded border border-line bg-surface">
         <div className="flex items-center gap-2.5 border-b border-line px-4">
@@ -192,83 +268,37 @@ export default function ProposalsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-x-4 gap-y-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-5">
-          <div className="space-y-1.5">
-            <Label className={FIELD_LABEL}>{t('proposals.filterStatus')}</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger data-testid="proposals-filter-status" className={FIELD_CONTROL}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={STATUS_ALL}>{t('proposals.filterStatusAll')}</SelectItem>
-                {ORDERED_STATES.map((state) => (
-                  <SelectItem key={state} value={state}>
-                    {getStatusLabel(state, t)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-3 p-4 sm:p-5 2xl:grid-cols-4">
+          {filterSelect('proposals-filter-type', t('proposals.filterType'), typeFilter, setTypeFilter, t('proposals.filterTypeAll'),
+            PROPOSAL_KINDS.map((k) => ({ value: k, label: t(`proposal.kind_${k}`) })))}
+          {filterSelect('proposals-filter-stage', t('proposals.filterStage'), stageFilter, setStageFilter, t('proposals.filterStageAll'),
+            PROPOSAL_STAGES.map((st) => ({ value: st, label: t(`stage.${st}`) })))}
+          {filterSelect('proposals-filter-community', t('proposals.filterCommunity'), communityFilter, setCommunityFilter, t('proposals.filterCommunityAll'),
+            communities.map((c) => ({ value: String(c.id), label: c.name })))}
+          {filterSelect('proposals-filter-category', t('proposals.filterCategory'), categoryFilter, setCategoryFilter, t('proposals.filterCategoryAll'),
+            CATEGORIES.map((c) => ({ value: c, label: t(`proposal.category_${c}`) })))}
 
-          <div className="space-y-1.5">
-            <Label className={FIELD_LABEL}>{t('proposals.filterCommunity')}</Label>
-            <Select value={communityFilter} onValueChange={setCommunityFilter}>
-              <SelectTrigger data-testid="proposals-filter-community" className={FIELD_CONTROL}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={COMMUNITY_ALL}>{t('proposals.filterCommunityAll')}</SelectItem>
-                {communities.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className={FIELD_LABEL}>{t('proposals.dateFrom')}</Label>
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={`${FIELD_CONTROL} font-mono tabular-nums`}
-              data-testid="proposals-date-from"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className={FIELD_LABEL}>{t('proposals.dateTo')}</Label>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className={`${FIELD_CONTROL} font-mono tabular-nums`}
-              data-testid="proposals-date-to"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className={FIELD_LABEL}>{t('proposals.sort')}</Label>
-            <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-              <SelectTrigger data-testid="proposals-sort" className={FIELD_CONTROL}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_desc">{t('proposals.sortNewest')}</SelectItem>
-                <SelectItem value="created_asc">{t('proposals.sortOldest')}</SelectItem>
-                <SelectItem value="score_desc">{t('proposals.sortScoreHigh')}</SelectItem>
-                <SelectItem value="score_asc">{t('proposals.sortScoreLow')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b border-t border-line bg-sunken px-4 py-2.5">
           <span className="font-mono text-xs tabular-nums text-ink-soft" data-testid="proposals-result-count">
             {t('proposals.resultCount', { count: filtered.length })}
           </span>
+          <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
+            <SelectTrigger
+              data-testid="proposals-sort"
+              aria-label={t('proposals.sort')}
+              className="h-7 w-auto gap-1 border-0 bg-transparent px-1 text-xs text-ink-soft shadow-none"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_desc">{t('proposals.sortNewest')}</SelectItem>
+              <SelectItem value="created_asc">{t('proposals.sortOldest')}</SelectItem>
+              <SelectItem value="score_desc">{t('proposals.sortScoreHigh')}</SelectItem>
+              <SelectItem value="score_asc">{t('proposals.sortScoreLow')}</SelectItem>
+            </SelectContent>
+          </Select>
           <button
             type="button"
             onClick={clearFilters}
@@ -294,8 +324,8 @@ export default function ProposalsPage() {
               data-testid="proposals-empty-cta"
               className="inline-flex items-center gap-2 rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
             >
-              <Plus className="h-4 w-4" aria-hidden="true" />
               {t('home.submitProposal')}
+              <Plus className="h-4 w-4" aria-hidden="true" />
             </button>
           }
         />
@@ -311,7 +341,7 @@ export default function ProposalsPage() {
                 <EntityCard
                   key={proposal.id}
                   subject="proposal"
-                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind, t('nav.proposals'))}
+                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind)}
                   id={proposal.id}
                   title={proposal.question}
                   excerpt={proposal.solution}

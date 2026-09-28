@@ -27,6 +27,7 @@ import { setupAuth } from "./auth";
 import { registerUsersRoutes } from "./routers/users";
 import { registerCommunitiesRoutes } from "./routers/communities";
 import { registerProposalsRoutes } from "./routers/proposals";
+import { registerProposalOptionRoutes } from "./routers/proposal-options";
 import { registerAmendmentsRoutes } from "./routers/amendments";
 import { registerSortitionRoutes } from "./routers/sortition";
 import { registerDebateRoutes } from "./routers/debate";
@@ -60,6 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerUsersRoutes(app);
   registerCommunitiesRoutes(app);
   registerProposalsRoutes(app);
+  registerProposalOptionRoutes(app);
   registerAmendmentsRoutes(app);
   registerSortitionRoutes(app);
   registerDebateRoutes(app);
