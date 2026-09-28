@@ -1,37 +1,53 @@
 /**
  * Proposal Form Component
- * 
- * Form for creating new proposals within a community.
- * Collects: question (problem), solution, category, and optional description.
- * On creation it also collects the proposal track (deliberation vs. direct
- * vote) and, for the vote track, the voting duration in hours.
+ *
+ * Creates — or edits the draft of — anything a community votes on. The first
+ * choice is *what* is being voted: a decision, the statute, an election or a
+ * poll. The rest of the form follows from it: the labels, whether the options
+ * are candidates or answers, whether a description is required at all.
+ *
+ * Direct vote is the default track. Members found deliberation heavy as the
+ * starting point and most votes do not need it, so it is one switch away
+ * under «Περισσότερες ρυθμίσεις» (for a decision or a statute — an election
+ * or a poll has no text to amend). Everything the author does not have to
+ * decide — picture, category, deliberation — lives there too, so the visible
+ * form is only what every vote needs.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { ThumbnailPicker } from "@/components/thumbnails/Thumbnail";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import {
+  AlertCircle, BarChart3, ChevronDown, FileText, Loader2, Paperclip, Plus,
+  ScrollText, Sparkles, UserCheck, Vote, X,
+} from 'lucide-react';
 import { useLocation } from 'wouter';
+import { ThumbnailPicker } from "@/components/thumbnails/Thumbnail";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, FileText, Loader2, Paperclip, Sparkles, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
 import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/upload-media';
+import {
+  PROPOSAL_KINDS, kindAllowsDeliberation, kindRequiresOptions, kindRequiresText,
+  proposalKindOf, refusalOptionLabel, type ProposalKind,
+} from '@shared/proposal-kinds';
 
 interface ProposalFormProps {
   communityId?: number;  // Optional for demo mode
   editProposalId?: number;  // When set, edit an existing draft instead of creating
   // The community forum topic this proposal is being made from. The form
   // fetches the topic and its whole discussion and fills itself with them —
-  // a starting point, not a commitment: the author still chooses the track
-  // and the durations, and can rewrite every word before saving. The topic is
-  // linked back to the proposal once it exists.
+  // a starting point, not a commitment: the author still chooses the kind
+  // and the durations, and can rewrite every word before saving. The topic
+  // is linked back to the proposal once it exists.
   fromPostId?: number;
 }
 
@@ -49,9 +65,22 @@ interface MemberCommunity {
   viewerCanPropose?: boolean;
 }
 
+const KIND_ICONS: Record<ProposalKind, LucideIcon> = {
+  decision: Vote,
+  statute: ScrollText,
+  election: UserCheck,
+  poll: BarChart3,
+};
+
+// The lengths people actually ask for. Anything else is one click away.
+const VOTING_PRESETS = [24, 72, 168, 336];
+const DELIBERATION_PRESETS = [48, 72, 168];
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
 export function ProposalForm({ communityId, editProposalId, fromPostId }: ProposalFormProps) {
   const [, setLocation] = useLocation();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [memberCommunities, setMemberCommunities] = useState<MemberCommunity[]>([]);
@@ -79,8 +108,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   }, [communityId]);
 
   const targetCommunityId = communityId ?? selectedCommunityId;
-  const lockedCommunity = communityId
-    ? memberCommunities.find((c) => c.id === communityId)
+  // A draft stays in the community it was filed in, so editing shows the
+  // name rather than a picker whose choice would be silently ignored.
+  const lockedCommunity = communityId || editProposalId
+    ? memberCommunities.find((c) => c.id === targetCommunityId)
     : null;
   // Duration bounds come from the community the proposal is being filed in.
   // The server re-checks them; these only keep the picker honest.
@@ -103,6 +134,50 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   const [aiIntent, setAiIntent] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiFilled, setAiFilled] = useState(false);
+
+  // What is being voted. Chosen at creation; a draft keeps its kind.
+  const [kind, setKind] = useState<ProposalKind>('decision');
+  // Deliberation is opt-in. The track follows from the switch *and* the
+  // kind, so switching to an election can never leave a deliberation track
+  // behind that the server would refuse.
+  const [deliberate, setDeliberate] = useState(false);
+  const [editTrack, setEditTrack] = useState<'deliberation' | 'vote' | null>(null);
+  const track: 'deliberation' | 'vote' = editTrack
+    ?? (deliberate && kindAllowsDeliberation(kind) ? 'deliberation' : 'vote');
+
+  // Yes/no or the author's own options. An election always has options (its
+  // candidates); a poll starts with them because most polls are a choice.
+  const [useOptions, setUseOptions] = useState(false);
+  const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
+  const optionBallot = kindRequiresOptions(kind) || useOptions;
+
+  const [votingHours, setVotingHours] = useState(72);
+  const [customVoting, setCustomVoting] = useState(false);
+  // Null = the community's own deliberation length. The author only
+  // overrides it deliberately, and only inside the community's range.
+  const [deliberationHours, setDeliberationHours] = useState<number | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Null until the author picks: the card derives one from the proposal id,
+  // so an author who never opens the picker still gets a picture.
+  const [thumbnailKey, setThumbnailKey] = useState<string | null>(null);
+
+  // Keep the duration inside whatever community is selected: the default of
+  // three days is outside some communities' range.
+  useEffect(() => {
+    setVotingHours((h) => clamp(h, votingMin, votingMax));
+  }, [votingMin, votingMax]);
+
+  // Document attachments — picked now, uploaded right after the proposal
+  // is created (the upload endpoint needs a proposal id).
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const attachRef = useRef<HTMLInputElement>(null);
+
+  // Which button triggered the form submit: 'save' keeps the proposal as a
+  // draft, 'submit' also starts it right away. Both buttons are
+  // type="submit" so native required-field validation runs for either path;
+  // the ref is set in each button's onClick, which fires before onSubmit.
+  const submitModeRef = useRef<'save' | 'submit'>('save');
 
   // Pull the topic and its replies in once, on arrival from the forum. It
   // never overwrites: if the author has already typed something (a reload
@@ -146,30 +221,6 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     return () => { cancelled = true; };
   }, [fromPostId, communityId, editProposalId, t]);
 
-  // Proposal track — only chosen at creation time; editing a draft never
-  // changes its track, so the selector is hidden in edit mode.
-  const [track, setTrack] = useState<'deliberation' | 'vote'>('deliberation');
-  const [votingDurationHours, setVotingDurationHours] = useState('72');
-  // Empty = use the community's own deliberation length. The author only
-  // overrides it deliberately, and only inside the community's range.
-  const [deliberationDurationHours, setDeliberationDurationHours] = useState('');
-  // Null until the author picks: the card derives one from the proposal id,
-  // so an author who never opens the picker still gets a picture.
-  const [thumbnailKey, setThumbnailKey] = useState<string | null>(null);
-  // Optional author-defined multiple choice (vote track). Empty = Ναι/Όχι.
-  const [voteOptions, setVoteOptions] = useState<string[]>([]);
-
-  // Document attachments — picked now, uploaded right after the proposal
-  // is created (the upload endpoint needs a proposal id).
-  const [attachments, setAttachments] = useState<File[]>([]);
-  const attachRef = useRef<HTMLInputElement>(null);
-
-  // Which button triggered the form submit: 'save' keeps the proposal as a
-  // draft, 'submit' also sends it into review right away. Both buttons are
-  // type="submit" so native required-field validation runs for either path;
-  // the ref is set in each button's onClick, which fires before onSubmit.
-  const submitModeRef = useRef<'save' | 'submit'>('save');
-
   function handleAttachPick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     if (picked.length === 0) return;
@@ -188,51 +239,76 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Edit mode: load the existing draft into the form.
+  // Edit mode: load the existing draft into the form. Kind and track are
+  // fixed once filed; they are loaded only so the labels and the submit
+  // button say the right thing.
   useEffect(() => {
     if (!editProposalId) return;
-    api.get<{ question: string; solution: string; category: string | null; communityId: number; status: string }>(
-      `/api/proposals/${editProposalId}`,
-    ).then((resp) => {
+    api.get<{
+      question: string; solution: string; category: string | null; communityId: number;
+      status: string; kind?: string; track?: string; votingDurationHours?: number | null;
+    }>(`/api/proposals/${editProposalId}`).then((resp) => {
       setFormData({
         question: resp.data.question ?? '',
         solution: resp.data.solution ?? '',
         category: resp.data.category ?? '',
       });
       setSelectedCommunityId(resp.data.communityId);
+      setKind(proposalKindOf(resp.data.kind));
+      setEditTrack(resp.data.track === 'vote' ? 'vote' : 'deliberation');
+      if (resp.data.votingDurationHours) setVotingHours(resp.data.votingDurationHours);
     }).catch(() => setError(t('proposal.create_error')));
   }, [editProposalId, t]);
 
+  function chooseKind(next: ProposalKind) {
+    setKind(next);
+    // A poll is usually a choice between answers; a decision or a statute
+    // usually a yes/no. Whatever the author already typed stays in the list.
+    if (next === 'poll') setUseOptions(true);
+    if (next === 'decision' || next === 'statute') {
+      setUseOptions(voteOptions.some((o) => o.trim() !== '') && useOptions);
+    }
+  }
 
   async function handleAiDraft() {
     if (aiIntent.trim().length < 10) return;
     setAiLoading(true);
     setAiError(null);
+    setAiFilled(false);
     try {
-      const resp = await api.post<{ question: string; solution: string; category: string }>(
-        '/api/proposals/compile',
-        { intent: aiIntent.trim() },
-      );
+      const resp = await api.post<{
+        kind?: string; question: string; solution?: string; category: string;
+        track?: string; votingDurationHours?: number | null; ballotOptions?: unknown[] | null;
+      }>('/api/proposals/compile', { intent: aiIntent.trim() });
+      const d = resp.data;
       setFormData({
-        question: resp.data.question,
-        solution: resp.data.solution,
-        category: resp.data.category,
+        question: d.question,
+        solution: d.solution ?? '',
+        category: d.category,
       });
-      // The AI also reads the intent for track/duration/options — apply them
-      // to the toggles (create mode only; the author can still change them).
+      // The AI also reads what kind of vote this is, the track, the length
+      // and the options — applied to the controls in create mode only; the
+      // author can still change every one of them.
       if (!editProposalId) {
-        const d = resp.data as any;
-        if (d.track === 'vote' || d.track === 'deliberation') setTrack(d.track);
-        if (d.track === 'vote' && Number.isInteger(d.votingDurationHours) && d.votingDurationHours > 0) {
-          setVotingDurationHours(String(d.votingDurationHours));
+        const k = proposalKindOf(d.kind);
+        setKind(k);
+        const wantsDeliberation = d.track === 'deliberation' && kindAllowsDeliberation(k);
+        setDeliberate(wantsDeliberation);
+        if (wantsDeliberation) setMoreOpen(true);
+        if (Number.isInteger(d.votingDurationHours) && (d.votingDurationHours as number) > 0) {
+          const hours = clamp(d.votingDurationHours as number, votingMin, votingMax);
+          setVotingHours(hours);
+          setCustomVoting(false);
         }
         if (Array.isArray(d.ballotOptions) && d.ballotOptions.length >= 2) {
-          setVoteOptions(d.ballotOptions.map((o: unknown) => String(o)));
-          setTrack('vote');
-        } else if (d.track !== 'vote') {
-          setVoteOptions([]);
+          setVoteOptions(d.ballotOptions.map((o) => String(o)));
+          setUseOptions(true);
+        } else {
+          setVoteOptions(['', '']);
+          setUseOptions(false);
         }
       }
+      setAiFilled(true);
     } catch (e) {
       setAiError(e instanceof ApiError ? e.message : (t('proposal.ai_failed') || 'AI drafting failed'));
     } finally {
@@ -250,6 +326,27 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     { value: 'other', label: t('proposal.category_other') },
   ];
 
+  function durationLabel(hours: number): string {
+    if (hours % 168 === 0) {
+      const weeks = hours / 168;
+      return weeks === 1 ? t('proposal.dur_week') : t('proposal.dur_weeks', { n: weeks });
+    }
+    if (hours % 24 === 0) {
+      const days = hours / 24;
+      return days === 1 ? t('proposal.dur_day') : t('proposal.dur_days', { n: days });
+    }
+    return t('proposal.dur_hours', { n: hours });
+  }
+
+  // When the vote would close if it started now — concrete where "72 ώρες"
+  // is arithmetic.
+  const closesAt = useMemo(() => {
+    const end = new Date(Date.now() + votingHours * 3600_000);
+    return end.toLocaleString(locale === 'el' ? 'el-GR' : 'en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    });
+  }, [votingHours, locale]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!targetCommunityId) {
@@ -257,6 +354,14 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
       return;
     }
     const mode = submitModeRef.current;
+    const options = voteOptions.map((o) => o.trim()).filter(Boolean);
+    if (!editProposalId && track === 'vote' && optionBallot) {
+      const distinct = new Set(options.map((o) => o.toLowerCase())).size;
+      if (options.length < 2 || distinct !== options.length) {
+        setError(kind === 'election' ? t('proposal.form_candidates_min') : t('proposal.form_options_min'));
+        return;
+      }
+    }
     setLoading(true);
     setError(null);
 
@@ -265,15 +370,16 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         ? await apiRequest('PATCH', `/api/proposals/${editProposalId}`, formData)
         : await apiRequest('POST', `/api/communities/${targetCommunityId}/proposals`, {
             ...formData,
+            kind,
             track,
             ...(thumbnailKey ? { thumbnailKey } : {}),
             ...(track === 'vote'
               ? {
-                  votingDurationHours: parseInt(votingDurationHours, 10),
-                  ballotOptions: voteOptions.map(o => o.trim()).filter(Boolean),
+                  votingDurationHours: votingHours,
+                  ballotOptions: optionBallot ? options : [],
                 }
-              : deliberationDurationHours.trim() !== ''
-                ? { deliberationDurationHours: parseInt(deliberationDurationHours, 10) }
+              : deliberationHours !== null
+                ? { deliberationDurationHours: deliberationHours }
                 : {}),
           });
 
@@ -297,10 +403,11 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         }
       }
 
-      // "Submit for review" chains the lifecycle transition right after the
-      // save. If it fails the draft is already stored, so navigate anyway —
-      // the detail page shows a draft banner where submission can be retried
-      // (staying on the form would risk creating a duplicate proposal).
+      // Starting the vote (or submitting for deliberation) chains the
+      // lifecycle transition right after the save. If it fails the draft is
+      // already stored, so navigate anyway — the detail page shows a draft
+      // banner where submission can be retried (staying on the form would
+      // risk creating a duplicate proposal).
       if (mode === 'submit') {
         try {
           await apiRequest('POST', `/api/proposals/${proposalId}/submit`);
@@ -330,32 +437,50 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     }
   }
 
+  const textRequired = kindRequiresText(kind) || track === 'deliberation';
+  // A community whose range excludes the presets (or a length the AI read
+  // from the description) gets the number field, never a row with nothing
+  // selected.
+  const votingPresets = VOTING_PRESETS.filter((h) => h >= votingMin && h <= votingMax);
+  const showCustomVoting = customVoting || !votingPresets.includes(votingHours);
+  const startLabel = track === 'deliberation'
+    ? t('proposal.form_start_deliberation')
+    : kind === 'poll' ? t('proposal.form_start_poll') : t('proposal.form_start_vote');
+  const startHint = track === 'deliberation'
+    ? t('proposal.form_hint_deliberation')
+    : t(kind === 'poll' ? 'proposal.form_hint_poll' : 'proposal.form_hint_vote');
+
+  const sectionLabel = 'font-sans text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint';
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{editProposalId ? t('proposal.edit_title') : t('proposal.submit_title')}</CardTitle>
+        <CardTitle>{editProposalId ? t('proposal.edit_title') : t('proposal.form_title_new')}</CardTitle>
         <CardDescription>
-          {editProposalId ? t('proposal.edit_description') : t('proposal.submit_description')}
+          {editProposalId ? t('proposal.edit_description') : t('proposal.form_subtitle_new')}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-8">
         {draftNote && (
-          <div className="mb-6 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
             {draftNote}
           </div>
         )}
-        <div className="mb-6 rounded-lg border bg-muted/40 p-4 space-y-3">
-          <Label htmlFor="ai-intent" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600" />
-            {t('proposal.ai_intent_label') || 'Περιγράψτε την ιδέα σας με απλά λόγια'}
+
+        {/* The quickest way through the form: say it in your own words. */}
+        <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+          <Label htmlFor="ai-intent" className="flex items-center gap-2 font-medium">
+            <Sparkles className="h-4 w-4 text-kyanos" />
+            {t('proposal.form_ai_label')}
           </Label>
           <Textarea
             id="ai-intent"
-            placeholder={t('proposal.ai_intent_placeholder') || 'π.χ. Στη γειτονιά μου δεν υπάρχουν ποδηλατόδρομοι και τα παιδιά κινδυνεύουν…'}
+            placeholder={t('proposal.form_ai_placeholder')}
             value={aiIntent}
             onChange={(e) => setAiIntent(e.target.value)}
-            rows={3}
+            rows={2}
             maxLength={12000}
+            className="bg-background"
           />
           <div className="flex items-center gap-3 flex-wrap">
             <Button
@@ -370,9 +495,11 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 ? (t('proposal.ai_generating') || 'Δημιουργία…')
                 : (t('proposal.ai_generate') || 'Συμπλήρωση με AI')}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              {t('proposal.ai_hint') || 'Το AI συμπληρώνει τα πεδία — ελέγξτε και διορθώστε πριν την υποβολή.'}
-            </p>
+            {aiFilled && (
+              <p className="text-xs text-muted-foreground" data-testid="proposal-ai-filled">
+                {t('proposal.form_ai_done')}
+              </p>
+            )}
           </div>
           {aiError && (
             <Alert variant="destructive">
@@ -382,7 +509,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -390,135 +517,289 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
             </Alert>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="community">
-              {t('proposal.community_label') || 'Κοινότητα'} <span className="text-red-500">*</span>
+          {/* Community — one line when there is nothing to choose. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-4">
+            <Label htmlFor="community" className="shrink-0 sm:w-28">
+              {t('proposal.form_community')}
             </Label>
-            {communitiesLoading ? (
-              <p className="text-sm text-muted-foreground">{t('common.loading') || 'Φόρτωση…'}</p>
-            ) : lockedCommunity ? (
-              <p className="text-sm font-medium">{lockedCommunity.name}</p>
-            ) : memberCommunities.length === 0 ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {t('proposal.no_communities') || 'Δεν είστε μέλος σε καμία κοινότητα. Εγγραφείτε πρώτα σε μία.'}
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Select
-                value={selectedCommunityId != null ? String(selectedCommunityId) : ''}
-                onValueChange={(v) => setSelectedCommunityId(parseInt(v, 10))}
-              >
-                <SelectTrigger id="community">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {memberCommunities.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}{c.isGeneral ? ' ★' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <p className="text-sm text-muted-foreground">
-              {t('proposal.community_hint') || 'Μόνο κοινότητες όπου είστε μέλος.'}
-            </p>
+            <div className="flex-1 min-w-0">
+              {communitiesLoading ? (
+                <p className="text-sm text-muted-foreground">{t('common.loading') || 'Φόρτωση…'}</p>
+              ) : lockedCommunity ? (
+                <p className="text-sm font-medium">{lockedCommunity.name}</p>
+              ) : memberCommunities.length === 0 ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('proposal.no_communities') || 'Δεν είστε μέλος σε καμία κοινότητα. Εγγραφείτε πρώτα σε μία.'}
+                  </AlertDescription>
+                </Alert>
+              ) : memberCommunities.length === 1 ? (
+                <p className="text-sm font-medium">{memberCommunities[0].name}</p>
+              ) : (
+                <Select
+                  value={selectedCommunityId != null ? String(selectedCommunityId) : ''}
+                  onValueChange={(v) => setSelectedCommunityId(parseInt(v, 10))}
+                >
+                  <SelectTrigger id="community">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {memberCommunities.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}{c.isGeneral ? ' ★' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
-          {!editProposalId && (
-            <>
-              <div className="space-y-2">
-                <Label>
-                  {t('proposal.track_label') || 'Διαδικασία'} <span className="text-red-500">*</span>
-                </Label>
-                <RadioGroup
-                  value={track}
-                  onValueChange={(v) => setTrack(v as 'deliberation' | 'vote')}
-                  className="grid gap-2 sm:grid-cols-2"
-                >
-                  <label
-                    htmlFor="track-deliberation"
-                    className={`flex items-start gap-3 rounded-lg border p-4 cursor-pointer ${track === 'deliberation' ? 'border-primary bg-muted/40' : ''}`}
-                  >
-                    <RadioGroupItem
-                      value="deliberation"
-                      id="track-deliberation"
-                      className="mt-0.5"
-                      data-testid="proposal-track-deliberation"
-                    />
-                    <span className="space-y-1">
-                      <span className="block text-sm font-medium">
-                        {t('proposal.track_deliberation') || 'Διαβούλευση'}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t('proposal.track_deliberation_help') || 'Η κοινότητα προτείνει τροπολογίες, το AI συνθέτει το τελικό κείμενο και οι αντιπροτάσεις ψηφίζονται ως εναλλακτικές.'}
-                      </span>
-                    </span>
-                  </label>
-                  <label
-                    htmlFor="track-vote"
-                    className={`flex items-start gap-3 rounded-lg border p-4 cursor-pointer ${track === 'vote' ? 'border-primary bg-muted/40' : ''}`}
-                  >
-                    <RadioGroupItem
-                      value="vote"
-                      id="track-vote"
-                      className="mt-0.5"
-                      data-testid="proposal-track-vote"
-                    />
-                    <span className="space-y-1">
-                      <span className="block text-sm font-medium">
-                        {t('proposal.track_vote') || 'Άμεση ψηφοφορία'}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {t('proposal.track_vote_help') || 'Χωρίς διαβούλευση — η πρόταση πάει κατευθείαν σε ψηφοφορία ναι/όχι με διάρκεια που ορίζετε εσείς.'}
-                      </span>
-                    </span>
-                  </label>
-                </RadioGroup>
+          {/* What is being voted. */}
+          {editProposalId ? (
+            <p className="text-sm text-muted-foreground" data-testid="proposal-kind-fixed">
+              {t(`proposal.kind_${kind}`)}
+              {' · '}
+              {track === 'vote' ? t('proposal.track_vote') : t('proposal.track_deliberation')}
+            </p>
+          ) : (
+            <fieldset className="space-y-3">
+              <legend className={`${sectionLabel} mb-3`}>{t('proposal.form_kind_label')}</legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
+                {PROPOSAL_KINDS.map((k) => {
+                  const Icon = KIND_ICONS[k];
+                  const selected = k === kind;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => chooseKind(k)}
+                      className={`flex flex-col items-start gap-1.5 rounded-lg border p-3 text-left transition-colors ${
+                        selected
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                          : 'hover:border-line-strong hover:bg-muted/40'
+                      }`}
+                      data-testid={`proposal-kind-${k}`}
+                    >
+                      <Icon className={`h-5 w-5 ${selected ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden="true" />
+                      <span className="text-sm font-medium leading-tight">{t(`proposal.kind_${k}`)}</span>
+                      <span className="text-xs leading-snug text-muted-foreground">{t(`proposal.kind_${k}_hint`)}</span>
+                    </button>
+                  );
+                })}
               </div>
+              {kind === 'poll' && (
+                <p className="text-xs text-muted-foreground">{t('proposal.form_poll_note')}</p>
+              )}
+            </fieldset>
+          )}
 
-              {track === 'deliberation' && !editProposalId && (
-                <div className="space-y-2">
-                  <Label htmlFor="deliberationDurationHours">
-                    {t('proposal.deliberation_duration_label')}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="question">
+                {t(`proposal.form_q_${kind}`)} <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="question"
+                placeholder={t(`proposal.form_q_${kind}_ph`)}
+                value={formData.question}
+                onChange={(e) => setFormData({ ...formData, question: e.target.value })}
+                rows={2}
+                maxLength={2000}
+                className="min-h-0 text-base"
+                required
+              />
+            </div>
+
+            {/* The ballot — candidates for an election, otherwise yes/no or
+                the author's own options. Deliberation builds its own ballot
+                from the amendments, so there is nothing to set here. */}
+            {!editProposalId && track === 'vote' && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label>
+                    {kind === 'election' ? t('proposal.form_candidates') : t('proposal.form_answers')}
+                    {kind === 'election' && <span className="text-red-500"> *</span>}
                   </Label>
-                  <Input
-                    id="deliberationDurationHours"
-                    type="number"
-                    min={deliberationMin}
-                    max={deliberationMax}
-                    step={1}
-                    value={deliberationDurationHours}
-                    onChange={(e) => setDeliberationDurationHours(e.target.value)}
-                    placeholder={String(targetCommunity?.communitySignalHours ?? 48)}
-                    className="max-w-[10rem]"
-                    data-testid="proposal-deliberation-duration"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('proposal.deliberation_duration_hint', { min: deliberationMin, max: deliberationMax })}
-                  </p>
+                  {!kindRequiresOptions(kind) && (
+                    <div className="inline-flex rounded-md border p-0.5 text-sm" role="radiogroup">
+                      {[false, true].map((withOptions) => (
+                        <button
+                          key={String(withOptions)}
+                          type="button"
+                          role="radio"
+                          aria-checked={useOptions === withOptions}
+                          onClick={() => setUseOptions(withOptions)}
+                          className={`rounded px-3 py-1 transition-colors ${
+                            useOptions === withOptions
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          data-testid={withOptions ? 'proposal-answers-options' : 'proposal-answers-yesno'}
+                        >
+                          {withOptions ? t('proposal.form_answers_options') : t('proposal.form_answers_yesno')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* The card picture. Create only: changing it later belongs with
-                  the proposal's own edit screen, not buried in the ballot
-                  settings. */}
-              {!editProposalId && (
-                <ThumbnailPicker
-                  value={thumbnailKey}
-                  onChange={setThumbnailKey}
-                  seed={`proposal-new-${targetCommunityId ?? 0}`}
-                  label={t('appearance.proposalThumbnail')}
-                />
-              )}
+                {optionBallot ? (
+                  <div className="space-y-2">
+                    {voteOptions.map((opt, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input
+                          value={opt}
+                          maxLength={200}
+                          placeholder={t(`proposal.form_option_ph_${kind}`, { n: i + 1 })}
+                          onChange={(e) => setVoteOptions((v) => v.map((o, j) => (j === i ? e.target.value : o)))}
+                          data-testid={`proposal-vote-option-${i}`}
+                        />
+                        {voteOptions.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setVoteOptions((v) => v.filter((_, j) => j !== i))}
+                            aria-label={t('common.remove') || 'Αφαίρεση'}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {/* The refusal option, shown so the author sees the
+                        whole ballot the members will see. */}
+                    <div className="flex items-center justify-between rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                      <span>{refusalOptionLabel(kind)}</span>
+                      <span className="text-xs">{t('proposal.form_auto_option')}</span>
+                    </div>
+                    {voteOptions.length < 10 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVoteOptions((v) => [...v, ''])}
+                        data-testid="proposal-vote-option-add"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        {kind === 'election' ? t('proposal.form_add_candidate') : t('proposal.form_add_option')}
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">{t('proposal.form_single_choice_hint')}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t('proposal.form_answers_yesno_hint')}</p>
+                )}
+              </div>
+            )}
 
-              {track === 'vote' && (
-                <div className="space-y-2">
-                  <Label htmlFor="votingDurationHours">
-                    {t('proposal.track_vote_duration_label') || 'Διάρκεια ψηφοφορίας (ώρες)'} <span className="text-red-500">*</span>
-                  </Label>
+            <div className="space-y-2">
+              <Label htmlFor="solution">
+                {t(`proposal.form_text_${kind}`)}
+                {textRequired
+                  ? <span className="text-red-500"> *</span>
+                  : <span className="font-normal text-muted-foreground"> ({t('proposal.form_optional')})</span>}
+              </Label>
+              <Textarea
+                id="solution"
+                placeholder={t(`proposal.form_text_${kind}_ph`)}
+                value={formData.solution}
+                onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
+                className={textRequired ? 'min-h-[140px]' : 'min-h-[80px]'}
+                required={textRequired}
+              />
+              <input
+                ref={attachRef}
+                type="file"
+                accept={DOCUMENT_ACCEPT}
+                multiple
+                className="hidden"
+                onChange={handleAttachPick}
+                data-testid="proposal-attach-input"
+              />
+              {attachments.length > 0 && (
+                <ul className="space-y-1">
+                  {attachments.map((file, i) => (
+                    <li
+                      key={`${file.name}-${i}`}
+                      className="flex items-center gap-2 text-sm border rounded-md px-3 py-1.5"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 truncate">{file.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {file.size > 1024 * 1024
+                          ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+                          : `${Math.round(file.size / 1024)} KB`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label={t('common.remove') || 'Remove'}
+                        data-testid={`proposal-attach-remove-${i}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => attachRef.current?.click()}
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                data-testid="proposal-attach-button"
+              >
+                <Paperclip className="h-4 w-4" />
+                {t('proposal.attach_document')}
+                <span className="text-xs">· {t('media.docSizeLimit')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* How long the vote stays open. */}
+          {!editProposalId && track === 'vote' && (
+            <fieldset className="space-y-3">
+              <legend className={`${sectionLabel} mb-3`}>{t('proposal.form_duration')}</legend>
+              <div className="flex flex-wrap gap-2">
+                {votingPresets.map((h) => {
+                  const selected = !showCustomVoting && votingHours === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => { setCustomVoting(false); setVotingHours(h); }}
+                      className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                        selected ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted/60'
+                      }`}
+                      data-testid={`proposal-duration-${h}`}
+                    >
+                      {durationLabel(h)}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  aria-pressed={showCustomVoting}
+                  onClick={() => setCustomVoting(true)}
+                  className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                    showCustomVoting ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted/60'
+                  }`}
+                  data-testid="proposal-duration-custom"
+                >
+                  {t('proposal.form_duration_custom')}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground" data-testid="proposal-closes-at">
+                {t('proposal.form_closes_at', { date: closesAt })}
+              </p>
+              {showCustomVoting && (
+                <div className="flex items-center gap-2">
                   <Input
                     id="votingDurationHours"
                     type="number"
@@ -526,171 +807,136 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                     max={votingMax}
                     step={1}
                     required
-                    value={votingDurationHours}
-                    onChange={(e) => setVotingDurationHours(e.target.value)}
-                    className="max-w-[10rem]"
+                    value={votingHours}
+                    onChange={(e) => setVotingHours(parseInt(e.target.value, 10) || votingMin)}
+                    className="max-w-[7rem]"
                     data-testid="proposal-voting-duration"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {t('proposal.track_vote_duration_hint') || '72 = 3 ημέρες, 168 = 1 εβδομάδα'}
-                    {` — ${votingMin}–${votingMax}`}
-                  </p>
-
-                  <div className="space-y-2 pt-2">
-                    <Label>{t('proposal.vote_options_label') || 'Επιλογές ψηφοφορίας (προαιρετικά)'}</Label>
-                    <p className="text-xs text-muted-foreground">
-                      {t('proposal.vote_options_hint') || 'Κενό = απλή ψηφοφορία Ναι/Όχι. Με επιλογές, οι ψηφοφόροι διαλέγουν μία — και προστίθεται αυτόματα η επιλογή «Καμία αλλαγή».'}
-                    </p>
-                    {voteOptions.map((opt, i) => (
-                      <div key={i} className="flex gap-2">
-                        <Input
-                          value={opt}
-                          maxLength={200}
-                          placeholder={`${t('proposal.vote_option_placeholder') || 'Επιλογή'} ${i + 1}`}
-                          onChange={(e) => setVoteOptions(v => v.map((o, j) => (j === i ? e.target.value : o)))}
-                          data-testid={`proposal-vote-option-${i}`}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setVoteOptions(v => v.filter((_, j) => j !== i))}
-                          aria-label={t('common.remove') || 'Αφαίρεση'}
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ))}
-                    {voteOptions.length < 10 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setVoteOptions(v => [...v, ''])}
-                        data-testid="proposal-vote-option-add"
-                      >
-                        + {t('proposal.vote_option_add') || 'Προσθήκη επιλογής'}
-                      </Button>
-                    )}
-                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {t('proposal.form_duration_hours')} · {t('proposal.form_duration_range', { min: votingMin, max: votingMax })}
+                  </span>
                 </div>
               )}
-            </>
+            </fieldset>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="question">
-              {t('proposal.question_label')} <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="question"
-              placeholder={t('proposal.question_placeholder')}
-              value={formData.question}
-              onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-              className="min-h-[120px]"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              {t('proposal.question_hint')}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="solution">
-              {t('proposal.solution_label')} <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="solution"
-              placeholder={t('proposal.solution_placeholder')}
-              value={formData.solution}
-              onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
-              className="min-h-[120px]"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              {t('proposal.solution_hint')}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>
-              <span className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4" />
-                {t('proposal.attachments_label')}
-              </span>
-            </Label>
-            <input
-              ref={attachRef}
-              type="file"
-              accept={DOCUMENT_ACCEPT}
-              multiple
-              className="hidden"
-              onChange={handleAttachPick}
-              data-testid="proposal-attach-input"
-            />
-            {attachments.length > 0 && (
-              <ul className="space-y-1">
-                {attachments.map((file, i) => (
-                  <li
-                    key={`${file.name}-${i}`}
-                    className="flex items-center gap-2 text-sm border rounded-md px-3 py-1.5"
-                  >
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate">{file.name}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {file.size > 1024 * 1024
-                        ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-                        : `${Math.round(file.size / 1024)} KB`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(i)}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label={t('common.remove') || 'Remove'}
-                      data-testid={`proposal-attach-remove-${i}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex items-center gap-3 flex-wrap">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => attachRef.current?.click()}
-                data-testid="proposal-attach-button"
+          {/* Everything a vote does not need to get started. */}
+          {!editProposalId ? (
+            <Collapsible open={moreOpen} onOpenChange={setMoreOpen} className="rounded-lg border">
+              <CollapsibleTrigger
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                data-testid="proposal-more-toggle"
               >
-                <Paperclip className="h-4 w-4 mr-2" />
-                {t('proposal.attach_document')}
-              </Button>
-              <p className="text-xs text-muted-foreground">{t('media.docSizeLimit')}</p>
+                <span>
+                  <span className="block text-sm font-medium">{t('proposal.form_more')}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {kindAllowsDeliberation(kind) ? t('proposal.form_more_hint') : t('proposal.form_more_hint_short')}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-6 border-t px-4 py-4">
+                {kindAllowsDeliberation(kind) && (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <Label htmlFor="deliberate" className="space-y-1 font-normal">
+                        <span className="block text-sm font-medium">{t('proposal.form_deliberate')}</span>
+                        <span className="block text-xs text-muted-foreground">{t('proposal.form_deliberate_hint')}</span>
+                      </Label>
+                      <Switch
+                        id="deliberate"
+                        checked={deliberate}
+                        onCheckedChange={setDeliberate}
+                        data-testid="proposal-deliberate"
+                      />
+                    </div>
+                    {deliberate && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground">{t('proposal.form_deliberation_ballot_note')}</p>
+                        <p className="text-sm">{t('proposal.form_deliberation_duration')}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {[null, ...DELIBERATION_PRESETS.filter((h) => h >= deliberationMin && h <= deliberationMax)].map((h) => {
+                            const selected = deliberationHours === h;
+                            return (
+                              <button
+                                key={String(h)}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => setDeliberationHours(h)}
+                                className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                                  selected ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted/60'
+                                }`}
+                                data-testid={`proposal-deliberation-duration-${h ?? 'default'}`}
+                              >
+                                {h === null
+                                  ? t('proposal.form_deliberation_default', {
+                                      duration: durationLabel(clamp(targetCommunity?.communitySignalHours ?? 48, deliberationMin, deliberationMax)),
+                                    })
+                                  : durationLabel(h)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">{t('proposal.category_label')}</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder={t('proposal.category_placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* The card picture. Create only: changing it later belongs
+                    with the proposal's own edit screen. */}
+                <ThumbnailPicker
+                  value={thumbnailKey}
+                  onChange={setThumbnailKey}
+                  seed={`proposal-new-${targetCommunityId ?? 0}`}
+                  label={t('appearance.proposalThumbnail')}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="category">{t('proposal.category_label')}</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder={t('proposal.category_placeholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="category">{t('proposal.category_label')}</Label>
-            <Select
-              value={formData.category}
-              onValueChange={(value) => setFormData({ ...formData, category: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t('proposal.category_placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-end gap-2 flex-wrap">
+          <div className="space-y-2 border-t pt-6">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
               <Button type="button" variant="ghost" onClick={() => window.history.back()}>
                 {t('common.cancel')}
               </Button>
@@ -701,14 +947,8 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 onClick={() => { submitModeRef.current = 'save'; }}
                 data-testid="proposal-save-draft"
               >
-                {loading && submitModeRef.current === 'save' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t('proposal.submitting')}
-                  </>
-                ) : (
-                  editProposalId ? t('proposal.edit_button') : t('proposal.submit_button')
-                )}
+                {loading && submitModeRef.current === 'save' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editProposalId ? t('proposal.edit_button') : t('proposal.form_save_draft')}
               </Button>
               <Button
                 type="submit"
@@ -716,20 +956,12 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 onClick={() => { submitModeRef.current = 'submit'; }}
                 data-testid="proposal-submit-review"
               >
-                {loading && submitModeRef.current === 'submit' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t('proposal.submitting_review')}
-                  </>
-                ) : (
-                  t('proposal.submit_for_review')
-                )}
+                {loading && submitModeRef.current === 'submit' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {startLabel}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground text-right">
-              {!editProposalId && track === 'vote'
-                ? (t('proposal.track_vote_submit_hint') || 'Το προσχέδιο δεν προχωρά σε ψηφοφορία μέχρι να υποβληθεί για έλεγχο.')
-                : t('proposal.submit_vs_save_hint')}
+            <p className="text-xs text-muted-foreground sm:text-right" data-testid="proposal-start-hint">
+              {startHint} {t('proposal.form_hint_draft')}
             </p>
           </div>
         </form>

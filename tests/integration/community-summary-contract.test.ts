@@ -36,6 +36,7 @@ describe('community summary contract', () => {
       authorId: 42,
       authorLabel: 'User #42',
       createdAt: '2026-04-25T10:00:00.000Z',
+      kind: 'decision',
     });
   });
 

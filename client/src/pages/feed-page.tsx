@@ -29,6 +29,7 @@ import StatusBadge from '@/components/proposal/StatusBadge';
 import TierBadge from '@/components/surveys/TierBadge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Mic, Video, Share2, Star, Loader2, FileText, BarChart3 } from 'lucide-react';
+import { proposalEyebrow } from '@/lib/proposal-kind';
 
 interface MediaFeedItem {
   feedType: 'media';
@@ -111,7 +112,7 @@ function ProposalFeedRow({ item }: { item: ProposalFeedItem }) {
   return (
     <EntityCard
       subject="proposal"
-      kindLabel={t('feed.newProposal')}
+      kindLabel={proposalEyebrow(t, (item as { kind?: string }).kind, t('feed.newProposal'))}
       id={item.id}
       title={item.question}
       excerpt={item.solution}

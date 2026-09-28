@@ -35,6 +35,7 @@ import { ORDERED_STATES } from '@/lib/proposal-status';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 import { publicHandle } from '@shared/user-identity';
+import { proposalEyebrow } from '@/lib/proposal-kind';
 
 type SortOption = 'created_desc' | 'created_asc' | 'score_desc' | 'score_asc';
 
@@ -310,7 +311,7 @@ export default function ProposalsPage() {
                 <EntityCard
                   key={proposal.id}
                   subject="proposal"
-                  kindLabel={t('nav.proposals')}
+                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind, t('nav.proposals'))}
                   id={proposal.id}
                   title={proposal.question}
                   excerpt={proposal.solution}

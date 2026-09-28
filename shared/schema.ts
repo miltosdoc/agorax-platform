@@ -424,6 +424,9 @@ export const proposals = pgTable("proposals", {
   // author acceptance, counter-proposals on the ballot as alternatives.
   // 'vote': straight to a yes/no/abstain vote with an author-chosen duration.
   track: text("track").notNull().default("deliberation"),
+  // What is being voted on (migration 0053) — see shared/proposal-kinds.ts.
+  // 'decision' | 'statute' | 'election' | 'poll'. Only a poll is non-binding.
+  kind: text("kind").notNull().default("decision"),
   // Author-chosen voting duration (hours) — overrides the community's
   // votingHours when this proposal enters voting. null = community default.
   // Clamped to the community's votingMin/MaxHours at transition time.

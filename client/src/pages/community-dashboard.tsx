@@ -495,6 +495,9 @@ export default function CommunityDashboardPage() {
                       <div>
                         <div className="font-medium">{proposal.question}</div>
                         <div className="text-sm text-muted-foreground">
+                          {proposal.kind && proposal.kind !== 'decision' && (
+                            <>{t(`proposal.kind_${proposal.kind}`)} · </>
+                          )}
                           {t('common.by')} {proposal.authorLabel} · {new Date(proposal.createdAt).toLocaleDateString()}
                         </div>
                       </div>

@@ -28,6 +28,10 @@ import {
   castProposalVoteSchema,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
+import {
+  DEFAULT_PROPOSAL_KIND, isBindingKind, isProposalKind, kindAllowsDeliberation,
+  kindRequiresOptions, kindRequiresText, proposalKindOf, refusalOptionLabel,
+} from '@shared/proposal-kinds';
 import { validBallotChoices } from '@shared/schema';
 import {
   canViewCommunityContentById,
@@ -46,7 +50,7 @@ import { createServer, type Server } from 'http';
  * until the election closes.
  */
 export async function computeVoteResults(
-  proposal: { communityId: number; ballotOptions?: unknown },
+  proposal: { communityId: number; ballotOptions?: unknown; kind?: string | null },
   view: VoterView,
 ) {
   const [community] = await db
@@ -97,8 +101,15 @@ export async function computeVoteResults(
     winner = passes ? 'yes' : null;
   }
 
+  // A poll is reported, never "passed", and quorum is a condition for a
+  // binding decision — so a poll that anyone answered closes as decided
+  // (its result stays on view) instead of being archived for turnout.
+  const kind = proposalKindOf(proposal.kind);
+  const binding = isBindingKind(kind);
+  const concludes = binding ? meetsQuorum && hasDecisive : total > 0;
   return {
     yes, no, abstain, total,
+    kind, binding, concludes,
     ballotOptions, counts, winner, hasDecisive,
     sealed: view.tallySealed || !tally,
     hasVoted: view.hasVoted,
@@ -207,12 +218,24 @@ export function registerProposalsRoutes(app: Express): void {
       }
       const gate = await proposalGate(communityId, userId);
       if (gate) return res.status(403).json({ message: gate });
-      const { question, solution, category, track, votingDurationHours, deliberationDurationHours, ballotOptions, thumbnailKey } = req.body;
-      if (!question || !solution) {
+      const { question, category, track, votingDurationHours, deliberationDurationHours, ballotOptions, thumbnailKey } = req.body;
+      if (req.body.kind !== undefined && !isProposalKind(req.body.kind)) {
+        return res.status(400).json({ message: "kind must be 'decision', 'statute', 'election' or 'poll'" });
+      }
+      const kind = proposalKindOf(req.body.kind ?? DEFAULT_PROPOSAL_KIND);
+      // An election or a poll may be nothing but its question and options.
+      const solution = req.body.solution ?? (kindRequiresText(kind) ? undefined : '');
+      if (!question || (kindRequiresText(kind) && !solution)) {
         return res.status(400).json({ message: "Question and solution are required" });
       }
       if (track !== undefined && !PROPOSAL_TRACKS.includes(track)) {
         return res.status(400).json({ message: "track must be 'deliberation' or 'vote'" });
+      }
+      // Deliberation amends a text. Candidates and poll answers have none,
+      // and the server default track is still 'deliberation' for callers
+      // that predate the kind, so an election must name its track.
+      if ((track ?? 'deliberation') === 'deliberation' && !kindAllowsDeliberation(kind)) {
+        return res.status(400).json({ message: `A ${kind} goes straight to a vote (track: 'vote')` });
       }
       // The community owns the range an author may choose within. Rejecting
       // out-of-range values here rather than clamping silently is what makes
@@ -245,8 +268,9 @@ export function registerProposalsRoutes(app: Express): void {
           });
         }
         // Optional author-defined multiple choice. Empty/absent = classic
-        // yes/no/abstain. «Καμία αλλαγή» is always appended so voters can
-        // reject every option — no forced-choice ballots.
+        // yes/no/abstain. A refusal option («Καμία αλλαγή», «Λευκό» on an
+        // election) is always appended so voters can reject every option —
+        // no forced-choice ballots.
         if (ballotOptions !== undefined && ballotOptions !== null) {
           if (!Array.isArray(ballotOptions)) {
             return res.status(400).json({ message: "ballotOptions must be an array of option labels" });
@@ -266,9 +290,12 @@ export function registerProposalsRoutes(app: Express): void {
             }
             customBallot = [
               ...labels.map((label: string, i: number) => ({ id: `opt_${i + 1}`, label })),
-              { id: 'status_quo', label: 'Καμία αλλαγή' },
+              { id: 'status_quo', label: refusalOptionLabel(kind) },
             ];
           }
+        }
+        if (!customBallot && kindRequiresOptions(kind)) {
+          return res.status(400).json({ message: "An election needs at least two candidates" });
         }
       }
       if (typeof question !== "string" || typeof solution !== "string") {
@@ -287,6 +314,7 @@ export function registerProposalsRoutes(app: Express): void {
         category,
         status: INITIAL_PROPOSAL_STATE,
         track: track ?? 'deliberation',
+        kind,
         votingDurationHours: durationHours,
         deliberationDurationHours: deliberationHours,
         ballotOptions: customBallot,
@@ -335,7 +363,8 @@ export function registerProposalsRoutes(app: Express): void {
         updates.question = question;
       }
       if (solution !== undefined) {
-        if (typeof solution !== "string" || solution.length === 0) {
+        const textRequired = kindRequiresText(proposalKindOf((proposal as any).kind));
+        if (typeof solution !== "string" || (textRequired && solution.length === 0)) {
           return res.status(400).json({ message: "Solution must be a non-empty string" });
         }
         updates.solution = solution;
@@ -1049,8 +1078,9 @@ export function registerProposalsRoutes(app: Express): void {
       const results = await computeVoteResults(proposal, view);
       // Use the community's minParticipationPct + decisive-vote check.
       // Archive if quorum was not met, or if there are zero yes/no votes
-      // (only abstains can't decide a yes/no outcome).
-      const nextState = results.meetsQuorum && results.hasDecisive ? 'decided' : 'archived';
+      // (only abstains can't decide a yes/no outcome). Polls: see
+      // computeVoteResults.
+      const nextState = results.concludes ? 'decided' : 'archived';
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');
       let updated = await transitionProposal(proposal, nextState, storage);
       if (results.ballotOptions && nextState === 'decided' && results.winner) {

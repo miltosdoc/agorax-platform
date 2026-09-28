@@ -34,6 +34,7 @@ import VotePanel from '@/components/voting/VotePanel';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { useTranslation } from '@/hooks/use-translation';
 import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
+import { proposalKindOf } from '@shared/proposal-kinds';
 
 interface Proposal {
   id: number;
@@ -55,6 +56,8 @@ interface Proposal {
   votingMode?: string;
   /** 'deliberation' (amendments + final_review) | 'vote' (straight to ballot) */
   track?: string;
+  /** 'decision' | 'statute' | 'election' | 'poll' — see shared/proposal-kinds.ts */
+  kind?: string;
 }
 
 interface FinalReviewData {
@@ -324,6 +327,9 @@ export default function ProposalDetailPage() {
   // ballot IS the page. Vote front and center, no amendments tab, no
   // sortition/AI-validation widgets, no "final text" copy.
   const isDirectVote = proposal.track === 'vote';
+  const kind = proposalKindOf(proposal.kind);
+  // A poll or an election may be nothing but its question and options.
+  const hasText = proposal.solution.trim() !== '';
   const hasDistinctFinalText = !!proposal.finalText
     && proposal.finalText.trim() !== proposal.solution.trim();
   const initialSolutionExpanded = initialSolutionOpen
@@ -451,6 +457,11 @@ export default function ProposalDetailPage() {
                 {t('proposal.by')} {proposal.authorName || proposal.authorUsername || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
               </span>
               <StatusBadge status={proposal.status} />
+              {kind !== 'decision' && (
+                <Badge variant="outline" data-testid="proposal-kind-badge">
+                  {t(`proposal.kind_${kind}`)}
+                </Badge>
+              )}
               {proposal.track === 'vote' && (
                 <Badge variant="outline" data-testid="proposal-track-badge">
                   {t('proposal.final_review_track_vote_badge') || 'Άμεση ψηφοφορία'}
@@ -483,6 +494,7 @@ export default function ProposalDetailPage() {
 
           {/* During an active vote, the distinct final text is primary. */}
           <section className="mb-8">
+            {hasText && (
             <Collapsible
               open={initialSolutionExpanded}
               onOpenChange={setInitialSolutionOpen}
@@ -495,7 +507,9 @@ export default function ProposalDetailPage() {
               >
                 <span className="min-w-0">
                   <span className="block text-sm font-medium">
-                    {hasDistinctFinalText ? t('proposal.initialSolution') : t('proposal.proposedSolution')}
+                    {hasDistinctFinalText
+                      ? t('proposal.initialSolution')
+                      : kind === 'decision' ? t('proposal.proposedSolution') : t(`proposal.form_text_${kind}`)}
                   </span>
                   {hasDistinctFinalText && (
                     <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
@@ -512,6 +526,7 @@ export default function ProposalDetailPage() {
                 <p className="whitespace-pre-wrap pb-4 text-base leading-relaxed">{proposal.solution}</p>
               </CollapsibleContent>
             </Collapsible>
+            )}
 
             {sortitionRevisions.length > 0 && (
               <div className="mt-4 p-4 border rounded space-y-3">

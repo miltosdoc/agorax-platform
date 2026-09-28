@@ -32,6 +32,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/hooks/use-translation';
 import type { AccentTheme } from '@shared/theme';
+import { proposalEyebrow } from '@/lib/proposal-kind';
 
 /**
  * The platform's signature mark: a hemicycle of ~90 seats in concentric
@@ -360,7 +361,7 @@ export default function LandingPage() {
                 <EntityCard
                   key={proposal.id}
                   subject="proposal"
-                  kindLabel={t('nav.proposals')}
+                  kindLabel={proposalEyebrow(t, (proposal as { kind?: string }).kind, t('nav.proposals'))}
                   id={proposal.id}
                   title={proposal.question}
                   excerpt={proposal.solution}

@@ -14,6 +14,8 @@ export interface CommunityProposalSummary {
   authorId: number;
   authorLabel: string;
   createdAt: string;
+  /** 'decision' | 'statute' | 'election' | 'poll' — see shared/proposal-kinds.ts */
+  kind: string;
 }
 
 export interface CommunitySummary {
@@ -73,7 +75,7 @@ export function getCommunityDashboardMetrics(input: {
   };
 }
 
-export function mapProposalToCommunitySummary(proposal: Pick<Proposal, 'id' | 'question' | 'status' | 'authorId' | 'createdAt'>): CommunityProposalSummary {
+export function mapProposalToCommunitySummary(proposal: Pick<Proposal, 'id' | 'question' | 'status' | 'authorId' | 'createdAt'> & { kind?: string | null }): CommunityProposalSummary {
   return {
     id: proposal.id,
     question: proposal.question,
@@ -81,12 +83,13 @@ export function mapProposalToCommunitySummary(proposal: Pick<Proposal, 'id' | 'q
     authorId: proposal.authorId,
     authorLabel: `User #${proposal.authorId}`,
     createdAt: proposal.createdAt instanceof Date ? proposal.createdAt.toISOString() : String(proposal.createdAt),
+    kind: proposal.kind ?? 'decision',
   };
 }
 
 export function buildCommunitySummary(
   community: Community,
-  proposals: Pick<Proposal, 'id' | 'question' | 'status' | 'authorId' | 'createdAt'>[],
+  proposals: Array<Pick<Proposal, 'id' | 'question' | 'status' | 'authorId' | 'createdAt'> & { kind?: string | null }>,
   memberCount: number,
   currentUserRole?: string,
   viewerId?: number,

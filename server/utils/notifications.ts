@@ -403,10 +403,25 @@ export async function notifyNewAmendment(
 
 // ─── Batch: Notify Vote Started ─────────────────────────────────────────────
 
+/** Say what opened: an election or a poll is not "a proposal". */
+function voteStartedText(title: string, kind?: string | null): { title: string; message: string } {
+  switch (kind) {
+    case 'election':
+      return { title: 'Ξεκίνησε εκλογή', message: `Η εκλογή «${title}» είναι ανοιχτή — δώστε την ψήφο σας!` };
+    case 'poll':
+      return { title: 'Νέα δημοσκόπηση', message: `Η δημοσκόπηση «${title}» είναι ανοιχτή — πείτε τη γνώμη σας!` };
+    case 'statute':
+      return { title: 'Ξεκίνησε ψηφοφορία', message: `Η ψηφοφορία για το «${title}» είναι ανοιχτή — δώστε την ψήφο σας!` };
+    default:
+      return { title: 'Ξεκίνησε ψηφοφορία', message: `Η ψηφοφορία για την πρόταση «${title}» είναι ανοιχτή — δώστε την ψήφο σας!` };
+  }
+}
+
 export async function notifyVoteStarted(
   proposalId: number,
   communityId: number,
-  proposalTitle: string
+  proposalTitle: string,
+  kind?: string | null,
 ): Promise<number> {
   const members = await db.execute(sql`
     SELECT cm.user_id FROM community_members cm
@@ -419,8 +434,7 @@ export async function notifyVoteStarted(
     await createNotification({
       userId,
       type: 'vote_started',
-      title: 'Ξεκίνησε ψηφοφορία',
-      message: `Η ψηφοφορία για την πρόταση «${proposalTitle.length > 100 ? proposalTitle.slice(0, 97) + '…' : proposalTitle}» είναι ανοιχτή — δώστε την ψήφο σας!`,
+      ...voteStartedText(proposalTitle.length > 100 ? proposalTitle.slice(0, 97) + '…' : proposalTitle, kind),
       proposalId,
       communityId,
       actionUrl: `/proposals/${proposalId}`,

@@ -26,6 +26,8 @@ interface Props {
   options?: Array<{ id: string; label: string; count: number }>;
   /** Winning option id to highlight (option ballots, once decided). */
   winner?: string | null;
+  /** Tag on the winning row; «Νικήτρια» unless the vote says otherwise (an election elects). */
+  winnerLabel?: string;
 }
 
 // Categorical accents for option ballots, tuned for the dark broadcast
@@ -98,7 +100,7 @@ function CountUp({ target, reduced, play }: { target: number; reduced: boolean; 
   return <>{val.toFixed(1)}</>;
 }
 
-export function BroadcastResults({ yes, no, abstain, total, participationPct, quorumPct, meetsQuorum, live, title, options, winner }: Props) {
+export function BroadcastResults({ yes, no, abstain, total, participationPct, quorumPct, meetsQuorum, live, title, options, winner, winnerLabel }: Props) {
   const { t } = useTranslation();
   const reduced = usePrefersReducedMotion();
   const seats = useSeats(total);
@@ -184,7 +186,7 @@ export function BroadcastResults({ yes, no, abstain, total, participationPct, qu
                 </span>
                 {isWinner && (
                   <span style={{ fontFamily: 'var(--font-data)', fontSize: '.6rem', letterSpacing: '.14em', fontWeight: 700, color: 'var(--bc-ground)', background: 'var(--bc-ink)', padding: '2px 6px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {(t('vote.option_winner') || 'Νικήτρια').toLocaleUpperCase('el')}
+                    {(winnerLabel ?? t('vote.option_winner')).toLocaleUpperCase('el')}
                   </span>
                 )}
               </span>

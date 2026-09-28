@@ -77,6 +77,10 @@ export interface VoteResults {
   hasVoted?: boolean;
   /** Effective ballots cast so far (shown while the tally is sealed). */
   ballotCount?: number;
+  /** What was voted — see shared/proposal-kinds.ts. Absent on older servers. */
+  kind?: string;
+  /** False for a poll: it is reported, never passed or rejected. */
+  binding?: boolean;
 }
 
 const EMPTY_RESULTS: VoteResults = {
@@ -218,6 +222,19 @@ export default function VotePanel({
     } catch {
       // Keep prior state.
     }
+  };
+
+  // A few lines read differently on an election, a poll or a statute vote
+  // («Τελική Ψηφοφορία Εγκρίσεως» over a list of candidates is wrong). A
+  // kind-specific key — 'vote.panelTitle_election' — wins when it exists;
+  // t() hands back the key itself when it does not.
+  const tk = (key: string): string => {
+    if (results.kind && results.kind !== 'decision') {
+      const specific = `${key}_${results.kind}`;
+      const text = t(specific);
+      if (text !== specific) return text;
+    }
+    return t(key);
   };
 
   // Option ballots: null ⇒ classic yes/no/abstain. Prefer the prop (the
@@ -391,33 +408,42 @@ export default function VotePanel({
           <div>
             <CardTitle className="flex items-center gap-2">
               <Vote className="w-5 h-5" />
-              {t('vote.panelTitle')}
+              {tk('vote.panelTitle')}
             </CardTitle>
             <CardDescription>
               {isVoting
-                ? t('proposal.votingOpen')
+                ? tk('proposal.votingOpen')
                 : isClosed
                 ? proposalStatus === 'archived'
-                  ? t('proposal.proposalArchived')
+                  ? tk('proposal.proposalArchived')
+                  : results.kind === 'poll'
+                  ? t('vote.poll_closed')
+                  : results.kind === 'election'
+                  ? t('vote.election_closed')
                   : t('proposal.proposalDecided')
                 : t('vote.notOpenShort')}
             </CardDescription>
           </div>
-          {isClosed && (
-            <Badge variant={results.passes ? 'default' : 'secondary'} className="flex items-center gap-1">
+          {isClosed && (results.binding === false ? (
+            // A poll decides nothing, so it is never "approved" or "rejected".
+            <Badge variant="secondary" className="flex items-center gap-1" data-testid="vote-outcome-poll">
+              {t('vote.poll_nonbinding')}
+            </Badge>
+          ) : (
+            <Badge variant={results.passes ? 'default' : 'secondary'} className="flex items-center gap-1" data-testid="vote-outcome">
               {results.passes ? (
                 <>
                   <CheckCircle2 className="w-3 h-3" />
-                  {t('vote.passed')}
+                  {results.kind === 'election' ? t('vote.elected_badge') : t('vote.passed')}
                 </>
               ) : (
                 <>
                   <Lock className="w-3 h-3" />
-                  {t('vote.notPassed')}
+                  {results.kind === 'election' ? t('vote.not_elected_badge') : t('vote.notPassed')}
                 </>
               )}
             </Badge>
-          )}
+          ))}
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -450,7 +476,7 @@ export default function VotePanel({
 
         {isVoting && (
           <div className="rounded-md border border-yper/30 bg-yper-wash px-3 py-2 text-xs text-yper">
-            {t('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
+            {tk('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
           </div>
         )}
         {!user && isVoting && (
@@ -476,9 +502,9 @@ export default function VotePanel({
         {showVoteButtons && user && !pendingBallot && isOptionBallot && ballotOptions && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
-              {userVoted ? t('vote.changeYourVote') : t('vote.castYourVote')}
+              {userVoted ? t('vote.changeYourVote') : tk('vote.castYourVote')}
             </div>
-            <div role="radiogroup" aria-label={t('vote.panelTitle')} className="space-y-2">
+            <div role="radiogroup" aria-label={tk('vote.panelTitle')} className="space-y-2">
               {ballotOptions.map((opt) => {
                 const selected = (selectedOption ?? results.userVote) === opt.id;
                 const isCounter = opt.id.startsWith('counter_');
@@ -569,7 +595,7 @@ export default function VotePanel({
         {showVoteButtons && user && !pendingBallot && !isOptionBallot && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
-              {userVoted ? t('vote.changeYourVote') : t('vote.castYourVote')}
+              {userVoted ? t('vote.changeYourVote') : tk('vote.castYourVote')}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Button
@@ -670,6 +696,7 @@ export default function VotePanel({
         ) : (
           /* Ceremony II — election-night broadcast results. */
           <BroadcastResults
+            title={tk('vote.panelTitle')}
             yes={results.yes}
             no={results.no}
             abstain={results.abstain}
@@ -688,7 +715,16 @@ export default function VotePanel({
                 : undefined
             }
             winner={
-              isOptionBallot && isClosed && results.total > 0 ? results.winner ?? null : null
+              // A blank vote winning an election elects nobody — no tag.
+              isOptionBallot && isClosed && results.total > 0
+                && !(results.kind === 'election' && results.winner === 'status_quo')
+                ? results.winner ?? null
+                : null
+            }
+            winnerLabel={
+              results.kind === 'election' ? t('vote.option_elected')
+                : results.kind === 'poll' ? t('vote.option_poll_top')
+                : undefined
             }
           />
         )}

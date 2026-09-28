@@ -282,7 +282,7 @@ async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void> {
         const view = await backend.getVoterView({ proposalId: proposal.id });
         const { computeVoteResults } = await import('../routers/proposals');
         const results = await computeVoteResults(proposal as any, view);
-        const nextState = results.meetsQuorum && results.hasDecisive ? 'decided' : 'archived';
+        const nextState = results.concludes ? 'decided' : 'archived';
         const { storage: st } = await import('../storage');
         let updated = await transitionProposal(proposal as any, nextState, st);
         if (results.ballotOptions && nextState === 'decided' && results.winner) {

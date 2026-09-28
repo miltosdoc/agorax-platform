@@ -276,7 +276,7 @@ export async function triggerSideEffects(
   if (toState === 'voting' && fromState !== 'voting') {
     try {
       const { notifyVoteStarted } = await import('./notifications');
-      await notifyVoteStarted(proposal.id, proposal.communityId, proposal.question);
+      await notifyVoteStarted(proposal.id, proposal.communityId, proposal.question, (proposal as any).kind);
     } catch (err: any) {
       console.warn(`[notify] vote_started fan-out failed for proposal ${proposal.id}: ${err?.message}`);
     }
