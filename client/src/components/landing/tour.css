@@ -488,6 +488,24 @@
 .tour-end-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; margin: 30px 0 0; font-size: 0.86rem; }
 .tour-end-links a { color: var(--gold); }
 
+/* ── demos that play themselves ─────────────────────────── */
+.tour-auto-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.kinds-ballot, .kinds-foot { margin-left: auto; }
+.tour-auto { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid currentColor; background: transparent; font: 600 0.74rem var(--font-ui); color: inherit; opacity: 0.85; cursor: pointer; transition: opacity 0.2s, background 0.2s; }
+.tour-auto:hover { opacity: 1; }
+.tour-auto .ic { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: var(--night); font-size: 0.55rem; letter-spacing: -0.05em; }
+.tour-parchment .tour-auto .ic { background: var(--parch-ink); color: var(--parch); }
+.tour-auto.on .ic { animation: tour-breathe 1.8s ease-in-out infinite; }
+@keyframes tour-breathe { 50% { transform: scale(0.86); } }
+/* the "finger" the film presses with */
+.tour .press { position: relative; outline: 2px solid var(--ui-accent); outline-offset: 2px; animation: tour-press 0.8s ease-in-out; }
+.tour-night .tour-box .press, .tour-parchment .tour-link.press { outline-color: var(--gold); }
+@keyframes tour-press { 0% { transform: scale(1); } 45% { transform: scale(0.96); } 100% { transform: scale(1); } }
+/* the playhead under the kind being shown */
+.kinds-tabs button { position: relative; overflow: hidden; }
+.kinds-tabs .take { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--gold); transform-origin: 0 50%; animation: tour-take linear forwards; }
+@keyframes tour-take { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
 /* ── Spray skin ──────────────────────────────────────────────
    The youth theme of the app (index.css [data-accent="spray"]): black
    grounds, lime for the lead, magenta for the second voice, condensed
@@ -653,7 +671,7 @@
   .film-stage { height: auto; display: grid; gap: 18px; padding: 18px; }
   .scene { position: relative; opacity: 1; visibility: visible; }
   .film-steps p { max-height: none; opacity: 1; margin-bottom: 12px; }
-  .caret, .rules-opts .who .me, .const-card .live ins, .tools-pane, .tools-list button.on span, .pane-polls .bars i, .pane-meet .live i { animation: none; }
+  .tour-auto.on .ic, .tour .press, .kinds-tabs .take, .caret, .rules-opts .who .me, .const-card .live ins, .tools-pane, .tools-list button.on span, .pane-polls .bars i, .pane-meet .live i { animation: none; }
   .tools-list button span { display: block; }
   .tour-pin { position: relative; top: 0; height: auto; min-height: calc(100svh - var(--hdr)); padding-block: 72px; }
   .tour-beat { position: relative; opacity: 1; transform: none; margin-bottom: 36px; transition: none; }

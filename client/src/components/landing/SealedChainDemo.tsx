@@ -10,10 +10,14 @@
  * longer in the chain, which is the check /verify runs. A vote of the
  * visitor's own is appended and answered with a receipt that, like the
  * real one, does not say what was chosen.
+ *
+ * It plays that story by itself like a short film (tamper, cover up, get
+ * caught, then cast a vote and get the receipt) until the visitor clicks.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { seeded } from './scroll';
+import { AutoplayToggle, useAutoplay, type AutoplayCopy, type Step } from './autoplay';
 
 type Choice = 'yes' | 'no' | 'abstain';
 
@@ -109,7 +113,7 @@ async function sealAll(ballots: Ballot[], from = 0, stored: Stored[] = []): Prom
 
 const short = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
-export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
+export default function SealedChainDemo({ copy, auto }: { copy: ChainCopy; auto: AutoplayCopy }) {
   const [ballots, setBallots] = useState<Ballot[]>(initialBallots);
   const [stored, setStored] = useState<Stored[]>([]);
   const [published, setPublished] = useState('');
@@ -178,11 +182,30 @@ export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
     setReceipt(row);
   };
 
+  // The film: an honest box, a quiet change, a cover-up, caught; then a vote.
+  const [hint, setHint] = useState<string | null>(null);
+  const steps: Step[] = [
+    { ms: 2600, run: () => { setHint(null); void reset(); } },
+    { ms: 800, run: () => setHint('blk-2') },
+    { ms: 3800, run: () => { setHint(null); flip(2); } },
+    { ms: 900, run: () => setHint('cover') },
+    { ms: 4600, run: () => { setHint(null); void cover(); } },
+    { ms: 1600, run: () => void reset() },
+    { ms: 800, run: () => setHint('cast-yes') },
+    { ms: 4800, run: () => { setHint(null); void cast('yes'); } },
+  ];
+  const film = useAutoplay<HTMLElement>(steps);
+  const userFlip = film.own(flip);
+  const userTamper = film.own(tamperRandom);
+  const userCover = film.own(() => void cover());
+  const userReset = film.own(() => void reset());
+  const userCast = film.own((c: Choice) => void cast(c));
+
   const groups = receipt.match(/.{8}/g) ?? [];
   const head = stored.length ? stored[stored.length - 1].row : '';
 
   return (
-    <section className="tour-chain tour-night" id="t-chain" aria-labelledby="t-chain-title">
+    <section ref={film.ref} className="tour-chain tour-night" id="t-chain" aria-labelledby="t-chain-title">
       <div className="tour-wrap tour-demo-grid">
         <div className="tour-demo-copy tour-reveal">
           <p className="tour-eyebrow"><span />{copy.eyebrow}</p>
@@ -209,6 +232,9 @@ export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
         {/* The reveal sits on a wrapper: React rewrites this box's class on
             every verdict, which would drop the observer's "in". */}
         <div className="tour-reveal">
+          <div className="tour-auto-row">
+            <AutoplayToggle playing={film.playing} onToggle={film.toggle} copy={auto} />
+          </div>
           <div className={`tour-box v-${verdict}`}>
             <div className="box-head">
               <span>{copy.box}</span>
@@ -224,8 +250,8 @@ export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
                       <span className="n">#{i + 1}</span>
                       <button
                         type="button"
-                        className={`chip c-${b.choice}`}
-                        onClick={() => flip(i)}
+                        className={`chip c-${b.choice}${hint === `blk-${i}` ? ' press' : ''}`}
+                        onClick={() => userFlip(i)}
                         disabled={b.mine}
                         title={copy.tamperHint}
                         aria-label={`#${i + 1}: ${copy.choice[b.choice]}. ${copy.tamperHint}`}
@@ -263,13 +289,13 @@ export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
 
             <div className="box-actions">
               {verdict === 'ok' && (
-                <button type="button" className="tour-btn ghost sm" onClick={tamperRandom}>{copy.tamper}</button>
+                <button type="button" className="tour-btn ghost sm" onClick={userTamper}>{copy.tamper}</button>
               )}
               {verdict === 'broken' && (
-                <button type="button" className="tour-btn sm" onClick={cover}>{copy.cover}</button>
+                <button type="button" className={`tour-btn sm${hint === 'cover' ? ' press' : ''}`} onClick={userCover}>{copy.cover}</button>
               )}
               {verdict !== 'ok' && (
-                <button type="button" className="tour-link" onClick={reset}>{copy.reset}</button>
+                <button type="button" className="tour-link" onClick={userReset}>{copy.reset}</button>
               )}
             </div>
 
@@ -277,7 +303,7 @@ export default function SealedChainDemo({ copy }: { copy: ChainCopy }) {
               <div className="box-cast">
                 <span>{copy.castTitle}</span>
                 {CHOICES.map((c) => (
-                  <button key={c} type="button" className={`chip c-${c}`} onClick={() => cast(c)}>
+                  <button key={c} type="button" className={`chip c-${c}${hint === `cast-${c}` ? ' press' : ''}`} onClick={() => userCast(c)}>
                     {copy.choice[c]}
                   </button>
                 ))}

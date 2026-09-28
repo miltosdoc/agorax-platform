@@ -170,11 +170,11 @@ export default function LandingPage() {
           onSignIn={() => navigate('/auth')}
         />
         <NoiseToOrder copy={copy.noise} />
-        <VoteKindsDemo copy={copy.kinds} />
+        <VoteKindsDemo copy={copy.kinds} auto={copy.auto} />
         <CommunityTools copy={copy.tools} />
         <ProcessFilm copy={copy.film} />
-        <RulesDemo copy={copy.rules} />
-        <SealedChainDemo copy={copy.chain} />
+        <RulesDemo copy={copy.rules} auto={copy.auto} />
+        <SealedChainDemo copy={copy.chain} auto={copy.auto} />
 
         {/* ————— Today: real votes from the public communities ————— */}
         <section className="tour-live tour-paper" id="t-live" aria-labelledby="t-live-title" data-testid="landing-live">

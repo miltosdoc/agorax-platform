@@ -5,8 +5,13 @@
  * two thirds (so one vote can tip it), an election goes to the candidate with
  * the most votes, and a community poll decides nothing and only shows the
  * answers. Abstentions never count toward a majority.
+ *
+ * It plays by itself like a short film: each kind in turn, a vote pressed,
+ * the count under its rule. The statute run votes No, so the two-thirds
+ * rule visibly fails by one vote. A click of the visitor's own stops it.
  */
 import { useState } from 'react';
+import { AutoplayToggle, useAutoplay, type AutoplayCopy, type Step } from './autoplay';
 
 export type Kind = 'decision' | 'statute' | 'election' | 'poll';
 
@@ -41,6 +46,9 @@ export interface KindsCopy {
 }
 
 const KINDS: Kind[] = ['decision', 'statute', 'election', 'poll'];
+/** The option the film presses for each kind. */
+const FILM_CHOICE: Record<Kind, number> = { decision: 0, statute: 1, election: 1, poll: 1 };
+const HOLD = { open: 1300, press: 800, result: 3600 };
 
 /** Yes/No ballots: option 0 is Yes, 1 is No, 2 is Abstain. */
 function passes(kind: Kind, counts: number[]): boolean {
@@ -49,9 +57,41 @@ function passes(kind: Kind, counts: number[]): boolean {
   return yes * 3 >= (yes + no) * 2;
 }
 
-export default function VoteKindsDemo({ copy }: { copy: KindsCopy }) {
+export default function VoteKindsDemo({ copy, auto }: { copy: KindsCopy; auto: AutoplayCopy }) {
   const [kind, setKind] = useState<Kind>('decision');
   const [mine, setMine] = useState<Record<Kind, number | null>>({ decision: null, statute: null, election: null, poll: null });
+  const [hint, setHint] = useState<number | null>(null);
+  const [take, setTake] = useState(0);
+
+  const steps: Step[] = KINDS.flatMap((kk) => [
+    {
+      ms: HOLD.open,
+      run: () => {
+        setKind(kk);
+        setMine((m) => ({ ...m, [kk]: null }));
+        setHint(null);
+        setTake((n) => n + 1);
+      },
+    },
+    { ms: HOLD.press, run: () => setHint(FILM_CHOICE[kk]) },
+    {
+      ms: HOLD.result,
+      run: () => {
+        setHint(null);
+        setMine((m) => ({ ...m, [kk]: FILM_CHOICE[kk] }));
+      },
+    },
+  ]);
+  const film = useAutoplay<HTMLElement>(steps);
+  const pickKind = film.own((kk: Kind) => {
+    setHint(null);
+    setKind(kk);
+  });
+  const vote = film.own((i: number) => {
+    setHint(null);
+    setMine((m) => ({ ...m, [kind]: i }));
+  });
+  const again = film.own(() => setMine((m) => ({ ...m, [kind]: null })));
   const k = copy.kinds[kind];
   const choice = mine[kind];
   const counts = k.counts.map((c, i) => c + (choice === i ? 1 : 0));
@@ -75,7 +115,7 @@ export default function VoteKindsDemo({ copy }: { copy: KindsCopy }) {
   }
 
   return (
-    <section className="tour-kinds tour-night" id="t-kinds" aria-labelledby="t-kinds-title">
+    <section ref={film.ref} className="tour-kinds tour-night" id="t-kinds" aria-labelledby="t-kinds-title">
       <div className="tour-wrap tour-demo-grid">
         <div className="tour-demo-copy tour-reveal">
           <p className="tour-eyebrow"><span />{copy.eyebrow}</p>
@@ -91,16 +131,22 @@ export default function VoteKindsDemo({ copy }: { copy: KindsCopy }) {
                 role="tab"
                 aria-selected={kind === kk}
                 className={kind === kk ? 'on' : ''}
-                onClick={() => setKind(kk)}
+                onClick={() => pickKind(kk)}
               >
                 <b>{copy.kinds[kk].tab}</b>
                 <span>{copy.kinds[kk].rule}</span>
+                {film.playing && kind === kk && (
+                  <i key={take} className="take" style={{ animationDuration: `${HOLD.open + HOLD.press + HOLD.result}ms` }} aria-hidden="true" />
+                )}
               </button>
             ))}
           </div>
         </div>
 
         <div className="tour-reveal">
+          <div className="tour-auto-row">
+            <AutoplayToggle playing={film.playing} onToggle={film.toggle} copy={auto} />
+          </div>
           <div className="kinds-ballot ui-card" role="tabpanel" aria-live="polite">
             <p className="lbl">{k.tab}</p>
             <h3>{k.question}</h3>
@@ -112,8 +158,8 @@ export default function VoteKindsDemo({ copy }: { copy: KindsCopy }) {
                   <li key={o}>
                     <button
                       type="button"
-                      className={`opt${choice === i ? ' mine' : ''}${yesNo ? ` yn-${i}` : ''}${choice !== null && !yesNo && i === leader ? ' lead' : ''}`}
-                      onClick={() => setMine((m) => ({ ...m, [kind]: i }))}
+                      className={`opt${choice === i ? ' mine' : ''}${hint === i ? ' press' : ''}${yesNo ? ` yn-${i}` : ''}${choice !== null && !yesNo && i === leader ? ' lead' : ''}`}
+                      onClick={() => vote(i)}
                       disabled={choice !== null}
                     >
                       <i style={{ width: choice === null ? 0 : `${pct}%` }} aria-hidden="true" />
@@ -137,7 +183,7 @@ export default function VoteKindsDemo({ copy }: { copy: KindsCopy }) {
               <div className={`kinds-outcome${kind === 'poll' || kind === 'election' ? ' neutral' : good ? ' ok' : ' no'}`}>
                 <b>{outcome}</b>
                 {yesNo && <span>{copy.abstainNote}</span>}
-                <button type="button" className="again" onClick={() => setMine((m) => ({ ...m, [kind]: null }))}>
+                <button type="button" className="again" onClick={again}>
                   {copy.again}
                 </button>
               </div>

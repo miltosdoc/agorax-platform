@@ -7,8 +7,12 @@
  * settings on every read (server/utils/constitution.ts), rewrites its
  * article on membership, with a fresh content fingerprint, when the rule
  * turns.
+ *
+ * It plays by itself like a short film (a vote that turns the rule, a tie
+ * that keeps it, a withdrawn vote) until the visitor clicks.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { AutoplayToggle, useAutoplay, type AutoplayCopy, type Step } from './autoplay';
 
 type Policy = 'open' | 'approval' | 'invite_only';
 const POLICIES: Policy[] = ['open', 'approval', 'invite_only'];
@@ -59,7 +63,7 @@ function recompute(current: Policy, votes: Policy[]): Policy {
   return leaders.length === 1 ? leaders[0] : current;
 }
 
-export default function RulesDemo({ copy }: { copy: RulesCopy }) {
+export default function RulesDemo({ copy, auto }: { copy: RulesCopy; auto: AutoplayCopy }) {
   const [others, setOthers] = useState<[string, Policy][]>(OTHERS);
   const [mine, setMine] = useState<Policy | null>(null);
   const [current, setCurrent] = useState<Policy>('open');
@@ -91,6 +95,27 @@ export default function RulesDemo({ copy }: { copy: RulesCopy }) {
     };
   }, [current, copy]);
 
+  // The film: your vote turns the rule, a tie keeps it, withdrawing leaves it.
+  const [hint, setHint] = useState<Policy | 'withdraw' | null>(null);
+  const restart = () => {
+    setOthers(OTHERS);
+    setMine(null);
+    setCurrent('open');
+    setPrevious(null);
+    setJustFlipped(false);
+    setHint(null);
+  };
+  const steps: Step[] = [
+    { ms: 2400, run: restart },
+    { ms: 800, run: () => setHint('approval') },
+    { ms: 3600, run: () => { setHint(null); setMine('approval'); } },
+    { ms: 800, run: () => setHint('invite_only') },
+    { ms: 3400, run: () => { setHint(null); setMine('invite_only'); } },
+    { ms: 800, run: () => setHint('withdraw') },
+    { ms: 3200, run: () => { setHint(null); setMine(null); } },
+  ];
+  const film = useAutoplay<HTMLElement>(steps);
+
   const nudge = () => {
     setOthers((os) => {
       const k = Math.floor(Math.random() * os.length);
@@ -108,7 +133,7 @@ export default function RulesDemo({ copy }: { copy: RulesCopy }) {
       : copy.lead(copy.options[current]);
 
   return (
-    <section className="tour-selfgov tour-parchment" id="t-rules" aria-labelledby="t-rules-title">
+    <section ref={film.ref} className="tour-selfgov tour-parchment" id="t-rules" aria-labelledby="t-rules-title">
       <div className="tour-wrap tour-demo-grid">
         <div className="tour-demo-copy tour-reveal">
           <p className="tour-eyebrow"><span />{copy.eyebrow}</p>
@@ -122,6 +147,9 @@ export default function RulesDemo({ copy }: { copy: RulesCopy }) {
         </div>
 
         <div className="tour-rules-stage tour-reveal">
+          <div className="tour-auto-row">
+            <AutoplayToggle playing={film.playing} onToggle={film.toggle} copy={auto} />
+          </div>
           <div className="rules-card">
             <div className="rules-head">
               <span>{copy.community}</span>
@@ -139,8 +167,8 @@ export default function RulesDemo({ copy }: { copy: RulesCopy }) {
                     <span className="cnt">{tally[i]}</span>
                     <button
                       type="button"
-                      className="vote"
-                      onClick={() => setMine(p)}
+                      className={`vote${hint === p ? ' press' : ''}`}
+                      onClick={film.own(() => setMine(p))}
                       disabled={mine === p}
                       aria-pressed={mine === p}
                     >
@@ -157,8 +185,12 @@ export default function RulesDemo({ copy }: { copy: RulesCopy }) {
             </ul>
             <p className="rules-status" aria-live="polite">{status}</p>
             <div className="rules-actions">
-              {mine && <button type="button" className="tour-link" onClick={() => setMine(null)}>{copy.withdraw}</button>}
-              <button type="button" className="tour-link" onClick={nudge}>{copy.nudge}</button>
+              {mine && (
+                <button type="button" className={`tour-link${hint === 'withdraw' ? ' press' : ''}`} onClick={film.own(() => setMine(null))}>
+                  {copy.withdraw}
+                </button>
+              )}
+              <button type="button" className="tour-link" onClick={film.own(nudge)}>{copy.nudge}</button>
             </div>
           </div>
 

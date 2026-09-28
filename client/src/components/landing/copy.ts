@@ -14,6 +14,7 @@ import type { ToolsCopy } from './CommunityTools';
 import type { FilmCopy } from './ProcessFilm';
 import type { RulesCopy } from './RulesDemo';
 import type { ChainCopy } from './SealedChainDemo';
+import type { AutoplayCopy } from './autoplay';
 
 export type Lang = 'el' | 'en';
 
@@ -39,6 +40,8 @@ export interface EndCopy {
 
 export interface TourCopy {
   chapters: string[];
+  /** The play/pause control on the demos that run by themselves. */
+  auto: AutoplayCopy;
   stats: [string, string, string, string];
   hero: HeroCopy;
   noise: NoiseCopy;
@@ -58,6 +61,7 @@ const FILM_RECEIPT = 'ced292a7f86f55a4b607dde55db7421207f3f46f0b8a02b17d7bc43cda
 
 const el: TourCopy = {
   chapters: ['Αρχή', 'Το πρόβλημα', 'Ψηφοφορίες', 'Η κοινότητα', 'Από την ιδέα στην απόφαση', 'Αυτοδιοίκηση', 'Η κάλπη', 'Σήμερα'],
+  auto: { playing: 'Παίζει μόνο του · παύση', play: 'Αυτόματη προβολή' },
   stats: ['μέλη', 'κοινότητες', 'ψηφοφορίες', 'αποφάσεις'],
   hero: {
     eyebrow: 'AgoraX · μια σύντομη περιήγηση',
@@ -353,6 +357,7 @@ const el: TourCopy = {
 
 const en: TourCopy = {
   chapters: ['Start', 'The problem', 'Votes', 'The community', 'From idea to decision', 'Self-government', 'The ballot box', 'Today'],
+  auto: { playing: 'Playing by itself · pause', play: 'Play the demo' },
   stats: ['members', 'communities', 'votes', 'decisions'],
   hero: {
     eyebrow: 'AgoraX · a short tour',
