@@ -73,7 +73,8 @@ hangs.
 
 `EMAIL_NOTIFICATIONS_ENABLED` is a **second** switch, off unless set to
 exactly `true`. SMTP alone enables security mail — password reset and address
-confirmation — and nothing else. See §8.
+confirmation — and the email to members drawn by lot for a jury, and nothing
+else. See §8.
 
 `APP_PUBLIC_URL` is the base for every link inside an email. Mail links are
 never built from a request `Host` header — a link built from an attacker-
@@ -145,6 +146,10 @@ messages a month, and a young sending domain that suddenly emits hundreds of
 messages is a domain that gets looked at.
 
 ## 8. Turning the notification fan-out on
+
+(The email to members drawn by lot is not part of the fan-out. It goes only to
+the members a draw picks, ignores preferences like security mail, and is sent
+as soon as SMTP works.)
 
 `EMAIL_NOTIFICATIONS_ENABLED=true`, and only after SMTP has been proven with
 security mail.

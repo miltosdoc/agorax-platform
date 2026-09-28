@@ -30,6 +30,7 @@ export type JobType =
   | 'conference_reminder'   // "Starts soon" fan-out for scheduled meetings
   | 'refresh_final_text'    // Live re-merge of the AI final text during deliberation
   | 'send_email'            // One optional notification email to one member
+  | 'send_juror_email'      // "You were drawn by lot" — always sent, ignores preferences
   | 'chain_anchor';         // Publish vote-chain head hashes to the external anchor repo
 
 export interface JobPayload {
@@ -307,17 +308,17 @@ export async function enqueueNotification(
 }
 
 /**
- * Enqueue a sortition creation job.
+ * Enqueue a sortition creation job. The handler reads the jury's size, mode
+ * and response time from the community's settings at draw time.
  */
 export async function enqueueCreateSortition(
   communityId: number,
-  size: number,
   proposalId?: number,
   purpose: string = 'text_synthesis',
 ): Promise<string> {
   return enqueueJob({
     type: 'create_sortition',
-    data: { communityId, size, proposalId, purpose },
+    data: { communityId, proposalId, purpose },
     priority: 'high',
   });
 }

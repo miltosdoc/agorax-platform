@@ -23,6 +23,7 @@ import { communities, proposalAmendments, proposals } from '@shared/schema';
 import {
   PROPOSAL_KINDS, majorityFraction, voteRulesFor, type MajorityRule, type ProposalKind,
 } from '@shared/proposal-kinds';
+import { synthesisJuryTerms } from '@shared/community-settings';
 import { canViewCommunityContentById } from './community-visibility';
 import { aiAvailable, ensureArticles, getCachedArticles, pendingCount, type AiArticle } from './constitution-ai';
 
@@ -139,7 +140,8 @@ function hours(h: number | null | undefined, lang: Lang): string {
 
 type CommunityRow = typeof communities.$inferSelect;
 
-function buildArticles(c: CommunityRow, lang: Lang): Article[] {
+/** Part I: the rules, read from the community's settings. Exported for tests. */
+export function buildArticles(c: CommunityRow, lang: Lang): Article[] {
   const el = lang === 'el';
   const inclusion = Number(c.amendmentInclusionThreshold ?? 0.6);
   const maxAm = c.maxAmendmentsPerProposal ?? -1;
@@ -241,10 +243,26 @@ function buildArticles(c: CommunityRow, lang: Lang): Article[] {
       + (inclusion < 1 ? `An amendment the author did not judge enters the final text if at least ${pct(inclusion)} of those who voted on it support it. ` : '')
       + `An amendment the author rejected still enters if at least ${pct(override)} of those who voted on it support it.`);
 
+  // The jury, when there is one: the terms handleCreateSortition draws with,
+  // and the trigger shouldDrawSynthesisJury applies. A rejected amendment is
+  // flagged when (up − down) / all votes on it >= amendmentThreshold with at
+  // least 3 votes, i.e. when at least (1 + threshold) / 2 of them support it.
+  const jury = synthesisJuryTerms(c);
+  const flagShare = (1 + Number(c.amendmentThreshold ?? 0.5)) / 2;
+  const jurySize = jury.mode === 'percentage'
+    ? (el ? `με το ${Math.min(jury.size, 100)}% των μελών (τουλάχιστον 3)` : `of ${Math.min(jury.size, 100)}% of the members (at least 3)`)
+    : (el ? `${jury.size} μελών` : `of ${jury.size} members`);
+  const merged = el
+    ? 'το τελικό κείμενο συντίθεται αυτόματα από την αρχική πρόταση και τις τροποποιήσεις που έγιναν δεκτές.'
+    : 'the final text is merged automatically from the original proposal and the accepted amendments.';
   const synthesis = c.synthesisMode === 'sortition'
     ? (el
-        ? `Το τελικό κείμενο συντάσσει κληρωτό σώμα ${c.sortitionSize}${c.sortitionMode === 'percentage' ? '%' : ''} μελών, που έχει ${hours(c.sortitionResponseHours, lang)} να απαντήσει. Αν δεν σχηματιστεί ή δεν απαντήσει, το κείμενο συντίθεται αυτόματα.`
-        : `The final text is written by a jury of ${c.sortitionSize}${c.sortitionMode === 'percentage' ? '%' : ''} members drawn by lot, who have ${hours(c.sortitionResponseHours, lang)} to respond. If the jury cannot form or does not respond, the text is merged automatically.`)
+        ? `Όταν κλείνει η συνδιαμόρφωση, αν μια τροποποίηση που απέρριψε ο συντάκτης τη στηρίζει τουλάχιστον το ${pct(flagShare)} όσων ψήφισαν γι' αυτήν (με τουλάχιστον 3 ψήφους), κληρώνεται σώμα ${jurySize} για να γράψει το τελικό κείμενο. `
+          + `Αν τα διαθέσιμα μέλη είναι λιγότερα, κληρώνονται όλα. Το σώμα έχει ${hours(jury.responseHours, lang)}· μόλις ένα μέλος του υποβάλει το κείμενο, ανοίγει η ψηφοφορία. `
+          + `Σε κάθε άλλη περίπτωση, ή αν το σώμα δεν σχηματιστεί ή δεν υποβάλει κείμενο εγκαίρως, ${merged}`
+        : `When co-drafting closes, if at least ${pct(flagShare)} of those who voted on an amendment the author rejected support it (with at least 3 votes), a jury ${jurySize} is drawn by lot to write the final text. `
+          + `If fewer members are available, all of them are drawn. The jury has ${hours(jury.responseHours, lang)}; as soon as one of its members submits the text, the vote opens. `
+          + `Otherwise, or if the jury cannot form or submits no text in time, ${merged}`)
     : (el
         ? 'Το τελικό κείμενο συντίθεται αυτόματα από την αρχική πρόταση και τις τροποποιήσεις που έγιναν δεκτές.'
         : 'The final text is merged automatically from the original proposal and the accepted amendments.');

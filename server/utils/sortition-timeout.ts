@@ -1,9 +1,9 @@
 /**
  * Sortition Timeout & Completion
  *
- * Handles deadline checks, replacement of non-responders, and completion of
- * sortition bodies. Deadlines are derived from `selectedAt + responseHours`
- * (no separate `responseDeadline` column).
+ * Handles deadline checks and completion of sortition bodies. Deadlines are
+ * derived from `selectedAt + responseHours` (no separate `responseDeadline`
+ * column).
  *
  * Wired up by the recurring `sortition_timeout` job in the queue worker.
  */
@@ -12,8 +12,6 @@ import { db } from '../db';
 import { storage } from '../storage';
 import { sortitionBodies, sortitionMembers, proposals } from '@shared/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { getEligibleMembers } from './sortition';
-import { cryptoShuffle } from './crypto-shuffle';
 import { logOverrideSortitionTimeout } from './admin-action-logger';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -45,46 +43,6 @@ export async function getNonRespondingCount(bodyId: number): Promise<number> {
     .from(sortitionMembers)
     .where(and(eq(sortitionMembers.bodyId, bodyId), eq(sortitionMembers.responded, false)));
   return row?.count ?? 0;
-}
-
-/**
- * Replace non-responding members with fresh random picks from the eligible
- * pool. Returns the number of replacements actually made.
- */
-export async function replaceNonRespondingMembers(
-  bodyId: number,
-  communityId: number,
-  maxReplacements: number = 5,
-): Promise<number> {
-  const members = await storage.getSortitionMembers(bodyId);
-  const nonResponders = members.filter(m => !m.responded);
-  if (nonResponders.length === 0) return 0;
-
-  const currentMemberIds = new Set(members.map(m => m.userId));
-
-  const eligible = await getEligibleMembers(communityId, storage);
-  const candidates = eligible.filter(m => !currentMemberIds.has(m.userId));
-
-  if (candidates.length === 0) return 0;
-
-  // Cryptographically secure shuffle for fairness, same as the initial draw
-  const shuffled = cryptoShuffle(candidates);
-
-  const replaceCount = Math.min(maxReplacements, nonResponders.length, shuffled.length);
-  let replaced = 0;
-  for (let i = 0; i < replaceCount; i++) {
-    const drop = nonResponders[i];
-    const pick = shuffled[i];
-
-    // Remove the non-responder, add the replacement.
-    await db
-      .delete(sortitionMembers)
-      .where(and(eq(sortitionMembers.bodyId, bodyId), eq(sortitionMembers.userId, drop.userId)));
-    await storage.addSortitionMember(bodyId, pick.userId);
-    replaced++;
-  }
-
-  return replaced;
 }
 
 /**

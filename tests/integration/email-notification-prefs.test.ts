@@ -266,6 +266,104 @@ describe('security mail ignores preferences entirely', () => {
   });
 });
 
+// ─── Juror mail: always sent, still behind the operator switch ──────────────
+
+describe('juror mail reaches everyone drawn', () => {
+  const jurorPath = service.slice(
+    service.indexOf('export async function enqueueJurorEmail'),
+    service.indexOf('// ─── Housekeeping'),
+  );
+  const notify = notifications.slice(
+    notifications.indexOf('export async function notifySortitionMembers'),
+    notifications.indexOf('// ─── Batch: Notify Community of Proposal Advancement'),
+  );
+
+  it('never consults the preference table', () => {
+    expect(jurorPath).toMatch(/export async function deliverJurorEmail/);
+    expect(jurorPath).not.toMatch(/getOrCreateEmailPrefs|isCategoryEnabled|masterEnabled/);
+  });
+
+  it('goes out like security mail: needs SMTP, not the notification switch', () => {
+    const enqueue = jurorPath.slice(0, jurorPath.indexOf('export async function deliverJurorEmail'));
+    expect(enqueue).toMatch(/if \(!isMailConfigured\(\)\) return;/);
+    expect(jurorPath).not.toMatch(/areNotificationEmailsEnabled/);
+  });
+
+  it('carries no unsubscribe header and no address in the job', () => {
+    expect(jurorPath.slice(jurorPath.indexOf('await deliver({'))).not.toMatch(/unsubscribeUrl/);
+    const start = service.indexOf('export interface JurorEmailJob');
+    const jobShape = service.slice(start, service.indexOf('\n}', start));
+    expect(jobShape).not.toMatch(/\bemail\b|\bto\b:/);
+  });
+
+  it('is queued for every member drawn, outside the in-app preference gate', () => {
+    expect(notify).toMatch(/enqueueJurorEmail\(\{/);
+    expect(notify).toMatch(/idempotencyKey: `sortition_assigned:\$\{bodyId\}:\$\{userId\}`/);
+    const create = notifications.slice(
+      notifications.indexOf('export async function createNotification'),
+      notifications.indexOf('// ─── Email fan-out'),
+    );
+    expect(create).not.toMatch(/enqueueJurorEmail/);
+  });
+
+  it('is not an opt-out category', () => {
+    expect(emailCategoryForNotification('sortition_assigned')).toBeNull();
+  });
+
+  it('says so in both languages on the settings page', () => {
+    const line = (src: string) => src.slice(src.indexOf("'emailPrefs.alwaysHint'"), src.indexOf('\n', src.indexOf("'emailPrefs.alwaysHint'")));
+    expect(line(el)).toMatch(/κληρωθείτε/);
+    expect(line(en)).toMatch(/drawn by lot/);
+  });
+});
+
+describe('juror email', () => {
+  let sortitionAssignedEmail: typeof import('../../server/utils/email-templates').sortitionAssignedEmail;
+  beforeAll(async () => {
+    ({ sortitionAssignedEmail } = await import('../../server/utils/email-templates'));
+  });
+
+  const base = {
+    name: 'Μαρία',
+    writesText: true,
+    subjectLine: 'Πεζόδρομος <στην> πλατεία',
+    communityName: 'Γειτονιά',
+    responseHours: 72,
+    actionUrl: 'https://agoraxdemocracy.com/proposals/7/sortition',
+  };
+
+  it('tells a jury what it writes, by when, and what happens otherwise', () => {
+    const mail = sortitionAssignedEmail({ ...base, locale: 'el' });
+    expect(mail.subject).toBe('Κληρωθήκατε να γράψετε ένα τελικό κείμενο');
+    expect(mail.html).toContain('Πεζόδρομος &lt;στην&gt; πλατεία');
+    expect(mail.text).toContain('Πεζόδρομος <στην> πλατεία');
+    expect(mail.text).toContain('3 ημέρες');
+    expect(mail.text).toContain('ανοίγει η ψηφοφορία');
+    expect(mail.text).toContain('το συνθέτει αυτόματα η πλατφόρμα');
+    expect(mail.html).toContain(base.actionUrl);
+  });
+
+  it('says it cannot be switched off, and offers no unsubscribe link', () => {
+    const mail = sortitionAssignedEmail({ ...base, locale: 'el' });
+    expect(mail.text).toContain('δεν απενεργοποιείται');
+    expect(mail.text).not.toMatch(/Διακοπή όλων των προαιρετικών email|email ασφαλείας/);
+  });
+
+  it('speaks English to an English-speaking member', () => {
+    const mail = sortitionAssignedEmail({ ...base, locale: 'en', responseHours: 36 });
+    expect(mail.subject).toBe('You were drawn to write a final text');
+    expect(mail.text).toContain('36 hours');
+    expect(mail.text).toContain('cannot be switched off');
+  });
+
+  it('has a plain version for a jury that writes no text', () => {
+    const mail = sortitionAssignedEmail({ ...base, locale: 'el', writesText: false, subjectLine: undefined, responseHours: 24 });
+    expect(mail.subject).toBe('Κληρωθήκατε σε κληρωτό σώμα');
+    expect(mail.text).toContain('1 ημέρα');
+    expect(mail.text).not.toContain('τελικό κείμενο');
+  });
+});
+
 // ─── Unsubscribe token ──────────────────────────────────────────────────────
 
 describe('unsubscribe token', () => {

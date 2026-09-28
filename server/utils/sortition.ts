@@ -161,7 +161,7 @@ export async function getActiveSortitionMembers(
  * Create a new sortition body by randomly selecting members.
  * 
  * @param communityId - The community to select from
- * @param size - Desired panel size (default: 7, range: 3-23)
+ * @param size - Desired panel size, or a percent in percentage mode (at least 3 members are drawn)
  * @param storage - Storage interface for database access
  * @param purpose - Purpose of the sortition body
  * @param proposalId - Optional proposal to associate
@@ -198,8 +198,9 @@ export async function createSortitionBody(
     const pct = Math.max(1, Math.min(100, size));
     desired = Math.max(1, Math.ceil((pool.length * pct) / 100));
   }
-  // Clamp to reasonable deliberative-body range
-  const clampedSize = Math.max(3, Math.min(23, desired));
+  // At least 3 members. No upper cap here: the community's own setting
+  // (3–500) is the limit, and it is what the charter tells members.
+  const clampedSize = Math.max(3, desired);
 
   // If pool is smaller than requested size, use all available
   const actualSize = Math.min(clampedSize, pool.length);

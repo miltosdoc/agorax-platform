@@ -113,7 +113,7 @@ export function SortitionPanel({ proposalId, proposalStatus }: SortitionPanelPro
           )}
           {before && (
             <p className="text-sm text-muted-foreground">
-              {t('workspace.sortition.not_applicable_yet') || 'Δεν εφαρμόζεται ακόμη. Το κληρωτό σώμα ενεργοποιείται μόνο αν η κοινότητα επισημάνει απορριφθείσες τροπολογίες κατά τη φάση «Σήμα Κοινότητας».'}
+              {t('workspace.sortition.not_applicable_yet') || 'Δεν εφαρμόζεται. Η τυπική διαδικασία είναι συνδιαμόρφωση → ψηφοφορία· κληρωτό σώμα κληρώνεται μόνο σε κοινότητες που το επέλεξαν, όταν τα μέλη στηρίζουν έντονα μια τροποποίηση που απέρριψε ο συντάκτης.'}
             </p>
           )}
           {skipped && (

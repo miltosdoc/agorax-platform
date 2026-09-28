@@ -13,7 +13,12 @@
  *                           Postgres job queue; the worker re-checks
  *                           preferences at send time, not at enqueue time.
  *
- * Both end up in deliver(), which claims an idempotency row *before* the SMTP
+ *   enqueueJurorEmail()    — "you were drawn by lot". Always sent, like
+ *                           security mail: ignores preferences and the
+ *                           notification switch. It carries no secret, so it
+ *                           takes the queue and its retries.
+ *
+ * All end up in deliver(), which claims an idempotency row *before* the SMTP
  * call. That claim is what stops a retried job or two overlapping fan-outs
  * from mailing the same person twice.
  *
@@ -54,6 +59,7 @@ import {
   passwordResetEmail,
   googleAccountEmail,
   proposalUpdateEmail,
+  sortitionAssignedEmail,
   verifyEmailEmail,
   votingEmail,
   type MailLocale,
@@ -477,6 +483,58 @@ export async function deliverOptionalEmail(job: OptionalEmailJob): Promise<void>
     to: recipient.email,
     rendered,
     unsubscribeUrl,
+  });
+}
+
+// ─── Juror mail ─────────────────────────────────────────────────────────────
+//
+// Being drawn for a jury is the one notification a member cannot afford to
+// miss, so it is sent like security mail: it ignores their preferences (see
+// NOTIFICATION_EMAIL_CATEGORY in shared/email-categories.ts) and does not
+// wait for EMAIL_NOTIFICATIONS_ENABLED. That switch holds back the fan-out to
+// every member of every live proposal; this goes only to the few people a
+// draw picks, so it fits the free tier. SMTP being configured is the only
+// gate — the same one that decides whether a password reset goes out.
+
+export interface JurorEmailJob {
+  userId: number;
+  idempotencyKey: string;
+  writesText: boolean;
+  responseHours: number;
+  actionPath: string;
+  subjectLine?: string;
+  communityName?: string;
+}
+
+/** Put a juror's email on the queue. The address is read at send time. */
+export async function enqueueJurorEmail(job: JurorEmailJob): Promise<void> {
+  // Nothing to send with: do not queue jobs that could only fail.
+  if (!isMailConfigured()) return;
+  await enqueueJob({ type: 'send_juror_email', data: job as any, priority: 'high' });
+}
+
+/** Worker side. Called only from the `send_juror_email` job handler. */
+export async function deliverJurorEmail(job: JurorEmailJob): Promise<void> {
+  const recipient = await loadRecipient(job.userId);
+  if (!recipient) return;
+
+  const rendered = sortitionAssignedEmail({
+    locale: recipient.locale,
+    name: recipient.name,
+    writesText: job.writesText,
+    subjectLine: job.subjectLine,
+    communityName: job.communityName,
+    responseHours: job.responseHours,
+    actionUrl: `${publicUrl()}${job.actionPath}`,
+  });
+
+  // No unsubscribeUrl, as with security mail: there is no switch to point to.
+  await deliver({
+    idempotencyKey: job.idempotencyKey,
+    userId: job.userId,
+    template: 'sortition_assigned',
+    to: recipient.email,
+    rendered,
   });
 }
 

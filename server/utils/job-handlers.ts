@@ -9,13 +9,16 @@ import { registerHandler, startWorker, enqueueJob, enqueueSortitionTimeout, enqu
 import { isCollecting, lockCollectedOptions } from './option-collection';
 import { proposalKindOf } from '@shared/proposal-kinds';
 import { handleSortitionCompletion, transitionToValidation } from './proposal-state-machine';
-import { checkSortitionTimeout, completeSortitionBody, replaceNonRespondingMembers } from './sortition-timeout';
+import { checkSortitionTimeout, completeSortitionBody } from './sortition-timeout';
+import { synthesisJuryTerms } from '@shared/community-settings';
 import { db } from '../db';
 import { sortitionBodies, proposals, proposalAmendments } from '@shared/schema';
 import { and, eq, lt, isNotNull, inArray, sql } from 'drizzle-orm';
 import {
   cleanupEmailDeliveries,
+  deliverJurorEmail,
   deliverOptionalEmail,
+  type JurorEmailJob,
   type OptionalEmailJob,
 } from './email-service';
 
@@ -50,20 +53,34 @@ async function handleSendNotification(payload: JobPayload): Promise<void> {
 // ─── Handler: create_sortition ──────────────────────────────────────────────
 
 async function handleCreateSortition(payload: JobPayload): Promise<void> {
-  const { communityId, size, proposalId, purpose } = payload.data;
+  const { communityId, proposalId, purpose } = payload.data;
 
   const { createSortitionBody } = await import('./sortition');
-  const { storage } = await import('../storage');
+  const { storage, communityRepo } = await import('../storage');
 
   try {
-    // createSortitionBody handles selection + DB insert in one call
-    await createSortitionBody(
+    // The jury the community's settings call for: the same terms its
+    // charter states. createSortitionBody handles selection + DB insert.
+    const community = await communityRepo.getCommunity(communityId);
+    if (!community) throw new Error(`Community ${communityId} not found`);
+    const { size, mode, responseHours } = synthesisJuryTerms(community);
+    const result = await createSortitionBody(
       communityId,
       size,
       storage,
       purpose,
       proposalId ?? undefined,
+      undefined,
+      { mode, responseHours },
     );
+    // A jury nobody tells about never writes: every draw would time out
+    // into the AI fallback. A failed notice must not undo the draw.
+    try {
+      const { notifySortitionMembers } = await import('./notifications');
+      await notifySortitionMembers(result.bodyId, communityId, proposalId ?? null, responseHours);
+    } catch (notifyErr: any) {
+      console.warn(`[sortition] could not notify body ${result.bodyId}: ${notifyErr?.message}`);
+    }
   } catch (err: any) {
     // AI fallback: a synthesis jury that cannot form (e.g. the community is
     // too small to have eligible members) must not deadlock the proposal in
@@ -173,6 +190,11 @@ async function handleSendEmail(payload: JobPayload): Promise<void> {
   await deliverOptionalEmail(payload.data as unknown as OptionalEmailJob);
 }
 
+/** One "you were drawn by lot" email: sent whatever the member's preferences. */
+async function handleSendJurorEmail(payload: JobPayload): Promise<void> {
+  await deliverJurorEmail(payload.data as unknown as JurorEmailJob);
+}
+
 // ─── Handler: sortition_timeout ─────────────────────────────────────────────
 
 async function handleSortitionTimeout(payload: JobPayload): Promise<void> {
@@ -189,11 +211,9 @@ async function handleSortitionTimeout(payload: JobPayload): Promise<void> {
     const isTimedOut = await checkSortitionTimeout(body.id);
     
     if (isTimedOut) {
-      
-      // First, try to replace non-responders
-      const nonResponding = await replaceNonRespondingMembers(body.id, body.communityId);
-      
-      // Then complete the body and handle the proposal transition
+      // Complete the body and move its proposal on. Members are not swapped
+      // at this point: a replacement drawn as the body closes would get no
+      // time and no notice, yet appear on the list of those drawn.
       if (body.proposalId) {
         await handleSortitionCompletion(body.id, body.proposalId);
       } else {
@@ -288,9 +308,12 @@ export async function handlePhaseAutoAdvance(_payload: JobPayload): Promise<void
         // reported by three users, and the reason final_review is back in the
         // flow: a short window where the merged text is visible, amendments
         // can still be judged, and silence accepts what the merge produced.
-        // (Sortition synthesis remains reachable via manual /transition.)
-        const updated = await transitionProposal(proposal as any, 'final_review', storage);
-        await triggerSideEffects('community_signal', 'final_review', updated);
+        // A community that chose a jury gets one here too, under the same
+        // rule as the manual advance: the jury writes instead.
+        const { shouldDrawSynthesisJury } = await import('./amendment-processor');
+        const next = (await shouldDrawSynthesisJury(proposal)) ? 'sortition_synthesis' : 'final_review';
+        const updated = await transitionProposal(proposal as any, next, storage);
+        await triggerSideEffects('community_signal', next, updated);
 
       } else if (proposal.status === 'final_review') {
         // Author silence = acceptance of the AI-merged text as-is.
@@ -445,6 +468,7 @@ export function registerAllHandlers(): void {
   registerHandler('phase_auto_advance', handlePhaseAutoAdvance);
   registerHandler('conference_reminder', handleConferenceReminder);
   registerHandler('send_email', handleSendEmail);
+  registerHandler('send_juror_email', handleSendJurorEmail);
   registerHandler('chain_anchor', handleChainAnchor);
 }
 

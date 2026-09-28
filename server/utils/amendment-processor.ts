@@ -232,6 +232,23 @@ export async function calculateCommunitySignals(
 }
 
 /**
+ * Whether closing co-drafting should draw a jury to write the final text:
+ * the community chose a jury, and members flagged at least one amendment the
+ * author rejected. The deadline job and the manual advance both ask this, so
+ * who closes the phase does not change the outcome.
+ */
+export async function shouldDrawSynthesisJury(
+  proposal: { id: number; communityId: number },
+): Promise<boolean> {
+  const community = await db.query.communities.findFirst({
+    where: eq(communities.id, proposal.communityId),
+  });
+  if (community?.synthesisMode !== 'sortition') return false;
+  const signals = await calculateCommunitySignals(proposal.id, proposal.communityId);
+  return signals.some(s => s.flagged);
+}
+
+/**
  * Get flagged amendments for sortition input.
  */
 export async function getFlaggedAmendments(

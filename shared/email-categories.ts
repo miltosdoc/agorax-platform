@@ -74,11 +74,10 @@ export function categoryDefault(key: EmailCategoryKey): boolean {
  * category. Anything absent stays in-app only.
  *
  * `sortition_assigned` is deliberately absent even though it is the most
- * consequential notification on the platform: being drawn for a jury has its
- * own deadline-driven reminder path, and folding it into an opt-out category
- * would let a member switch off the one message they cannot afford to miss.
- * If it ever gets email, it belongs with the security mail that ignores
- * preferences, not here.
+ * consequential notification on the platform: folding it into an opt-out
+ * category would let a member switch off the one message they cannot afford
+ * to miss. Its email is sent by enqueueJurorEmail() in email-service.ts,
+ * which ignores preferences like security mail does.
  */
 export const NOTIFICATION_EMAIL_CATEGORY: Readonly<Record<string, EmailCategoryKey>> = {
   new_proposal: 'community_proposals',

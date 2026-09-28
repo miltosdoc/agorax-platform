@@ -16,7 +16,7 @@ import { sortitionNotifications } from '@shared/schema';
 import { createHash } from 'node:crypto';
 import { notificationBus } from './notification-bus';
 import { pushToUsers } from './push-client';
-import { enqueueOptionalEmail, type OptionalTemplate } from './email-service';
+import { enqueueJurorEmail, enqueueOptionalEmail, type OptionalTemplate } from './email-service';
 import { emailCategoryForNotification } from '@shared/email-categories';
 
 // ─── Notification Types ─────────────────────────────────────────────────────
@@ -245,6 +245,19 @@ export async function notifyFileLost(
 
 // ─── Batch: Notify Sortition Members ────────────────────────────────────────
 
+/**
+ * Where a drawn member acts. A jury writing a final text works on the
+ * proposal's jury page; any other body opens on its ceremony page, which
+ * shows who was drawn and links each member to their assignment.
+ * (`/sortition/:id` is the scoring page and takes an assignment id, not a
+ * body id.)
+ */
+function sortitionActionUrl(bodyId: number, proposalId: number | null, purpose: unknown): string {
+  return proposalId && purpose === 'text_synthesis'
+    ? `/proposals/${proposalId}/sortition`
+    : `/sortition/${bodyId}/ceremony`;
+}
+
 export async function notifySortitionMembers(
   bodyId: number,
   communityId: number,
@@ -256,21 +269,50 @@ export async function notifySortitionMembers(
     SELECT sm.user_id FROM sortition_members sm
     WHERE sm.body_id = ${bodyId}
   `);
+  const body = await db.execute(sql`SELECT purpose FROM sortition_bodies WHERE id = ${bodyId}`);
+  const purpose = body.rows[0]?.purpose;
+  const writesText = !!proposalId && purpose === 'text_synthesis';
+  const actionUrl = sortitionActionUrl(bodyId, proposalId, purpose);
+
+  // Plain text for the email's body; the address is read when it is sent.
+  const community = await db.execute(sql`SELECT name FROM communities WHERE id = ${communityId}`);
+  const communityName = (community.rows[0]?.name as string | undefined) ?? undefined;
+  const proposal = writesText
+    ? await db.execute(sql`SELECT question FROM proposals WHERE id = ${proposalId}`)
+    : null;
+  const subjectLine = (proposal?.rows[0]?.question as string | undefined) ?? undefined;
 
   let notified = 0;
-  const hoursLabel = responseHours.toString();
 
   for (const member of members.rows) {
     const userId = member.user_id as number;
+    // The email goes out whatever the member's preferences, including the
+    // in-app switch createNotification() honours below: being drawn has a
+    // deadline, and a juror nobody reaches cannot write the text.
+    try {
+      await enqueueJurorEmail({
+        userId,
+        idempotencyKey: `sortition_assigned:${bodyId}:${userId}`,
+        writesText,
+        responseHours,
+        actionPath: actionUrl,
+        subjectLine,
+        communityName,
+      });
+    } catch (err: any) {
+      console.warn(`[sortition] could not queue the juror email for user ${userId} (body ${bodyId}): ${err?.message}`);
+    }
     await createNotification({
       userId,
       type: 'sortition_assigned',
-      title: 'Sortition Assignment',
-      message: `You have been selected for a sortition body. You have ${hoursLabel} hours to respond.`,
+      title: writesText ? 'Κληρωθήκατε να γράψετε ένα τελικό κείμενο' : 'Κληρωθήκατε σε κληρωτό σώμα',
+      message: writesText
+        ? `Κληρωθήκατε στο σώμα που γράφει το τελικό κείμενο μιας πρότασης. Έχετε ${responseHours} ώρες. Αν δεν υποβληθεί κείμενο, το συνθέτει αυτόματα η πλατφόρμα.`
+        : `Κληρωθήκατε σε κληρωτό σώμα της κοινότητας. Έχετε ${responseHours} ώρες για να απαντήσετε.`,
       sortitionBodyId: bodyId,
       proposalId: proposalId || undefined,
       communityId,
-      actionUrl: `/sortition/${bodyId}`,
+      actionUrl,
     });
     notified++;
   }
@@ -525,7 +567,7 @@ export async function sendDeadlineReminders(): Promise<number> {
 
   // Find sortition bodies that are active and approaching deadline
   const bodies = await db.execute(sql`
-    SELECT sb.id, sb.response_hours, sb.selected_at, sb.proposal_id, sb.community_id
+    SELECT sb.id, sb.response_hours, sb.selected_at, sb.proposal_id, sb.community_id, sb.purpose
     FROM sortition_bodies sb
     WHERE sb.status = 'active'
       AND sb.selected_at IS NOT NULL
@@ -545,15 +587,19 @@ export async function sendDeadlineReminders(): Promise<number> {
       const userId = member.user_id as number;
       const bodyId = body.id as number;
       if (await alreadyReminded(userId, 'sortition_reminder', { sortitionBodyId: bodyId })) continue;
+      const proposalId = (body.proposal_id as number) || null;
+      const writesText = !!proposalId && body.purpose === 'text_synthesis';
       await createNotification({
         userId,
         type: 'sortition_reminder',
-        title: 'Deadline Approaching',
-        message: 'Your sortition assignment deadline is approaching. Please complete your evaluation.',
-        sortitionBodyId: body.id as number,
-        proposalId: (body.proposal_id as number) || undefined,
+        title: 'Λήγει η προθεσμία του κληρωτού σώματος',
+        message: writesText
+          ? 'Απομένουν λιγότερες από 24 ώρες για να υποβληθεί το τελικό κείμενο. Αν δεν υποβληθεί, το συνθέτει αυτόματα η πλατφόρμα.'
+          : 'Απομένουν λιγότερες από 24 ώρες για να απαντήσετε στο κληρωτό σώμα.',
+        sortitionBodyId: bodyId,
+        proposalId: proposalId ?? undefined,
         communityId: body.community_id as number,
-        actionUrl: `/sortition/${body.id}`,
+        actionUrl: sortitionActionUrl(bodyId, proposalId, body.purpose),
       });
       reminded++;
     }

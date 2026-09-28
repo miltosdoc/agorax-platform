@@ -368,8 +368,9 @@ export async function triggerSideEffects(
       } catch (err: any) {
         console.warn(`[sortition] failed to close scoring bodies for proposal ${proposal.id}: ${err?.message}`);
       }
-      // Create sortition body for text synthesis
-      await enqueueCreateSortition(proposal.communityId, 12, proposal.id, 'text_synthesis');
+      // Draw the jury; its size, mode and time come from the community's
+      // settings (see handleCreateSortition).
+      await enqueueCreateSortition(proposal.communityId, proposal.id, 'text_synthesis');
       // Pre-fill finalText with the AI merge so the jury has a baseline.
       try {
         const { saveAiMergedFinalText } = await import('./ai-merger');
@@ -378,6 +379,21 @@ export async function triggerSideEffects(
       break;
 
     case 'sortition_synthesis->voting':
+      // The jury's work ends when the vote opens, whether on its text or on
+      // the AI's in its place. Left active, the body would keep its members
+      // out of other draws and send them reminders for a text already in.
+      try {
+        await database()
+          .update(sortitionBodies)
+          .set({ status: 'completed', completedAt: new Date() })
+          .where(and(
+            eq(sortitionBodies.proposalId, proposal.id),
+            eq(sortitionBodies.purpose, 'text_synthesis'),
+            sql`${sortitionBodies.status} IN ('selecting', 'active')`,
+          ));
+      } catch (err: any) {
+        console.warn(`[sortition] failed to close the synthesis jury for proposal ${proposal.id}: ${err?.message}`);
+      }
       await enqueueRecalculateScore(proposal.communityId);
       try {
         const { saveAiMergedFinalText, buildBallotOptions } = await import('./ai-merger');

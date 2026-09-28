@@ -39,6 +39,8 @@ interface ShellParts {
   note?: string;
   /** Optional-mail footer. Absent on security mail. */
   footer?: { settingsUrl: string; unsubscribeUrl: string };
+  /** Footer line for other mail that is always sent; defaults to the security note. */
+  alwaysSentNote?: string;
 }
 
 /**
@@ -75,7 +77,7 @@ const SECURITY_FOOTER: Record<MailLocale, string> = {
 };
 
 function renderHtml(parts: ShellParts): string {
-  const { locale, title, paragraphs, cta, note, footer } = parts;
+  const { locale, title, paragraphs, cta, note, footer, alwaysSentNote } = parts;
   const f = FOOTER_COPY[locale];
 
   const body = paragraphs
@@ -102,7 +104,7 @@ function renderHtml(parts: ShellParts): string {
               &nbsp;·&nbsp;
               <a href="${esc(footer.unsubscribeUrl)}" style="color:${BRAND};">${esc(f.unsubscribe)}</a>
             </p>`
-    : `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${MUTED};">${esc(SECURITY_FOOTER[locale])}</p>`;
+    : `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${MUTED};">${esc(alwaysSentNote ?? SECURITY_FOOTER[locale])}</p>`;
 
   return `<!doctype html>
 <html lang="${locale}">
@@ -139,7 +141,7 @@ function renderHtml(parts: ShellParts): string {
 }
 
 function renderText(parts: ShellParts): string {
-  const { locale, title, paragraphs, cta, note, footer } = parts;
+  const { locale, title, paragraphs, cta, note, footer, alwaysSentNote } = parts;
   const f = FOOTER_COPY[locale];
   const lines: string[] = ['AgoraX', '', title, '='.repeat(Math.min(title.length, 60)), ''];
 
@@ -151,7 +153,7 @@ function renderText(parts: ShellParts): string {
   if (footer) {
     lines.push(f.why, '', `${f.settings}: ${footer.settingsUrl}`, `${f.unsubscribe}: ${footer.unsubscribeUrl}`);
   } else {
-    lines.push(SECURITY_FOOTER[locale]);
+    lines.push(alwaysSentNote ?? SECURITY_FOOTER[locale]);
   }
   lines.push('', f.sig);
   return lines.join('\n');
@@ -449,6 +451,102 @@ export function proposalUpdateEmail(o: OptionalOpts & { updateLine: string }): R
     ],
     cta: { label: 'Δείτε τι άλλαξε', url: o.actionUrl },
     footer,
+  });
+}
+
+// ─── Juror mail — always sent, like security mail ───────────────────────────
+
+const JUROR_FOOTER: Record<MailLocale, string> = {
+  el: 'Αυτό το email το λαμβάνουν όσοι κληρώνονται και δεν απενεργοποιείται από τις ρυθμίσεις ειδοποιήσεων, γιατί η κλήρωση έχει προθεσμία.',
+  en: 'Everyone drawn by lot receives this email. It cannot be switched off in notification settings, because the draw has a deadline.',
+};
+
+function duration(hours: number, locale: MailLocale): string {
+  if (hours % 24 === 0) {
+    const d = hours / 24;
+    return locale === 'en' ? `${d} day${d === 1 ? '' : 's'}` : `${d} ${d === 1 ? 'ημέρα' : 'ημέρες'}`;
+  }
+  return locale === 'en' ? `${hours} hour${hours === 1 ? '' : 's'}` : `${hours} ${hours === 1 ? 'ώρα' : 'ώρες'}`;
+}
+
+/**
+ * A member was drawn for a jury. `writesText` is a jury that writes a
+ * proposal's final text; anything else is a body a community admin drew.
+ */
+export function sortitionAssignedEmail(o: {
+  locale: MailLocale;
+  name: string;
+  writesText: boolean;
+  /** The proposal's question, when the jury writes its final text. */
+  subjectLine?: string;
+  communityName?: string;
+  responseHours: number;
+  actionUrl: string;
+}): RenderedMail {
+  const n = esc(o.name);
+  const s = o.subjectLine ? esc(o.subjectLine) : null;
+  const c = o.communityName ? esc(o.communityName) : null;
+  const time = esc(duration(o.responseHours, o.locale));
+  const alwaysSentNote = JUROR_FOOTER[o.locale];
+
+  if (o.locale === 'en') {
+    if (o.writesText) {
+      return render('You were drawn to write a final text', {
+        locale: o.locale,
+        title: 'You were drawn by lot',
+        paragraphs: [
+          `Hello ${n},`,
+          c
+            ? `In <strong>${c}</strong>, you were drawn for the jury that writes the final text of this proposal:`
+            : 'You were drawn for the jury that writes the final text of this proposal:',
+          ...(s ? [`<strong>${s}</strong>`] : []),
+          'Members strongly backed an amendment the author rejected, so a jury writes the final text. You start from the text the platform has already merged.',
+          `You have <strong>${time}</strong>. As soon as one member of the jury submits the text, the vote opens. If no text is submitted in time, the platform merges it automatically.`,
+        ],
+        cta: { label: 'Open the jury page', url: o.actionUrl },
+        alwaysSentNote,
+      });
+    }
+    return render('You were drawn by lot', {
+      locale: o.locale,
+      title: 'You were drawn by lot',
+      paragraphs: [
+        `Hello ${n},`,
+        c ? `You were drawn for a jury in <strong>${c}</strong>.` : 'You were drawn for a jury in your community.',
+        `You have <strong>${time}</strong> to respond.`,
+      ],
+      cta: { label: 'See the jury', url: o.actionUrl },
+      alwaysSentNote,
+    });
+  }
+
+  if (o.writesText) {
+    return render('Κληρωθήκατε να γράψετε ένα τελικό κείμενο', {
+      locale: o.locale,
+      title: 'Κληρωθήκατε σε κληρωτό σώμα',
+      paragraphs: [
+        `Γεια σας ${n},`,
+        c
+          ? `Στην κοινότητα <strong>${c}</strong> κληρωθήκατε στο σώμα που γράφει το τελικό κείμενο της πρότασης:`
+          : 'Κληρωθήκατε στο σώμα που γράφει το τελικό κείμενο της πρότασης:',
+        ...(s ? [`<strong>${s}</strong>`] : []),
+        'Τα μέλη στήριξαν έντονα μια τροποποίηση που απέρριψε ο συντάκτης, γι\' αυτό το τελικό κείμενο το γράφει κληρωτό σώμα. Ξεκινάτε από το κείμενο που έχει ήδη συνθέσει η πλατφόρμα.',
+        `Έχετε <strong>${time}</strong>. Μόλις ένα μέλος του σώματος υποβάλει το κείμενο, ανοίγει η ψηφοφορία. Αν δεν υποβληθεί κείμενο εγκαίρως, το συνθέτει αυτόματα η πλατφόρμα.`,
+      ],
+      cta: { label: 'Ανοίξτε τη σελίδα του σώματος', url: o.actionUrl },
+      alwaysSentNote,
+    });
+  }
+  return render('Κληρωθήκατε σε κληρωτό σώμα', {
+    locale: o.locale,
+    title: 'Κληρωθήκατε σε κληρωτό σώμα',
+    paragraphs: [
+      `Γεια σας ${n},`,
+      c ? `Κληρωθήκατε σε κληρωτό σώμα της κοινότητας <strong>${c}</strong>.` : 'Κληρωθήκατε σε κληρωτό σώμα της κοινότητάς σας.',
+      `Έχετε <strong>${time}</strong> για να απαντήσετε.`,
+    ],
+    cta: { label: 'Δείτε το σώμα', url: o.actionUrl },
+    alwaysSentNote,
   });
 }
 

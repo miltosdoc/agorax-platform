@@ -1184,15 +1184,16 @@ export function registerProposalsRoutes(app: Express): void {
           current_status: proposal.status,
         });
       }
-      // Synthesis mode: a sortition jury only convenes in communities that
-      // opted into it — everywhere else the AI merge synthesizes and the
-      // vote opens directly. (AI is also the automatic fallback when a jury
-      // cannot form or does not respond; see job-handlers.)
-      if (newState === 'sortition_synthesis') {
-        const community = await communityRepo.getCommunity(proposal.communityId);
-        if ((community as any)?.synthesisMode !== 'sortition') {
-          newState = 'voting';
-        }
+      // Leaving co-drafting for the vote: the rule the deadline job applies
+      // decides whether a jury writes the final text first (the community
+      // chose a jury and members flagged a rejected amendment), so who
+      // presses the button does not change the outcome. Everywhere else the
+      // AI merge synthesizes and the vote opens directly. (AI is also the
+      // automatic fallback when a jury cannot form or does not respond; see
+      // job-handlers.)
+      if (proposal.status === 'community_signal' && (newState === 'voting' || newState === 'sortition_synthesis')) {
+        const { shouldDrawSynthesisJury } = await import('../utils/amendment-processor');
+        newState = (await shouldDrawSynthesisJury(proposal)) ? 'sortition_synthesis' : 'voting';
       }
       // Import state machine
       const { transitionProposal, canTransition, getNextStates, triggerSideEffects } = await import('../utils/proposal-state-machine');

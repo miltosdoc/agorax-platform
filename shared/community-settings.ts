@@ -227,6 +227,23 @@ const DEFAULT_COMMUNITY_SETTINGS = {
 export const DEFAULT_AMENDMENT_INCLUSION_THRESHOLD = Number(DEFAULT_COMMUNITY_SETTINGS.amendmentInclusionThreshold);
 
 /**
+ * The jury a community's settings call for when it writes a final text.
+ * The draw and the charter both read it here, so what members are told is
+ * what the platform does.
+ */
+export function synthesisJuryTerms(c: {
+  sortitionSize?: number | null;
+  sortitionMode?: string | null;
+  sortitionResponseHours?: number | null;
+}): { size: number; mode: CommunitySortitionMode; responseHours: number } {
+  return {
+    size: c.sortitionSize ?? DEFAULT_COMMUNITY_SETTINGS.sortitionSize,
+    mode: c.sortitionMode === 'percentage' ? 'percentage' : 'absolute',
+    responseHours: c.sortitionResponseHours ?? DEFAULT_COMMUNITY_SETTINGS.sortitionResponseHours,
+  };
+}
+
+/**
  * Resolve the duration of a phase the author is allowed to configure.
  *
  * The community owns the range and the fallback; the author's choice only
