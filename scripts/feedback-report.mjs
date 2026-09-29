@@ -523,13 +523,15 @@ for (const e of entries) {
 }
 const shotBytes = Object.values(thumbs).reduce((n, s) => n + s.length, 0);
 
-// Το σήμα του AgoraX. Η σελίδα σερβίρεται από τον δίσκο, έξω από το bundle του
-// Vite, οπότε δεν μπορεί να δείξει το assets/logo.png με τη διεύθυνση που του
-// δίνει το build — μπαίνει σμικρυμένο μέσα στη σελίδα, όπως τα στιγμιότυπα.
-const logo = 'data:image/png;base64,' + (await sharp(path.join(ROOT, 'client', 'src', 'assets', 'logo.png'))
-  .resize({ height: 96, withoutEnlargement: true })
-  .png({ compressionLevel: 9 })
-  .toBuffer()).toString('base64');
+// Το σήμα του AgoraX, ζωγραφισμένο μέσα στη σελίδα από τα ίδια σχήματα που
+// ζωγραφίζει και η εφαρμογή (components/brand/logo-paths.ts): το σήμα και το
+// ΑΓΟΡΑ στην κεφαλίδα, μαζί με τον υπότιτλο και σε ανοιχτά χρώματα στο υποσέλιδο.
+const shapes = fs.readFileSync(path.join(ROOT, 'client', 'src', 'components', 'brand', 'logo-paths.ts'), 'utf8');
+const shape = (name) => shapes.match(new RegExp(`export const ${name} = '([^']+)'`))[1];
+const logoSvg = (height, [a, b, soft], tagline) =>
+  `<svg viewBox="0 0 1000 229.76" height="${height}" width="${Math.round(height * 1000 / 229.76)}" aria-hidden="true">` +
+  `<path d="${shape('MARK')}${shape('LETTERS_A')}" fill="${a}"/>` +
+  `<path d="${shape('LETTERS_B')}${tagline ? shape('TAGLINE') : ''}" fill="${b}" fill-opacity="${soft}"/></svg>`;
 const year = new Date().getFullYear();
 
 // Εβδομαδιαία κατανομή. Η σελίδα ταξινομεί και φιλτράρει χρονικά, οπότε
@@ -652,23 +654,16 @@ h1,h2,h3{font-family:"GFS Didot",Georgia,"Times New Roman",serif; font-weight:40
 .masthead-inner{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:10px 0}
 .brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit; min-width:0}
 .masthead .brand{margin-right:auto}
-.brand img{height:36px; width:auto; flex:0 0 auto}
-.brand-line{display:flex; align-items:baseline; gap:6px; line-height:1}
-.wordmark{font-family:"GFS Didot",Georgia,"Times New Roman",serif; font-size:1.5rem; color:var(--ink)}
+.brand svg{flex:0 0 auto; display:block}
 .beta{
   border:1px solid rgba(11,76,140,.4); background:var(--kyanos-wash); color:var(--kyanos);
   border-radius:2px; padding:2px 4px; font-size:10px; font-weight:600;
   text-transform:uppercase; letter-spacing:.12em; line-height:1;
 }
-.brand-sub{
-  display:block; margin-top:4px; font-size:10px; font-weight:600;
-  text-transform:uppercase; letter-spacing:.14em; color:var(--ink-faint);
-}
 .masthead-nav{display:flex; flex-wrap:wrap; gap:8px 16px; font-size:.82rem}
 .masthead-nav a{color:var(--kyanos); text-decoration:none; font-weight:500}
 .masthead-nav a:hover{text-decoration:underline}
 .masthead-nav a:focus-visible{outline:2px solid var(--kyanos); outline-offset:2px}
-@media (max-width:640px){.brand-sub{display:none}}
 
 header.top{border-bottom:1px solid var(--line); background:var(--surface)}
 .head-inner{display:flex; flex-direction:column; gap:10px; padding:40px 0 30px}
@@ -841,7 +836,6 @@ input[type=search]:focus-visible,select:focus-visible,button:focus-visible{outli
 .colophon{background:#14212E; color:#FAFAF7; border-top:1px solid #9AA096; margin-top:48px}
 .colophon-grid{display:grid; gap:34px; padding:54px 0; grid-template-columns:1fr}
 @media (min-width:760px){.colophon-grid{grid-template-columns:6fr 3fr 3fr; gap:32px}}
-.colophon .wordmark{color:#FAFAF7; font-size:2rem}
 .tagline{margin:16px 0 0; max-width:40ch; font-size:.86rem; line-height:1.65; color:#93A6BA}
 .col-h{margin:0; font-family:Inter,system-ui,sans-serif; font-size:.7rem; font-weight:600;
   text-transform:uppercase; letter-spacing:.14em; color:#93A6BA}
@@ -861,12 +855,9 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 
 <div class="rule" aria-hidden="true"></div>
 <header class="masthead"><div class="wrap masthead-inner">
-  <a class="brand" href="/feed">
-    <img src="${logo}" alt="" width="36" height="36">
-    <span>
-      <span class="brand-line"><span class="wordmark">AgoraX</span><span class="beta">Beta</span></span>
-      <span class="brand-sub">Πλατφόρμα Ψηφιακής Δημοκρατίας</span>
-    </span>
+  <a class="brand" href="/feed" aria-label="AgoraX">
+    ${logoSvg(36, ['#0B4C8C', '#14212E', 1], false)}
+    <span class="beta">Beta</span>
   </a>
   <nav class="masthead-nav">
     <a href="/admin/accounts">Διαχείριση</a>
@@ -922,9 +913,8 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 <footer class="colophon"><div class="wrap">
   <div class="colophon-grid">
     <div>
-      <a class="brand" href="/">
-        <img src="${logo}" alt="" width="36" height="36">
-        <span class="wordmark">AgoraX</span>
+      <a class="brand" href="/" aria-label="AgoraX">
+        ${logoSvg(64, ['#FAFAF7', '#FAFAF7', 0.72], true)}
       </a>
       <p class="tagline">Πλατφόρμα ψηφιακής δημοκρατίας για μια πιο ανοιχτή και συμμετοχική διακυβέρνηση</p>
     </div>

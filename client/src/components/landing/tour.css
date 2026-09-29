@@ -481,7 +481,7 @@
 /* ── the way in ──────────────────────────────────────────── */
 .tour-end { padding: 120px 0 110px; text-align: center; }
 .tour-end .tour-wrap > div { display: flex; flex-direction: column; align-items: center; }
-.tour-end-mark { border-radius: 50%; margin-bottom: 26px; filter: drop-shadow(0 0 24px rgba(var(--gold-rgb), 0.35)); }
+.tour-end-mark { width: auto; height: 84px; margin-bottom: 26px; color: var(--gold); filter: drop-shadow(0 0 24px rgba(var(--gold-rgb), 0.35)); }
 .tour-end h2 { font-size: clamp(2.4rem, 5vw, 4.2rem); }
 .tour-end .tour-lede { margin-left: auto; margin-right: auto; color: var(--moon-mid); }
 .tour-end .tour-actions { justify-content: center; }
@@ -608,7 +608,6 @@
 .tour[data-skin="spray"] .stamp { background: var(--gold); box-shadow: 0 0 22px rgba(198, 255, 0, 0.55); }
 .tour[data-skin="spray"] .tour-stats dd { font-family: var(--display); font-weight: 700; }
 .tour[data-skin="spray"] .kinds-tabs button b, .tour[data-skin="spray"] .tools-list button b { text-transform: uppercase; font-weight: 700; }
-.tour[data-skin="spray"] .tour-end-mark { filter: drop-shadow(0 0 24px rgba(198, 255, 0, 0.35)); }
 .tour[data-skin="spray"] .tour-live { border-top-color: var(--paper-line); }
 /* the paper chapters sit on the app's own dark ground under Spray */
 .tour[data-skin="spray"] .tour-paper { color: var(--moon-soft); }

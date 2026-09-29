@@ -5,6 +5,7 @@ import { previewTheme, useTheme } from "@/hooks/use-theme";
 import { useTranslation } from "@/hooks/use-translation";
 import { api } from "@/lib/api";
 import { ACCENT_THEMES, type AccentTheme } from "@shared/theme";
+import { AgoraLogo } from "@/components/brand/AgoraLogo";
 
 /**
  * The theme gallery: one card per palette, each rendered in its own colours.
@@ -33,7 +34,7 @@ function Miniature() {
     <div className="overflow-hidden rounded-sm border border-line bg-paper text-ink" aria-hidden="true">
       {/* header */}
       <div className="flex items-center gap-3 border-b border-line px-3 py-2">
-        <span className="font-serif text-sm leading-none">AgoraX</span>
+        <AgoraLogo className="h-5 w-auto" />
         <span className="ml-auto flex items-center gap-2.5 text-[10px] text-ink-soft">
           <span>{t('nav.home')}</span>
           <span className="border-b-2 border-kyanos pb-0.5 font-medium text-ink">{t('nav.proposals')}</span>

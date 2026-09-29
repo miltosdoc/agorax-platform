@@ -347,7 +347,7 @@ describe('signed-out pages', () => {
   });
 
   it('the shell carries the wordmark, the Beta badge and the language switcher', () => {
-    expect(shell).toMatch(/logoImage/);
+    expect(shell).toMatch(/<AgoraLogo /);
     expect(shell).toMatch(/data-testid="badge-beta"/);
     expect(shell).toMatch(/<LanguageSwitcher \/>/);
   });

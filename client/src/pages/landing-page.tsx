@@ -28,7 +28,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { previewTheme, useLandingTheme, useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/hooks/use-translation';
 import { proposalEyebrow } from '@/lib/proposal-kind';
-import logoImage from '@/assets/logo.png';
+import { AgoraMark } from '@/components/brand/AgoraLogo';
 import HeroAssembly from '@/components/landing/HeroAssembly';
 import NoiseToOrder from '@/components/landing/NoiseToOrder';
 import VoteKindsDemo from '@/components/landing/VoteKindsDemo';
@@ -236,7 +236,7 @@ export default function LandingPage() {
         <section className="tour-end tour-night" aria-labelledby="t-end-title">
           <div className="tour-wrap">
             <Reveal>
-              <img src={logoImage} alt="" width={76} height={76} className="tour-end-mark" />
+              <AgoraMark tone="current" className="tour-end-mark" />
               <h2 id="t-end-title">
                 {copy.end.title}
                 <br />

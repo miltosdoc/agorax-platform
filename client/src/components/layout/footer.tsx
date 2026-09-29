@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Heart, ArrowRight, Smartphone, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { useToast } from "@/hooks/use-toast";
-import logoImage from "../../assets/logo.png";
+import { AgoraLogo } from "@/components/brand/AgoraLogo";
 import { apiRequest } from "@/lib/queryClient";
 import { downloadApk } from "@/lib/download-apk";
 import { LOCALE_NAMES, SUPPORTED_LOCALES } from "@/lib/i18n-types";
@@ -131,20 +131,21 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 py-14 md:grid-cols-2 lg:grid-cols-12">
           {/* ── Wordmark, tagline, support ── */}
           <div className="lg:col-span-3">
-            <Link href="/" className="inline-flex items-center gap-3" aria-label="AgoraX">
-              <img src={logoImage} alt="" className="h-9 w-auto" />
-              <span className="font-serif text-3xl leading-none text-paper">AgoraX</span>
+            <Link href="/" className="inline-block" aria-label="AgoraX">
+              <AgoraLogo tone="ink" tagline className="h-16 w-auto" />
             </Link>
             <p className="mt-4 max-w-[34ch] text-sm leading-relaxed text-bc-ink-soft">
               {t('footer.tagline')}
             </p>
 
+            {/* The panel is dark in every theme (bc-*), so its text is too:
+                in Spray and Parliament the footer itself turns light. */}
             <div className="mt-6 rounded-sm border border-bc-line bg-bc-panel p-4">
-              <p className="font-serif text-lg leading-tight text-paper">{t('footer.supportTitle')}</p>
+              <p className="font-serif text-lg leading-tight text-bc-ink">{t('footer.supportTitle')}</p>
               <p className="mt-1 text-xs leading-relaxed text-bc-ink-soft">{t('footer.supportBody')}</p>
               <Link
                 href="/support"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-sm border border-bc-line px-3 py-2 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-sm border border-bc-line px-3 py-2 text-sm font-medium text-bc-ink transition-colors duration-[120ms] hover:bg-bc-line"
                 data-testid="link-donate"
               >
                 <Heart className="h-4 w-4" />

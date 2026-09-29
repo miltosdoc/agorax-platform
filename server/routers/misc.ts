@@ -205,14 +205,11 @@ export function registerMiscRoutes(app: Express): void {
       // Clean white background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
-      // Load and draw logo (centered)
+      // Draw the share card (already 1200x630: the logo centred on paper)
       try {
         const logoPath = path.resolve(process.cwd(), 'client/public/logo-share.png');
         const logo = await loadImage(logoPath);
-        const logoSize = 200;
-        const logoX = (width - logoSize) / 2;
-        const logoY = (height - logoSize) / 2;
-        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        ctx.drawImage(logo, 0, 0, width, height);
       } catch (err) {
         // If logo fails to load, show AgoraX text instead
         ctx.fillStyle = '#1e293b';

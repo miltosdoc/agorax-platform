@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 import { reducedMotion } from '@/components/landing/scroll';
+import { AgoraLogo } from '@/components/brand/AgoraLogo';
 import type { Samples, StepId } from './guide-copy';
 
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -46,7 +47,7 @@ const CARD = 'rounded-sm border border-line bg-surface';
 function AppBar({ t }: { t: T }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2.5">
-      <span className="font-serif text-base text-ink">AgoraX</span>
+      <AgoraLogo className="h-6 w-auto" />
       <span className="hidden gap-4 text-xs text-ink-soft sm:flex">
         <span>{t('nav.communities')}</span>
         <span>{t('nav.proposals')}</span>

@@ -21,7 +21,7 @@ import type { ReactNode } from 'react';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { useTranslation } from '@/hooks/use-translation';
 import { EYEBROW } from './auth-styles';
-import logoImage from '../../assets/logo.png';
+import { AgoraLogo } from '@/components/brand/AgoraLogo';
 
 interface AuthShellProps {
   title: string;
@@ -37,16 +37,13 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
     <div className="flex min-h-screen flex-col bg-paper text-ink">
       <header className="border-b border-line bg-paper">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <a href="/" className="flex items-center gap-3">
-            <img src={logoImage} alt="AgoraX" className="h-9 w-auto" />
-            <span className="flex items-baseline gap-1.5 leading-none">
-              <span className="font-serif text-xl font-normal text-ink">AgoraX</span>
-              <span
-                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos"
-                data-testid="badge-beta"
-              >
-                Beta
-              </span>
+          <a href="/" className="flex items-center gap-2" aria-label="AgoraX">
+            <AgoraLogo className="h-9 w-auto" />
+            <span
+              className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos"
+              data-testid="badge-beta"
+            >
+              Beta
             </span>
           </a>
           <LanguageSwitcher />

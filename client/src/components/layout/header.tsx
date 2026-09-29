@@ -20,7 +20,7 @@ import {
   Settings, HelpCircle, PlusCircle, Plus,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
-import logoImage from "../../assets/logo.png";
+import { AgoraLogo } from "@/components/brand/AgoraLogo";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 
@@ -124,24 +124,19 @@ export default function Header() {
         {/* ── Wordmark ── */}
         <Link
           href={user ? "/feed" : "/"}
-          className="flex min-w-0 flex-1 items-center gap-2.5 lg:w-[220px] lg:flex-none xl:w-[260px]"
+          className="flex min-w-0 flex-1 items-center gap-2 lg:w-[220px] lg:flex-none xl:w-[260px]"
           data-testid="logo-link"
         >
-          <img src={logoImage} alt="" className="h-8 w-auto flex-shrink-0 sm:h-9" />
-          <span className="min-w-0">
-            <span className="flex items-baseline gap-1.5 leading-none">
-              <span className="font-serif text-lg leading-none text-ink sm:text-2xl">AgoraX</span>
-              {/* The platform is not finished and should never pretend to be:
-                  votes are advisory (Terms §7) and the rules still move. */}
-              <span
-                className="rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-0.5 font-sans text-[9px] font-semibold uppercase leading-none tracking-[0.12em] text-kyanos"
-                data-testid="badge-beta"
-              >
-                Beta
-              </span>
-            </span>
-            <span className="mt-1 hidden font-sans text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-ink-faint sm:block">
-              {t('general.digitalDemocracy')}
+          <span className="relative flex-shrink-0">
+            <AgoraLogo title="AgoraX" className="h-7 w-auto sm:h-9" />
+            {/* The platform is not finished and should never pretend to be:
+                votes are advisory (Terms §7) and the rules still move. It
+                hangs under the letters, where the full logo has its tagline. */}
+            <span
+              className="absolute -bottom-2 right-0 rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-px font-sans text-[8px] font-semibold uppercase leading-none tracking-[0.14em] text-kyanos"
+              data-testid="badge-beta"
+            >
+              Beta
             </span>
           </span>
         </Link>
