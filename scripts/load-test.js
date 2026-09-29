@@ -59,7 +59,7 @@ function makeRequest() {
 }
 
 async function runLoadTest() {
-  console.log('🚀 AgoraX Load Test');
+  console.log('🚀 Agora Load Test');
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`Duration: ${DURATION}s`);
   console.log(`Users: ${USERS}`);

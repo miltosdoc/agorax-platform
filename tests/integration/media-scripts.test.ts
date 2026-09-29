@@ -67,12 +67,12 @@ describe('podcastScript — structure', () => {
     const orphan = { ...baseCtx, communityName: null };
     const text = podcastScript(orphan);
     expect(text).not.toContain('«null»');
-    expect(text).toContain('Καλώς ήρθατε στο AgoraX');
+    expect(text).toContain('Καλώς ήρθατε στην Αγορά');
   });
 
   it('closes with a call to read & vote', () => {
     const text = podcastScript(baseCtx);
-    expect(text).toMatch(/AgoraX/);
+    expect(text).toMatch(/Αγορά/);
     expect(text).toMatch(/ψηφίστε/);
   });
 });
@@ -140,9 +140,9 @@ describe('teaserScript — structure', () => {
     expect(text).toMatch(/η συζήτηση είναι ανοιχτή/);
   });
 
-  it('ends with the AgoraX call to action', () => {
+  it('ends with the Agora call to action', () => {
     const text = teaserScript(baseCtx);
-    expect(text).toMatch(/AgoraX/);
+    expect(text).toMatch(/Αγορά/);
     expect(text).toMatch(/ψηφίστε/);
   });
 });

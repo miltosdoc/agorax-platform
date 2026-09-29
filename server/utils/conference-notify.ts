@@ -154,7 +154,7 @@ export function buildIcs(input: IcsInput): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//AgoraX//Conference//EN',
+    'PRODID:-//Agora//Conference//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',

@@ -111,7 +111,7 @@ export default function AuthPage() {
       {/* ————— Slim masthead strip: wordmark + language toggle ————— */}
       <header className="border-b border-line bg-paper">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <a href="/" className="flex items-center gap-2" aria-label="AgoraX">
+          <a href="/" className="flex items-center gap-2" aria-label={t('brand.name')}>
             <AgoraLogo className="h-9 w-auto" />
             {/* Shown before sign-up too: people deciding whether to join
                 should know the platform is still under construction. */}
@@ -136,7 +136,7 @@ export default function AuthPage() {
         <aside className="border-b border-line-strong bg-ink text-paper lg:order-2 lg:border-b-0 lg:border-l lg:border-l-line-strong">
           <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center px-4 py-8 sm:px-6 lg:px-12 lg:py-16">
             <p className="text-xs uppercase tracking-[0.14em] font-semibold text-bc-ink-soft">
-              AgoraX
+              {t('brand.name')}
             </p>
             <h1 className="mt-3 max-w-[22ch] text-balance font-serif text-2xl font-normal leading-tight text-paper sm:text-3xl lg:mt-5 lg:text-4xl">
               {t('auth.heroTitle')}

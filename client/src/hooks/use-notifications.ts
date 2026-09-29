@@ -16,8 +16,8 @@ async function fireLocalNotification(title: string, body: string): Promise<void>
       try {
         await plugin.createChannel({
           id: ANDROID_CHANNEL_ID,
-          name: 'AgoraX',
-          description: 'AgoraX notifications',
+          name: 'Agora',
+          description: 'Agora notifications',
           importance: 5,
           visibility: 1,
           vibration: true,

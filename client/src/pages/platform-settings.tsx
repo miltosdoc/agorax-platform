@@ -34,7 +34,7 @@ const SETTINGS_GROUPS: SettingGroupDef[] = [
   {
     title: "platformSettings.general",
     settings: [
-      { key: "platform_name", label: "platformSettings.platformName", type: "text", default: "AgoraX" },
+      { key: "platform_name", label: "platformSettings.platformName", type: "text", default: "Agora" },
       { key: "platform_description", label: "platformSettings.platformDescription", type: "textarea", default: "" },
       { key: "default_community_type", label: "platformSettings.defaultCommunityType", type: "select", options: ["autonomous", "managed"], default: "autonomous" },
       { key: "default_language", label: "platformSettings.defaultLanguage", type: "select", options: ["en", "el"], default: "el" },

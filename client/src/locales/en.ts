@@ -1,5 +1,5 @@
 /**
- * English (en) translations for AgoraX
+ * English (en) translations for Agora
  */
 import type { TranslationDictionary } from '../lib/i18n-types';
 
@@ -15,12 +15,12 @@ const en: TranslationDictionary = {
 
   // Democracy Points
   'points.title': 'Democracy Points',
-  'points.subtitle': 'Your record of civic contribution to AgoraX.',
+  'points.subtitle': 'Your record of civic contribution to Agora.',
   'points.balance': 'Current balance',
   'points.lifetime': 'Lifetime earned',
   'points.honestTitle': 'What Democracy Points are',
   'points.honestBody': 'Democracy Points record the civic work you put into collective decisions — the modern form of ο μισθός εκκλησιαστικός, the pay Athenian citizens received for taking part in the assembly. They are not a token or a cryptocurrency, and they cannot be bought or traded.',
-  'points.honestRedemption': 'Points have no monetary value yet. Redemption opens only once AgoraX has real revenue to back it; until then your balance is a transparent, permanent record of your contribution.',
+  'points.honestRedemption': 'Points have no monetary value yet. Redemption opens only once Agora has real revenue to back it; until then your balance is a transparent, permanent record of your contribution.',
   'points.scheduleTitle': 'How points are earned',
   'points.scheduleHint': 'A fixed, public schedule. Points reward the act of well-formed participation, never the outcome of a vote.',
   'points.cap': 'Up to {max} per {days} days',
@@ -32,7 +32,7 @@ const en: TranslationDictionary = {
   'points.historyTitle': 'Your contribution history',
   'points.historyEmpty': 'You have not earned any Democracy Points yet. Take part in a proposal, a vote or a sortition jury to start.',
   'points.redeemTitle': 'Redeem points',
-  'points.redeemClosed': 'Redemption is not open yet. It opens once AgoraX has real revenue to back a payout — until then your points remain a transparent record of contribution.',
+  'points.redeemClosed': 'Redemption is not open yet. It opens once Agora has real revenue to back a payout — until then your points remain a transparent record of contribution.',
   'points.redeemVerify': 'Redeeming points requires an identity-verified account.',
   'points.redeemAmount': 'Points to redeem',
   'points.redeemSubmit': 'Request redemption',
@@ -113,7 +113,7 @@ const en: TranslationDictionary = {
 
   // ─── Email notification settings ──────────────────────────────────────────
   'emailPrefs.title': 'Notification settings',
-  'emailPrefs.intro': 'Choose which optional emails AgoraX may send you. In-app notifications are unaffected.',
+  'emailPrefs.intro': 'Choose which optional emails Agora may send you. In-app notifications are unaffected.',
   'emailPrefs.masterTitle': 'Optional email',
   'emailPrefs.masterHint': 'The master switch. While it is off no optional email is sent at all, whatever the individual categories say.',
   'emailPrefs.masterLabel': 'Send me optional email',
@@ -139,7 +139,7 @@ const en: TranslationDictionary = {
   'unsubscribe.title': 'Stop optional email',
   'unsubscribe.checking': 'Checking the link…',
   'unsubscribe.invalid': 'This link is not valid or has been replaced. You can change your preferences in notification settings.',
-  'unsubscribe.confirmBody': 'This stops all optional email from AgoraX. In-app notifications carry on as normal.',
+  'unsubscribe.confirmBody': 'This stops all optional email from Agora. In-app notifications carry on as normal.',
   'unsubscribe.securityNote': 'Security email (password reset, password-changed confirmation) will still be sent.',
   'unsubscribe.confirm': 'Stop all optional email',
   'unsubscribe.done': 'Done — you will not receive any more optional email.',
@@ -150,7 +150,7 @@ const en: TranslationDictionary = {
   'verifyEmail.checking': 'Confirming…',
   'verifyEmail.done': 'Your address is confirmed. Thank you.',
   'verifyEmail.invalid': 'This link is not valid, has expired, or the address on the account changed after it was sent. Request a new one.',
-  'verifyEmail.continue': 'Continue to AgoraX',
+  'verifyEmail.continue': 'Continue to Agora',
   'verifyEmail.requestNew': 'Request a new link',
   'verifyEmail.statusTitle': 'Email address',
   'verifyEmail.statusVerified': 'Your address is confirmed.',
@@ -185,7 +185,7 @@ const en: TranslationDictionary = {
   'auth.loginSuccess': 'Login successful',
   'auth.registerSuccess': 'Registration successful',
   'auth.heroTitle': 'Welcome to the co-drafting and participatory governance platform',
-  'auth.heroSubtitle': 'AgoraX is a platform where you create communities and decide together: take an issue through co-drafting or straight to a vote, and measure what members think through anonymous polls.',
+  'auth.heroSubtitle': 'Agora is a platform where you create communities and decide together: take an issue through co-drafting or straight to a vote, and measure what members think through anonymous polls.',
   'auth.heroFeature1Title': 'Submit proposals',
   'auth.heroFeature1Desc': 'Propose ideas and solutions — the community evaluates and improves them',
   'auth.heroFeature2Title': 'Co-draft with the community',
@@ -362,7 +362,7 @@ const en: TranslationDictionary = {
   // Ballot
 
   // App
-  'app.title': 'AgoraX - Digital Democracy Platform',
+  'app.title': 'Agora - Digital Democracy Platform',
   'app.description': 'Digital platform for a more open and participatory governance.',
 
   // Not Found
@@ -373,6 +373,7 @@ const en: TranslationDictionary = {
   'common.cancel': 'Cancel',
   'common.back': 'Back',
   'common.close': 'Close',
+  'brand.name': 'Agora',
   'common.loading': 'Loading...',
   'common.from': 'From',
   'common.by': 'by',
@@ -627,9 +628,9 @@ const en: TranslationDictionary = {
   'walkthrough.summary_ratify': 'Community approves or rejects',
   'walkthrough.step7_name': 'Decided',
 'walkthrough.hiw_hero_title': 'The Co-drafting Process',
-  'walkthrough.hiw_hero_subtitle': 'On AgoraX you create communities and decide together. Each community sets its own rules and takes its issues either through co-drafting — where the proposal is improved before it is voted on — or straight to a vote. The aim: turn spontaneous participation into a documented, transparent decision.',
+  'walkthrough.hiw_hero_subtitle': 'On Agora you create communities and decide together. Each community sets its own rules and takes its issues either through co-drafting — where the proposal is improved before it is voted on — or straight to a vote. The aim: turn spontaneous participation into a documented, transparent decision.',
   'walkthrough.hiw_phase_label': 'PHASE',
-  'walkthrough.hiw_different_title': 'What Makes AgoraX Different',
+  'walkthrough.hiw_different_title': 'What Makes Agora Different',
   'walkthrough.hiw_innovation1_title': 'Co-drafting, Not Just Voting',
   'walkthrough.hiw_innovation1_desc': 'A vote can go through co-drafting first: members suggest improvements and counter-proposals, so the final text ends up better than the original idea. When that is not needed, it goes straight to a vote.',
   'walkthrough.hiw_innovation2_title': 'Counter-Proposals Are Not Buried',
@@ -713,7 +714,7 @@ const en: TranslationDictionary = {
   'walkthrough.verified_ballot': 'Verified Ballot',
   'walkthrough.identity_flow': 'Identity Verification Flow',
   'walkthrough.pdf_upload': 'Upload Signed PDF',
-  'walkthrough.pdf_upload_desc': 'The signed PDF is uploaded to AgoraX for verification',
+  'walkthrough.pdf_upload_desc': 'The signed PDF is uploaded to Agora for verification',
   'walkthrough.four_gate_validation': '4-Gate PDF Validation',
   'walkthrough.four_gate_desc': 'Signature → Signer → Token → Content — all must pass',
   'walkthrough.security_afm': 'AFM-based identity binding',
@@ -856,10 +857,10 @@ const en: TranslationDictionary = {
 
   // Landing page
   'landing.heroTitle': 'Decisions made together — by co-drafting, not noise.',
-  'landing.heroSubtitle': 'AgoraX is a platform where you create communities and decide together: each community brings its issues to co-drafting or straight to a vote, and measures what its members think through anonymous polls.',
+  'landing.heroSubtitle': 'Agora is a platform where you create communities and decide together: each community brings its issues to co-drafting or straight to a vote, and measures what its members think through anonymous polls.',
   'landing.getStarted': 'Get started',
   'landing.signIn': 'Sign in',
-  'landing.featuresTitle': 'How AgoraX works',
+  'landing.featuresTitle': 'How Agora works',
   'landing.liveNow': 'Live now',
   'landing.liveNowMore': 'All proposals',
   'landing.stamp': 'Shape the future',
@@ -907,7 +908,7 @@ const en: TranslationDictionary = {
   'vote.quorumShort': 'Quorum',
   'vote.panelTitle': 'Final Ratification Vote',
   'vote.ballotPendingTitle': 'Your ballot is sealed — casting in a moment',
-  'vote.ballotPendingBody': 'Your vote is cast automatically within the next 2–3 minutes, at a random moment, so it cannot be tied to your session. Stay on AgoraX until the receipt appears. If you leave earlier, the ballot stays on this device and is cast the next time you open the app, as long as the vote is still open.',
+  'vote.ballotPendingBody': 'Your vote is cast automatically within the next 2–3 minutes, at a random moment, so it cannot be tied to your session. Stay on Agora until the receipt appears. If you leave earlier, the ballot stays on this device and is cast the next time you open the app, as long as the vote is still open.',
   'vote.ballotCasting': 'Casting your ballot…',
   'vote.castYourVote': 'Cast your vote on this proposal:',
   'vote.changeYourVote': 'Update your vote:',
@@ -1044,12 +1045,12 @@ const en: TranslationDictionary = {
   'hiw.polls_subtitle': 'An open public-opinion measurement tool, built on the same anonymity infrastructure as voting.',
   'hiw.polls_cta': 'See the polls',
   'hiw.app_title': 'Get the Android app',
-  'hiw.app_subtitle': 'AgoraX is also an Android app — same account and communities, with the native share sheet and notifications.',
+  'hiw.app_subtitle': 'Agora is also an Android app — same account and communities, with the native share sheet and notifications.',
   'hiw.app_step1': 'Sign in at agoraxdemocracy.com in your phone browser and download the APK from your Profile page (or the account menu, top right).',
   'hiw.app_step2': 'Open the downloaded file — its name looks like agorax-v0.8.0-mobile.apk.',
   'hiw.app_step3': 'Android will warn you because the app does not come from the Play Store. That is expected — tap “Install anyway”. If your browser is not yet allowed to install apps, Android will take you to Settings → Install unknown apps: allow it and go back.',
-  'hiw.app_step4': 'Open AgoraX and sign in. Signing in with Google opens your browser briefly and returns you to the app automatically.',
-  'hiw.app_note': 'The warning is standard for every app distributed outside the Play Store — the AgoraX app is built openly from the public source code on GitHub.',
+  'hiw.app_step4': 'Open Agora and sign in. Signing in with Google opens your browser briefly and returns you to the app automatically.',
+  'hiw.app_note': 'The warning is standard for every app distributed outside the Play Store — the Agora app is built openly from the public source code on GitHub.',
   // ── Communities: creating one, and the two kinds ──────────────────────────
   // Everything described here is enforced by code. The "governance model"
   // field (no_admin / admin_team / hybrid) is read by no access check — what
@@ -1141,13 +1142,13 @@ const en: TranslationDictionary = {
   'hiw.communities_settings_note': 'In an autonomous community most of these are open questions put to the members: you see them, you see how everyone else voted, and you vote, on the community settings page.',
 
   'hiw.engagement_title': 'Engagement tools',
-  'hiw.engagement_subtitle': 'Beyond the proposal lifecycle, AgoraX offers four surfaces that make co-drafting feel alive — all built on the same community and sortition-body data.',
+  'hiw.engagement_subtitle': 'Beyond the proposal lifecycle, Agora offers four surfaces that make co-drafting feel alive — all built on the same community and sortition-body data.',
   'hiw.engagement_conferences_title': 'Real-time meetings',
   'hiw.engagement_conferences_desc': 'Community conferences (admin-scheduled) and private co-drafting rooms for sortition bodies. Self-hosted LiveKit, automatic notification to all members, one-click calendar link (.ics), host-only End-call, and a recent-calls history with duration and participants.',
   'hiw.engagement_media_title': 'Media production',
   'hiw.engagement_media_desc': "Every proposal page ships a Media Studio that writes Greek scripts for a podcast and a short video automatically from the community's data. You produce the audio/video externally and upload it back. The author picks one as 'Featured' — that's the one that lands in the Feed with a shareable social-card preview.",
   'hiw.engagement_feed_title': 'Platform feed',
-  'hiw.engagement_feed_desc': "A single page with the most recent featured podcasts and videos from every proposal in co-drafting. Discover what AgoraX is debating right now, play inline, jump to the full proposal to participate.",
+  'hiw.engagement_feed_desc': "A single page with the most recent featured podcasts and videos from every proposal in co-drafting. Discover what Agora is debating right now, play inline, jump to the full proposal to participate.",
   'hiw.engagement_notifications_title': 'On-device notifications',
   'hiw.engagement_notifications_desc': 'In-app bell plus optional Web Push to phone or laptop for: sortition room opens, community conferences scheduled, and proposal-lifecycle milestones. Push payloads are end-to-end encrypted.',
 
@@ -1515,7 +1516,7 @@ const en: TranslationDictionary = {
   'nav.feed': 'Feed',
   'media.tabLabel': 'Media',
   'media.studio': 'Media Studio',
-  'media.studioDescription': 'Produce a podcast and a short video for the proposal. AgoraX writes the script; you generate the media with NotebookLM (or any tool of your choice) and upload it back here. The featured podcast/video appears in the platform feed and is shareable to social.',
+  'media.studioDescription': 'Produce a podcast and a short video for the proposal. Agora writes the script; you generate the media with NotebookLM (or any tool of your choice) and upload it back here. The featured podcast/video appears in the platform feed and is shareable to social.',
   'media.podcastTitle': 'Podcast (MP3)',
   'media.podcastDescription': 'Produce a 3–5 minute podcast for this proposal.',
   'media.podcastScriptHint': 'Paste this script into NotebookLM (Audio Overview) or another TTS tool to generate the audio. Then upload the MP3 here.',
@@ -1586,7 +1587,7 @@ const en: TranslationDictionary = {
   'media.fileMissingHint': 'The file could not be found on the server (likely lost after a server restart). Delete this entry and re-upload the file.',
   'media.overviewHeading': 'Podcast & video',
 
-  'feed.title': 'AgoraX Feed',
+  'feed.title': 'Agora Feed',
   'feed.subtitle': 'Short podcasts and videos from proposals in co-drafting. Pick one to read, discuss, and vote.',
   'feed.filterAll': 'All',
   'feed.filterProposals': 'Votes',
@@ -1764,13 +1765,13 @@ const en: TranslationDictionary = {
   'conference.device_error': 'Camera/microphone problem',
 
   'push.title': 'Device notifications',
-  'push.description': "Get notified when a conference is scheduled or a sortition co-drafting room opens — even when AgoraX isn't open.",
+  'push.description': "Get notified when a conference is scheduled or a sortition co-drafting room opens — even when Agora isn't open.",
   'push.enable': 'Enable notifications',
   'push.disable': 'Disable notifications',
   'push.deniedHint': "You've blocked notifications in your browser. Open the site permissions to re-enable.",
 
   'android.downloadTitle': 'Android App',
-  'android.downloadDescription': 'Install the AgoraX Android app to participate on the go.',
+  'android.downloadDescription': 'Install the Agora Android app to participate on the go.',
   'android.downloadButton': 'Download APK',
   'android.downloadMenuLabel': 'Download Android App',
   'android.notAvailable': 'The Android APK is not yet available. Check back soon.',
@@ -1783,7 +1784,7 @@ const en: TranslationDictionary = {
   'activity.addedMedia': '{name} added "{title}" to the library.',
   'activity.decided': 'The proposal "{title}" was decided with {count} votes.',
 
-  'support.intro': 'AgoraX is open source and does not sell its members\u2019 data. There are four ways to support it — only one of them costs money.',
+  'support.intro': 'Agora is open source and does not sell its members\u2019 data. There are four ways to support it — only one of them costs money.',
   'support.donateTitle': 'Financial support',
   'support.donateBody': 'The one channel that actually exists is GitHub Sponsors. The platform takes no payments itself and stores no card details.',
   'support.donateCta': 'Open GitHub Sponsors',
@@ -1793,10 +1794,10 @@ const en: TranslationDictionary = {
   'support.codeBody': 'The code is public. Bug reports, translations and pull requests are all welcome.',
   'support.feedbackTitle': 'Feedback',
   'support.feedbackBody': 'Tell us what does not work. Member reports decide what gets built next.',
-  'support.disclosure': 'AgoraX does not process payments. The link above goes to GitHub, which has its own terms and privacy policy.',
+  'support.disclosure': 'Agora does not process payments. The link above goes to GitHub, which has its own terms and privacy policy.',
 
   'newsletter.confirmedTitle': 'Subscription confirmed',
-  'newsletter.confirmedBody': 'You will receive the AgoraX newsletter. Every issue carries an unsubscribe link.',
+  'newsletter.confirmedBody': 'You will receive the Agora newsletter. Every issue carries an unsubscribe link.',
   'newsletter.failedTitle': 'That link is not valid',
   'newsletter.failedBody': 'The confirmation link has already been used or is not valid. Try subscribing again from the footer.',
 
@@ -1897,13 +1898,13 @@ const en: TranslationDictionary = {
   'footer.reportProblem': 'Report a problem',
   'footer.improvements': 'Suggest improvements',
   'footer.newsletterTitle': "DON'T MISS WHAT'S HAPPENING",
-  'footer.newsletterBody': 'Subscribe to the AgoraX newsletter',
+  'footer.newsletterBody': 'Subscribe to the Agora newsletter',
   'footer.newsletterPlaceholder': 'email@example.com',
   'footer.newsletterSubmit': 'Subscribe',
   'footer.newsletterThanks': 'Check your email to confirm the subscription.',
   'footer.newsletterInvalid': 'Enter a valid email address.',
   'footer.newsletterFailed': 'Subscription failed. Please try again.',
-  'footer.supportTitle': 'Support AgoraX',
+  'footer.supportTitle': 'Support Agora',
   'footer.supportBody': 'Everyone taking part is what makes democracy real.',
   'footer.donate': 'Make a donation',
   'footer.madeWith': 'DESIGNED WITH ♡ FOR DEMOCRACY',
@@ -1914,7 +1915,7 @@ const en: TranslationDictionary = {
   'rail.popularProposals': 'Popular Proposals',
   'rail.achievements': 'Democracy Achievements',
   'rail.meetings': 'Community Meetings',
-  'rail.agoraFeed': 'AgoraX Feed',
+  'rail.agoraFeed': 'Agora Feed',
   'rail.activityFeed': 'Activity feed',
   'rail.documents': 'Documents & resources',
   'rail.tags': 'Tags',

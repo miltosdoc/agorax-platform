@@ -64,14 +64,14 @@ const el: TourCopy = {
   auto: { playing: 'Παίζει μόνο του · παύση', play: 'Αυτόματη προβολή' },
   stats: ['μέλη', 'κοινότητες', 'ψηφοφορίες', 'αποφάσεις'],
   hero: {
-    eyebrow: 'AgoraX · μια σύντομη περιήγηση',
+    eyebrow: 'Αγορά · μια σύντομη περιήγηση',
     title: ['Συζητάμε.', 'Ψηφίζουμε.', 'Αποφασίζουμε.'],
-    lede: 'Η AgoraX είναι ο τόπος όπου ένας σύλλογος, μια γειτονιά ή μια ομάδα συζητά, ψηφίζει και αποφασίζει. Forum, ψηφοφορίες, δημοσκοπήσεις, βιβλιοθήκη, βίντεο και podcast, όλα σε ένα μέρος, με μια κάλπη που μπορεί να ελέγξει ο καθένας.',
+    lede: 'Η Αγορά είναι ο τόπος όπου ένας σύλλογος, μια γειτονιά ή μια ομάδα συζητά, ψηφίζει και αποφασίζει. Forum, ψηφοφορίες, δημοσκοπήσεις, βιβλιοθήκη, βίντεο και podcast, όλα σε ένα μέρος, με μια κάλπη που μπορεί να ελέγξει ο καθένας.',
     tour: 'Ξεκινήστε την περιήγηση',
     register: 'Εγγραφή',
     signIn: 'Σύνδεση',
     stamp: 'Διαμόρφωσε το μέλλον',
-    caption: (n) => `Κάθε τελεία είναι ένα μέλος της AgoraX: ${n} σήμερα.`,
+    caption: (n) => `Κάθε τελεία είναι ένα μέλος της Αγοράς: ${n} σήμερα.`,
     scroll: 'κύλιση',
   },
   noise: {
@@ -88,7 +88,7 @@ const el: TourCopy = {
         body: 'Σχόλια, likes, θυμωμένα κεφαλαία, μηνύματα που χάνονται σε δέκα ομάδες. Ακούγεται όποιος φωνάζει πιο δυνατά, και στο τέλος δεν αποφασίζεται τίποτα.',
       },
       {
-        title: 'Η AgoraX βάζει',
+        title: 'Η Αγορά βάζει',
         titleEm: 'τάξη.',
         body: 'Η συζήτηση γίνεται σε ένα μέρος, καταλήγει σε ψηφοφορία, και η απόφαση μένει γραμμένη στο Σύνταγμα της κοινότητας, για όποιον τη χρειαστεί.',
       },
@@ -151,17 +151,18 @@ const el: TourCopy = {
     eyebrow: '03 · Η κοινότητα',
     title: 'Όλα όσα χρειάζεται',
     titleEm: 'μια κοινότητα.',
-    lede: 'Κάθε κοινότητα στην AgoraX έχει το δικό της forum, ψηφοφορίες, βιβλιοθήκη, βιντεοκλήσεις και Σύνταγμα. Δημόσια ή μόνο για τα μέλη: το αποφασίζει η ίδια.',
+    lede: 'Κάθε κοινότητα στην Αγορά έχει το δικό της forum, ψηφοφορίες, βιβλιοθήκη, βιντεοκλήσεις και Σύνταγμα. Δημόσια ή μόνο για τα μέλη: το αποφασίζει η ίδια.',
     tools: {
       forum: { t: 'Forum', d: 'Θέματα, απαντήσεις και «Χρήσιμο» για τις καλές ιδέες. Όταν μια συζήτηση ωριμάσει, με ένα κουμπί γίνεται ψηφοφορία: η ΤΝ διαβάζει όλο το νήμα και γράφει την πρόταση.' },
       library: { t: 'Βιβλιοθήκη', d: 'Ήχος, βίντεο, έγγραφα και κάρτες Anki για τα μέλη, με τα σημαντικά καρφιτσωμένα στην κορυφή. Μένουν μέσα στην κοινότητα, όχι στη γενική ροή.' },
-      media: { t: 'Podcast & βίντεο', d: 'Για κάθε ψηφοφορία η AgoraX γράφει σενάριο για podcast 3–5 λεπτών και βίντεο 45 δευτερολέπτων. Το φτιάχνετε με το NotebookLM ή όποιο εργαλείο θέλετε, το ανεβάζετε, και φαίνεται στη ροή και στα social.' },
+      media: { t: 'Podcast & βίντεο', d: 'Για κάθε ψηφοφορία η Αγορά γράφει σενάριο για podcast 3–5 λεπτών και βίντεο 45 δευτερολέπτων. Το φτιάχνετε με το NotebookLM ή όποιο εργαλείο θέλετε, το ανεβάζετε, και φαίνεται στη ροή και στα social.' },
       meetings: { t: 'Βιντεοκλήσεις', d: 'Συναντήσεις της κοινότητας στους δικούς μας διακομιστές, με σειρά ομιλητών, πρόσκληση στο ημερολόγιο και ειδοποίηση σε όλα τα μέλη.' },
       polls: { t: 'Δημοσκοπήσεις', d: 'Γράφετε τι θέλετε να μάθετε και η ΤΝ φτιάχνει ουδέτερο ερωτηματολόγιο, που το ελέγχει ένας δεύτερος έλεγχος για καθοδηγητικές ερωτήσεις. Απαντά ανώνυμο πάνελ, και κάθε αποτέλεσμα έχει σελίδα μεθοδολογίας.' },
     },
     community: 'Κοινότητα «Η γειτονιά μας»',
     members: '48 μέλη · αυτόνομη',
     tabs: ['Forum', 'Ψηφοφορίες', 'Σύνταγμα', 'Βιβλιοθήκη', 'Μέλη'],
+    platform: 'Αγορά',
     platformTabs: ['Podcasts', 'Βίντεο', 'Δημοσκοπήσεις'],
     forum: {
       topics: [
@@ -187,7 +188,7 @@ const el: TourCopy = {
       ready: 'έτοιμο',
       podcast: 'Podcast: «30 δέντρα για την πλατεία»',
       teaser: 'Βίντεο 45 δευτερολέπτων για τα social',
-      featured: 'Προτεινόμενο: φαίνεται στη ροή της AgoraX',
+      featured: 'Προτεινόμενο: φαίνεται στη ροή της Αγοράς',
       share: 'Facebook, X, WhatsApp, Viber',
     },
     meetings: {
@@ -336,7 +337,7 @@ const el: TourCopy = {
     fine: 'Τεχνικά: κάθε αποτύπωμα είναι SHA-256, υπολογισμένο εδώ με την ίδια συνταγή που χρησιμοποιεί ο διακομιστής. Η σφραγίδα στο Bitcoin γίνεται μέσω OpenTimestamps.',
   },
   live: {
-    eyebrow: '07 · Σήμερα στην AgoraX',
+    eyebrow: '07 · Σήμερα στην Αγορά',
     title: 'Αληθινές κοινότητες,',
     titleEm: 'αληθινές αποφάσεις.',
     lede: 'Οι πιο πρόσφατες δημόσιες ψηφοφορίες, όπως είναι αυτή τη στιγμή.',
@@ -360,14 +361,14 @@ const en: TourCopy = {
   auto: { playing: 'Playing by itself · pause', play: 'Play the demo' },
   stats: ['members', 'communities', 'votes', 'decisions'],
   hero: {
-    eyebrow: 'AgoraX · a short tour',
+    eyebrow: 'Agora · a short tour',
     title: ['Discuss.', 'Vote.', 'Decide.'],
-    lede: 'AgoraX is where an association, a neighbourhood or a group discusses, votes and decides. Forum, votes, polls, library, video and podcasts, all in one place, with a ballot box anyone can check.',
+    lede: 'Agora is where an association, a neighbourhood or a group discusses, votes and decides. Forum, votes, polls, library, video and podcasts, all in one place, with a ballot box anyone can check.',
     tour: 'Take the tour',
     register: 'Join',
     signIn: 'Sign in',
     stamp: 'Shape the future',
-    caption: (n) => `Every dot is an AgoraX member: ${n} today.`,
+    caption: (n) => `Every dot is an Agora member: ${n} today.`,
     scroll: 'scroll',
   },
   noise: {
@@ -384,7 +385,7 @@ const en: TourCopy = {
         body: 'Comments, likes, angry capitals, messages lost across ten group chats. The loudest voice gets heard, and in the end nothing is decided.',
       },
       {
-        title: 'AgoraX brings',
+        title: 'Agora brings',
         titleEm: 'order.',
         body: 'The discussion happens in one place, ends in a vote, and the decision stays written in the community’s constitution for anyone who needs it.',
       },
@@ -447,17 +448,18 @@ const en: TourCopy = {
     eyebrow: '03 · The community',
     title: 'Everything',
     titleEm: 'a community needs.',
-    lede: 'Every community on AgoraX has its own forum, votes, library, video calls and constitution. Public or members-only: the community decides.',
+    lede: 'Every community on Agora has its own forum, votes, library, video calls and constitution. Public or members-only: the community decides.',
     tools: {
       forum: { t: 'Forum', d: 'Topics, replies and “Useful” for the good ideas. When a discussion is ready, one button turns it into a vote: the AI reads the whole thread and drafts the proposal.' },
       library: { t: 'Library', d: 'Audio, video, documents and Anki decks for members, with the important ones pinned on top. They stay inside the community, never in the public feed.' },
-      media: { t: 'Podcasts & video', d: 'For every vote AgoraX writes a script for a 3–5 minute podcast and a 45-second video. You produce it with NotebookLM or any tool you like, upload it, and it shows in the feed and on social media.' },
+      media: { t: 'Podcasts & video', d: 'For every vote Agora writes a script for a 3–5 minute podcast and a 45-second video. You produce it with NotebookLM or any tool you like, upload it, and it shows in the feed and on social media.' },
       meetings: { t: 'Video calls', d: 'Community meetings on our own servers, with a speaking queue, a calendar invite and a notice to every member.' },
       polls: { t: 'Polls', d: 'You write what you want to learn and the AI drafts a neutral questionnaire, which a second check screens for leading questions. An anonymous panel answers, and every result has a methodology page.' },
     },
     community: 'Community “Our neighbourhood”',
     members: '48 members · autonomous',
     tabs: ['Forum', 'Votes', 'Constitution', 'Library', 'Members'],
+    platform: 'Agora',
     platformTabs: ['Podcasts', 'Videos', 'Polls'],
     forum: {
       topics: [
@@ -483,7 +485,7 @@ const en: TourCopy = {
       ready: 'ready',
       podcast: 'Podcast: “Thirty trees for the square”',
       teaser: '45-second video for social media',
-      featured: 'Featured: shows in the AgoraX feed',
+      featured: 'Featured: shows in the Agora feed',
       share: 'Facebook, X, WhatsApp, Viber',
     },
     meetings: {
@@ -632,7 +634,7 @@ const en: TourCopy = {
     fine: 'Technically: each fingerprint is a SHA-256 hash, computed here with the same recipe the server uses. The Bitcoin seal is made through OpenTimestamps.',
   },
   live: {
-    eyebrow: '07 · Today on AgoraX',
+    eyebrow: '07 · Today on Agora',
     title: 'Real communities,',
     titleEm: 'real decisions.',
     lede: 'The latest public votes, as they stand right now.',

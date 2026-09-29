@@ -59,7 +59,7 @@ function GreekContent() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Υπεύθυνος επεξεργασίας</h2>
         <p className="mb-3">
-          <strong className="text-foreground">Η πλατφόρμα AgoraX</strong> (Σουηδία).
+          <strong className="text-foreground">Η πλατφόρμα Αγορά</strong> (Σουηδία).
           Εποπτική αρχή: <strong className="text-foreground">Σουηδική Αρχή Προστασίας
           Δεδομένων (IMY)</strong> —{" "}
           <a href="https://www.imy.se" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
@@ -280,7 +280,7 @@ function EnglishContent() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Controller</h2>
         <p className="mb-3">
-          <strong className="text-foreground">The AgoraX platform</strong> (Sweden).
+          <strong className="text-foreground">The Agora platform</strong> (Sweden).
           Supervisory authority:{" "}
           <strong className="text-foreground">Swedish Authority for Privacy Protection (IMY)</strong> —{" "}
           <a href="https://www.imy.se" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">

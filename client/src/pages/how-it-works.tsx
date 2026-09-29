@@ -20,7 +20,7 @@ export default function HowItWorksPage() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    document.title = `AgoraX — ${t('footer.howItWorks')}`;
+    document.title = `${t('brand.name')} — ${t('footer.howItWorks')}`;
   }, []);
 
   const phases = [

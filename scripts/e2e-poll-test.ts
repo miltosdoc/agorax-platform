@@ -160,7 +160,7 @@ async function createPoll(creatorId: number): Promise<SurveyPoll> {
 }
 
 async function main() {
-  console.log('═══ AgoraX polling module — end-to-end flow test ═══');
+  console.log('═══ Agora polling module — end-to-end flow test ═══');
 
   const tokens = await enrollPanel();
   if (tokens.length < N_PANELISTS - 2) {

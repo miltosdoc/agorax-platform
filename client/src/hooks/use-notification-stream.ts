@@ -86,8 +86,8 @@ async function ensureAndroidChannel(): Promise<void> {
   try {
     await plugin.createChannel({
       id: ANDROID_CHANNEL_ID,
-      name: 'AgoraX',
-      description: 'AgoraX notifications',
+      name: 'Agora',
+      description: 'Agora notifications',
       importance: 5,        // HIGH: heads-up banner + sound
       visibility: 1,        // public on lock screen
       vibration: true,

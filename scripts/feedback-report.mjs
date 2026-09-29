@@ -602,7 +602,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>Ανατροφοδότηση AgoraX</title>
+<title>Ανατροφοδότηση · Αγορά</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=GFS+Didot&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -855,7 +855,7 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 
 <div class="rule" aria-hidden="true"></div>
 <header class="masthead"><div class="wrap masthead-inner">
-  <a class="brand" href="/feed" aria-label="AgoraX">
+  <a class="brand" href="/feed" aria-label="Αγορά">
     ${logoSvg(36, ['#0B4C8C', '#14212E', 1], false)}
     <span class="beta">Beta</span>
   </a>
@@ -866,7 +866,7 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 </div></header>
 
 <header class="top"><div class="wrap head-inner">
-  <p class="eyebrow">AgoraX &middot; διαλογή ανατροφοδότησης</p>
+  <p class="eyebrow">Αγορά &middot; διαλογή ανατροφοδότησης</p>
   <h1>Τι μας είπαν οι πρώτοι χρήστες</h1>
   <p class="lede">Κάθε υποβολή από το widget της πλατφόρμας, ομαδοποιημένη κατά θέμα αντί για ημερομηνία. Ανοίξτε ένα θέμα για να δείτε τα αυτούσια λόγια.</p>
   <div class="stats" id="stats"></div>
@@ -913,7 +913,7 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
 <footer class="colophon"><div class="wrap">
   <div class="colophon-grid">
     <div>
-      <a class="brand" href="/" aria-label="AgoraX">
+      <a class="brand" href="/" aria-label="Αγορά">
         ${logoSvg(64, ['#FAFAF7', '#FAFAF7', 0.72], true)}
       </a>
       <p class="tagline">Πλατφόρμα ψηφιακής δημοκρατίας για μια πιο ανοιχτή και συμμετοχική διακυβέρνηση</p>
@@ -933,7 +933,7 @@ code{font-family:"IBM Plex Mono",Menlo,Consolas,monospace; font-size:.86em; back
       <p class="col-note">Παράγεται από <code>scripts/feedback-report.mjs</code>, αυτόματα κάθε μέρα. Τα στιγμιότυπα είναι σμικρυμένα για να χωρέσουν στη σελίδα· τα πρωτότυπα μένουν στον διακομιστή.</p>
     </div>
   </div>
-  <div class="legal"><p class="mono">&copy; ${year} AgoraX &mdash; Πλατφόρμα Ψηφιακής Δημοκρατίας</p></div>
+  <div class="legal"><p class="mono">&copy; ${year} Αγορά &mdash; Πλατφόρμα Ψηφιακής Δημοκρατίας</p></div>
 </div></footer>
 
 <script>

@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   await createNotification({
     userId: user.id,
     type: 'new_proposal',
-    title: 'Δοκιμαστική ειδοποίηση AgoraX',
+    title: 'Δοκιμαστική ειδοποίηση της Αγοράς',
     message: 'Αν τη βλέπεις, οι ειδοποιήσεις δουλεύουν!',
     actionUrl: '/notifications',
   });

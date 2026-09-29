@@ -612,7 +612,7 @@ function renderSharePage(ctx: ShareCtx): string {
 <html lang="el">
 <head>
 <meta charset="utf-8">
-<title>${ctx.title} — AgoraX</title>
+<title>${ctx.title} — Αγορά</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta property="og:title" content="${ctx.title}">
 <meta property="og:description" content="${ctx.description}">
@@ -637,7 +637,7 @@ h1 { font-size: 1.5rem; }
 <h1>${ctx.title}</h1>
 <p>${ctx.description}</p>
 ${player}
-<p class="muted">Από την κοινότητα της AgoraX.</p>
+<p class="muted">Από την κοινότητα της Αγοράς.</p>
 <a class="cta" href="${ctx.platformUrl}">Διαβάστε όλη την πρόταση & ψηφίστε →</a>
 </body>
 </html>`;

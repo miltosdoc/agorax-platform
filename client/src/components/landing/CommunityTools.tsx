@@ -36,6 +36,8 @@ export interface ToolsCopy {
   community: string;
   members: string;
   tabs: string[];
+  /** The platform's own name, for its podcasts, videos and polls. */
+  platform: string;
   platformTabs: string[];
   forum: { topics: { t: string; n: string; pinned?: boolean }[]; reply: string; promote: string };
   library: { items: { t: string; kind: 'video' | 'audio' | 'doc' | 'deck'; pinned?: boolean }[]; pinned: string; note: string };
@@ -100,7 +102,7 @@ export default function CommunityTools({ copy }: { copy: ToolsCopy }) {
           <div className="tools-frame" role="tabpanel" aria-label={copy.tools[tool].t}>
             <div className="tools-top">
               <div>
-                <b>{platform ? 'AgoraX' : copy.community}</b>
+                <b>{platform ? copy.platform : copy.community}</b>
                 {!platform && <small>{copy.members}</small>}
               </div>
               <nav aria-hidden="true">

@@ -347,7 +347,7 @@ async function step8_finalize(proposalId: number): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.log('━━━ AgoraX E2E flow test ━━━');
+  console.log('━━━ Agora E2E flow test ━━━');
   const { communityId, userIds } = await step1_setupUsersAndCommunity();
   const proposalId = await step2_createProposal(communityId, userIds[0]);
   await step3_submit(proposalId);

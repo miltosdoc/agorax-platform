@@ -73,11 +73,11 @@ const el: FaqCopy = {
     {
       id: 'basics',
       title: 'Τα βασικά',
-      blurb: 'Τι είναι η AgoraX και πώς ξεκινάτε.',
+      blurb: 'Τι είναι η Αγορά και πώς ξεκινάτε.',
       items: [
         {
           id: 'what',
-          q: 'Τι είναι η AgoraX;',
+          q: 'Τι είναι η Αγορά;',
           short: 'Ένα μέρος όπου μια κοινότητα συζητά, ψηφίζει και αποφασίζει μαζί, με μυστική ψήφο που μπορεί να ελέγξει ο καθένας.',
           body: [
             'Φτιάχνετε ή μπαίνετε σε μια κοινότητα: σύλλογο, γειτονιά, συνέλευση, ομάδα. Εκεί υπάρχουν forum για συζήτηση, ψηφοφορίες, βιβλιοθήκη, βιντεοκλήσεις και το Σύνταγμα της κοινότητας.',
@@ -98,7 +98,7 @@ const el: FaqCopy = {
           id: 'free',
           q: 'Είναι δωρεάν;',
           short: 'Ναι. Εγγραφή, κοινότητες, συζητήσεις και ψηφοφορίες δεν κοστίζουν τίποτα.',
-          body: ['Η AgoraX είναι ανοιχτός κώδικας. Αν θέλετε να τη στηρίξετε, υπάρχει δωρεά μέσω GitHub Sponsors στη σελίδα Υποστήριξη.'],
+          body: ['Η Αγορά είναι ανοιχτός κώδικας. Αν θέλετε να τη στηρίξετε, υπάρχει δωρεά μέσω GitHub Sponsors στη σελίδα Υποστήριξη.'],
           links: [{ label: 'Υποστήριξη', href: '/support' }],
         },
         {
@@ -115,7 +115,7 @@ const el: FaqCopy = {
         {
           id: 'app',
           q: 'Υπάρχει εφαρμογή για κινητό;',
-          short: 'Ναι, για Android: την κατεβάζετε από το κάτω μέρος κάθε σελίδας. Σε iPhone η AgoraX δουλεύει κανονικά από τον browser.',
+          short: 'Ναι, για Android: την κατεβάζετε από το κάτω μέρος κάθε σελίδας. Σε iPhone η Αγορά δουλεύει κανονικά από τον browser.',
           body: ['Με την εφαρμογή, ή με ενεργές ειδοποιήσεις στον browser, μαθαίνετε αμέσως όταν ανοίγει μια ψηφοφορία ή μια συνάντηση.'],
         },
       ],
@@ -274,8 +274,8 @@ const el: FaqCopy = {
         {
           id: 'media',
           q: 'Μπορώ να φτιάξω podcast ή βίντεο για μια ψηφοφορία;',
-          short: 'Ναι. Στην καρτέλα «Media» κάθε ψηφοφορίας η AgoraX γράφει σενάριο για podcast 3–5 λεπτών και για βίντεο περίπου 45 δευτερολέπτων.',
-          body: ['Το παράγετε με NotebookLM, ElevenLabs ή όποιο εργαλείο θέλετε, και ανεβάζετε MP3 ή MP4 έως 120 MB. Ο συντάκτης διαλέγει το προτεινόμενο, που εμφανίζεται στη Ροή της AgoraX και μοιράζεται στα social με προεπισκόπηση.'],
+          short: 'Ναι. Στην καρτέλα «Media» κάθε ψηφοφορίας η Αγορά γράφει σενάριο για podcast 3–5 λεπτών και για βίντεο περίπου 45 δευτερολέπτων.',
+          body: ['Το παράγετε με NotebookLM, ElevenLabs ή όποιο εργαλείο θέλετε, και ανεβάζετε MP3 ή MP4 έως 120 MB. Ο συντάκτης διαλέγει το προτεινόμενο, που εμφανίζεται στη Ροή της Αγοράς και μοιράζεται στα social με προεπισκόπηση.'],
         },
         {
           id: 'meetings',
@@ -292,7 +292,7 @@ const el: FaqCopy = {
         {
           id: 'notify',
           q: 'Πώς μαθαίνω τι γίνεται;',
-          short: 'Από το κουδούνι πάνω δεξιά. Αν ενεργοποιήσετε τις ειδοποιήσεις, τις παίρνετε και στο κινητό ή στον υπολογιστή, ακόμα κι όταν η AgoraX είναι κλειστή.',
+          short: 'Από το κουδούνι πάνω δεξιά. Αν ενεργοποιήσετε τις ειδοποιήσεις, τις παίρνετε και στο κινητό ή στον υπολογιστή, ακόμα κι όταν η Αγορά είναι κλειστή.',
           body: ['Ειδοποιείστε όταν ανοίγει μια ψηφοφορία στην κοινότητά σας, όταν έχετε μια τροπολογία να κρίνετε, όταν προγραμματίζεται συνάντηση ή όταν κληρωθείτε. Οι ειδοποιήσεις ταξιδεύουν κρυπτογραφημένες.'],
           links: [{ label: 'Ειδοποιήσεις', href: '/notifications' }],
         },
@@ -306,7 +306,7 @@ const el: FaqCopy = {
         {
           id: 'polls',
           q: 'Τι είναι οι Δημοσκοπήσεις και το ανώνυμο πάνελ;',
-          short: 'Γράφετε τι θέλετε να μάθετε και η AgoraX φτιάχνει ουδέτερο ερωτηματολόγιο· απαντά ένα ανώνυμο πάνελ μελών.',
+          short: 'Γράφετε τι θέλετε να μάθετε και η Αγορά φτιάχνει ουδέτερο ερωτηματολόγιο· απαντά ένα ανώνυμο πάνελ μελών.',
           body: [
             'Ένας δεύτερος, αυτόματος έλεγχος ψάχνει καθοδηγητικές ερωτήσεις και ανισόρροπες κλίμακες. Στο πάνελ εγγράφεστε μία φορά, με «τυφλές υπογραφές», ώστε οι απαντήσεις σας να μη συνδέονται ποτέ με την ταυτότητά σας. Κάθε αποτέλεσμα έχει σελίδα μεθοδολογίας με δείγμα, στάθμιση και την ακριβή διατύπωση.',
             'Οι κοινοτικές δημοσκοπήσεις είναι ανεπίσημες· μόνο οι πιστοποιημένες δημοσιεύονται ως ευρήματα.',
@@ -382,11 +382,11 @@ const en: FaqCopy = {
     {
       id: 'basics',
       title: 'The basics',
-      blurb: 'What AgoraX is and how to start.',
+      blurb: 'What Agora is and how to start.',
       items: [
         {
           id: 'what',
-          q: 'What is AgoraX?',
+          q: 'What is Agora?',
           short: 'A place where a community discusses, votes and decides together, with a secret ballot anyone can check.',
           body: [
             'You start or join a community: an association, a neighbourhood, an assembly, a group. It has a forum for discussion, votes, a library, video calls and its own constitution.',
@@ -407,7 +407,7 @@ const en: FaqCopy = {
           id: 'free',
           q: 'Is it free?',
           short: 'Yes. Signing up, communities, discussions and votes cost nothing.',
-          body: ['AgoraX is open source. If you want to support it, you can donate through GitHub Sponsors on the Support page.'],
+          body: ['Agora is open source. If you want to support it, you can donate through GitHub Sponsors on the Support page.'],
           links: [{ label: 'Support', href: '/support' }],
         },
         {
@@ -424,7 +424,7 @@ const en: FaqCopy = {
         {
           id: 'app',
           q: 'Is there a mobile app?',
-          short: 'Yes, for Android: download it from the bottom of any page. On an iPhone AgoraX works fine in the browser.',
+          short: 'Yes, for Android: download it from the bottom of any page. On an iPhone Agora works fine in the browser.',
           body: ['With the app, or with notifications turned on in the browser, you hear at once when a vote or a meeting opens.'],
         },
       ],
@@ -577,8 +577,8 @@ const en: FaqCopy = {
         {
           id: 'media',
           q: 'Can I make a podcast or video for a vote?',
-          short: 'Yes. In each vote’s “Media” tab AgoraX writes a script for a 3–5 minute podcast and a video of about 45 seconds.',
-          body: ['You produce it with NotebookLM, ElevenLabs or any tool you like, and upload an MP3 or MP4 of up to 120 MB. The author picks the featured one, which shows in the AgoraX feed and shares to social media with a preview.'],
+          short: 'Yes. In each vote’s “Media” tab Agora writes a script for a 3–5 minute podcast and a video of about 45 seconds.',
+          body: ['You produce it with NotebookLM, ElevenLabs or any tool you like, and upload an MP3 or MP4 of up to 120 MB. The author picks the featured one, which shows in the Agora feed and shares to social media with a preview.'],
         },
         {
           id: 'meetings',
@@ -595,7 +595,7 @@ const en: FaqCopy = {
         {
           id: 'notify',
           q: 'How do I hear what is happening?',
-          short: 'From the bell at the top right. Turn on notifications and you also get them on your phone or computer, even when AgoraX is closed.',
+          short: 'From the bell at the top right. Turn on notifications and you also get them on your phone or computer, even when Agora is closed.',
           body: ['You are notified when a vote opens in your community, when you have an amendment to judge, when a meeting is scheduled, or when you are drawn by lot. Notifications travel encrypted.'],
           links: [{ label: 'Notifications', href: '/notifications' }],
         },
@@ -609,7 +609,7 @@ const en: FaqCopy = {
         {
           id: 'polls',
           q: 'What are Polls and the anonymous panel?',
-          short: 'You write what you want to learn and AgoraX drafts a neutral questionnaire; an anonymous panel of members answers.',
+          short: 'You write what you want to learn and Agora drafts a neutral questionnaire; an anonymous panel of members answers.',
           body: [
             'A second, automatic check looks for leading questions and unbalanced scales. You join the panel once, with “blind signatures”, so your answers can never be linked to your identity. Every result has a methodology page with the sample, the weighting and the exact wording.',
             'Community polls are unofficial; only certified ones are published as findings.',

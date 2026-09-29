@@ -37,8 +37,8 @@ export function LocalNotifTestButton() {
     try {
       await (plugin as any).createChannel?.({
         id: CHANNEL_ID,
-        name: 'AgoraX',
-        description: 'AgoraX notifications',
+        name: 'Agora',
+        description: 'Agora notifications',
         importance: 5,
         visibility: 1,
         vibration: true,
@@ -54,7 +54,7 @@ export function LocalNotifTestButton() {
       const res = await plugin.schedule({
         notifications: [{
           id: Math.floor(Math.random() * 2_000_000_000),
-          title: 'AgoraX hardware test',
+          title: 'Agora hardware test',
           body: `direct plugin call @ ${new Date().toLocaleTimeString()}`,
           channelId: CHANNEL_ID,
         }],

@@ -24,9 +24,9 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: 'AgoraX', body: event.data.text(), url: '/' };
+    payload = { title: 'Αγορά', body: event.data.text(), url: '/' };
   }
-  const title = payload.title || 'AgoraX';
+  const title = payload.title || 'Αγορά';
   const options = {
     body: payload.body || '',
     icon: '/favicon.png',

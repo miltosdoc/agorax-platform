@@ -127,7 +127,7 @@ export default function Header() {
           data-testid="logo-link"
         >
           <span className="relative flex-shrink-0">
-            <AgoraLogo title="AgoraX" className="h-7 w-auto sm:h-9" />
+            <AgoraLogo title={t('brand.name')} className="h-7 w-auto sm:h-9" />
             {/* The platform is not finished and should never pretend to be:
                 votes are advisory (Terms §7) and the rules still move. It
                 hangs under the letters, where the full logo has its tagline. */}

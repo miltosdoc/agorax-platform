@@ -500,8 +500,10 @@ describe('templates', () => {
   it('uses one image only, the logo, so a client that blocks images loses nothing', () => {
     const imgs = templates.match(/<img\b[^>]*>/gi) ?? [];
     expect(imgs).toHaveLength(1);
-    // Blocked, the logo shows its alt text: the wordmark the header always had.
-    expect(imgs[0]).toMatch(/alt="AgoraX"/);
+    // Blocked, the logo shows its alt text: the platform's name in the
+    // mail's language, where the header always had its wordmark.
+    expect(imgs[0]).toMatch(/alt="\$\{BRAND_NAME\[locale\]\}"/);
+    expect(templates).toMatch(/BRAND_NAME[^=]*= \{ el: 'Αγορά', en: 'Agora' \}/);
     expect(imgs[0]).toMatch(/\/email-logo\.png/);
     expect(templates).not.toMatch(/background-image/i);
   });

@@ -22,7 +22,7 @@ VOTE_ENDPOINTS=("/blind-sign" "/anonymous-vote" "/verify-receipt" "/blind-key")
 PASS=true
 RESULTS=""
 
-echo "=== AgoraX Production Log Verification (B2) ==="
+echo "=== Agora Production Log Verification (B2) ==="
 echo "Nginx log:        $NGINX_LOG"
 echo "Docker container: $DOCKER_CONTAINER"
 echo "API base:         $API_BASE"

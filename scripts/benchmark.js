@@ -46,7 +46,7 @@ function makeRequest(endpoint) {
 }
 
 async function runBenchmark() {
-  console.log('🚀 AgoraX Performance Benchmark');
+  console.log('🚀 Agora Performance Benchmark');
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`Concurrent: ${CONCURRENT_REQUESTS}`);
   console.log(`Total: ${TOTAL_REQUESTS}`);

@@ -39,7 +39,7 @@ async function main(): Promise<void> {
       const resp = await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         JSON.stringify({
-          title: 'AgoraX RAW test',
+          title: 'Agora RAW test',
           body: `OS-level test @ ${new Date().toLocaleTimeString()}`,
           url: '/notifications',
         }),

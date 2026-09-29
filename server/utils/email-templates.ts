@@ -1,9 +1,9 @@
 /**
- * Every email AgoraX sends, as HTML plus a plain-text twin.
+ * Every email Agora sends, as HTML plus a plain-text twin.
  *
  * Constraints these templates are built to:
  *  - One image only, the logo, and nothing depends on it: its alt text is
- *    styled as the plain "AgoraX" wordmark the header used to be, so with
+ *    the platform's name, styled as the plain wordmark the header used to be, so with
  *    images blocked (the default in a lot of clients) the mail reads the
  *    same. No spacers, no tracking pixels, no background images.
  *  - Tables and inline styles, because Outlook still does not do flexbox.
@@ -29,6 +29,9 @@ const BRAND = '#1d4e89';
 const INK = '#1a1a1a';
 const MUTED = '#5f6b7a';
 const LINE = '#e3e8ef';
+
+/** The platform's name in each language: Αγορά in Greek, Agora in English. */
+const BRAND_NAME: Record<MailLocale, string> = { el: 'Αγορά', en: 'Agora' };
 
 interface ShellParts {
   locale: MailLocale;
@@ -59,16 +62,16 @@ export function esc(value: string): string {
 
 const FOOTER_COPY: Record<MailLocale, { why: string; settings: string; unsubscribe: string; sig: string }> = {
   el: {
-    why: 'Λαμβάνετε αυτό το email επειδή συμμετέχετε στο AgoraX και έχετε ενεργές προαιρετικές ειδοποιήσεις.',
+    why: 'Λαμβάνετε αυτό το email επειδή συμμετέχετε στην Αγορά και έχετε ενεργές προαιρετικές ειδοποιήσεις.',
     settings: 'Ρυθμίσεις ειδοποιήσεων',
     unsubscribe: 'Διακοπή όλων των προαιρετικών email',
-    sig: 'AgoraX — πλατφόρμα διαβουλευτικής δημοκρατίας',
+    sig: 'Αγορά — πλατφόρμα διαβουλευτικής δημοκρατίας',
   },
   en: {
-    why: 'You are receiving this because you take part in AgoraX and have optional notifications switched on.',
+    why: 'You are receiving this because you take part in Agora and have optional notifications switched on.',
     settings: 'Notification settings',
     unsubscribe: 'Stop all optional email',
-    sig: 'AgoraX — deliberative democracy platform',
+    sig: 'Agora — deliberative democracy platform',
   },
 };
 
@@ -121,7 +124,7 @@ function renderHtml(parts: ShellParts): string {
         <td align="center" style="padding:24px 12px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid ${LINE};border-radius:10px;">
             <tr><td style="padding:28px 28px 8px;">
-              <p style="margin:0 0 18px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND};"><img src="${esc(publicUrl())}/email-logo.png" width="148" height="34" alt="AgoraX" style="display:block;width:148px;height:34px;border:0;outline:none;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:0.06em;color:${BRAND};"></p>
+              <p style="margin:0 0 18px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND};"><img src="${esc(publicUrl())}/email-logo.png" width="148" height="34" alt="${BRAND_NAME[locale]}" style="display:block;width:148px;height:34px;border:0;outline:none;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:0.06em;color:${BRAND};"></p>
               <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;color:${INK};font-weight:700;">${esc(title)}</h1>
             </td></tr>
             <tr><td style="padding:0 28px;">
@@ -144,7 +147,7 @@ function renderHtml(parts: ShellParts): string {
 function renderText(parts: ShellParts): string {
   const { locale, title, paragraphs, cta, note, footer, alwaysSentNote } = parts;
   const f = FOOTER_COPY[locale];
-  const lines: string[] = ['AgoraX', '', title, '='.repeat(Math.min(title.length, 60)), ''];
+  const lines: string[] = [BRAND_NAME[locale], '', title, '='.repeat(Math.min(title.length, 60)), ''];
 
   for (const p of paragraphs) lines.push(stripTags(p), '');
   if (cta) lines.push(`${cta.label}:`, cta.url, '');
@@ -193,12 +196,12 @@ export function passwordResetEmail(opts: {
   const n = esc(name);
 
   if (locale === 'en') {
-    return render('Reset your AgoraX password', {
+    return render('Reset your Agora password', {
       locale,
       title: 'Reset your password',
       paragraphs: [
         `Hello ${n},`,
-        'Someone asked to reset the password for the AgoraX account registered to this address. Use the button below to choose a new one.',
+        'Someone asked to reset the password for the Agora account registered to this address. Use the button below to choose a new one.',
         'If that was not you, no action is needed — the link expires on its own and your password stays unchanged.',
       ],
       cta: { label: 'Set a new password', url: resetUrl },
@@ -206,12 +209,12 @@ export function passwordResetEmail(opts: {
     });
   }
 
-  return render('Επαναφορά κωδικού AgoraX', {
+  return render('Επαναφορά κωδικού στην Αγορά', {
     locale,
     title: 'Επαναφορά κωδικού',
     paragraphs: [
       `Γεια σας ${n},`,
-      'Ζητήθηκε επαναφορά κωδικού για τον λογαριασμό AgoraX που είναι δηλωμένος σε αυτή τη διεύθυνση. Χρησιμοποιήστε το κουμπί παρακάτω για να ορίσετε νέο κωδικό.',
+      'Ζητήθηκε επαναφορά κωδικού για τον λογαριασμό στην Αγορά που είναι δηλωμένος σε αυτή τη διεύθυνση. Χρησιμοποιήστε το κουμπί παρακάτω για να ορίσετε νέο κωδικό.',
       'Αν δεν το ζητήσατε εσείς, δεν χρειάζεται να κάνετε τίποτα — ο σύνδεσμος λήγει μόνος του και ο κωδικός σας παραμένει ο ίδιος.',
     ],
     cta: { label: 'Ορισμός νέου κωδικού', url: resetUrl },
@@ -229,24 +232,24 @@ export function passwordChangedEmail(opts: {
   const when = changedAt.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
 
   if (locale === 'en') {
-    return render('Your AgoraX password was changed', {
+    return render('Your Agora password was changed', {
       locale,
       title: 'Your password was changed',
       paragraphs: [
         `Hello ${n},`,
-        `The password on your AgoraX account was changed on <strong>${esc(when)}</strong>. Every session on every device was signed out, so you will need to sign in again.`,
+        `The password on your Agora account was changed on <strong>${esc(when)}</strong>. Every session on every device was signed out, so you will need to sign in again.`,
         'If this was you, nothing further is needed. <strong>If it was not, your account may be compromised</strong> — reset the password immediately and contact the platform administrators.',
       ],
       cta: { label: 'Sign in', url: `${publicUrl()}/auth` },
     });
   }
 
-  return render('Ο κωδικός σας στο AgoraX άλλαξε', {
+  return render('Ο κωδικός σας στην Αγορά άλλαξε', {
     locale,
     title: 'Ο κωδικός σας άλλαξε',
     paragraphs: [
       `Γεια σας ${n},`,
-      `Ο κωδικός του λογαριασμού σας στο AgoraX άλλαξε στις <strong>${esc(when)}</strong>. Όλες οι συνεδρίες σε όλες τις συσκευές τερματίστηκαν, οπότε θα χρειαστεί να συνδεθείτε ξανά.`,
+      `Ο κωδικός του λογαριασμού σας στην Αγορά άλλαξε στις <strong>${esc(when)}</strong>. Όλες οι συνεδρίες σε όλες τις συσκευές τερματίστηκαν, οπότε θα χρειαστεί να συνδεθείτε ξανά.`,
       'Αν το κάνατε εσείς, δεν χρειάζεται καμία ενέργεια. <strong>Αν όχι, ο λογαριασμός σας ενδέχεται να έχει παραβιαστεί</strong> — κάντε αμέσως επαναφορά κωδικού και ενημερώστε τη διαχείριση της πλατφόρμας.',
     ],
     cta: { label: 'Σύνδεση', url: `${publicUrl()}/auth` },
@@ -264,26 +267,26 @@ export function verifyEmailEmail(opts: {
   const days = Math.round(expiresInHours / 24);
 
   if (locale === 'en') {
-    return render('Confirm your AgoraX email address', {
+    return render('Confirm your Agora email address', {
       locale,
       title: 'Confirm your email address',
       paragraphs: [
         `Hello ${n},`,
-        'Confirming your address is how AgoraX can reach you about the proposals and votes in your communities — and how we can get you back into your account if you ever lose your password.',
-        'If you did not create an AgoraX account, ignore this message and nothing will happen.',
+        'Confirming your address is how Agora can reach you about the proposals and votes in your communities — and how we can get you back into your account if you ever lose your password.',
+        'If you did not create an Agora account, ignore this message and nothing will happen.',
       ],
       cta: { label: 'Confirm my address', url: verifyUrl },
       note: `<strong>This link expires in ${days} days.</strong> You can ask for a new one any time from your account settings.`,
     });
   }
 
-  return render('Επιβεβαιώστε το email σας στο AgoraX', {
+  return render('Επιβεβαιώστε το email σας στην Αγορά', {
     locale,
     title: 'Επιβεβαίωση διεύθυνσης email',
     paragraphs: [
       `Γεια σας ${n},`,
-      'Η επιβεβαίωση της διεύθυνσής σας είναι ο τρόπος με τον οποίο το AgoraX μπορεί να σας ενημερώνει για τις προτάσεις και τις ψηφοφορίες των κοινοτήτων σας — και ο τρόπος να ξαναμπείτε στον λογαριασμό σας αν χάσετε ποτέ τον κωδικό σας.',
-      'Αν δεν δημιουργήσατε εσείς λογαριασμό στο AgoraX, αγνοήστε αυτό το μήνυμα και δεν θα συμβεί τίποτα.',
+      'Η επιβεβαίωση της διεύθυνσής σας είναι ο τρόπος με τον οποίο η Αγορά μπορεί να σας ενημερώνει για τις προτάσεις και τις ψηφοφορίες των κοινοτήτων σας — και ο τρόπος να ξαναμπείτε στον λογαριασμό σας αν χάσετε ποτέ τον κωδικό σας.',
+      'Αν δεν δημιουργήσατε εσείς λογαριασμό στην Αγορά, αγνοήστε αυτό το μήνυμα και δεν θα συμβεί τίποτα.',
     ],
     cta: { label: 'Επιβεβαίωση διεύθυνσης', url: verifyUrl },
     note: `<strong>Ο σύνδεσμος λήγει σε ${days} ημέρες.</strong> Μπορείτε να ζητήσετε νέον όποτε θέλετε από τις ρυθμίσεις του λογαριασμού σας.`,
@@ -310,12 +313,12 @@ export function googleAccountEmail(opts: {
   const n = esc(name);
 
   if (locale === 'en') {
-    return render('Signing in to AgoraX', {
+    return render('Signing in to Agora', {
       locale,
       title: 'This account signs in with Google',
       paragraphs: [
         `Hello ${n},`,
-        'Someone asked to reset the password for the AgoraX account on this address. There is no password to reset: this account signs in with Google.',
+        'Someone asked to reset the password for the Agora account on this address. There is no password to reset: this account signs in with Google.',
         'Use the <strong>Sign in with Google</strong> button on the sign-in page and you are in — no password needed, and nothing about your account has changed.',
         'If that was not you, no action is needed.',
       ],
@@ -323,12 +326,12 @@ export function googleAccountEmail(opts: {
     });
   }
 
-  return render('Σύνδεση στο AgoraX', {
+  return render('Σύνδεση στην Αγορά', {
     locale,
     title: 'Ο λογαριασμός συνδέεται με Google',
     paragraphs: [
       `Γεια σας ${n},`,
-      'Ζητήθηκε επαναφορά κωδικού για τον λογαριασμό AgoraX σε αυτή τη διεύθυνση. Δεν υπάρχει κωδικός να επαναφερθεί: ο λογαριασμός συνδέεται μέσω Google.',
+      'Ζητήθηκε επαναφορά κωδικού για τον λογαριασμό στην Αγορά σε αυτή τη διεύθυνση. Δεν υπάρχει κωδικός να επαναφερθεί: ο λογαριασμός συνδέεται μέσω Google.',
       'Χρησιμοποιήστε το κουμπί <strong>Σύνδεση με Google</strong> στη σελίδα σύνδεσης και μπαίνετε κατευθείαν — χωρίς κωδικό, και χωρίς καμία αλλαγή στον λογαριασμό σας.',
       'Αν δεν το ζητήσατε εσείς, δεν χρειάζεται καμία ενέργεια.',
     ],
@@ -568,11 +571,11 @@ export function newsletterConfirmEmail(opts: {
   const { locale, confirmUrl } = opts;
 
   if (locale === 'en') {
-    return render('Confirm your AgoraX newsletter subscription', {
+    return render('Confirm your Agora newsletter subscription', {
       locale,
       title: 'Confirm your subscription',
       paragraphs: [
-        'Someone entered this address to receive the AgoraX newsletter — what is being proposed, debated and decided across the platform.',
+        'Someone entered this address to receive the Agora newsletter — what is being proposed, debated and decided across the platform.',
         'Confirm below and you will start receiving it. Every issue carries an unsubscribe link.',
         'If that was not you, ignore this message. Without the confirmation below nothing is ever sent to this address.',
       ],
@@ -580,11 +583,11 @@ export function newsletterConfirmEmail(opts: {
     });
   }
 
-  return render('Επιβεβαίωση εγγραφής στο newsletter του AgoraX', {
+  return render('Επιβεβαίωση εγγραφής στο newsletter της Αγοράς', {
     locale,
     title: 'Επιβεβαίωση εγγραφής',
     paragraphs: [
-      'Κάποιος καταχώρησε αυτή τη διεύθυνση για το newsletter του AgoraX — τι προτείνεται, τι συζητιέται και τι αποφασίζεται στην πλατφόρμα.',
+      'Κάποιος καταχώρησε αυτή τη διεύθυνση για το newsletter της Αγοράς — τι προτείνεται, τι συζητιέται και τι αποφασίζεται στην πλατφόρμα.',
       'Επιβεβαιώστε παρακάτω για να αρχίσετε να το λαμβάνετε. Κάθε αποστολή περιέχει σύνδεσμο διαγραφής.',
       'Αν δεν το κάνατε εσείς, αγνοήστε αυτό το μήνυμα. Χωρίς την παρακάτω επιβεβαίωση δεν στέλνεται ποτέ τίποτα σε αυτή τη διεύθυνση.',
     ],

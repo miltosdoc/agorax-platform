@@ -187,12 +187,12 @@ export const MIN_WEIGHTED_N = 30;
 
 // ─── Polling consent (separate GDPR purpose) ─────────────────────────────────
 
-export const POLLING_CONSENT_VERSION = '2026-06-12';
+export const POLLING_CONSENT_VERSION = '2026-09-30';
 
 export const POLLING_CONSENT_TEXT: Record<'el' | 'en', string> = {
   el: `Συγκατάθεση για συμμετοχή στο Πάνελ Δημοσκοπήσεων — έκδοση ${POLLING_CONSENT_VERSION}
 
-Με την εγγραφή μου στο πάνελ δημοσκοπήσεων του AgoraX συναινώ ρητά:
+Με την εγγραφή μου στο πάνελ δημοσκοπήσεων της Αγοράς συναινώ ρητά:
 
 1. Στην επεξεργασία των απαντήσεών μου σε δημοσκοπήσεις (πολιτικές απόψεις — δεδομένα ειδικής κατηγορίας, Άρθρο 9 ΓΚΠΔ), αποθηκευμένων ΜΟΝΟ έναντι ανώνυμου αναγνωριστικού πάνελ που δεν συνδέεται με την ταυτότητά μου.
 2. Στη συλλογή δημογραφικού προφίλ (ηλικιακή ομάδα, φύλο, περιφέρεια, εκπαίδευση, αστικότητα, ψήφος 2023, στοιχεία βαθμονόμησης) έναντι του ίδιου ανώνυμου αναγνωριστικού — μία φορά, με ετήσια επικαιροποίηση.
@@ -202,7 +202,7 @@ export const POLLING_CONSENT_TEXT: Record<'el' | 'en', string> = {
 
   en: `Consent to Polling Panel participation — version ${POLLING_CONSENT_VERSION}
 
-By joining the AgoraX polling panel I explicitly consent to:
+By joining the Agora polling panel I explicitly consent to:
 
 1. Processing of my survey responses (political opinions — special-category data, GDPR Art. 9), stored ONLY against an anonymous panel identifier not linkable to my identity.
 2. Collection of a demographic profile (age band, gender, region, education, urbanity, 2023 vote, calibration items) against the same anonymous identifier — once, with annual refresh.

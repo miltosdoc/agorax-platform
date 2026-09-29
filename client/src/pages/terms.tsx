@@ -60,7 +60,7 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Περιγραφή υπηρεσίας</h2>
         <p>
-          Η AgoraX είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας (Σουηδία). Επιτρέπει σε
+          Η Αγορά είναι μια κλειστή πλατφόρμα διαβουλευτικής δημοκρατίας (Σουηδία). Επιτρέπει σε
           επαληθευμένα μέλη να υποβάλλουν προτάσεις, να καταθέτουν
           τροπολογίες, να συμμετέχουν σε διαβούλευση, σε κληρωτά σώματα κρίσης, και να ψηφίζουν
           συμβουλευτικά για το τελικό κείμενο μιας πρότασης.
@@ -181,7 +181,7 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">9. Πνευματική ιδιοκτησία και άδεια</h2>
         <p>
-          Ο κώδικας της πλατφόρμας AgoraX, η τεκμηρίωση και τα σχήματα δεδομένων διατίθενται με την άδεια{" "}
+          Ο κώδικας της πλατφόρμας Αγορά, η τεκμηρίωση και τα σχήματα δεδομένων διατίθενται με την άδεια{" "}
           <strong className="text-foreground">CC-BY-NC-4.0</strong> (Creative Commons Attribution-NonCommercial)
           — δείτε το αρχείο LICENSE στο αποθετήριο. Επιτρέπεται η μη εμπορική επαναχρησιμοποίηση με
           αναφορά. Οι προτάσεις και τα σχόλια των μελών παραμένουν διανοητική ιδιοκτησία των μελών αλλά
@@ -218,7 +218,7 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">1. Service description</h2>
         <p>
-          AgoraX is a closed deliberative-democracy platform (Sweden). It allows verified members to submit proposals, file amendments, participate in
+          Agora is a closed deliberative-democracy platform (Sweden). It allows verified members to submit proposals, file amendments, participate in
           deliberation, serve on sortition (randomly selected) review bodies, and vote consultatively on
           a proposal's final text.
         </p>
@@ -337,7 +337,7 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">9. Intellectual property and license</h2>
         <p>
-          The AgoraX source code, documentation, and data schemas are licensed under{" "}
+          The Agora source code, documentation, and data schemas are licensed under{" "}
           <strong className="text-foreground">CC-BY-NC-4.0</strong> (Creative Commons
           Attribution-NonCommercial) — see the LICENSE file in the repository. Non-commercial reuse is
           permitted with attribution. Member proposals and comments remain the members' intellectual

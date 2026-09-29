@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- The app's name on a phone set to Greek. The package name and URL scheme
+     stay gr.agorax.app: they identify the installed app across updates. -->
+<resources>
+    <string name="app_name">Αγορά</string>
+    <string name="title_activity_main">Αγορά</string>
+</resources>

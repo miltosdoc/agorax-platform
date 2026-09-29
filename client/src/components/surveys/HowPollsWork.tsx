@@ -14,7 +14,7 @@ export interface Section { title: { el: string; en: string }; body: { el: string
 
 export const POLL_HOW_SECTIONS: Section[] = [
   {
-    title: { el: "Τι είναι οι δημοσκοπήσεις του AgoraX;", en: "What are AgoraX polls?" },
+    title: { el: "Τι είναι οι δημοσκοπήσεις της Αγοράς;", en: "What are Agora polls?" },
     body: { el: "Ένα ανοιχτό εργαλείο μέτρησης της κοινής γνώμης: οποιοδήποτε μέλος περιγράφει με απλά λόγια τι θέλει να μάθει, το σύστημα χτίζει ουδέτερο ερωτηματολόγιο, και το ανώνυμο πάνελ απαντά. Κάθε αποτέλεσμα συνοδεύεται από πλήρη σελίδα μεθοδολογίας — δείγμα, στάθμιση, ακριβής διατύπωση. Η διαφάνεια δεν είναι υποσημείωση· είναι το προϊόν.", en: "An open public-opinion measurement tool: any member describes in plain words what they want to learn, the system builds a neutral questionnaire, and the anonymous panel answers. Every result ships with a full methodology page — sample, weighting, exact wording. Transparency is not a footnote; it is the product." },
   },
   {
@@ -39,7 +39,7 @@ export const POLL_HOW_SECTIONS: Section[] = [
   },
   {
     title: { el: "Τι σημαίνει «Κοινοτική · Ανεπίσημη» και «Πιστοποιημένη»;", en: "What do “Community · Unofficial” and “Certified” mean?" },
-    body: { el: "Οι κοινοτικές δημοσκοπήσεις φτιάχνονται από μέλη και είναι ρητά ανεπίσημες — χρήσιμες, αλλά όχι δημοσιευμένα ευρήματα. Οι πιστοποιημένες συντάσσονται από την πλατφόρμα με ελεγμένη μεθοδολογία και είναι οι μόνες που δημοσιεύονται ως ευρήματα του AgoraX. Ο διαχωρισμός είναι ορατός παντού — ακόμα και στις προεπισκοπήσεις όταν μοιράζεσαι σύνδεσμο.", en: "Community polls are made by members and are explicitly unofficial — useful, but not published findings. Certified polls are authored by the platform with reviewed methodology and are the only ones published as AgoraX findings. The separation is visible everywhere — even in link previews when you share." },
+    body: { el: "Οι κοινοτικές δημοσκοπήσεις φτιάχνονται από μέλη και είναι ρητά ανεπίσημες — χρήσιμες, αλλά όχι δημοσιευμένα ευρήματα. Οι πιστοποιημένες συντάσσονται από την πλατφόρμα με ελεγμένη μεθοδολογία και είναι οι μόνες που δημοσιεύονται ως ευρήματα της Αγοράς. Ο διαχωρισμός είναι ορατός παντού — ακόμα και στις προεπισκοπήσεις όταν μοιράζεσαι σύνδεσμο.", en: "Community polls are made by members and are explicitly unofficial — useful, but not published findings. Certified polls are authored by the platform with reviewed methodology and are the only ones published as Agora findings. The separation is visible everywhere — even in link previews when you share." },
   },
   {
     title: { el: "Τι σημαίνει «σταθμισμένο» αποτέλεσμα;", en: "What does a “weighted” result mean?" },

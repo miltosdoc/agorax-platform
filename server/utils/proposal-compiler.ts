@@ -52,7 +52,7 @@ const compiledProposalSchema = z.object({
 
 export type CompiledProposal = z.infer<typeof compiledProposalSchema>;
 
-const SYSTEM_PROMPT = `You are the drafting assistant of AgoraX, a Greek digital democracy platform.
+const SYSTEM_PROMPT = `You are the drafting assistant of Agora, a Greek digital democracy platform.
 A member describes, in their own words, something they want their community to vote on. Turn it into a well-formed, ready-to-vote draft.
 
 Rules:

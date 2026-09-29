@@ -64,7 +64,7 @@ export default function DemocracyPointsPage() {
   const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    document.title = `AgoraX — ${t('points.title')}`;
+    document.title = `${t('brand.name')} — ${t('points.title')}`;
     Promise.all([
       api.get<PointSummary>('/api/me/points').then((r) => r.data).catch(() => null),
       api.get<EconomySchedule>('/api/economy/schedule').then((r) => r.data).catch(() => null),

@@ -1300,7 +1300,7 @@ export function setupAuth(app: Express) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgoraX</title>
+  <title>Αγορά</title>
   <style>
     body { font-family: -apple-system, Roboto, sans-serif; display: flex; flex-direction: column;
            align-items: center; justify-content: center; min-height: 90vh; gap: 1.5rem; margin: 0; padding: 1rem; text-align: center; }
@@ -1311,7 +1311,7 @@ export function setupAuth(app: Express) {
 </head>
 <body>
   <h1>Επιτυχής σύνδεση ✓</h1>
-  <p>Επιστρέψτε στην εφαρμογή AgoraX για να συνεχίσετε. / Return to the AgoraX app to continue.</p>
+  <p>Επιστρέψτε στην εφαρμογή της Αγοράς για να συνεχίσετε. / Return to the Agora app to continue.</p>
   <a class="btn" href="${deepLink}">Άνοιγμα εφαρμογής / Open app</a>
   <script>
     setTimeout(function () { window.location.href = ${JSON.stringify(intentLink)}; }, 150);

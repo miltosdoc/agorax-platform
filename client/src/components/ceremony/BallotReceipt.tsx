@@ -36,7 +36,7 @@ export function BallotReceipt({ rowHash, castAt, proposalId }: Props) {
     if (!proposalId) return;
     const base = window.location.origin;
     const body = [
-      'AgoraX — Πιστοποιητικό Καταχώρησης Ψήφου / Ballot Inclusion Certificate',
+      'Αγορά / Agora — Πιστοποιητικό Καταχώρησης Ψήφου / Ballot Inclusion Certificate',
       '='.repeat(72),
       '',
       `Πρόταση / Proposal: ${base}/proposals/${proposalId}`,
@@ -61,7 +61,7 @@ export function BallotReceipt({ rowHash, castAt, proposalId }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `agorax-ballot-${proposalId}-${rowHash.slice(0, 8)}.txt`;
+    a.download = `agora-ballot-${proposalId}-${rowHash.slice(0, 8)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -89,7 +89,7 @@ export function BallotReceipt({ rowHash, castAt, proposalId }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-2)' }}>
           <AgoraSeal className="h-16 w-16 text-bronze" />
           <span style={{ fontSize: 'var(--fs-cap, .75rem)', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: 'var(--bronze)' }}>
-            AgoraX · {t('nav.home') === 'Home' ? 'Digital Democracy' : 'Ψηφιακή Δημοκρατία'}
+            {t('brand.name')} · {t('nav.home') === 'Home' ? 'Digital Democracy' : 'Ψηφιακή Δημοκρατία'}
           </span>
         </div>
 

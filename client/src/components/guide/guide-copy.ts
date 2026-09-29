@@ -82,7 +82,7 @@ export interface GuideCopy {
 
 const el: GuideCopy = {
   eyebrow: 'Οδηγός χρήσης',
-  title: 'Η AgoraX σε 8 βήματα',
+  title: 'Η Αγορά σε 8 βήματα',
   lede: 'Από την εγγραφή μέχρι την πρώτη σας απόφαση. Ο οδηγός παίζει μόνος του σαν βίντεο· πατήστε ένα βήμα για να πάτε κατευθείαν εκεί.',
   length: 'περίπου 2 λεπτά',
   play: 'Αναπαραγωγή',
@@ -189,7 +189,7 @@ const el: GuideCopy = {
       path: '/feed',
       shots: [
         { caption: 'Στη βιβλιοθήκη μοιράζεστε ήχο, βίντεο και έγγραφα με την κοινότητα.', target: 'library', ms: 3000 },
-        { caption: 'Για κάθε ψηφοφορία η AgoraX γράφει σενάριο για podcast και βίντεο.', target: 'media', ms: 3000 },
+        { caption: 'Για κάθε ψηφοφορία η Αγορά γράφει σενάριο για podcast και βίντεο.', target: 'media', ms: 3000 },
         { caption: 'Βιντεοκλήσεις, δημοσκοπήσεις με ανώνυμο πάνελ και ειδοποιήσεις στο κινητό.', target: 'meet', ms: 3600 },
       ],
       text: 'Κάθε κοινότητα έχει βιβλιοθήκη και βιντεοκλήσεις. Το Media Studio γράφει σενάρια για podcast και βίντεο, οι Δημοσκοπήσεις μετρούν τη γνώμη με ανώνυμο πάνελ, και οι ειδοποιήσεις σας κρατούν ενήμερους και στο κινητό.',
@@ -241,7 +241,7 @@ const el: GuideCopy = {
 
 const en: GuideCopy = {
   eyebrow: 'User guide',
-  title: 'AgoraX in 8 steps',
+  title: 'Agora in 8 steps',
   lede: 'From signing up to your first decision. The guide plays by itself like a video; tap a step to jump straight there.',
   length: 'about 2 minutes',
   play: 'Play',
@@ -348,7 +348,7 @@ const en: GuideCopy = {
       path: '/feed',
       shots: [
         { caption: 'In the library you share audio, video and documents with the community.', target: 'library', ms: 3000 },
-        { caption: 'For every vote AgoraX writes a script for a podcast and a video.', target: 'media', ms: 3000 },
+        { caption: 'For every vote Agora writes a script for a podcast and a video.', target: 'media', ms: 3000 },
         { caption: 'Video calls, polls with an anonymous panel, and notifications on your phone.', target: 'meet', ms: 3600 },
       ],
       text: 'Every community has a library and video calls. The Media Studio writes scripts for podcasts and videos, Polls measure opinion with an anonymous panel, and notifications keep you up to date on your phone too.',

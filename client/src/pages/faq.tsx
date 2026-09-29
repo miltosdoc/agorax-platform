@@ -61,8 +61,8 @@ export default function FAQPage() {
   const [open, setOpen] = useState<string[]>([]);
 
   useEffect(() => {
-    document.title = `AgoraX — ${copy.title}`;
-  }, [copy.title]);
+    document.title = `${t('brand.name')} — ${copy.title}`;
+  }, [copy.title, t]);
 
   // Text of an item as the reader sees it, including answers from locale keys.
   const tx = (key: string) => t(key as Parameters<typeof t>[0]);

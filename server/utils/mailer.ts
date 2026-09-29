@@ -68,7 +68,7 @@ export function areNotificationEmailsEnabled(): boolean {
 
 /** `AgoraX <no-reply@mail.agoraxdemocracy.com>` — the envelope and header From. */
 export function mailFrom(): string {
-  return process.env.MAIL_FROM || 'AgoraX <no-reply@mail.agoraxdemocracy.com>';
+  return process.env.MAIL_FROM || 'Αγορά <no-reply@mail.agoraxdemocracy.com>';
 }
 
 /**

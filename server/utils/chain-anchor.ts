@@ -168,7 +168,7 @@ export class GitHubAnchorPublisher implements AnchorPublisher {
     if (probe.status !== 404) await this.fail(probe, 'branch probe failed');
 
     const readme =
-      '# AgoraX vote-chain anchors\n\n' +
+      '# Agora vote-chain anchors\n\n' +
       'One file per proposal under `anchors/`, one JSON line per anchor, append-only.\n' +
       'Each line publishes the SHA-256 head of that proposal\'s vote chain at a point in time.\n' +
       'No ballots, choices or voters are recorded here. Verification procedure:\n' +

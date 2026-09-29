@@ -529,8 +529,8 @@ export function registerLivekitRoutes(app: Express): void {
         // want in the calendar entry — otherwise the generic label.
         description: room.description?.trim()
           || (room.kind === 'sortition'
-            ? 'Σύσκεψη κληρωτού σώματος στο AgoraX'
-            : 'Συνάντηση κοινότητας στο AgoraX'),
+            ? 'Σύσκεψη κληρωτού σώματος στην Αγορά'
+            : 'Συνάντηση κοινότητας στην Αγορά'),
         url: landingUrl,
         start: start ? new Date(start) : new Date(),
         durationMinutes: 60,

@@ -72,7 +72,7 @@ export function useShare() {
     const url = getPollUrl(pollId);
     const cleanText = stripHtml(description || title);
     const text = encodeURIComponent(cleanText);
-    const shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(url)}&hashtags=AgoraX`;
+    const shareUrl = `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(url)}&hashtags=Agora`;
     window.open(shareUrl, '_blank', 'width=550,height=420');
   };
 

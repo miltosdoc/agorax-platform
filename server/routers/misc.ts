@@ -31,13 +31,13 @@ function renderOgPage(opts: { url: string; title: string; description: string; i
 <html lang="el">
 <head>
     <meta charset="UTF-8">
-    <title>${title} - AgoraX</title>
+    <title>${title} - Αγορά</title>
     <meta property="og:type" content="article">
     <meta property="og:url" content="${opts.url}">
     <meta property="og:title" content="${title}">
     <meta property="og:description" content="${description}">
     <meta property="og:image" content="${opts.image}">
-    <meta property="og:site_name" content="AgoraX">
+    <meta property="og:site_name" content="Αγορά">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${title}">
     <meta name="twitter:description" content="${description}">
@@ -48,7 +48,7 @@ function renderOgPage(opts: { url: string; title: string; description: string; i
     <div style="font-family: Arial; max-width: 600px; margin: 2rem auto; padding: 2rem;">
         <h1>${title}</h1>
         <p>${description}</p>
-        <a href="${opts.url}" style="background: #2563eb; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; display: inline-block;">Άνοιγμα στο AgoraX</a>
+        <a href="${opts.url}" style="background: #2563eb; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; display: inline-block;">Άνοιγμα στην Αγορά</a>
     </div>
 </body>
 </html>`;
@@ -68,7 +68,7 @@ export function registerMiscRoutes(app: Express): void {
       if (!proposal) return next();
       const [community] = await db.select().from(communities).where(eq(communities.id, proposal.communityId)).limit(1);
       const base = `${req.protocol}://${req.get('host')}`;
-      const description = `${(proposal.solution ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)} — Πρόταση στην κοινότητα ${community?.name ?? 'AgoraX'}. Συμμετοχή στη συνδιαμόρφωση στο AgoraX.`;
+      const description = `${(proposal.solution ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)} — Πρόταση στην κοινότητα ${community?.name ?? 'Αγορά'}. Συμμετοχή στη συνδιαμόρφωση στην Αγορά.`;
       res.send(renderOgPage({
         url: `${base}/proposals/${id}`,
         title: proposal.question,
@@ -88,7 +88,7 @@ export function registerMiscRoutes(app: Express): void {
       if (!poll || (poll.status !== 'live' && poll.status !== 'closed')) return next();
       const base = `${req.protocol}://${req.get('host')}`;
       const tierNote = poll.tier === 'certified'
-        ? 'Πιστοποιημένη δημοσκόπηση AgoraX'
+        ? 'Πιστοποιημένη δημοσκόπηση της Αγοράς'
         : 'Κοινοτική (ανεπίσημη) δημοσκόπηση';
       const action = poll.status === 'live'
         ? '🗳️ Συμμετοχή τώρα — ανώνυμα, με πλήρη μεθοδολογική διαφάνεια.'
@@ -111,7 +111,7 @@ export function registerMiscRoutes(app: Express): void {
       const [community] = await db.select().from(communities).where(eq(communities.id, id)).limit(1);
       if (!community) return next();
       const base = `${req.protocol}://${req.get('host')}`;
-      const description = `${(community.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)} — Κοινότητα στο AgoraX. Συμμετοχή στη συνδιαμόρφωση, τις προτάσεις και τις τηλεδιασκέψεις.`.trim();
+      const description = `${(community.description ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)} — Κοινότητα στην Αγορά. Συμμετοχή στη συνδιαμόρφωση, τις προτάσεις και τις τηλεδιασκέψεις.`.trim();
       res.send(renderOgPage({
         url: `${base}/communities/${id}`,
         title: community.name,
@@ -147,7 +147,7 @@ export function registerMiscRoutes(app: Express): void {
         : '';
       // Optimized description for social sharing
       const shareDescription = cleanDescription
-        ? `${cleanDescription.substring(0, 150)}... 🗳️ Ψηφίστε στο AgoraX!`
+        ? `${cleanDescription.substring(0, 150)}... 🗳️ Ψηφίστε στην Αγορά!`
         : `🗳️ Συμμετέχετε στην ψηφοφορία και εκφράστε τη γνώμη σας!`;
       const pollUrl = `${req.protocol}://${req.get('host')}/polls/${pollId}`;
       const ogImage = `${req.protocol}://${req.get('host')}/api/og-image/${pollId}?v=3`;
@@ -156,7 +156,7 @@ export function registerMiscRoutes(app: Express): void {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${poll.title} - AgoraX</title>
+    <title>${poll.title} - Αγορά</title>
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="article">
     <meta property="og:url" content="${pollUrl}">
@@ -166,7 +166,7 @@ export function registerMiscRoutes(app: Express): void {
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type" content="image/png">
-    <meta property="og:site_name" content="AgoraX">
+    <meta property="og:site_name" content="Αγορά">
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${poll.title}">
@@ -215,7 +215,7 @@ export function registerMiscRoutes(app: Express): void {
         ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 64px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('AgoraX', width / 2, height / 2);
+        ctx.fillText('Αγορά', width / 2, height / 2);
       }
       // Convert to PNG buffer
       const pngBuffer = canvas.toBuffer('image/png');
@@ -407,7 +407,7 @@ export function registerMiscRoutes(app: Express): void {
       + '<body style="font:16px/1.6 system-ui;max-width:34rem;margin:15vh auto;padding:0 1.5rem;color:#14212E">'
       + '<h1 style="font:400 1.6rem Georgia,serif">Χωρίς πρόσβαση</h1>'
       + '<p>Η αναφορά ανατροφοδότησης είναι διαθέσιμη μόνο σε διαχειριστές.</p>'
-      + '<p><a href="/" style="color:#0B4C8C">Επιστροφή στο AgoraX</a></p>',
+      + '<p><a href="/" style="color:#0B4C8C">Επιστροφή στην Αγορά</a></p>',
     );
   };
 

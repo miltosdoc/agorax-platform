@@ -338,7 +338,7 @@ describe('signed-out pages', () => {
     'client/src/pages/verify-email.tsx',
   ];
 
-  it('all use the shared AgoraX shell', () => {
+  it('all use the shared Agora shell', () => {
     for (const p of pages) {
       const src = read(p);
       expect(src, `${p} is not in the shell`).toMatch(/<AuthShell/);

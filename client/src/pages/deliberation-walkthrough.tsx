@@ -20,13 +20,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 
 export default function DeliberationWalkthrough() {
-  const { locale } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   const copy = GUIDE_COPY[locale === 'en' ? 'en' : 'el'];
 
   useEffect(() => {
-    document.title = `AgoraX — ${copy.eyebrow}`;
-  }, [copy.eyebrow]);
+    document.title = `${t('brand.name')} — ${copy.eyebrow}`;
+  }, [copy.eyebrow, t]);
 
   return (
     <AppShell>

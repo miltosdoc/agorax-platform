@@ -119,7 +119,7 @@ describe.skipIf(!generated)('feedback review page', () => {
     if (r.n > 0) expect(r.shown).toBe(true);
   });
 
-  it('wears the AgoraX masthead and colophon, not a bare report page', () => {
+  it('wears the Agora masthead and colophon, not a bare report page', () => {
     const html = fs.readFileSync(REVIEW, 'utf8');
     expect(html).toContain('class="masthead"');
     expect(html).toContain('class="beta"');   // η πλατφόρμα δηλώνει ότι είναι Beta παντού

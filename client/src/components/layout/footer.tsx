@@ -131,7 +131,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 py-14 md:grid-cols-2 lg:grid-cols-12">
           {/* ── Wordmark, tagline, support ── */}
           <div className="lg:col-span-3">
-            <Link href="/" className="inline-block" aria-label="AgoraX">
+            <Link href="/" className="inline-block" aria-label={t('brand.name')}>
               <AgoraLogo tone="ink" tagline className="h-16 w-auto" />
             </Link>
             <p className="mt-4 max-w-[34ch] text-sm leading-relaxed text-bc-ink-soft">
@@ -224,7 +224,7 @@ export default function Footer() {
           </p>
           <div className="flex items-center gap-4">
             <p className="font-mono text-xs tabular-nums text-bc-ink-soft">
-              © {new Date().getFullYear()} AgoraX
+              © {new Date().getFullYear()} {t('brand.name')}
             </p>
             <div className="flex items-center gap-2">
               {SUPPORTED_LOCALES.map((code) => (
