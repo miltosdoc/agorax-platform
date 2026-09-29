@@ -133,7 +133,7 @@ export default function Header() {
                 votes are advisory (Terms §7) and the rules still move. It
                 hangs under the letters, where the full logo has its tagline. */}
             <span
-              className="absolute -bottom-2 right-0 rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-px font-sans text-[8px] font-semibold uppercase leading-none tracking-[0.14em] text-kyanos"
+              className="absolute -bottom-2 right-0 rounded-sm border border-kyanos/40 bg-kyanos-wash px-1 py-px font-sans text-[8px] font-bold uppercase leading-none tracking-[0.12em] text-kyanos"
               data-testid="badge-beta"
             >
               Beta

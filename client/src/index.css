@@ -45,9 +45,14 @@
     --bc-ink: #F2F6FA;     --bc-ink-soft: #93A6BA;
     --bc-yper: #56A96E;    --bc-kata: #C75A50;   --bc-apochi: #66788C;  --bc-live: #D0342C;
     /* ── Type ── */
-    --font-display: "GFS Didot", Georgia, "Times New Roman", serif;
-    --font-ui:      Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Tektur for titles, whose squared letters answer the logo's; Play for
+       the smaller headings and all text. Both carry full Greek. */
+    --font-display: "Tektur", "Play", system-ui, sans-serif;
+    --font-heading: "Play", Inter, system-ui, sans-serif;
+    --font-ui:      "Play", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-data:    "IBM Plex Mono", Menlo, Consolas, monospace;
+    --display-weight: 500;
+    --heading-weight: 700;
     /* ── Space (4px base) ── */
     --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
     --sp-6: 1.5rem;  --sp-8: 2rem;   --sp-12: 3rem;   --sp-16: 4rem; --sp-24: 6rem;
@@ -272,6 +277,8 @@
 
   [data-accent="marble"] {
     --font-display: "GFS Didot", Georgia, "Times New Roman", serif;
+    --font-heading: "GFS Didot", Georgia, "Times New Roman", serif;
+    --display-weight: 400; --heading-weight: 400;
     --paper:        #F6F1E7;
     --surface:      #FCFAF5;
     --sunken:       #EEE7D8;
@@ -368,6 +375,7 @@
   }
   [data-accent="spray"] {
     --font-display: "Roboto Condensed", Impact, "Arial Narrow", sans-serif; --radius: 0.25rem;
+    --font-heading: "Roboto Condensed", Impact, "Arial Narrow", sans-serif; --display-weight: 400;
     --paper:        #121212;
     --surface:      #1B1B1B;
     --sunken:       #232323;
@@ -420,6 +428,7 @@
   }
   [data-accent="poster"] {
     --font-display: "Fira Sans", "Arial Black", Impact, sans-serif; --radius: 1rem;
+    --font-heading: "Fira Sans", "Arial Black", Impact, sans-serif; --display-weight: 400;
     --paper:        #FFFCF2;
     --surface:      #FFFFFF;
     --sunken:       #F4EFDF;
@@ -467,8 +476,8 @@
      The four sketch-born themes change more than colour. Spray and
      Poster set condensed and heavy display faces with Greek glyphs
      (the sketches' Anton and Archivo Black have none) and uppercase
-     the serif headings; Marble draws a meander rule under the header.
-     Body copy stays Inter in every theme. ── */
+     the display headings; Marble keeps GFS Didot and draws a meander
+     rule under the header. Body copy is Play in every theme. ── */
   .theme-rule { display: none; }
   [data-accent="marble"] .theme-rule {
     display: block; height: 12px; margin: 0 16px;
@@ -547,13 +556,22 @@
     line-height: 1.6;
   }
 
-  /* Headings speak in the display serif (GFS Didot) — Greek state
-     typography, set at its natural weight. Balanced, never crammed. */
+  /* Titles (h1, h2) speak in the display face, smaller headings (h3, h4)
+     in the heading face, bold. Balanced, never crammed. */
   h1, h2, h3, h4 {
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: var(--display-weight);
     letter-spacing: 0;
     text-wrap: balance;
+  }
+  h3, h4 {
+    font-family: var(--font-heading);
+    font-weight: var(--heading-weight);
+  }
+  /* The display class at card-title sizes is a smaller heading too. */
+  .font-serif:is(.text-xs, .text-sm, .text-base, .text-lg, .text-xl) {
+    font-family: var(--font-heading);
+    font-weight: var(--heading-weight);
   }
 
   h1 {
