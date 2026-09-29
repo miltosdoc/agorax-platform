@@ -59,7 +59,7 @@ function CommunityRailCard({ community }: { community: CommunityCardData }) {
         <div className="min-w-0 flex-1">
           <Link
             href={`/communities/${community.id}`}
-            className="line-clamp-2 text-sm font-semibold leading-snug text-ink hover:text-kyanos"
+            className="line-clamp-2 text-sm leading-snug text-ink hover:text-kyanos"
           >
             {community.name}
           </Link>

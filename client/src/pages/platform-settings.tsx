@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
+import { LogoLoader } from "@/components/brand/LogoLoader";
 
 interface PlatformSetting {
   id: number;
@@ -138,7 +139,7 @@ export function PlatformSettingsPage() {
     return (
       <AppShell title={t("platformSettings.title")}>
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          <LogoLoader className="h-10 w-auto text-kyanos" />
         </div>
       </AppShell>
     );

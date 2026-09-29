@@ -234,7 +234,7 @@ export default function FAQPage() {
                       id={`q-${item.id}`}
                       className="scroll-mt-24 rounded-sm border border-line bg-surface px-4 transition-colors data-[state=open]:border-line-strong sm:px-5"
                     >
-                      <AccordionTrigger className="gap-4 py-4 text-left text-base font-semibold text-ink hover:no-underline sm:text-[1.05rem]">
+                      <AccordionTrigger className="gap-4 py-4 text-left text-[1.05rem] font-normal text-ink hover:no-underline sm:text-lg">
                         {question(item)}
                       </AccordionTrigger>
                       <AccordionContent className="pb-5 text-[0.95rem] leading-relaxed text-ink-soft">

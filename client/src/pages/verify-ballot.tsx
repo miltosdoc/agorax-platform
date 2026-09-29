@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 import { auditBallotBox, type AuditReport } from '@/lib/ballot-box-audit';
+import { AgoraSeal } from '@/components/brand/AgoraSeal';
 
 type Lang = 'el' | 'en';
 type Mode = 'box' | 'ballot';
@@ -293,9 +294,7 @@ export default function VerifyBallotPage() {
         <div className="container mx-auto px-4 max-w-2xl">
           {/* ── Hero ── */}
           <div className="text-center mb-8">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <ShieldCheck className="h-7 w-7" />
-            </div>
+            <AgoraSeal className="mx-auto mb-4 h-16 w-16 text-kyanos" />
             <h1 className="text-3xl font-serif font-bold mb-3">{s.title}</h1>
             <p className="text-muted-foreground mx-auto max-w-prose">{s.subtitle}</p>
           </div>
@@ -474,7 +473,7 @@ export default function VerifyBallotPage() {
               {/* ── Single-ballot result ── */}
               {mode === 'ballot' && state === 'genuine' && (
                 <div className="rounded-md border border-emerald-300 bg-emerald-50 p-4 flex gap-3 items-start" data-testid="verify-genuine">
-                  <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+                  <AgoraSeal className="h-12 w-12 shrink-0 text-emerald-700" />
                   <div>
                     <p className="font-semibold text-emerald-800">{s.genuinePlain}</p>
                     {castAt && <p className="text-sm text-emerald-800/80 mt-1">{s.genuineAt} {fmt(castAt)}</p>}

@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Clock, Flame } from 'lucide-react';
 import { Link } from 'wouter';
 import { useTranslation } from '@/hooks/use-translation';
+import { LogoLoader } from '@/components/brand/LogoLoader';
 
 interface Community {
   id: number;
@@ -49,7 +50,7 @@ export function CommunityList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ink" />
+        <LogoLoader className="h-10 w-auto text-kyanos" />
       </div>
     );
   }

@@ -17,6 +17,7 @@ import { Loader2, MailOpen, ShieldX } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
+import { LogoLoader } from '@/components/brand/LogoLoader';
 
 interface InvitePreview {
   token: string;
@@ -81,7 +82,7 @@ export default function InviteAcceptPage() {
     if (loading || authLoading) {
       return (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-border" />
+          <LogoLoader className="h-10 w-auto text-kyanos" />
         </div>
       );
     }

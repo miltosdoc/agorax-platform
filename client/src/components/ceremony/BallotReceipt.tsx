@@ -2,12 +2,13 @@
  * CEREMONY I — the ballot receipt.
  *
  * Casting a vote is an event. The confirmation is rendered as an official
- * document: paper ground, serif crest, bronze meander thresholds, and the
+ * document: paper ground, the logo's seal, bronze meander thresholds, and the
  * cryptographic fingerprint set like an engraved certificate number.
  * Content is the voter's real, locally-stored receipt — the server cannot
  * produce this; only this device holds it.
  */
 import { useTranslation } from '@/hooks/use-translation';
+import { AgoraSeal } from '@/components/brand/AgoraSeal';
 import { GreekKeyRule } from './GreekKeyRule';
 
 interface Props {
@@ -84,13 +85,9 @@ export function BallotReceipt({ rowHash, castAt, proposalId }: Props) {
     >
       <GreekKeyRule />
       <div style={{ padding: 'var(--sp-8)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
-        {/* Crest */}
+        {/* Seal */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--sp-2)' }}>
-          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" stroke="var(--bronze)" strokeWidth="1.4" aria-hidden="true">
-            <path d="M6 28 C2 20 2 10 8 3 C9 11 8 19 12 26" />
-            <path d="M38 28 C42 20 42 10 36 3 C35 11 36 19 32 26" />
-            <circle cx="22" cy="17" r="3.2" />
-          </svg>
+          <AgoraSeal className="h-16 w-16 text-bronze" />
           <span style={{ fontSize: 'var(--fs-cap, .75rem)', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: 'var(--bronze)' }}>
             AgoraX · {t('nav.home') === 'Home' ? 'Digital Democracy' : 'Ψηφιακή Δημοκρατία'}
           </span>

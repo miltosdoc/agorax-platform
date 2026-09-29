@@ -18,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { api, ApiError } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { usernameChangeAvailableAt } from "@shared/user-identity";
+import { LogoLoader } from '@/components/brand/LogoLoader';
 
 /**
  * Editing the two identity fields.
@@ -190,7 +191,7 @@ export default function ProfilePage() {
     return (
       <AppShell>
         <div className="flex items-center justify-center min-h-[40vh]">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <LogoLoader className="h-10 w-auto text-kyanos" />
         </div>
       </AppShell>
     );

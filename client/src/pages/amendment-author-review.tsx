@@ -17,6 +17,7 @@ import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { api } from '@/lib/api';
 import { ArrowLeft, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
+import { LogoLoader } from '@/components/brand/LogoLoader';
 
 interface Amendment {
   id: number;
@@ -122,7 +123,7 @@ export default function AmendmentAuthorReview() {
         <Header />
         <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+            <LogoLoader className="h-10 w-auto text-kyanos" />
           </div>
         </div>
         <Footer />

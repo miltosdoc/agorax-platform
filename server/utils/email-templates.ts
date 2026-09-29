@@ -2,9 +2,10 @@
  * Every email AgoraX sends, as HTML plus a plain-text twin.
  *
  * Constraints these templates are built to:
- *  - No images. Not a logo, not a spacer, not a tracking pixel. The design
- *    has to survive "images are blocked", which is the default in a lot of
- *    clients, so it must not depend on any.
+ *  - One image only, the logo, and nothing depends on it: its alt text is
+ *    styled as the plain "AgoraX" wordmark the header used to be, so with
+ *    images blocked (the default in a lot of clients) the mail reads the
+ *    same. No spacers, no tracking pixels, no background images.
  *  - Tables and inline styles, because Outlook still does not do flexbox.
  *  - A real text/plain alternative, not a tag-stripped afterthought.
  *  - Every link absolute and built from APP_PUBLIC_URL.
@@ -120,7 +121,7 @@ function renderHtml(parts: ShellParts): string {
         <td align="center" style="padding:24px 12px;">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid ${LINE};border-radius:10px;">
             <tr><td style="padding:28px 28px 8px;">
-              <p style="margin:0 0 4px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND};">AgoraX</p>
+              <p style="margin:0 0 18px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND};"><img src="${esc(publicUrl())}/email-logo.png" width="148" height="34" alt="AgoraX" style="display:block;width:148px;height:34px;border:0;outline:none;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:0.06em;color:${BRAND};"></p>
               <h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;color:${INK};font-weight:700;">${esc(title)}</h1>
             </td></tr>
             <tr><td style="padding:0 28px;">

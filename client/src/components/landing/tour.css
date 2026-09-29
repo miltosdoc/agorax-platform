@@ -2,7 +2,7 @@
    in one of two skins. Navy speaks the ceremony language of the promo film:
    night blue and gold for the dark chapters, parchment and bronze ink for the
    light ones, Tektur for headlines and Play for the smaller ones. Spray is the youth theme: black,
-   lime and magenta, condensed capitals, sprayed blobs and offset shadows.
+   lime and magenta, bold capitals, sprayed blobs and offset shadows.
    Every colour below is a variable so a skin only restates the palette.
    Motion is scroll-scrubbed; under prefers-reduced-motion every scene shows
    its final state and the pinned chapters become ordinary flowing sections. */
@@ -516,8 +516,6 @@
    the gold ceremony gives way to spray blobs, highlighter marks and hard
    offset shadows. */
 .tour[data-skin="spray"] {
-  --display: "Roboto Condensed", Impact, "Arial Narrow", sans-serif;
-  --display-sm: var(--display);
   --night: #0e0e0e;
   --night-2: #1b1b1b;
   --night-2-rgb: 27, 27, 27;

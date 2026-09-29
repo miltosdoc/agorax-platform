@@ -497,8 +497,12 @@ describe('templates', () => {
     expect(templates).toMatch(/return \{ subject, html: renderHtml\(parts\), text: renderText\(parts\) \}/);
   });
 
-  it('uses no images at all, so a client that blocks them loses nothing', () => {
-    expect(templates).not.toMatch(/<img\b/i);
+  it('uses one image only, the logo, so a client that blocks images loses nothing', () => {
+    const imgs = templates.match(/<img\b[^>]*>/gi) ?? [];
+    expect(imgs).toHaveLength(1);
+    // Blocked, the logo shows its alt text: the wordmark the header always had.
+    expect(imgs[0]).toMatch(/alt="AgoraX"/);
+    expect(imgs[0]).toMatch(/\/email-logo\.png/);
     expect(templates).not.toMatch(/background-image/i);
   });
 

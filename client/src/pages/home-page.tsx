@@ -53,7 +53,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-base line-clamp-2 mb-1">{proposal.question}</h3>
+              <h3 className="text-base line-clamp-2 mb-1">{proposal.question}</h3>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5" />

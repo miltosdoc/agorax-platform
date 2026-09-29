@@ -52,7 +52,7 @@
     --font-ui:      "Play", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-data:    "IBM Plex Mono", Menlo, Consolas, monospace;
     --display-weight: 500;
-    --heading-weight: 700;
+    --heading-weight: 400;
     /* ── Space (4px base) ── */
     --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
     --sp-6: 1.5rem;  --sp-8: 2rem;   --sp-12: 3rem;   --sp-16: 4rem; --sp-24: 6rem;
@@ -374,8 +374,7 @@
     --sidebar-ring: 43 57.8% 56.3%;
   }
   [data-accent="spray"] {
-    --font-display: "Roboto Condensed", Impact, "Arial Narrow", sans-serif; --radius: 0.25rem;
-    --font-heading: "Roboto Condensed", Impact, "Arial Narrow", sans-serif; --display-weight: 400;
+    --radius: 0.25rem;
     --paper:        #121212;
     --surface:      #1B1B1B;
     --sunken:       #232323;
@@ -473,11 +472,11 @@
   }
 
   /* ── Per-theme typography and ornament ─────────────────────────────
-     The four sketch-born themes change more than colour. Spray and
-     Poster set condensed and heavy display faces with Greek glyphs
-     (the sketches' Anton and Archivo Black have none) and uppercase
-     the display headings; Marble keeps GFS Didot and draws a meander
-     rule under the header. Body copy is Play in every theme. ── */
+     The four sketch-born themes change more than colour. Spray sets its
+     Tektur titles in bold capitals; Poster sets a heavy display face with
+     Greek glyphs (the sketch's Archivo Black has none) and uppercases its
+     titles too; Marble keeps GFS Didot and draws a meander rule under the
+     header. Body copy is Play in every theme. ── */
   .theme-rule { display: none; }
   [data-accent="marble"] .theme-rule {
     display: block; height: 12px; margin: 0 16px;
@@ -557,7 +556,7 @@
   }
 
   /* Titles (h1, h2) speak in the display face, smaller headings (h3, h4)
-     in the heading face, bold. Balanced, never crammed. */
+     in the heading face at its regular weight. Balanced, never crammed. */
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     font-weight: var(--display-weight);
@@ -716,6 +715,21 @@
   /* Legacy dotted background → plain paper. */
   .bg-subtle {
     background-color: var(--paper);
+  }
+
+  /* The loading sign (components/brand/LogoLoader.tsx): each outer node of
+     the mark lights up in turn, staggered by its inline animation-delay. */
+  .agora-loader-node {
+    opacity: 0;
+    animation: agora-loader-node 1.8s ease-in-out infinite both;
+  }
+  @keyframes agora-loader-node {
+    0% { opacity: 0; }
+    14%, 46% { opacity: 1; }
+    72%, 100% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .agora-loader-node { animation: none; opacity: 1; }
   }
 
   @media (max-width: 640px) {

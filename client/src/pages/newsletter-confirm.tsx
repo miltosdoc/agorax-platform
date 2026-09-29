@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import { useTranslation } from "@/hooks/use-translation";
+import { LogoLoader } from "@/components/brand/LogoLoader";
 
 /**
  * Where the newsletter double opt-in link lands.
@@ -38,7 +39,7 @@ export default function NewsletterConfirmPage() {
       <div className="mx-auto max-w-lg rounded-sm border border-line bg-surface px-6 py-14 text-center">
         {state === "working" && (
           <>
-            <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-ink-faint" aria-hidden="true" />
+            <LogoLoader className="mx-auto mb-4 h-10 w-auto text-kyanos" />
             <p className="text-sm text-ink-soft">{t('common.loading')}</p>
           </>
         )}

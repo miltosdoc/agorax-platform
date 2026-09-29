@@ -32,6 +32,9 @@ const ACCENT = '#0B4C8C';
 const INK = '#14212E';
 const ACCENT_LIGHT = '#7EA6D9';
 const PAPER = '#FAFAF7';
+// A phone in dark mode gets the splash on the Parliament night blue.
+const NIGHT = '#0F1B2B';
+const NIGHT_INK = '#9DBBE3';
 
 const MARK_W = 204.8;
 const MARK_H = 229.76;
@@ -42,7 +45,7 @@ const LOGO_H = 229.76;
  * An SVG canvas of w×h with the mark centred at the given height.
  * `ground` fills the canvas, `shape` ('square' | 'round' | 'rounded') clips it.
  */
-function markSvg({ w, h, markH, ground = null, shape: clip = 'square' }) {
+function markSvg({ w, h, markH, ground = null, shape: clip = 'square', ink = ACCENT }) {
   const s = markH / MARK_H;
   const x = (w - MARK_W * s) / 2;
   const y = (h - markH) / 2;
@@ -53,17 +56,17 @@ function markSvg({ w, h, markH, ground = null, shape: clip = 'square' }) {
     else back = `<rect width="${w}" height="${h}" fill="${ground}"/>`;
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${back}` +
-    `<path transform="translate(${x} ${y}) scale(${s})" d="${MARK}" fill="${ACCENT}"/></svg>`;
+    `<path transform="translate(${x} ${y}) scale(${s})" d="${MARK}" fill="${ink}"/></svg>`;
 }
 
-/** The whole logo, tagline included, centred on a w×h ground. */
-function logoSvg({ w, h, logoW, ground }) {
+/** The whole logo (with its tagline unless told otherwise), centred on a w×h ground. */
+function logoSvg({ w, h, logoW, ground, tagline = true }) {
   const s = logoW / LOGO_W;
   const x = (w - logoW) / 2;
   const y = (h - LOGO_H * s) / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
     `<rect width="${w}" height="${h}" fill="${ground}"/><g transform="translate(${x} ${y}) scale(${s})">` +
-    `<path d="${MARK}${LETTERS_A}" fill="${ACCENT}"/><path d="${LETTERS_B}${TAGLINE}" fill="${INK}"/></g></svg>`;
+    `<path d="${MARK}${LETTERS_A}" fill="${ACCENT}"/><path d="${LETTERS_B}${tagline ? TAGLINE : ''}" fill="${INK}"/></g></svg>`;
 }
 
 async function png(svg, file) {
@@ -95,6 +98,9 @@ await png(markSvg({ w: 180, h: 180, markH: 118, ground: PAPER }), path.join(PUBL
 const share = logoSvg({ w: 1200, h: 630, logoW: 860, ground: PAPER });
 await png(share, path.join(PUBLIC, 'logo-share.png'));
 await jpeg(share, path.join(PUBLIC, 'logo-share.jpg'));
+// The email header (server/utils/email-templates.ts shows it at 148×34):
+// mark and letters at twice that, on the card's white.
+await png(logoSvg({ w: 296, h: 68, logoW: 296, ground: '#FFFFFF', tagline: false }), path.join(PUBLIC, 'email-logo.png'));
 
 // ── Android ─────────────────────────────────────────────────────────────────
 console.log('android');
@@ -107,11 +113,16 @@ for (const [name, k] of Object.entries(DENSITIES)) {
   await png(markSvg({ w: 48 * k, h: 48 * k, markH: 30 * k, ground: '#FFFFFF', shape: 'rounded' }), path.join(dir, 'ic_launcher.png'));
   await png(markSvg({ w: 48 * k, h: 48 * k, markH: 27 * k, ground: '#FFFFFF', shape: 'round' }), path.join(dir, 'ic_launcher_round.png'));
 }
-// Splash screens: the mark on white, a quarter of the short side.
-const splashes = fs.readdirSync(RES).filter((d) => d === 'drawable' || /^drawable-(land|port)-/.test(d));
+// Splash screens: the mark on white, a quarter of the short side, and the
+// same on night blue for a phone in dark mode (the -night folders).
+const splashes = fs.readdirSync(RES).filter((d) => d === 'drawable' || /^drawable-(land|port)-[a-z]*dpi$/.test(d));
 for (const d of splashes) {
   const file = path.join(RES, d, 'splash.png');
   if (!fs.existsSync(file)) continue;
   const { width: w, height: h } = await sharp(file).metadata();
-  await png(markSvg({ w, h, markH: Math.round(Math.min(w, h) * 0.26), ground: '#FFFFFF' }), file);
+  const markH = Math.round(Math.min(w, h) * 0.26);
+  await png(markSvg({ w, h, markH, ground: '#FFFFFF' }), file);
+  const night = path.join(RES, d === 'drawable' ? 'drawable-night' : d.replace(/^(drawable-(?:land|port))-/, '$1-night-'));
+  fs.mkdirSync(night, { recursive: true });
+  await png(markSvg({ w, h, markH, ground: NIGHT, ink: NIGHT_INK }), path.join(night, 'splash.png'));
 }

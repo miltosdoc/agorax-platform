@@ -18,6 +18,7 @@ import { api } from '@/lib/api';
 import { ArrowLeft, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 import { useAuth } from '@/hooks/use-auth';
+import { LogoLoader } from '@/components/brand/LogoLoader';
 
 interface RejectedAmendment {
   id: number;
@@ -143,7 +144,7 @@ export default function AmendmentCommunitySignal() {
         <Header />
         <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+            <LogoLoader className="h-10 w-auto text-kyanos" />
           </div>
         </div>
         <Footer />
