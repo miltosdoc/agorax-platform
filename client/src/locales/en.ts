@@ -184,7 +184,6 @@ const en: TranslationDictionary = {
   'contact.failed': 'Message not sent',
   'auth.loginSuccess': 'Login successful',
   'auth.registerSuccess': 'Registration successful',
-  'auth.logoutSuccess': 'Logged out successfully',
   'auth.heroTitle': 'Welcome to the co-drafting and participatory governance platform',
   'auth.heroSubtitle': 'AgoraX is a platform where you create communities and decide together: take an issue through co-drafting or straight to a vote, and measure what members think through anonymous polls.',
   'auth.heroFeature1Title': 'Submit proposals',

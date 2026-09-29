@@ -67,7 +67,6 @@ export default function Header() {
 
   const handleLogout = () => {
     setIsAccountOpen(false);
-    navigate("/");
     logoutMutation.mutate();
   };
 

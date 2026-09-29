@@ -81,12 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
-      toast({
-        title: t('auth.logout'),
-        description: t('auth.logoutSuccess'),
-        variant: "default",
-      });
+      // Signed out, you land on the front page, loaded afresh: nothing of the
+      // session stays in memory. Navigating inside the app raced the auth
+      // context, which still held the user for a tick, so the front page
+      // sent you on to /feed and /feed on to the sign-in form.
+      window.location.assign("/");
     },
     onError: (error: Error) => {
       toast({
