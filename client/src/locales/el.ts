@@ -2051,6 +2051,8 @@ const el: TranslationDictionary = {
   'proposal.form_optional': 'προαιρετικά',
   'proposal.form_text_over': 'Ξεπερνά το όριο των {max} χαρακτήρων κατά {over}. Συντομεύστε το ή επισυνάψτε το ως έγγραφο.',
   'proposal.form_text_over_statute': 'Ξεπερνά το όριο των {max} χαρακτήρων κατά {over}. Αν πρόκειται για καταστατικό, επιλέξτε «{statute}»: χωράει έως {statuteMax}.',
+  'proposal.form_articles_found': 'Βρέθηκαν {n} άρθρα. Στη συνδιαμόρφωση κάθε τροπολογία δηλώνει σε ποιο άρθρο αναφέρεται, και το AI αλλάζει μόνο εκείνο.',
+  'proposal.form_articles_hint': 'Το κείμενο έχει {n} άρθρα. Ως «{statute}» με συνδιαμόρφωση, οι τροπολογίες γίνονται ανά άρθρο.',
   'proposal.form_ai_too_long': 'Το κείμενο έχει {n} χαρακτήρες· το AI δέχεται έως {max}.',
   'proposal.form_answers': 'Απαντήσεις',
   'proposal.form_answers_yesno': 'Ναι / Όχι',

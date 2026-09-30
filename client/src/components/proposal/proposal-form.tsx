@@ -41,6 +41,7 @@ import {
   TEXT_MAX_CHARS, enabledKinds, kindAllowsDeliberation, kindCollectsOptions, kindRequiresOptions, kindRequiresText,
   majorityFraction, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, type ProposalKind,
 } from '@shared/proposal-kinds';
+import { statuteSections } from '@shared/statute-articles';
 import { hoursLabel } from '@/lib/governable-setting-labels';
 
 interface ProposalFormProps {
@@ -207,6 +208,9 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   // The attached document being read into the text, and how that went.
   const [readingDoc, setReadingDoc] = useState<string | null>(null);
   const [docNote, setDocNote] = useState<{ ok: boolean; text: string } | null>(null);
+  // Set once a document's text is in the field. From then on the text is
+  // the author's document, which the AI fill must not replace.
+  const docFilledRef = useRef(false);
 
   // Which button triggered the form submit: 'save' keeps the proposal as a
   // draft, 'submit' also starts it right away. Both buttons are
@@ -286,6 +290,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         return;
       }
       setFormData((prev) => ({ ...prev, solution: text }));
+      docFilledRef.current = true;
       setDocNote({ ok: true, text: t('proposal.doc_text_filled', { name: file.name }) });
     } catch (e) {
       setDocNote({ ok: false, text: e instanceof Error && e.message ? e.message : t('proposal.doc_text_failed') });
@@ -330,7 +335,15 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   }
 
   async function handleAiDraft() {
-    if (aiIntent.trim().length < 10) return;
+    // A text that came from an attached document is the proposal itself. The
+    // AI reads its opening to fill in the rest of the form and leaves it as
+    // it is: it never sees the whole document, so whatever it wrote in its
+    // place would be a summary — a 32,000-character statute came back as 191.
+    const keepText = docFilledRef.current && solutionRef.current.trim().length > 0;
+    const intent = keepText
+      ? `${aiIntent.trim()}\n\n[Η αρχή του συνημμένου εγγράφου· το πλήρες κείμενό του μένει όπως είναι]\n${solutionRef.current.slice(0, 3000)}`.trim()
+      : aiIntent.trim();
+    if (intent.length < 10) return;
     setAiLoading(true);
     setAiError(null);
     setAiFilled(false);
@@ -339,15 +352,15 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
         kind?: string; question: string; solution?: string; category: string;
         track?: string; votingDurationHours?: number | null; ballotOptions?: unknown[] | null;
       }>('/api/proposals/compile', {
-        intent: aiIntent.trim(),
+        intent,
         ...(targetCommunityId ? { communityId: targetCommunityId } : {}),
       });
       const d = resp.data;
-      setFormData({
+      setFormData((prev) => ({
         question: d.question,
-        solution: d.solution ?? '',
+        solution: keepText ? prev.solution : (d.solution ?? ''),
         category: d.category,
-      });
+      }));
       // The AI also reads what kind of vote this is, the track, the length
       // and the options — applied to the controls in create mode only; the
       // author can still change every one of them.
@@ -519,6 +532,12 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     statuteMax: formatCount(TEXT_MAX_CHARS),
   });
   const aiOver = aiIntent.length > TEXT_MAX_CHARS;
+  // The articles the text is laid out in, shown as soon as there are any:
+  // for a statute they are what each amendment will name.
+  const articles = useMemo(
+    () => statuteSections(formData.solution)?.filter((a) => a.heading) ?? null,
+    [formData.solution],
+  );
   // The community's terms for this kind, in one line, so the author sees the
   // rules they are choosing within rather than discovering them on submit.
   const rulesSummary = [
@@ -591,7 +610,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
               type="button"
               size="sm"
               onClick={handleAiDraft}
-              disabled={aiLoading || aiIntent.trim().length < 10 || aiOver}
+              disabled={aiLoading || (aiIntent.trim().length < 10 && !(docFilledRef.current && textLength > 0)) || aiOver}
               data-testid="proposal-ai-draft"
             >
               {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
@@ -842,6 +861,18 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                   </p>
                 </div>
               )}
+              {articles && (kind === 'statute' ? (
+                <details className="text-xs text-muted-foreground" data-testid="proposal-articles">
+                  <summary className="cursor-pointer">{t('proposal.form_articles_found', { n: articles.length })}</summary>
+                  <ul className="mt-1.5 space-y-0.5 pl-4">
+                    {articles.map((a) => <li key={a.ref}>{a.heading}</li>)}
+                  </ul>
+                </details>
+              ) : !editProposalId && kinds.includes('statute') ? (
+                <p className="text-xs text-muted-foreground" data-testid="proposal-articles-hint">
+                  {t('proposal.form_articles_hint', { n: articles.length, statute: t('proposal.kind_statute') })}
+                </p>
+              ) : null)}
               <input
                 ref={attachRef}
                 type="file"

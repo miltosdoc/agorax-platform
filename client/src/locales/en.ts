@@ -2049,6 +2049,8 @@ const en: TranslationDictionary = {
   'proposal.form_optional': 'optional',
   'proposal.form_text_over': 'Over the {max}-character limit by {over}. Shorten it or attach it as a document.',
   'proposal.form_text_over_statute': 'Over the {max}-character limit by {over}. If this is a statute, choose "{statute}": it takes up to {statuteMax}.',
+  'proposal.form_articles_found': '{n} articles found. In co-drafting each amendment names the article it changes, and the AI changes only that one.',
+  'proposal.form_articles_hint': 'The text has {n} articles. As a "{statute}" with co-drafting, amendments are made article by article.',
   'proposal.form_ai_too_long': 'The text has {n} characters; the AI takes up to {max}.',
   'proposal.form_answers': 'Answers',
   'proposal.form_answers_yesno': 'Yes / No',
