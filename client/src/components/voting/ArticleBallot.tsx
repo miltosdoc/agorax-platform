@@ -150,7 +150,7 @@ export function ArticleBallotForm({ ballot, initial, disabled, onSubmit, onCance
                       </summary>
                       <div className="mt-2 space-y-2">
                         {q.versions.map((text, v) => (
-                          <div key={v} className="max-h-56 overflow-y-auto whitespace-pre-wrap border-l-2 pl-3 text-xs text-muted-foreground">
+                          <div key={v} className="max-h-72 overflow-y-auto whitespace-pre-wrap border-l-2 pl-3 text-sm leading-relaxed text-foreground">
                             {q.versions.length > 1 && (
                               <div className="mb-1 font-medium text-foreground">{t('vote.article_version', { letter: versionName(v) })}</div>
                             )}
@@ -221,7 +221,7 @@ export function ArticleResults({ ballot, results, closed, onRedraft }: ArticleRe
             {t(closed ? 'vote.article_results_adopted' : 'vote.article_results_carrying', { n: carrying, total: results.length })}
           </span>
         </summary>
-        <ul className="divide-y border-t text-xs">
+        <ul className="divide-y border-t text-sm">
           {results.map((r, i) => {
             const q = ballot.articles[i];
             const ok = closed ? r.adopted : r.passes;
@@ -231,7 +231,7 @@ export function ArticleResults({ ballot, results, closed, onRedraft }: ArticleRe
             return (
               <li key={r.ref} className="flex items-center gap-2 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate" title={r.heading}>{r.heading}</span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">
+                <span className="shrink-0 text-xs tabular-nums text-foreground/80">
                   {counts} · {t('vote.article_no')} {r.no} · – {r.abstain}
                 </span>
                 <Badge variant={ok ? 'default' : 'secondary'} className="shrink-0">

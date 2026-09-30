@@ -43,6 +43,7 @@ import {
 } from '@shared/proposal-kinds';
 import { statuteSections } from '@shared/statute-articles';
 import { isArticleBallot } from '@shared/article-ballot';
+import { ArticlePreview } from '@/components/proposal/ArticlePreview';
 import { hoursLabel } from '@/lib/governable-setting-labels';
 
 interface ProposalFormProps {
@@ -892,18 +893,11 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
                   </p>
                 </div>
               )}
-              {articles && (kind === 'statute' ? (
-                <details className="text-xs text-muted-foreground" data-testid="proposal-articles">
-                  <summary className="cursor-pointer">{t('proposal.form_articles_found', { n: articles.length })}</summary>
-                  <ul className="mt-1.5 space-y-0.5 pl-4">
-                    {articles.map((a) => <li key={a.ref}>{a.heading}</li>)}
-                  </ul>
-                </details>
-              ) : !editProposalId && kinds.includes('statute') ? (
+              {articles && kind !== 'statute' && !editProposalId && kinds.includes('statute') && (
                 <p className="text-xs text-muted-foreground" data-testid="proposal-articles-hint">
                   {t('proposal.form_articles_hint', { n: articles.length, statute: t('proposal.kind_statute') })}
                 </p>
-              ) : null)}
+              )}
               <input
                 ref={attachRef}
                 type="file"
@@ -961,6 +955,15 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
                 {t('proposal.attach_document')}
                 <span className="text-xs">· {t('media.docSizeLimit')}</span>
               </button>
+              {/* The ballot the statute will have, while it can still be fixed. */}
+              {articles && kind === 'statute' && (
+                <ArticlePreview
+                  text={formData.solution}
+                  onChange={(solution) => setFormData((prev) => ({ ...prev, solution }))}
+                  withOptions={!editProposalId && track === 'vote' && useOptions}
+                  codrafted={track === 'deliberation'}
+                />
+              )}
             </div>
           </div>
 
