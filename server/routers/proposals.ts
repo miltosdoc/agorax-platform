@@ -5,6 +5,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
+import express from 'express';
 import {  communityRepo, proposalRepo, sortitionRepo , storage } from '../storage';
 import { requireAuth, requireConsent } from '../auth';
 import { isThumbnailKey } from '../../shared/thumbnails';
@@ -41,6 +42,8 @@ import {
   visibleCommunityIdSet,
 } from '../utils/community-visibility';
 import { compileProposal } from '../utils/proposal-compiler';
+import { UnreadableDocumentError, documentText } from '../utils/document-text';
+import { safeDecodeHeader } from '../utils/media-rules';
 import { isLlmConfigured } from '../utils/llm-client';
 import type { VoterView } from '../voting';
 import { createServer, type Server } from 'http';
@@ -442,6 +445,25 @@ export function registerProposalsRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update proposal" });
     }
   });
+  // The text of a document attached in the proposal form (see
+  // utils/document-text.ts). Nothing is kept here: the form puts the text
+  // into the proposal and uploads the file itself once the proposal exists.
+  app.post("/api/proposals/document-text", requireAuth,
+    express.raw({ type: '*/*', limit: '25mb' }),
+    async (req: any, res) => {
+      const buffer = req.body;
+      if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+        return res.status(400).json({ message: 'Δεν στάλθηκε αρχείο.' });
+      }
+      try {
+        const text = await documentText(buffer, safeDecodeHeader(req.headers['x-file-name']));
+        res.json({ text });
+      } catch (err) {
+        if (err instanceof UnreadableDocumentError) return res.status(422).json({ message: err.message });
+        console.error('document-text failed:', err);
+        res.status(500).json({ message: 'Δεν ήταν δυνατό να διαβαστεί το έγγραφο.' });
+      }
+    });
   // AI-assisted drafting: natural-language intent → editable form fields.
   // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
   // author edits before submitting — the validation gate still runs on submit.

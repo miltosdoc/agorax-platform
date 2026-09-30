@@ -17,11 +17,10 @@ export function readCsrfCookie(): string | undefined {
   return undefined;
 }
 
-export async function uploadProposalFile<T = unknown>(
-  file: File,
-  uploadUrl: string,
-  title: string,
-): Promise<T> {
+/** Documents whose text the server can read (see readDocumentText). */
+export const READABLE_DOCUMENT = /\.(docx|odt|pdf|txt)$/i;
+
+async function sendFile<T>(file: File, url: string, extraHeaders: Record<string, string> = {}): Promise<T> {
   // Ensure CSRF cookie exists before sending.
   if (!readCsrfCookie()) {
     await fetch('/api/csrf', { credentials: 'include' }).catch(() => {});
@@ -30,10 +29,10 @@ export async function uploadProposalFile<T = unknown>(
   const headers: Record<string, string> = {
     'Content-Type': file.type || 'application/octet-stream',
     'X-File-Name': encodeURIComponent(file.name),
-    'X-Media-Title': encodeURIComponent(title),
+    ...extraHeaders,
   };
   if (csrf) headers['X-CSRF-Token'] = csrf;
-  const res = await fetch(uploadUrl, {
+  const res = await fetch(url, {
     method: 'POST',
     credentials: 'include',
     headers,
@@ -48,4 +47,21 @@ export async function uploadProposalFile<T = unknown>(
     throw new Error(msg);
   }
   return await res.json();
+}
+
+export async function uploadProposalFile<T = unknown>(
+  file: File,
+  uploadUrl: string,
+  title: string,
+): Promise<T> {
+  return sendFile<T>(file, uploadUrl, { 'X-Media-Title': encodeURIComponent(title) });
+}
+
+/**
+ * The text of a document, read on the server, for the proposal form to put
+ * into the proposal. Throws with the server's reason when it cannot.
+ */
+export async function readDocumentText(file: File): Promise<string> {
+  const { text } = await sendFile<{ text: string }>(file, '/api/proposals/document-text');
+  return text;
 }

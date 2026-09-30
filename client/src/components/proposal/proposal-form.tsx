@@ -34,7 +34,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTranslation } from '@/hooks/use-translation';
 import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
-import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/upload-media';
+import {
+  uploadProposalFile, readDocumentText, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES, READABLE_DOCUMENT,
+} from '@/lib/upload-media';
 import {
   TEXT_MAX_CHARS, enabledKinds, kindAllowsDeliberation, kindCollectsOptions, kindRequiresOptions, kindRequiresText,
   majorityFraction, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, type ProposalKind,
@@ -134,6 +136,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     solution: '',
     category: '',
   });
+  // Read after an await: whatever the author has typed by the time a
+  // document's text arrives.
+  const solutionRef = useRef('');
+  solutionRef.current = formData.solution;
   // How much of the discussion made it into the draft, so the author is told
   // rather than left to wonder why a long thread came in shorter.
   const [draftNote, setDraftNote] = useState<string | null>(null);
@@ -198,6 +204,9 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   // is created (the upload endpoint needs a proposal id).
   const [attachments, setAttachments] = useState<File[]>([]);
   const attachRef = useRef<HTMLInputElement>(null);
+  // The attached document being read into the text, and how that went.
+  const [readingDoc, setReadingDoc] = useState<string | null>(null);
+  const [docNote, setDocNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Which button triggered the form submit: 'save' keeps the proposal as a
   // draft, 'submit' also starts it right away. Both buttons are
@@ -259,6 +268,30 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     const ok = picked.filter((f) => f.size <= DOCUMENT_MAX_BYTES);
     setAttachments((prev) => [...prev, ...ok].slice(0, 10));
     if (attachRef.current) attachRef.current.value = '';
+    // The document is usually the text itself — a statute as a Word file —
+    // and the text is where its articles are found and amended.
+    const readable = ok.find((f) => READABLE_DOCUMENT.test(f.name));
+    if (readable) void fillTextFrom(readable);
+  }
+
+  async function fillTextFrom(file: File) {
+    setReadingDoc(file.name);
+    setDocNote(null);
+    try {
+      const text = await readDocumentText(file);
+      const current = solutionRef.current.trim();
+      // Never overwrite the author's words without asking.
+      if (current && current !== text.trim()
+        && !window.confirm(t('proposal.doc_text_replace', { name: file.name }))) {
+        return;
+      }
+      setFormData((prev) => ({ ...prev, solution: text }));
+      setDocNote({ ok: true, text: t('proposal.doc_text_filled', { name: file.name }) });
+    } catch (e) {
+      setDocNote({ ok: false, text: e instanceof Error && e.message ? e.message : t('proposal.doc_text_failed') });
+    } finally {
+      setReadingDoc(null);
+    }
   }
 
   function removeAttachment(index: number) {
@@ -844,6 +877,17 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                     </li>
                   ))}
                 </ul>
+              )}
+              {readingDoc && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground" data-testid="proposal-doc-reading">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {t('proposal.doc_text_reading')}
+                </p>
+              )}
+              {docNote && !readingDoc && (
+                <p className={`text-xs ${docNote.ok ? 'text-muted-foreground' : 'text-destructive'}`} data-testid="proposal-doc-note">
+                  {docNote.text}
+                </p>
               )}
               <button
                 type="button"
