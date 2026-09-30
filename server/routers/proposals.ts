@@ -27,6 +27,7 @@ import {
   debateArguments,
   users,
   castProposalVoteSchema,
+  blindSigIssuance,
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
 import {
@@ -1544,6 +1545,19 @@ export function registerProposalsRoutes(app: Express): void {
     };
   }
 
+  /**
+   * Whether anyone has begun to vote: a ballot recorded, or an anonymous
+   * ballot signed and waiting out its delay. Until then an open vote is a
+   * mistake its author may still take back; from then on it is a record.
+   */
+  async function votingHasBegun(proposalId: number): Promise<boolean> {
+    const [[votes], [issued]] = await Promise.all([
+      db.select({ c: count() }).from(proposalVotes).where(eq(proposalVotes.proposalId, proposalId)),
+      db.select({ c: count() }).from(blindSigIssuance).where(eq(blindSigIssuance.proposalId, proposalId)),
+    ]);
+    return (votes?.c ?? 0) + (issued?.c ?? 0) > 0;
+  }
+
   app.delete("/api/proposals/:id", requireAuth, async (req: any, res) => {
     try {
       const proposalId = parseInt(req.params.id);
@@ -1553,9 +1567,14 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.authorId !== req.user.id && !isAdmin) {
         return res.status(403).json({ message: "Only the author can delete this proposal" });
       }
-      // A ballot — open or concluded — is immutable record for everyone.
-      if (proposal.status === 'voting' || proposal.status === 'decided') {
+      // A concluded ballot is a record for everyone, and so is an open one
+      // the moment anyone has begun to vote in it. Before that, opening the
+      // vote can still be taken back.
+      if (proposal.status === 'decided') {
         return res.status(409).json({ message: "Ψηφισμένες προτάσεις δεν διαγράφονται — αποτελούν δημοκρατικό αρχείο." });
+      }
+      if (proposal.status === 'voting' && await votingHasBegun(proposalId)) {
+        return res.status(409).json({ message: "Έχουν ήδη ψηφίσει μέλη, οπότε η ψηφοφορία δεν διαγράφεται — αποτελεί δημοκρατικό αρχείο." });
       }
       const eng = await proposalEngagement(proposalId);
       if (eng.votes > 0) {
@@ -1590,7 +1609,8 @@ export function registerProposalsRoutes(app: Express): void {
       if (proposal.authorId !== req.user.id && !req.user.isAdmin) {
         return res.status(403).json({ message: "Only the author can withdraw this proposal" });
       }
-      if (['voting', 'decided', 'archived'].includes(proposal.status)) {
+      if (['decided', 'archived'].includes(proposal.status)
+        || (proposal.status === 'voting' && await votingHasBegun(proposalId))) {
         return res.status(409).json({ message: "Η πρόταση δεν μπορεί να αποσυρθεί σε αυτή τη φάση." });
       }
       const { transitionProposal, triggerSideEffects } = await import('../utils/proposal-state-machine');

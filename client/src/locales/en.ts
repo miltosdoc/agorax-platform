@@ -217,6 +217,7 @@ const en: TranslationDictionary = {
   // Proposal Detail
   'proposal.notFound': 'Proposal not found',
   'proposal.delete': 'Delete',
+  'proposal.deleteVoteConfirm': 'Delete this vote? Nobody has voted yet. This cannot be undone.',
   'proposal.deleteConfirm': 'Delete this draft proposal? This cannot be undone.',
   'proposal.by': 'by',
   'proposal.userWithId': 'User #{id}',

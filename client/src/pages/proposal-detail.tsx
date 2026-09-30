@@ -6,7 +6,7 @@
  * SortitionPanel, VotePanel
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +30,7 @@ import { AmendmentsPanel } from '@/components/proposal/AmendmentsPanel';
 import { SortitionPanel } from '@/components/proposal/SortitionPanel';
 import { MediaStudioPanel } from '@/components/proposal/MediaStudioPanel';
 import { ProposalMediaPreview } from '@/components/proposal/ProposalMediaPreview';
-import VotePanel from '@/components/voting/VotePanel';
+import VotePanel, { type VoteResults } from '@/components/voting/VotePanel';
 import StatusBadge from '@/components/proposal/StatusBadge';
 import { useTranslation } from '@/hooks/use-translation';
 import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
@@ -265,6 +265,12 @@ export default function ProposalDetailPage() {
     }
   };
 
+  // Ballots cast so far: an open vote nobody has voted in can still be
+  // deleted by its author (the server also counts anonymous ballots that are
+  // signed but not yet cast).
+  const [ballotCount, setBallotCount] = useState<number | null>(null);
+  const handleVoteResults = useCallback((r: VoteResults) => setBallotCount(r.ballotCount ?? r.total), []);
+
   const handleProposalAdvanced = (newStatus: string) => {
     if (proposal) {
       setProposal({ ...proposal, status: newStatus });
@@ -421,14 +427,16 @@ export default function ProposalDetailPage() {
                     {t('proposal.edit') || 'Edit'}
                   </Button>
                 )}
-                {userIsAuthor && !['voting', 'decided', 'archived'].includes(proposal.status) && (
+                {userIsAuthor && (!['voting', 'decided', 'archived'].includes(proposal.status)
+                  || (proposal.status === 'voting' && ballotCount === 0)) && (
                   <Button
                     size="sm"
                     variant="outline"
                     className="text-red-600 hover:bg-red-50"
                     data-testid="proposal-delete"
                     onClick={async () => {
-                      if (!window.confirm(t('proposal.deleteConfirm') || 'Να διαγραφεί η πρόταση;')) return;
+                      const confirmKey = proposal.status === 'voting' ? 'proposal.deleteVoteConfirm' : 'proposal.deleteConfirm';
+                      if (!window.confirm(t(confirmKey) || 'Να διαγραφεί η πρόταση;')) return;
                       try {
                         await apiRequest('DELETE', `/api/proposals/${proposal.id}`);
                         setLocation('/home');
@@ -454,7 +462,7 @@ export default function ProposalDetailPage() {
                     }}
                   >
                     <Trash2 className="w-4 h-4 mr-1" />
-                    {proposal.status === 'draft'
+                    {proposal.status === 'draft' || proposal.status === 'voting'
                       ? (t('proposal.delete') || 'Διαγραφή')
                       : (t('proposal.deleteOrWithdraw') || 'Διαγραφή / Απόσυρση')}
                   </Button>
@@ -687,6 +695,7 @@ export default function ProposalDetailPage() {
                 phaseDeadline={(proposal as any).phaseDeadline}
                 articleBallot={(proposal as any).articleBallot}
                 communityId={proposal.communityId}
+                onVoteResultsChange={handleVoteResults}
                 onProposalAdvanced={handleProposalAdvanced}
               />
               {voteError && (
@@ -762,6 +771,7 @@ export default function ProposalDetailPage() {
                   phaseDeadline={(proposal as any).phaseDeadline}
                   articleBallot={(proposal as any).articleBallot}
                   communityId={proposal.communityId}
+                  onVoteResultsChange={handleVoteResults}
                   onProposalAdvanced={handleProposalAdvanced}
                 />
                 {voteError && (

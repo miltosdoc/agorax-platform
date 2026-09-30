@@ -217,6 +217,7 @@ const el: TranslationDictionary = {
   // Proposal Detail
   'proposal.notFound': 'Η πρόταση δεν βρέθηκε',
   'proposal.delete': 'Διαγραφή',
+  'proposal.deleteVoteConfirm': 'Να διαγραφεί η ψηφοφορία; Δεν έχει ψηφίσει ακόμη κανείς. Η ενέργεια δεν αναιρείται.',
   'proposal.deleteConfirm': 'Διαγραφή του πρόχειρου; Η ενέργεια δεν αναιρείται.',
   'proposal.by': 'από',
   'proposal.userWithId': 'Χρήστης #{id}',
