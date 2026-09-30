@@ -36,8 +36,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { api, ApiError } from '@/lib/api';
 import { uploadProposalFile, DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES } from '@/lib/upload-media';
 import {
-  enabledKinds, kindAllowsDeliberation, kindCollectsOptions, kindRequiresOptions, kindRequiresText, majorityFraction,
-  proposalKindOf, refusalOptionLabel, voteRulesFor, type ProposalKind,
+  TEXT_MAX_CHARS, enabledKinds, kindAllowsDeliberation, kindCollectsOptions, kindRequiresOptions, kindRequiresText,
+  majorityFraction, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, type ProposalKind,
 } from '@shared/proposal-kinds';
 import { hoursLabel } from '@/lib/governable-setting-labels';
 
@@ -375,6 +375,12 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
       return;
     }
     const mode = submitModeRef.current;
+    // The reason sits under the text and goes away as soon as it fits; taking
+    // the author there beats a banner that would outlive the problem.
+    if (textOver) {
+      document.getElementById('solution')?.focus();
+      return;
+    }
     const options = voteOptions.map((o) => o.trim()).filter(Boolean);
     if (!editProposalId && track === 'vote' && optionBallot) {
       const distinct = new Set(options.map((o) => o.toLowerCase())).size;
@@ -463,6 +469,23 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
   }
 
   const textRequired = kindRequiresText(kind);
+  // The text's ceiling depends on the kind — a statute is often a whole
+  // document — so the count is shown as the author writes, not discovered
+  // on submit. Nothing is cut: a paste over the limit stays whole for the
+  // author to shorten, attach, or file as a statute.
+  const formatCount = (n: number) => n.toLocaleString(locale === 'el' ? 'el-GR' : 'en-GB');
+  const textMax = textMaxChars(kind);
+  const textLength = formData.solution.length;
+  const textOver = textLength > textMax;
+  const fitsAsStatute = !editProposalId && kind !== 'statute' && kinds.includes('statute')
+    && textLength <= TEXT_MAX_CHARS;
+  const textOverMessage = t(fitsAsStatute ? 'proposal.form_text_over_statute' : 'proposal.form_text_over', {
+    max: formatCount(textMax),
+    over: formatCount(textLength - textMax),
+    statute: t('proposal.kind_statute'),
+    statuteMax: formatCount(TEXT_MAX_CHARS),
+  });
+  const aiOver = aiIntent.length > TEXT_MAX_CHARS;
   // The community's terms for this kind, in one line, so the author sees the
   // rules they are choosing within rather than discovering them on submit.
   const rulesSummary = [
@@ -523,15 +546,19 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
             value={aiIntent}
             onChange={(e) => setAiIntent(e.target.value)}
             rows={2}
-            maxLength={12000}
             className="bg-background"
           />
+          {aiOver && (
+            <p className="text-xs text-destructive" data-testid="proposal-ai-too-long">
+              {t('proposal.form_ai_too_long', { n: formatCount(aiIntent.length), max: formatCount(TEXT_MAX_CHARS) })}
+            </p>
+          )}
           <div className="flex items-center gap-3 flex-wrap">
             <Button
               type="button"
               size="sm"
               onClick={handleAiDraft}
-              disabled={aiLoading || aiIntent.trim().length < 10}
+              disabled={aiLoading || aiIntent.trim().length < 10 || aiOver}
               data-testid="proposal-ai-draft"
             >
               {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
@@ -766,7 +793,22 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
                 onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
                 className={textRequired ? 'min-h-[140px]' : 'min-h-[80px]'}
                 required={textRequired}
+                aria-invalid={textOver || undefined}
+                aria-describedby={textLength > 0 ? 'solution-count' : undefined}
               />
+              {textLength > 0 && (
+                <div id="solution-count" className="flex items-start justify-between gap-3 text-xs">
+                  <p className="text-destructive" data-testid="proposal-text-over">
+                    {textOver ? textOverMessage : null}
+                  </p>
+                  <p
+                    className={`ml-auto shrink-0 tabular-nums ${textOver ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
+                    data-testid="proposal-text-count"
+                  >
+                    {formatCount(textLength)} / {formatCount(textMax)}
+                  </p>
+                </div>
+              )}
               <input
                 ref={attachRef}
                 type="file"

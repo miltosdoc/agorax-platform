@@ -511,6 +511,12 @@ export const proposalAmendments = pgTable("proposal_amendments", {
   // Content
   text: text("text").notNull(),
 
+  // Which article of a statute this amendment changes: the article's number
+  // as written ('5', '5Α'), 'preamble', or 'new' for an added article — see
+  // shared/statute-articles.ts. null on any other text, and on amendments
+  // filed before statutes were amended article by article (migration 0058).
+  articleRef: text("article_ref"),
+
   // AI-restyled version of a counter_proposal, rewritten to match the final
   // proposal's structure/style so it can stand on the ballot as a complete
   // alternative (migration 0033). null until the final_review merge runs.

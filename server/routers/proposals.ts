@@ -29,9 +29,10 @@ import {
 } from '@shared/schema';
 import { INITIAL_PROPOSAL_STATE, isProposalState, PROPOSAL_TRACKS } from '@shared/proposal-lifecycle';
 import {
-  DEFAULT_PROPOSAL_KIND, MAX_COLLECTED_OPTIONS, isBindingKind, isProposalKind, kindCollectsOptions,
-  kindRequiresOptions, kindRequiresText, majorityFraction, meetsMajority, proposalKindOf,
-  refusalOptionLabel, voteRulesFor, enabledKinds,
+  DEFAULT_PROPOSAL_KIND, MAX_COLLECTED_OPTIONS, QUESTION_MAX_CHARS, TEXT_MAX_CHARS, isBindingKind,
+  isProposalKind, kindCollectsOptions, kindRequiresOptions, kindRequiresText, majorityFraction,
+  meetsMajority, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, enabledKinds,
+  type ProposalKind,
 } from '@shared/proposal-kinds';
 import { validBallotChoices } from '@shared/schema';
 import {
@@ -43,6 +44,23 @@ import { compileProposal } from '../utils/proposal-compiler';
 import { isLlmConfigured } from '../utils/llm-client';
 import type { VoterView } from '../voting';
 import { createServer, type Server } from 'http';
+
+const greekNumber = (n: number) => n.toLocaleString('el-GR');
+
+/**
+ * Why a title or a text is too long for its kind, or null. The form counts
+ * and stops the author first; this is what they read if a text still arrives.
+ */
+function tooLongMessage(question: string, solution: string, kind: ProposalKind): string | null {
+  if (question.length > QUESTION_MAX_CHARS) {
+    return `Ο τίτλος μπορεί να έχει έως ${greekNumber(QUESTION_MAX_CHARS)} χαρακτήρες.`;
+  }
+  const max = textMaxChars(kind);
+  if (solution.length > max) {
+    return `Το κείμενο έχει ${greekNumber(solution.length)} χαρακτήρες· το όριο είναι ${greekNumber(max)}.`;
+  }
+  return null;
+}
 
 /**
  * Build the vote-results payload the client expects from a backend-provided
@@ -336,11 +354,8 @@ export function registerProposalsRoutes(app: Express): void {
       if (typeof question !== "string" || typeof solution !== "string") {
         return res.status(400).json({ message: "Question and solution must be strings" });
       }
-      // Solution ceiling matches the AI-drafting paste limit (12k) so a
-      // verbatim pass-through draft can always be submitted.
-      if (question.length > 2000 || solution.length > 12000) {
-        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
-      }
+      const tooLong = tooLongMessage(question, solution, kind);
+      if (tooLong) return res.status(400).json({ message: tooLong });
       const proposal = await proposalRepo.createProposal({
         communityId,
         authorId: userId,
@@ -410,9 +425,8 @@ export function registerProposalsRoutes(app: Express): void {
         }
         updates.solution = solution;
       }
-      if ((updates.question ?? '').length > 2000 || (updates.solution ?? '').length > 12000) {
-        return res.status(400).json({ message: "Question max 2000 chars, solution max 12000 chars" });
-      }
+      const tooLong = tooLongMessage(updates.question ?? '', updates.solution ?? '', proposalKindOf((proposal as any).kind));
+      if (tooLong) return res.status(400).json({ message: tooLong });
       if (category !== undefined) {
         if (typeof category !== "string") {
           return res.status(400).json({ message: "Category must be a string" });
@@ -432,11 +446,13 @@ export function registerProposalsRoutes(app: Express): void {
   // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
   // author edits before submitting — the validation gate still runs on submit.
   app.post("/api/proposals/compile", requireAuth, async (req: any, res) => {
-    // Generous ceiling so users can paste a full pre-written document —
-    // the compiler is instructed to keep pasted text verbatim.
+    // Room for a whole pasted statute — the compiler is instructed to keep
+    // pasted text verbatim, and the kind is not known until it has run.
     const intent = typeof req.body?.intent === 'string' ? req.body.intent.trim() : '';
-    if (intent.length < 10 || intent.length > 12000) {
-      return res.status(400).json({ message: 'intent must be 10–12000 characters' });
+    if (intent.length < 10 || intent.length > TEXT_MAX_CHARS) {
+      return res.status(400).json({
+        message: `Γράψτε από 10 έως ${greekNumber(TEXT_MAX_CHARS)} χαρακτήρες.`,
+      });
     }
     if (!isLlmConfigured()) {
       return res.status(503).json({ message: 'AI drafting is not available' });

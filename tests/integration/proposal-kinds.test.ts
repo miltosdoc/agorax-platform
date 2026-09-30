@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_VOTE_RULES,
   PROPOSAL_KINDS,
+  TEXT_MAX_CHARS,
   enabledKinds,
   isBindingKind,
   majorityRuleOf,
@@ -23,6 +24,7 @@ import {
   kindRequiresText,
   proposalKindOf,
   refusalOptionLabel,
+  textMaxChars,
 } from '../../shared/proposal-kinds';
 
 const chatCompletion = vi.fn();
@@ -48,6 +50,13 @@ describe('proposal kinds — rules', () => {
   it('requires candidates for an election and text for a decision or statute', () => {
     expect(PROPOSAL_KINDS.filter(kindRequiresOptions)).toEqual(['election']);
     expect(PROPOSAL_KINDS.filter(kindRequiresText)).toEqual(['decision', 'statute']);
+  });
+
+  it('gives a statute room for a whole document, every other kind a description', () => {
+    expect(textMaxChars('statute')).toBe(100_000);
+    for (const kind of ['decision', 'election', 'poll'] as const) expect(textMaxChars(kind)).toBe(12_000);
+    // The AI box and the merger size to the longest; none may exceed it.
+    expect(Math.max(...PROPOSAL_KINDS.map(textMaxChars))).toBe(TEXT_MAX_CHARS);
   });
 
   it('treats only a poll as non-binding', () => {
@@ -205,6 +214,18 @@ describe('proposal compiler — kinds', () => {
     const draft = await compileProposal('Δημοσκόπηση για τη μέρα', { allowedKinds: ['decision', 'statute'] });
     expect(draft.kind).toBe('decision');
     expect(String(chatCompletion.mock.calls[0][0].messages[0].content)).toContain('only holds these kinds');
+  });
+
+  it('hands back a pasted statute longer than a decision allows, word for word', async () => {
+    const article = 'Άρθρο. Το Διοικητικό Συμβούλιο συνεδριάζει τακτικά μία φορά τον μήνα και έκτακτα όποτε χρειαστεί.\n\n';
+    const statute = article.repeat(Math.floor(30_000 / article.length)).trim();
+    expect(statute.length).toBeGreaterThan(textMaxChars('decision'));
+    chatCompletion.mockResolvedValueOnce(JSON.stringify({
+      kind: 'statute', question: 'Νέο καταστατικό του Συλλόγου', solution: statute, category: 'governance',
+    }));
+    const draft = await compileProposal(statute);
+    expect(chatCompletion).toHaveBeenCalledTimes(1);
+    expect(draft.solution).toBe(statute);
   });
 
   it('retries when a decision comes back without its text', async () => {

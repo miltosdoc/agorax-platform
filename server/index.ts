@@ -45,6 +45,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// A statute's text may run to 100,000 characters — about 200 KB of Greek in
+// UTF-8 before the title and the JSON around it — so the routes that take a
+// proposal's text get room for one. Everything else keeps the tight default.
+app.use(['/api/communities/:communityId/proposals', '/api/proposals'], express.json({ limit: "512kb" }));
 app.use(express.json({ limit: "100kb" }));
 
 // Apply rate limiting to all API routes

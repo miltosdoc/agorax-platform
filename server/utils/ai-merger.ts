@@ -19,6 +19,11 @@
 import { db } from '../db';
 import { proposalAmendments, proposals, communities } from '../../shared/schema';
 import { DEFAULT_AMENDMENT_INCLUSION_THRESHOLD } from '../../shared/community-settings';
+import { TEXT_MAX_CHARS, proposalKindOf, type ProposalKind } from '../../shared/proposal-kinds';
+import {
+  NEW_ARTICLE_REF, appendArticles, articleSectionsFor, nextArticleNumber, opensWithHeading, replaceSections,
+  sectionText, type TextSection,
+} from '../../shared/statute-articles';
 import { eq } from 'drizzle-orm';
 import { chatCompletion, isLlmConfigured, LlmUnavailableError } from './llm-client';
 
@@ -56,24 +61,43 @@ function popularityRatio(a: { rejectionUpvotes: number | null; rejectionDownvote
   return total > 0 ? up / total : 0;
 }
 
-function localConcat(question: string, solution: string, accepted: Array<{ id: number; type: string; text: string }>): string {
-  if (accepted.length === 0) return solution;
-  const tagFor = (type: string) =>
-    type === 'improvement' ? 'Βελτίωση' :
+/** How an amendment's type reads in a prompt or a fallback block. */
+function typeLabel(type: string): string {
+  return type === 'improvement' ? 'Βελτίωση' :
     type === 'addition' ? 'Προσθήκη' :
     type === 'removal' ? 'Αφαίρεση' :
     type === 'counter_proposal' ? 'Αντιπρόταση' : 'Τροπολογία';
+}
+
+function localConcat(question: string, solution: string, accepted: Array<{ id: number; type: string; text: string }>): string {
+  if (accepted.length === 0) return solution;
   return [
     solution,
-    ...accepted.map(a => `\n\n[${tagFor(a.type)}] ${a.text}`),
+    ...accepted.map(a => `\n\n[${typeLabel(a.type)}] ${a.text}`),
   ].join('');
 }
 
-// Prompt-side input caps. These sit far above real proposal sizes: the point
-// is to bound a runaway input, not to trim ordinary ones. Prompt tokens are
-// billed separately from `max_tokens`, so a generous cap costs nothing.
-const MAX_TEXT_CHARS = 12_000;
+// Prompt-side input caps. These sit above the largest text a proposal may
+// hold: the point is to bound a runaway input, not to trim real ones. A merged
+// text is the original plus its amendments, so it gets room for both. Prompt
+// tokens are billed separately from `max_tokens`, so a generous cap costs
+// nothing.
 const MAX_LIST_CHARS = 24_000;
+const MAX_TEXT_CHARS = TEXT_MAX_CHARS + MAX_LIST_CHARS;
+
+/**
+ * Token budget and timeout for a call whose answer is a whole text. Greek
+ * measures ~2.6 characters per token on the configured model; one token per
+ * character leaves ample headroom, and the cap costs nothing unless used. A
+ * flat 8k fits a decision but would clip a long statute, and a clipped
+ * answer is thrown away. Long answers also take minutes rather than seconds.
+ */
+function rewriteBudget(chars: number): { maxTokens: number; timeoutMs: number } {
+  return {
+    maxTokens: Math.min(64_000, Math.max(8000, chars)),
+    timeoutMs: Math.max(90_000, chars * 5),
+  };
+}
 
 /**
  * Render a numbered amendment list for a prompt, dropping WHOLE amendments if
@@ -144,15 +168,7 @@ async function llmMerge(
   }
 
   const amendmentsText = renderAmendmentList(
-    amendments.map(a => ({
-      id: a.id,
-      label:
-        a.type === 'improvement' ? 'Βελτίωση' :
-        a.type === 'addition' ? 'Προσθήκη' :
-        a.type === 'removal' ? 'Αφαίρεση' :
-        a.type === 'counter_proposal' ? 'Αντιπρόταση' : 'Τροπολογία',
-      text: a.text,
-    })),
+    amendments.map(a => ({ id: a.id, label: typeLabel(a.type), text: a.text })),
     MAX_LIST_CHARS,
     'merge',
   );
@@ -167,11 +183,10 @@ async function llmMerge(
         { role: 'system', content: 'Είσαι ειδικός στη σύνταξη και επεξεργασία πολιτικών κειμένων. Ενσωματώνεις τροπολογίες σε προτάσεις με φυσικό και συνεκτικό τρόπο.' },
         { role: 'user', content: prompt },
       ],
-      // The merged text grows with the amendment count — 15 amendments already
-      // produce ~3k tokens of Greek. Leave room so the answer is never clipped.
-      maxTokens: 8000,
+      // The merged text is the original plus every amendment, so the answer
+      // needs room for both.
+      ...rewriteBudget(Math.min(solution.length, MAX_TEXT_CHARS) + amendmentsText.length),
       temperature: 0.3,
-      timeoutMs: 90_000,
       enableThinking: false,
     });
 
@@ -187,6 +202,275 @@ async function llmMerge(
   }
 
   return { text: '', success: false };
+}
+
+// ─── Article by article (statutes) ──────────────────────────────────────────
+//
+// A statute laid out in articles is merged one article at a time: each
+// amended article is rewritten on its own and spliced back into the text, so
+// an article nobody amended reaches the ballot exactly as written, and the AI
+// never reproduces a hundred-page text to change one line.
+
+interface MergeItem {
+  id: number;
+  type: string;
+  text: string;
+  articleRef?: string | null;
+}
+
+const ARTICLE_MERGE_PROMPT = `Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών.
+Έχεις ΕΝΑ τμήμα ενός καταστατικού (ένα άρθρο ή την εισαγωγή του) και τις αποδεκτές τροπολογίες που αφορούν αυτό το τμήμα.
+Ενσωμάτωσε ΟΛΕΣ τις τροπολογίες στο τμήμα.
+
+ΚΑΝΟΝΕΣ:
+1. Άλλαξε ΜΟΝΟ ό,τι ζητούν οι τροπολογίες. Κάθε άλλη πρόταση, λέξη και σημείο στίξης μένει ΑΚΡΙΒΩΣ όπως είναι.
+2. Κράτησε την επικεφαλίδα του άρθρου (αριθμό και τίτλο) και την αρίθμηση των παραγράφων. Άλλαξε τον τίτλο μόνο αν το ζητά ρητά τροπολογία.
+3. Αν μια τροπολογία είναι "Αφαίρεση", αφαίρεσε το αντίστοιχο σημείο. Αν καταργεί ολόκληρο το άρθρο, απάντησε μόνο την επικεφαλίδα και από κάτω «(Καταργείται)».
+4. Αν μια τροπολογία είναι "Αντιπρόταση", αντικατάστησε το αντίστοιχο σημείο.
+5. Απάντησε ΜΟΝΟ το πλήρες νέο κείμενο του τμήματος, με την επικεφαλίδα του, χωρίς σχόλια.
+
+ΤΙΤΛΟΣ ΤΗΣ ΠΡΟΤΑΣΗΣ: {question}
+
+ΤΜΗΜΑ:
+---
+{section}
+---
+
+ΤΡΟΠΟΛΟΓΙΕΣ ΣΤΟ ΤΜΗΜΑ:
+{amendments}
+
+ΝΕΟ ΚΕΙΜΕΝΟ ΤΟΥ ΤΜΗΜΑΤΟΣ:`;
+
+const NEW_ARTICLES_PROMPT = `Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών.
+Οι παρακάτω αποδεκτές τροπολογίες προσθέτουν νέα άρθρα σε ένα καταστατικό. Γράψε τα νέα άρθρα, στο ύφος και τη μορφή των υπαρχόντων.
+
+ΚΑΝΟΝΕΣ:
+1. Αρίθμησε τα νέα άρθρα διαδοχικά ξεκινώντας από «Άρθρο {next}», με επικεφαλίδα όπως των υπαρχόντων άρθρων.
+2. Μην προσθέσεις τίποτα που δεν ζητούν οι τροπολογίες. Τροπολογίες για το ίδιο θέμα πάνε στο ίδιο άρθρο.
+3. Απάντησε ΜΟΝΟ τα νέα άρθρα, χωρίς σχόλια.
+
+ΤΙΤΛΟΣ ΤΗΣ ΠΡΟΤΑΣΗΣ: {question}
+
+ΟΙ ΕΠΙΚΕΦΑΛΙΔΕΣ ΤΩΝ ΥΠΑΡΧΟΝΤΩΝ ΑΡΘΡΩΝ:
+{headings}
+
+ΕΝΑ ΥΠΑΡΧΟΝ ΑΡΘΡΟ, ΓΙΑ ΤΗ ΜΟΡΦΗ:
+---
+{sample}
+---
+
+ΤΡΟΠΟΛΟΓΙΕΣ:
+{amendments}
+
+ΝΕΑ ΑΡΘΡΑ:`;
+
+const ARTICLE_RESTYLE_PROMPT = `Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών.
+Παρακάτω είναι ένα ΑΡΘΡΟ του τελικού κειμένου ενός καταστατικού και μια ΑΝΤΙΠΡΟΤΑΣΗ για αυτό το άρθρο, που θα τεθεί σε ψηφοφορία ως εναλλακτική.
+Γράψε το άρθρο όπως θα διαβάζεται αν υιοθετηθεί η αντιπρόταση.
+
+ΚΑΝΟΝΕΣ:
+1. ΔΙΑΤΗΡΕΣΕ ΑΠΑΡΕΓΚΛΙΤΑ την ουσία της αντιπρότασης — μην την αμβλύνεις και μην την πλησιάσεις στο τελικό κείμενο.
+2. Κράτησε την επικεφαλίδα και τη μορφή του άρθρου. Ό,τι δεν αγγίζει η αντιπρόταση μένει αυτούσιο.
+3. ΕΝΣΩΜΑΤΩΣΕ ΟΛΕΣ τις τροπολογίες της αντιπρότασης παρακάτω.
+4. Απάντησε ΜΟΝΟ το πλήρες κείμενο του άρθρου, χωρίς σχόλια.
+
+ΑΡΘΡΟ ΤΟΥ ΤΕΛΙΚΟΥ ΚΕΙΜΕΝΟΥ:
+---
+{section}
+---
+
+ΑΝΤΙΠΡΟΤΑΣΗ:
+---
+{counter}
+---
+
+ΤΡΟΠΟΛΟΓΙΕΣ ΤΗΣ ΑΝΤΙΠΡΟΤΑΣΗΣ:
+{childAmendments}
+
+ΤΟ ΑΡΘΡΟ ΜΕ ΤΗΝ ΑΝΤΙΠΡΟΤΑΣΗ:`;
+
+/** One LLM call whose answer is a section of text, or null. */
+async function rewriteSection(system: string, prompt: string, chars: number, context: string): Promise<string | null> {
+  if (!isLlmConfigured()) return null;
+  try {
+    const response = await chatCompletion({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
+      ...rewriteBudget(chars),
+      temperature: 0.2,
+      enableThinking: false,
+    });
+    const text = response.trim();
+    // A section many times longer than what went in is the model rewriting
+    // far more than it was given — never splice that into a statute.
+    if (!text || text.length > 4 * chars + 2000) return null;
+    return text;
+  } catch (err) {
+    console.warn(`[ai-merger] ${context} failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
+/** The model sometimes drops the heading it was told to keep; put it back. */
+function keepHeading(section: TextSection, rewritten: string): string {
+  if (!section.heading || opensWithHeading(rewritten)) return rewritten;
+  return `${section.heading}\n${rewritten}`;
+}
+
+const SECTION_SYSTEM = 'Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών. Αλλάζεις μόνο ό,τι σου ζητείται και αφήνεις κάθε άλλη λέξη ακριβώς όπως είναι.';
+
+async function mergeSection(question: string, text: string, section: TextSection, items: MergeItem[]): Promise<{ text: string; llm: boolean }> {
+  const original = sectionText(text, section);
+  const list = renderAmendmentList(
+    items.map(a => ({ id: a.id, label: typeLabel(a.type), text: a.text })),
+    MAX_LIST_CHARS,
+    `article ${section.ref}`,
+  );
+  const prompt = ARTICLE_MERGE_PROMPT
+    .replace('{question}', question)
+    .replace('{section}', original)
+    .replace('{amendments}', list);
+  const merged = await rewriteSection(SECTION_SYSTEM, prompt, original.length + list.length, `article ${section.ref} merge`);
+  if (merged) return { text: keepHeading(section, merged), llm: true };
+  // Deterministic fallback, kept inside the article it belongs to.
+  return { text: localConcat(question, original, items), llm: false };
+}
+
+async function draftNewArticles(question: string, text: string, sections: TextSection[], items: MergeItem[]): Promise<{ text: string; llm: boolean }> {
+  const next = nextArticleNumber(sections);
+  const articles = sections.filter(s => s.heading);
+  const list = renderAmendmentList(
+    items.map(a => ({ id: a.id, label: typeLabel(a.type), text: a.text })),
+    MAX_LIST_CHARS,
+    'new articles',
+  );
+  const prompt = NEW_ARTICLES_PROMPT
+    .replace('{next}', String(next))
+    .replace('{question}', question)
+    .replace('{headings}', articles.map(s => s.heading).join('\n'))
+    .replace('{sample}', articles.length > 0 ? sectionText(text, articles[articles.length - 1]) : '')
+    .replace('{amendments}', list);
+  const drafted = await rewriteSection(SECTION_SYSTEM, prompt, list.length, 'new articles');
+  if (drafted) return { text: drafted, llm: true };
+  return {
+    text: items.map((a, i) => `Άρθρο ${next + i}\n[${typeLabel(a.type)}] ${a.text}`).join('\n\n'),
+    llm: false,
+  };
+}
+
+/** Run `fn` over `items`, at most `limit` at a time, keeping their order. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * Merge amendments into a proposal's text. A statute laid out in articles is
+ * merged article by article (see above); any other text — and amendments
+ * that name no article, filed before articles were asked for — go through
+ * the whole-text merge. `llm` is false when any part fell back to the
+ * deterministic concatenation.
+ */
+export async function mergeIntoText(
+  kind: ProposalKind,
+  question: string,
+  solution: string,
+  items: MergeItem[],
+): Promise<{ text: string; llm: boolean }> {
+  const wholeText = async (base: string, list: MergeItem[]) => {
+    const r = await llmMerge(question, base, list);
+    return r.success ? { text: r.text, llm: true } : { text: localConcat(question, base, list), llm: false };
+  };
+  const sections = articleSectionsFor(kind, solution);
+  if (!sections) return wholeText(solution, items);
+
+  const byRef = new Map<string, MergeItem[]>();
+  const loose: MergeItem[] = [];
+  for (const item of items) {
+    const ref = item.articleRef;
+    if (ref && (ref === NEW_ARTICLE_REF || sections.some(s => s.ref === ref))) {
+      if (!byRef.has(ref)) byRef.set(ref, []);
+      byRef.get(ref)!.push(item);
+    } else {
+      loose.push(item);
+    }
+  }
+
+  let llm = true;
+  const amended = sections.filter(s => byRef.has(s.ref));
+  // A few at a time: parallel enough to be quick, gentle on the endpoint.
+  const results = await mapLimit(amended, 3, s => mergeSection(question, solution, s, byRef.get(s.ref)!));
+  const replacements = new Map<string, string>();
+  amended.forEach((s, i) => {
+    replacements.set(s.ref, results[i].text);
+    llm &&= results[i].llm;
+  });
+  let text = replaceSections(solution, sections, replacements);
+
+  const added = byRef.get(NEW_ARTICLE_REF);
+  if (added) {
+    const drafted = await draftNewArticles(question, solution, sections, added);
+    text = appendArticles(text, drafted.text);
+    llm &&= drafted.llm;
+  }
+  if (loose.length > 0) {
+    const whole = await wholeText(text, loose);
+    text = whole.text;
+    llm &&= whole.llm;
+  }
+  return { text, llm };
+}
+
+/**
+ * A counter-proposal on one article, as a complete alternative: the final
+ * text with that article as the counter would have it. null when the counter
+ * names no article of the final text (the whole-text restyle then applies).
+ */
+async function articleAlternative(
+  kind: ProposalKind,
+  finalText: string,
+  counter: { text: string; articleRef?: string | null },
+  childTexts: string[],
+): Promise<string | null> {
+  const ref = counter.articleRef;
+  if (!ref) return null;
+  const sections = articleSectionsFor(kind, finalText);
+  if (!sections) return null;
+  if (ref === NEW_ARTICLE_REF) {
+    const items = [counter.text, ...childTexts].map((t, i) => ({ id: i + 1, type: 'addition', text: t }));
+    const drafted = await draftNewArticles('', finalText, sections, items);
+    return appendArticles(finalText, drafted.text);
+  }
+  const section = sections.find(s => s.ref === ref);
+  if (!section) return null;
+  const original = sectionText(finalText, section);
+  const children = renderAmendmentList(
+    childTexts.map((t, i) => ({ id: i + 1, text: t })),
+    MAX_LIST_CHARS,
+    `counter on article ${ref}`,
+  );
+  const prompt = ARTICLE_RESTYLE_PROMPT
+    .replace('{section}', original)
+    .replace('{counter}', counter.text.slice(0, MAX_TEXT_CHARS))
+    .replace('{childAmendments}', children);
+  const restyled = await rewriteSection(
+    'Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών. Γράφεις αντιπροτάσεις ώστε να συγκρίνονται δίκαια, χωρίς ποτέ να αλλοιώνεις την ουσία τους.',
+    prompt,
+    original.length + counter.text.length + children.length,
+    `counter restyle on article ${ref}`,
+  );
+  const article = restyled ? keepHeading(section, restyled) : keepHeading(section, counter.text);
+  return replaceSections(finalText, sections, new Map([[ref, article]]));
 }
 
 export async function aiMergeAmendments(
@@ -211,19 +495,20 @@ export async function aiMergeAmendments(
     threshold = community?.t != null ? Number(community.t) : DEFAULT_AMENDMENT_INCLUSION_THRESHOLD;
   }
 
-  const included: Array<{ id: number; type: string; text: string; reason: string }> = [];
+  const included: Array<MergeItem & { reason: string }> = [];
   const excluded: number[] = [];
   // Children of counter-proposals belong to their parent's restyle, not here.
   const mergeable = amendments.filter(a => (a as any).parentAmendmentId == null);
   for (const a of mergeable) {
     const decision = decisionOf(a);
     const ratio = popularityRatio(a);
+    const item = { id: a.id, type: a.type, text: a.text, articleRef: a.articleRef };
     if (decision === 'accepted') {
-      included.push({ id: a.id, type: a.type, text: a.text, reason: 'author-accepted' });
+      included.push({ ...item, reason: 'author-accepted' });
     } else if (decision !== 'rejected' && threshold < 1 && ratio >= threshold) {
-      included.push({ id: a.id, type: a.type, text: a.text, reason: `popularity ${(ratio * 100).toFixed(0)}%` });
+      included.push({ ...item, reason: `popularity ${(ratio * 100).toFixed(0)}%` });
     } else if (decision === 'rejected' && ratio >= Math.max(threshold, 0.7)) {
-      included.push({ id: a.id, type: a.type, text: a.text, reason: `community-override ${(ratio * 100).toFixed(0)}%` });
+      included.push({ ...item, reason: `community-override ${(ratio * 100).toFixed(0)}%` });
     } else {
       excluded.push(a.id);
     }
@@ -243,15 +528,14 @@ export async function aiMergeAmendments(
     return base; // nothing to merge — return original verbatim
   }
 
-  // Try LLM merge first; fall back to deterministic concat.
-  const llmResult = await llmMerge(proposal.question, proposal.solution, included);
-  if (llmResult.success) {
-    base.mergedSolution = llmResult.text;
+  // LLM merge (article by article for a statute), falling back to
+  // deterministic concatenation wherever the LLM cannot help.
+  const merged = await mergeIntoText(proposalKindOf(proposal.kind), proposal.question, proposal.solution, included);
+  base.mergedSolution = merged.text;
+  if (merged.llm) {
     base.source = 'llm';
     const cfg = (await import('./llm-client')).readLlmConfig();
     base.llmModel = cfg?.model;
-  } else {
-    base.mergedSolution = localConcat(proposal.question, proposal.solution, included);
   }
 
   return base;
@@ -354,9 +638,9 @@ async function restyleCounter(finalText: string, counterText: string, childAmend
         { role: 'system', content: 'Είσαι ειδικός στη σύνταξη πολιτικών κειμένων. Ξαναγράφεις αντιπροτάσεις ώστε να συγκρίνονται δίκαια, χωρίς ποτέ να αλλοιώνεις την ουσία τους.' },
         { role: 'user', content: RESTYLE_PROMPT.replace('{finalText}', finalText.slice(0, MAX_TEXT_CHARS)).replace('{counter}', counterText.slice(0, MAX_TEXT_CHARS)).replace('{childAmendments}', childText) },
       ],
-      maxTokens: 8000,
+      // The answer is the counter-proposal rewritten with its own amendments.
+      ...rewriteBudget(Math.min(counterText.length, MAX_TEXT_CHARS) + childText.length),
       temperature: 0.3,
-      timeoutMs: 90_000,
       enableThinking: false,
     });
     return response.trim().length > 0 ? response.trim() : null;
@@ -399,18 +683,16 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
   // Merge improvements/additions/removals into the vote-ready text.
   let finalText = proposal.solution;
   let source: 'llm' | 'fallback' = 'fallback';
+  const kind = proposalKindOf(proposal.kind);
   if (mergeIncluded.length > 0) {
-    const llmResult = await llmMerge(
+    const merged = await mergeIntoText(
+      kind,
       proposal.question,
       proposal.solution,
-      mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text })),
+      mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text, articleRef: a.articleRef })),
     );
-    if (llmResult.success) {
-      finalText = llmResult.text;
-      source = 'llm';
-    } else {
-      finalText = localConcat(proposal.question, proposal.solution, mergeIncluded.map(a => ({ id: a.id, type: a.type, text: a.text })));
-    }
+    finalText = merged.text;
+    if (merged.llm) source = 'llm';
   }
   // Re-apply the author's standing refine instruction on every recompute,
   // so live re-merges never silently discard it. The refine prompt treats
@@ -433,9 +715,11 @@ export async function prepareFinalReview(proposalId: number): Promise<FinalRevie
 
   // Restyle each qualifying counter-proposal into a standalone alternative,
   // folding in the amendments the deliberation accepted on that counter.
+  // A counter on one article of a statute changes only that article.
   for (const counter of counterAlternatives) {
     const childTexts = (counterChildren.get(counter.id) ?? []).map(c => c.text);
-    const restyled = await restyleCounter(finalText, counter.text, childTexts);
+    const restyled = await articleAlternative(kind, finalText, counter, childTexts)
+      ?? await restyleCounter(finalText, counter.text, childTexts);
     await db.update(proposalAmendments)
       .set({ restyledText: restyled ?? counter.text })
       .where(eq(proposalAmendments.id, counter.id));
@@ -492,9 +776,8 @@ async function runRefine(finalText: string, instruction: string, inviolable: str
           .replace('{instruction}', instruction.slice(0, 500)),
       },
     ],
-    maxTokens: 8000,
+    ...rewriteBudget(Math.min(finalText.length, MAX_TEXT_CHARS)),
     temperature: 0.2,
-    timeoutMs: 90_000,
     enableThinking: false,
   });
   const refined = response.trim();

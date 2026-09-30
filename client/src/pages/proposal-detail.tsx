@@ -35,6 +35,7 @@ import StatusBadge from '@/components/proposal/StatusBadge';
 import { useTranslation } from '@/hooks/use-translation';
 import { AIValidationBadge } from '@/components/proposal/AIValidationBadge';
 import { kindAllowsDeliberation, kindCollectsOptions, proposalKindOf } from '@shared/proposal-kinds';
+import { articleSectionsFor } from '@shared/statute-articles';
 import { OptionCollectionPanel } from '@/components/proposal/OptionCollectionPanel';
 
 interface Proposal {
@@ -722,6 +723,7 @@ export default function ProposalDetailPage() {
                     proposalId={proposal.id}
                     proposalStatus={proposal.status}
                     userIsAuthor={userIsAuthor}
+                    articles={articleSectionsFor(kind, proposal.solution ?? '')}
                   />
                 </TabsContent>
               )}

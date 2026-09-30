@@ -16,6 +16,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { AmendmentTree } from '@/components/proposal/AmendmentTree';
 import { AmendmentComments, type AmendmentComment } from '@/components/proposal/AmendmentComments';
 import { isDebateOpen } from '@shared/proposal-lifecycle';
+import { NEW_ARTICLE_REF, PREAMBLE_REF, type TextSection } from '@shared/statute-articles';
 import {
   FileText,
   Plus,
@@ -39,6 +40,8 @@ interface Amendment {
   text: string;
   status: 'pending' | 'accepted' | 'rejected' | 'flagged';
   parentAmendmentId?: number | null;
+  /** The statute article it changes — see shared/statute-articles.ts. */
+  articleRef?: string | null;
   authorDecision?: 'accepted' | 'rejected' | null;
   authorReason?: string | null;
   createdAt: string;
@@ -67,15 +70,21 @@ interface AmendmentsPanelProps {
   proposalId: number;
   proposalStatus: string;
   userIsAuthor?: boolean;
+  /**
+   * A statute's articles. When set, every amendment names the article it
+   * changes, and the merge rewrites only that article.
+   */
+  articles?: TextSection[] | null;
 }
 
-export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: AmendmentsPanelProps) {
+export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, articles }: AmendmentsPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [amendments, setAmendments] = useState<Amendment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState('');
   const [newType, setNewType] = useState<'improvement' | 'counter_proposal'>('improvement');
+  const [articleRef, setArticleRef] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [voting, setVoting] = useState<Record<number, boolean>>({});
@@ -130,8 +139,13 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
 
   const canSubmit = ['draft', 'author_review', 'community_signal'].includes(proposalStatus);
 
+  // An amendment on a counter-proposal takes the counter's article, so the
+  // choice is only asked of a top-level amendment.
+  const asksArticle = !!articles && !amendTarget;
+  const missingArticle = asksArticle && !articleRef;
+
   const handleSubmit = async () => {
-    if (!newText.trim() || submitting) return;
+    if (!newText.trim() || submitting || missingArticle) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -141,10 +155,12 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
         type: amendTarget ? 'improvement' : newType,
         text: newText.trim(),
         ...(amendTarget ? { parentAmendmentId: amendTarget.id } : {}),
+        ...(asksArticle ? { articleRef } : {}),
       });
       setAmendments(prev => [...prev, resp.data]);
       setNewText('');
       setNewType('improvement');
+      setArticleRef('');
       setAmendTarget(null);
     } catch (error) {
       setSubmitError(error instanceof ApiError ? error.message : t('workspace.amendments.submitFailed'));
@@ -186,6 +202,41 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
     }
   }
 
+  // «Άρθρο 5» on a card, the full heading on hover.
+  const articleName = (ref: string) =>
+    ref === PREAMBLE_REF ? t('workspace.amendments.articlePreamble')
+      : ref === NEW_ARTICLE_REF ? t('workspace.amendments.articleNew')
+      : t('workspace.amendments.articleShort', { ref });
+  const articleHeading = (ref: string) =>
+    articles?.find(a => a.ref === ref)?.heading ?? articleName(ref);
+  const articleBadge = (a: Amendment) => a.articleRef ? (
+    <Badge variant="outline" className="text-xs" title={articleHeading(a.articleRef)} data-testid={`amendment-article-${a.id}`}>
+      {articleName(a.articleRef)}
+    </Badge>
+  ) : null;
+
+  const articlePicker = (id: string) => asksArticle ? (
+    <div className="space-y-1">
+      <Label htmlFor={id}>{t('workspace.amendments.articleLabel')}</Label>
+      <Select value={articleRef} onValueChange={setArticleRef}>
+        <SelectTrigger id={id} data-testid="amendment-article">
+          <SelectValue placeholder={t('workspace.amendments.articlePlaceholder')} />
+        </SelectTrigger>
+        <SelectContent>
+          {articles!.map(a => (
+            <SelectItem key={a.ref} value={a.ref}>
+              {a.heading
+                ? (a.heading.length > 90 ? `${a.heading.slice(0, 89)}…` : a.heading)
+                : t('workspace.amendments.articlePreamble')}
+            </SelectItem>
+          ))}
+          <SelectItem value={NEW_ARTICLE_REF}>{t('workspace.amendments.articleNew')}</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">{t('workspace.amendments.articleHint')}</p>
+    </div>
+  ) : null;
+
   if (loading) {
     return (
       <Card>
@@ -221,6 +272,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                   </SelectContent>
                 </Select>
               </div>
+              {articlePicker('amendment-article')}
               <Textarea
                 placeholder={t('workspace.amendments.placeholder') || 'Προτείνετε τροπολογία...'}
                 value={newText}
@@ -229,7 +281,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
               />
               <div className="flex justify-between items-center">
                 {submitError && <span className="text-red-600 text-sm">{submitError}</span>}
-                <Button size="sm" onClick={handleSubmit} disabled={submitting || !newText.trim()}>
+                <Button size="sm" onClick={handleSubmit} disabled={submitting || !newText.trim() || missingArticle}>
                   <Plus className="w-4 h-4 mr-1" />
                   {t('workspace.amendments.submit') || 'Υποβολή'}
                 </Button>
@@ -318,6 +370,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                 >
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {articleBadge(amendment)}
                       {isCounter && (
                         <Badge className="bg-antip-wash text-antip-deep border border-antip/30 hover:bg-antip-wash">
                           {t('workspace.amendments.counterBadge') || 'Αντιπρόταση'}
@@ -547,6 +600,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
                 </Select>
               </div>
             )}
+            {articlePicker('amendment-article-2')}
             <Textarea
               id="new-amendment"
               placeholder={t('workspace.amendments.placeholder') || 'Προτείνετε τροπολογία...'}
@@ -556,7 +610,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor }: Am
             />
             <div className="flex justify-between items-center">
               {submitError && <span className="text-red-600 text-sm">{submitError}</span>}
-              <Button size="sm" onClick={handleSubmit} disabled={submitting || !newText.trim()}>
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || !newText.trim() || missingArticle}>
                 <Plus className="w-4 h-4 mr-1" />
                 {t('workspace.amendments.submit') || 'Υποβολή'}
               </Button>

@@ -93,7 +93,8 @@ export function registerAmendmentsRoutes(app: Express): void {
       // An election or a poll is co-drafted by adding candidates or answers
       // (/options), not by amending a text it does not have.
       const { kindCollectsOptions, proposalKindOf } = await import('@shared/proposal-kinds');
-      if (kindCollectsOptions(proposalKindOf((proposal as any).kind))) {
+      const kind = proposalKindOf((proposal as any).kind);
+      if (kindCollectsOptions(kind)) {
         return res.status(409).json({ message: "Αυτή η ψηφοφορία δεν έχει κείμενο για τροπολογίες." });
       }
       // Check amendment cap
@@ -110,6 +111,19 @@ export function registerAmendmentsRoutes(app: Express): void {
       const { type, text, parentAmendmentId } = req.body;
       if (!type || !text) {
         return res.status(400).json({ message: "Type and text are required" });
+      }
+      // A statute laid out in articles is amended article by article, so
+      // each amendment says which one it changes; the merge then rewrites
+      // only that article. An amendment on a counter-proposal takes its
+      // parent's article below. Any other text has no articles to name.
+      const { articleSectionsFor, isArticleRef } = await import('@shared/statute-articles');
+      const sections = articleSectionsFor(kind, proposal.solution);
+      let articleRef: string | null = null;
+      if (sections && (parentAmendmentId === undefined || parentAmendmentId === null)) {
+        if (!isArticleRef(sections, req.body.articleRef)) {
+          return res.status(400).json({ message: "Διαλέξτε σε ποιο άρθρο αναφέρεται η τροπολογία." });
+        }
+        articleRef = req.body.articleRef;
       }
       // Amendments on a counter-proposal: one level deep, and a
       // counter-proposal cannot itself receive a counter-proposal.
@@ -129,6 +143,7 @@ export function registerAmendmentsRoutes(app: Express): void {
         if (parent.type !== 'counter_proposal' || (parent as any).parentAmendmentId != null) {
           return res.status(400).json({ message: "Τροπολογίες επιτρέπονται μόνο πάνω σε αντιπροτάσεις." });
         }
+        articleRef = (parent as any).articleRef ?? null;
       }
       const amendment = await amendmentRepo.createAmendment({
         proposalId,
@@ -136,6 +151,7 @@ export function registerAmendmentsRoutes(app: Express): void {
         type,
         text,
         parentAmendmentId: parentId,
+        articleRef,
         status: 'pending',
       });
       // Best-effort fan-out to community members; failures must not block the response.

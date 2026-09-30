@@ -13,7 +13,7 @@
  */
 import { z } from 'zod';
 import { chatCompletion } from './llm-client';
-import { PROPOSAL_KINDS, kindRequiresText, type ProposalKind } from '../../shared/proposal-kinds';
+import { PROPOSAL_KINDS, TEXT_MAX_CHARS, kindRequiresText, type ProposalKind } from '../../shared/proposal-kinds';
 
 export const PROPOSAL_CATEGORIES = [
   'education', 'healthcare', 'infrastructure', 'environment',
@@ -24,11 +24,12 @@ const compiledProposalSchema = z.object({
   // What the community is voting on — see shared/proposal-kinds.ts.
   kind: z.enum(PROPOSAL_KINDS).default('decision'),
   question: z.string().min(10).max(300),
-  // Generous ceiling: pasted documents are preserved verbatim (see the
-  // system prompt), so the solution can be as long as the paste itself.
-  // An election or a poll may have no text at all; the kind-specific floor
-  // is enforced below.
-  solution: z.string().max(12000).default(''),
+  // Pasted documents are preserved verbatim (see the system prompt), so the
+  // solution can be as long as the paste itself. The kind's own ceiling is
+  // the form's to show: a draft over it is still worth handing back, since
+  // the author may only need to call it a statute. An election or a poll may
+  // have no text at all; the kind-specific floor is enforced below.
+  solution: z.string().max(TEXT_MAX_CHARS).default(''),
   category: z.enum(PROPOSAL_CATEGORIES),
   // Which track the user's intent calls for. 'vote' = straight to the
   // ballot with an author-set duration (the default — most members want a
@@ -123,8 +124,9 @@ export async function compileProposal(
       // output (Greek runs ~1 token per character), and reasoning models
       // on this endpoint spend hidden thinking tokens from the same pot.
       maxTokens: 64000,
-      // Long verbatim outputs take longer than the 45s default.
-      timeoutMs: 180_000,
+      // Long verbatim outputs take longer than the 45s default; a whole
+      // statute passed through (up to ~38k tokens) takes minutes.
+      timeoutMs: 600_000,
       jsonMode: true,
     });
 

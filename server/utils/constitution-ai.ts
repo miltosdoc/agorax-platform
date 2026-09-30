@@ -150,9 +150,10 @@ ${decision.text}
         { role: 'user', content: round === 1 ? user : `${user}\n\nYour previous output failed validation (${lastErrors}). Return the corrected JSON only.` },
       ],
       temperature: 0.2,
-      // Greek runs ~1 token per character; leave room for the full text.
-      maxTokens: Math.max(4000, decision.text.length * 2),
-      timeoutMs: 180_000,
+      // Greek runs ~1 token per character; leave room for the full text, up
+      // to the most any call here asks for (a 40k statute would ask for 80k).
+      maxTokens: Math.min(64_000, Math.max(4000, decision.text.length * 2)),
+      timeoutMs: Math.max(180_000, decision.text.length * 5),
       jsonMode: true,
     });
     let parsed: unknown;

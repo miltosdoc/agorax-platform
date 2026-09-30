@@ -74,6 +74,27 @@ export function isBindingKind(kind: ProposalKind): boolean {
   return kind !== 'poll';
 }
 
+/** The title or question (the `question` column), for every kind. */
+export const QUESTION_MAX_CHARS = 2_000;
+
+/**
+ * The longest text any kind allows. The AI box takes a paste this long and
+ * the merger reads a text this long, so neither can be what cuts it short.
+ * About 38k tokens on the configured model, which reads Greek at ~2.6
+ * characters per token (measured on a 32k-character statute: 12.3k tokens)
+ * — the size asked for, counted in the unit members can see.
+ */
+export const TEXT_MAX_CHARS = 100_000;
+
+/**
+ * How long the text may be. A statute is often a whole document — an
+ * association's statute runs to 30–60 thousand characters — so it has room
+ * for one; for every other kind the text is a description.
+ */
+export function textMaxChars(kind: ProposalKind): number {
+  return kind === 'statute' ? TEXT_MAX_CHARS : 12_000;
+}
+
 /**
  * The option appended to every option ballot so that nobody is forced to
  * pick one of the listed choices. Its id stays 'status_quo' whatever the
