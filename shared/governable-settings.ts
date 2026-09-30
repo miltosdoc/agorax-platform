@@ -16,6 +16,7 @@ import {
   COMMUNITY_SYNTHESIS_MODES,
   COMMUNITY_JOIN_POLICIES,
   COMMUNITY_VISIBILITY_LEVELS,
+  CONSTITUTION_SCOPES,
   type CommunityGovernanceModel,
   type CommunitySortitionMode,
   type CommunityJoinPolicy,
@@ -55,6 +56,8 @@ export const GOVERNABLE_SETTING_KEYS = [
   'pollMinHours',
   'pollMaxHours',
   'pollSuggestionsEnabled',
+  // What the constitution gathers (migration 0059).
+  'constitutionScope',
 ] as const;
 export type GovernableSettingKey = typeof GOVERNABLE_SETTING_KEYS[number];
 
@@ -104,6 +107,7 @@ export const GOVERNABLE_SETTING_DESCRIPTORS: Record<GovernableSettingKey, Govern
   pollMaxHours:                  { key: 'pollMaxHours',                  type: 'integer', min: 1, max: 8760, unit: 'hours' },
   electionNominationsEnabled:    { key: 'electionNominationsEnabled',    type: 'boolean' },
   pollSuggestionsEnabled:        { key: 'pollSuggestionsEnabled',        type: 'boolean' },
+  constitutionScope:             { key: 'constitutionScope',             type: 'enum',    allowed: CONSTITUTION_SCOPES },
 };
 
 /**

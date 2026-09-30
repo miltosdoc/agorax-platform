@@ -42,6 +42,7 @@ import {
   majorityFraction, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, type ProposalKind,
 } from '@shared/proposal-kinds';
 import { statuteSections } from '@shared/statute-articles';
+import { isArticleBallot } from '@shared/article-ballot';
 import { hoursLabel } from '@/lib/governable-setting-labels';
 
 interface ProposalFormProps {
@@ -53,6 +54,10 @@ interface ProposalFormProps {
   // and the durations, and can rewrite every word before saving. The topic
   // is linked back to the proposal once it exists.
   fromPostId?: number;
+  // A statute voted article by article whose rejected articles are to be
+  // co-drafted again: the form opens as a statute with co-drafting, holding
+  // those articles in the version that was put to the vote.
+  fromArticlesOf?: number;
 }
 
 interface MemberCommunity {
@@ -90,7 +95,7 @@ const DELIBERATION_PRESETS = [48, 72, 168];
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-export function ProposalForm({ communityId, editProposalId, fromPostId }: ProposalFormProps) {
+export function ProposalForm({ communityId, editProposalId, fromPostId, fromArticlesOf }: ProposalFormProps) {
   const [, setLocation] = useLocation();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -259,6 +264,32 @@ export function ProposalForm({ communityId, editProposalId, fromPostId }: Propos
     })();
     return () => { cancelled = true; };
   }, [fromPostId, communityId, editProposalId, t]);
+
+  // The articles that did not pass, once, on arrival. The author's own
+  // words win if they have already typed (a reload after editing).
+  useEffect(() => {
+    if (!fromArticlesOf || editProposalId) return;
+    let cancelled = false;
+    Promise.all([
+      api.get<{ question: string; articleBallot?: unknown }>(`/api/proposals/${fromArticlesOf}`),
+      api.get<{ articles?: Array<{ ref: string; adopted: boolean }> | null }>(`/api/proposals/${fromArticlesOf}/vote-results`),
+    ]).then(([p, r]) => {
+      if (cancelled || !isArticleBallot(p.data.articleBallot)) return;
+      const ballot = p.data.articleBallot;
+      const rejected = ballot.articles.filter((q) => r.data.articles?.find((a) => a.ref === q.ref && !a.adopted));
+      if (rejected.length === 0) return;
+      setKind('statute');
+      setDeliberate(true);
+      setMoreOpen(true);
+      setFormData((prev) => (prev.question || prev.solution ? prev : {
+        ...prev,
+        question: t('proposal.redraft_title', { question: p.data.question }).slice(0, 2000),
+        solution: rejected.map((q) => q.versions[0]).join('\n\n'),
+      }));
+    }).catch(() => { /* the form still works empty */ });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromArticlesOf, editProposalId]);
 
   function handleAttachPick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);

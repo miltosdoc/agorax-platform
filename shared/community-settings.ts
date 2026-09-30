@@ -43,6 +43,24 @@ export type CommunitySynthesisMode = typeof COMMUNITY_SYNTHESIS_MODES[number];
  * there and `effectiveProposalPolicy` reports 'all_members' whatever the
  * column holds. Read the effective value, never the raw column.
  */
+/**
+ * What the community's constitution gathers from its votes: everything
+ * decided (the statute, decisions, elections — as it always has), or only
+ * part of it. The rules the platform enforces are always there.
+ */
+export const CONSTITUTION_SCOPES = ['all', 'statute_decisions', 'statute', 'decisions'] as const;
+export type ConstitutionScope = typeof CONSTITUTION_SCOPES[number];
+
+/** Which kinds of decided vote the constitution takes, under a scope. */
+export function constitutionKinds(scope: unknown): ReadonlyArray<'statute' | 'decision' | 'election'> {
+  switch (scope) {
+    case 'statute_decisions': return ['statute', 'decision'];
+    case 'statute': return ['statute'];
+    case 'decisions': return ['decision'];
+    default: return ['statute', 'decision', 'election'];
+  }
+}
+
 export const COMMUNITY_PROPOSAL_POLICIES = ['all_members', 'admins', 'founder'] as const;
 export type CommunityProposalPolicy = typeof COMMUNITY_PROPOSAL_POLICIES[number];
 
@@ -126,6 +144,7 @@ export interface CommunitySettingsInput {
   pollSuggestionsEnabled?: unknown;
   pollMinHours?: unknown;
   pollMaxHours?: unknown;
+  constitutionScope?: unknown;
 }
 
 // Sanitized community settings — narrow literal types instead of the wide
@@ -173,6 +192,7 @@ export interface CommunityCreateSettings {
   pollSuggestionsEnabled: boolean;
   pollMinHours: number;
   pollMaxHours: number;
+  constitutionScope: ConstitutionScope;
 }
 
 export type CommunityUpdateSettings = Partial<CommunityCreateSettings>;
@@ -218,6 +238,7 @@ const DEFAULT_COMMUNITY_SETTINGS = {
   pollSuggestionsEnabled: true,
   pollMinHours: 24,
   pollMaxHours: 336,
+  constitutionScope: 'all',
 } as const;
 
 /**
@@ -403,6 +424,7 @@ export function sanitizeCommunityCreateInput(input: CommunitySettingsInput): Com
     pollEnabled: booleanValue(input.pollEnabled, DEFAULT_COMMUNITY_SETTINGS.pollEnabled),
     electionNominationsEnabled: booleanValue(input.electionNominationsEnabled, DEFAULT_COMMUNITY_SETTINGS.electionNominationsEnabled),
     pollSuggestionsEnabled: booleanValue(input.pollSuggestionsEnabled, DEFAULT_COMMUNITY_SETTINGS.pollSuggestionsEnabled),
+    constitutionScope: enumValue(input.constitutionScope, CONSTITUTION_SCOPES, DEFAULT_COMMUNITY_SETTINGS.constitutionScope, 'Invalid constitution scope'),
   };
 }
 
@@ -529,6 +551,8 @@ export function sanitizeCommunityUpdateInput(input: CommunitySettingsInput): Com
     const value = optionalDecimalString(input[key], 0, 100, `${key} must be between 0 and 100`);
     if (value !== undefined) updates[key] = value;
   }
+  const constitutionScope = optionalEnumValue(input.constitutionScope, CONSTITUTION_SCOPES, 'Invalid constitution scope');
+  if (constitutionScope !== undefined) updates.constitutionScope = constitutionScope;
 
   // Only catches a self-contradictory pair sent together. A partial update
   // that crosses the *stored* bound is caught by assertCommunityRanges(),

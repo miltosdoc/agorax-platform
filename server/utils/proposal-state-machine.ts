@@ -197,6 +197,15 @@ export async function transitionProposal(
 
   const phaseDeadline = await computePhaseDeadline(proposal, newState);
 
+  // A statute put straight to the vote gets its article-by-article ballot
+  // before the vote opens. (After co-drafting it is built with the final
+  // text, in triggerSideEffects; a ballot cast in between counts on the
+  // whole — see decodeArticleChoice.)
+  if (newState === 'voting' && track === 'vote') {
+    const { freezeDirectArticleBallot } = await import('./ai-merger');
+    await freezeDirectArticleBallot(proposal.id);
+  }
+
   const updated = await storage.updateProposal(proposal.id, { status: newState, phaseDeadline });
 
   // Democracy Points: a proposal that passes quality validation — leaving

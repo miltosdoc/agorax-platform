@@ -298,6 +298,9 @@ export const communities = pgTable("communities", {
   pollMinHours: integer("poll_min_hours").notNull().default(24),
   pollMaxHours: integer("poll_max_hours").notNull().default(336),
   pollSuggestionsEnabled: boolean("poll_suggestions_enabled").notNull().default(true),
+  // What the community's constitution gathers from its votes (migration
+  // 0059) — see CONSTITUTION_SCOPES in shared/community-settings.ts.
+  constitutionScope: text("constitution_scope").notNull().default("all"),
 
   // Democracy score (computed, shows how democratic the community governance is)
   democracyScore: numeric("democracy_score"),
@@ -463,6 +466,11 @@ export const proposals = pgTable("proposals", {
   // { id: 'final' | 'counter_<amendmentId>' | 'status_quo', label: string }.
   // null = classic yes/no/abstain ballot (all legacy proposals).
   ballotOptions: jsonb("ballot_options"),
+  // A statute voted article by article (migration 0059): the question on
+  // the whole, one per article, versions where co-drafting produced a
+  // counter-proposal — see shared/article-ballot.ts. Frozen when the vote
+  // opens; null for every other ballot.
+  articleBallot: jsonb("article_ballot"),
   // Winning option id once decided (option ballots only).
   winningOption: text("winning_option"),
 
@@ -1556,9 +1564,11 @@ export const insertProposalVoteSchema = createInsertSchema(proposalVotes).omit({
 
 // Classic ballots use yes/no/abstain; option ballots (deliberation track
 // with counter-proposal alternatives) use ids like 'final', 'counter_12',
-// 'status_quo'. The route validates against the proposal's actual option
-// set — this schema only enforces shape.
-export const proposalVoteChoiceSchema = z.string().min(1).max(64).regex(/^[a-z0-9_]+$/);
+// 'status_quo'; an article-by-article statute ballot carries one letter per
+// article (shared/article-ballot.ts), hence the room. The route validates
+// against the proposal's actual ballot — this schema only enforces shape.
+export const BALLOT_CHOICE_MAX_LENGTH = 256;
+export const proposalVoteChoiceSchema = z.string().min(1).max(BALLOT_CHOICE_MAX_LENGTH).regex(/^[a-z0-9_]+$/);
 export const CLASSIC_BALLOT_CHOICES = ['yes', 'no', 'abstain'] as const;
 
 export interface BallotOption { id: string; label: string }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -6,6 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { PhaseCountdown } from '@/components/ui/PhaseCountdown';
 import { BallotReceipt } from '@/components/ceremony/BallotReceipt';
 import { BroadcastResults } from '@/components/ceremony/BroadcastResults';
+import { ArticleBallotForm, ArticleResults, describeArticleChoice } from '@/components/voting/ArticleBallot';
+import {
+  decodeArticleChoice, isArticleBallot, type ArticleBallot, type ArticleResult,
+} from '@shared/article-ballot';
 import {
   ThumbsUp,
   ThumbsDown,
@@ -81,6 +86,8 @@ export interface VoteResults {
   kind?: string;
   /** False for a poll: it is reported, never passed or rejected. */
   binding?: boolean;
+  /** A statute voted article by article: each article's result (null while sealed). */
+  articles?: ArticleResult[] | null;
 }
 
 const EMPTY_RESULTS: VoteResults = {
@@ -108,6 +115,10 @@ interface VotePanelProps {
   /** The proposal's option-ballot definition, if the caller has it. Also
    *  arrives with the vote-results payload, so this prop is optional. */
   ballotOptions?: BallotOption[] | null;
+  /** A statute voted article by article and on the whole — see shared/article-ballot.ts. */
+  articleBallot?: unknown;
+  /** Where a new co-drafting for articles that did not pass is filed. */
+  communityId?: number;
   onVoteResultsChange?: (results: VoteResults) => void;
   onProposalAdvanced?: (newStatus: string) => void;
 }
@@ -119,11 +130,14 @@ export default function VotePanel({
   votingMode = 'pseudonymous',
   phaseDeadline,
   ballotOptions: ballotOptionsProp,
+  articleBallot: articleBallotProp,
+  communityId,
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
   const { t, locale } = useTranslation();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [results, setResults] = useState<VoteResults>(EMPTY_RESULTS);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
@@ -241,10 +255,15 @@ export default function VotePanel({
   // caller may have the proposal), fall back to the vote-results payload.
   const ballotOptions = ballotOptionsProp ?? results.ballotOptions ?? null;
   const isOptionBallot = !!ballotOptions && ballotOptions.length > 0;
+  const articleBallot: ArticleBallot | null = isArticleBallot(articleBallotProp) ? articleBallotProp : null;
 
   /** Human label for any choice id — classic trio or ballot option. */
   const optionLabel = (choice: string | null): string => {
     if (!choice) return '';
+    if (articleBallot) {
+      const decoded = decodeArticleChoice(articleBallot, choice);
+      if (decoded) return describeArticleChoice(t, decoded);
+    }
     if (choice === 'yes') return t('proposal.support');
     if (choice === 'no') return t('proposal.oppose');
     if (choice === 'abstain') return t('proposal.abstain');
@@ -499,7 +518,23 @@ export default function VotePanel({
           </div>
         )}
 
-        {showVoteButtons && user && !pendingBallot && isOptionBallot && ballotOptions && (
+        {/* A statute voted article by article and on the whole. */}
+        {showVoteButtons && user && !pendingBallot && articleBallot && (
+          <div>
+            <div className="text-sm text-muted-foreground mb-3">
+              {userVoted ? t('vote.changeYourVote') : tk('vote.castYourVote')}
+            </div>
+            <ArticleBallotForm
+              ballot={articleBallot}
+              initial={results.userVote ? decodeArticleChoice(articleBallot, results.userVote) : null}
+              disabled={voting}
+              onSubmit={handleCastVote}
+              onCancel={changing ? () => setChanging(false) : undefined}
+            />
+          </div>
+        )}
+
+        {showVoteButtons && user && !pendingBallot && !articleBallot && isOptionBallot && ballotOptions && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
               {userVoted ? t('vote.changeYourVote') : tk('vote.castYourVote')}
@@ -592,7 +627,7 @@ export default function VotePanel({
           </div>
         )}
 
-        {showVoteButtons && user && !pendingBallot && !isOptionBallot && (
+        {showVoteButtons && user && !pendingBallot && !articleBallot && !isOptionBallot && (
           <div>
             <div className="text-sm text-muted-foreground mb-3">
               {userVoted ? t('vote.changeYourVote') : tk('vote.castYourVote')}
@@ -726,6 +761,18 @@ export default function VotePanel({
                 : results.kind === 'poll' ? t('vote.option_poll_top')
                 : undefined
             }
+          />
+        )}
+
+        {/* Each article's result, under the vote on the whole. */}
+        {!results.sealed && articleBallot && results.articles && results.articles.length > 0 && (
+          <ArticleResults
+            ballot={articleBallot}
+            results={results.articles}
+            closed={isClosed}
+            onRedraft={isClosed && results.passes && communityId
+              ? () => setLocation(`/proposals/new?community=${communityId}&fromArticles=${proposalId}`)
+              : undefined}
           />
         )}
 

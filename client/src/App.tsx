@@ -77,11 +77,14 @@ function ProposalFormPage({ editId }: { editId?: number }) {
   // A community forum topic being turned into a proposal arrives prefilled.
   const fromPostRaw = params.get('fromPost');
   const fromPostId = fromPostRaw && /^\d+$/.test(fromPostRaw) ? parseInt(fromPostRaw, 10) : undefined;
+  // The articles of a statute that did not pass, to be co-drafted again.
+  const fromArticlesRaw = params.get('fromArticles');
+  const fromArticlesOf = fromArticlesRaw && /^\d+$/.test(fromArticlesRaw) ? parseInt(fromArticlesRaw, 10) : undefined;
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <ProposalForm communityId={communityId} editProposalId={editId} fromPostId={fromPostId} />
+        <ProposalForm communityId={communityId} editProposalId={editId} fromPostId={fromPostId} fromArticlesOf={fromArticlesOf} />
       </div>
       <Footer />
     </div>

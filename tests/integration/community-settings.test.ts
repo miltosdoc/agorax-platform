@@ -12,6 +12,7 @@ import {
   COMMUNITY_TYPES,
   sanitizeCommunityCreateInput,
   sanitizeCommunityUpdateInput,
+  constitutionKinds,
   assertCommunityRanges,
   resolveAuthoredPhaseHours,
 } from '../../shared/community-settings';
@@ -83,6 +84,7 @@ describe('community settings contract', () => {
       pollMaxHours: 336,
       electionNominationsEnabled: true,
       pollSuggestionsEnabled: true,
+      constitutionScope: 'all',
     });
   });
 
@@ -128,7 +130,18 @@ describe('community settings contract', () => {
       pollMaxHours: 336,
       electionNominationsEnabled: true,
       pollSuggestionsEnabled: true,
+      constitutionScope: 'all',
     });
+  });
+
+  it('lets a community choose what its constitution gathers', () => {
+    expect(sanitizeCommunityUpdateInput({ constitutionScope: 'statute' })).toEqual({ constitutionScope: 'statute' });
+    expect(() => sanitizeCommunityUpdateInput({ constitutionScope: 'polls' })).toThrow();
+    expect(constitutionKinds('all')).toEqual(['statute', 'decision', 'election']);
+    expect(constitutionKinds('statute_decisions')).toEqual(['statute', 'decision']);
+    expect(constitutionKinds('decisions')).toEqual(['decision']);
+    // A row from before the column reads as everything, as it always did.
+    expect(constitutionKinds(undefined)).toEqual(['statute', 'decision', 'election']);
   });
 
   it('derives the governance model from the type on update, and never from input', () => {

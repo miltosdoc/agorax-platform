@@ -21,7 +21,11 @@ import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/use-translation';
 import type { Community } from '@shared/schema';
-import type { CommunityJoinPolicy, CommunitySortitionMode, CommunitySynthesisMode, CommunityType, CommunityVisibilityLevel } from '@shared/community-settings';
+import {
+  CONSTITUTION_SCOPES,
+  type CommunityJoinPolicy, type CommunitySortitionMode, type CommunitySynthesisMode, type CommunityType,
+  type CommunityVisibilityLevel, type ConstitutionScope,
+} from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
 import { VoteRulesSection, type VoteRulesForm } from '@/components/community/VoteRulesSection';
 import { voteRulesFor } from '@shared/proposal-kinds';
@@ -44,6 +48,7 @@ interface CommunitySettingsForm extends VoteRulesForm {
   joinPolicy: CommunityJoinPolicy;
   memberListVisibility: CommunityVisibilityLevel;
   contentVisibility: CommunityVisibilityLevel;
+  constitutionScope: ConstitutionScope;
   authorReviewHours: number;
   communitySignalHours: number;
   votingHours: number;
@@ -76,6 +81,7 @@ function toForm(community: Community): CommunitySettingsForm {
     joinPolicy: ((community as any).joinPolicy as CommunityJoinPolicy) || 'open',
     memberListVisibility: ((community as any).memberListVisibility as CommunityVisibilityLevel) || 'public',
     contentVisibility: ((community as any).contentVisibility as CommunityVisibilityLevel) || 'public',
+    constitutionScope: ((community as any).constitutionScope as ConstitutionScope) || 'all',
     authorReviewHours: (community as any).authorReviewHours ?? 72,
     communitySignalHours: (community as any).communitySignalHours ?? 48,
     votingHours: (community as any).votingHours ?? 168,
@@ -330,6 +336,18 @@ export default function CommunitySettingsPage() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">{t('community.content_visibility_help') || 'Καλύπτει προτάσεις, συζητήσεις, ψηφοφορίες και τα συνημμένα αρχεία/πολυμέσα. Για ουσιαστική ιδιωτικότητα συνδυάστε με πολιτική εισδοχής με έγκριση ή πρόσκληση.'}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="constitutionScope">{t('community.constitution_scope')}</Label>
+                      <Select value={form.constitutionScope} onValueChange={(value) => update('constitutionScope', value as ConstitutionScope)}>
+                        <SelectTrigger id="constitutionScope"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CONSTITUTION_SCOPES.map((scope) => (
+                            <SelectItem key={scope} value={scope}>{t(`community.constitution_scope_${scope}`)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">{t('community.constitution_scope_help')}</p>
                     </div>
                   </div>
                 </section>

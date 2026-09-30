@@ -21,9 +21,11 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { communities, proposalAmendments, proposals } from '@shared/schema';
 import {
-  PROPOSAL_KINDS, majorityFraction, voteRulesFor, type MajorityRule, type ProposalKind,
+  PROPOSAL_KINDS, majorityFraction, proposalKindOf, voteRulesFor, type MajorityRule, type ProposalKind,
 } from '@shared/proposal-kinds';
-import { synthesisJuryTerms } from '@shared/community-settings';
+import { constitutionKinds, synthesisJuryTerms } from '@shared/community-settings';
+import { adoptedText, isArticleBallot } from '@shared/article-ballot';
+import { sectionText, statuteSections } from '@shared/statute-articles';
 import { canViewCommunityContentById } from './community-visibility';
 import { aiAvailable, ensureArticles, getCachedArticles, pendingCount, type AiArticle } from './constitution-ai';
 
@@ -36,6 +38,7 @@ export interface Article {
 
 export interface Decision {
   proposalId: number;
+  kind: ProposalKind;
   question: string;
   text: string;
   /** e.g. "Yes 12 · No 3 · Abstain 1" or "Final proposal 9 · No change 2". */
@@ -74,6 +77,10 @@ const L = {
     part1Intro: 'Οι ισχύοντες κανόνες λειτουργίας της κοινότητας. Εφαρμόζονται αυτόματα από την πλατφόρμα.',
     part2: 'Μέρος Β — Αποφάσεις',
     part2Intro: 'Κάθε πρόταση που εγκρίθηκε με ψηφοφορία, με το κείμενο που υιοθετήθηκε.',
+    statutePart: 'Μέρος Β — Καταστατικό',
+    statuteIntro: 'Το ισχύον κείμενο: κάθε άρθρο στην τελευταία εγκεκριμένη διατύπωσή του, με την απόφαση από την οποία προέρχεται.',
+    decisionsAfterStatute: 'Μέρος Γ — Αποφάσεις',
+    articlesAdopted: (n: number, total: number) => `εγκρίθηκαν ${n} από ${total} άρθρα`,
     noDecisions: 'Δεν έχει εγκριθεί ακόμη καμία πρόταση.',
     decisionsHidden: 'Οι αποφάσεις είναι ορατές μόνο στα μέλη της κοινότητας.',
     article: 'Άρθρο',
@@ -89,6 +96,7 @@ const L = {
     yes: 'Ναι', no: 'Όχι', abstain: 'Αποχή',
     ofMembers: (n: number, pct: string) => `${n} ψηφοφόροι (${pct} των μελών)`,
     aiPart2: 'Μέρος Β — Άρθρα από τις αποφάσεις',
+    aiPart3: 'Μέρος Γ — Άρθρα από τις αποφάσεις',
     aiPart2Intro: 'Κάθε εγκεκριμένη απόφαση, γραμμένη ως άρθρο. Κάθε άρθρο παραπέμπει στην πρόταση από την οποία προέρχεται.',
     appendix: 'Παράρτημα — Άλλες αποφάσεις',
     appendixIntro: 'Αποφάσεις που δεν θεσπίζουν κανόνα (δημοσκοπήσεις, δοκιμές, καλέσματα για ιδέες).',
@@ -102,6 +110,10 @@ const L = {
     part1Intro: 'The community\'s current operating rules. The platform enforces them automatically.',
     part2: 'Part II — Decisions',
     part2Intro: 'Every proposal approved by vote, with the text that was adopted.',
+    statutePart: 'Part II — Statute',
+    statuteIntro: 'The text in force: each article in its latest approved wording, with the decision it comes from.',
+    decisionsAfterStatute: 'Part III — Decisions',
+    articlesAdopted: (n: number, total: number) => `${n} of ${total} articles adopted`,
     noDecisions: 'No proposal has been approved yet.',
     decisionsHidden: 'Decisions are visible to community members only.',
     article: 'Article',
@@ -117,6 +129,7 @@ const L = {
     yes: 'Yes', no: 'No', abstain: 'Abstain',
     ofMembers: (n: number, pct: string) => `${n} voters (${pct} of members)`,
     aiPart2: 'Part II — Articles from decisions',
+    aiPart3: 'Part III — Articles from decisions',
     aiPart2Intro: 'Every approved decision, written as an article. Each article cites the proposal it comes from.',
     appendix: 'Appendix — Other decisions',
     appendixIntro: 'Decisions that set no rule (polls, tests, calls for ideas).',
@@ -221,6 +234,12 @@ export function buildArticles(c: CommunityRow, lang: Lang): Article[] {
     el
       ? 'Όταν το ψηφοδέλτιο έχει επιλογές ή αντιπροτάσεις, νικά η επιλογή με τις περισσότερες ψήφους.'
       : 'When the ballot offers options or counter-proposals, the option with the most votes wins.',
+    el
+      ? 'Ένα καταστατικό γραμμένο σε άρθρα ψηφίζεται κατ\' άρθρο και στο σύνολο: ένα άρθρο ισχύει μόνο αν εγκριθεί το ίδιο και το σύνολο, και όπου υπάρχουν εκδοχές ισχύει όποια πάρει τις περισσότερες ψήφους.'
+      : 'A statute written in articles is voted article by article and on the whole: an article takes effect only if it and the whole are approved, and where there are versions, the one with most votes applies.',
+    el
+      ? `Το Σύνταγμα καταγράφει: ${scopeText(c.constitutionScope, lang)}.`
+      : `The constitution records: ${scopeText(c.constitutionScope, lang)}.`,
   ].join(' ');
 
   const timeline = el
@@ -286,7 +305,18 @@ export function buildArticles(c: CommunityRow, lang: Lang): Article[] {
   ];
 }
 
-async function buildDecisions(communityId: number, lang: Lang): Promise<Decision[]> {
+/** What the constitution records under a community's scope, in words. */
+function scopeText(scope: unknown, lang: Lang): string {
+  const el = lang === 'el';
+  switch (scope) {
+    case 'statute_decisions': return el ? 'το καταστατικό και τις αποφάσεις' : 'the statute and decisions';
+    case 'statute': return el ? 'μόνο το καταστατικό' : 'the statute only';
+    case 'decisions': return el ? 'μόνο τις αποφάσεις' : 'decisions only';
+    default: return el ? 'ό,τι αποφασίστηκε — καταστατικό, αποφάσεις, εκλογές' : 'everything decided — statute, decisions, elections';
+  }
+}
+
+async function buildDecisions(communityId: number, lang: Lang, kinds: readonly ProposalKind[]): Promise<Decision[]> {
   const s = L[lang];
   const rows = await db.select().from(proposals)
     .where(and(eq(proposals.communityId, communityId), eq(proposals.status, 'decided')))
@@ -312,10 +342,20 @@ async function buildDecisions(communityId: number, lang: Lang): Promise<Decision
     const r = await computeVoteResults(p, view);
     // A poll records opinion; it never becomes a rule of the community.
     if (!r.passes || !r.binding) continue;
+    // The community decides what its constitution records.
+    const kind = proposalKindOf(p.kind);
+    if (!kinds.includes(kind)) continue;
 
     let text = p.finalText || p.solution;
     let result: string;
-    if (r.ballotOptions && r.counts) {
+    if (r.articles && isArticleBallot(p.articleBallot)) {
+      // Voted article by article: only the adopted articles, each in the
+      // version that won.
+      text = adoptedText(p.articleBallot, r.articles);
+      if (!text) continue;
+      const adopted = r.articles.filter((a) => a.adopted).length;
+      result = `${s.yes} ${r.yes} · ${s.no} ${r.no} · ${s.abstain} ${r.abstain} — ${s.articlesAdopted(adopted, r.articles.length)}`;
+    } else if (r.ballotOptions && r.counts) {
       const winner = r.ballotOptions.find((o) => o.id === r.winner);
       if (r.winner?.startsWith('counter_')) {
         text = counterText.get(parseInt(r.winner.slice(8), 10)) ?? text;
@@ -330,6 +370,7 @@ async function buildDecisions(communityId: number, lang: Lang): Promise<Decision
 
     out.push({
       proposalId: p.id,
+      kind,
       question: p.question,
       text: text.trim(),
       result,
@@ -351,16 +392,20 @@ export async function buildConstitution(
 
   const articles = buildArticles(c, lang);
   const visible = await canViewCommunityContentById(communityId, viewerId);
-  const decisions = visible ? await buildDecisions(communityId, lang) : null;
+  const decisions = visible ? await buildDecisions(communityId, lang, constitutionKinds(c.constitutionScope)) : null;
 
   let ai: Constitution['ai'] = null;
   if (decisions) {
-    const have = await getCachedArticles(decisions, lang);
-    ensureArticles(decisions, lang, c.name, have);
+    // A statute written in articles is already articles: both versions show
+    // it as the statute in force, verbatim, so it is never sent to the AI.
+    const { from } = consolidatedStatute(decisions);
+    const toWrite = decisions.filter((d) => !from.has(d.proposalId));
+    const have = await getCachedArticles(toWrite, lang);
+    ensureArticles(toWrite, lang, c.name, have);
     ai = {
       available: aiAvailable(),
-      pending: pendingCount(decisions, lang),
-      articles: decisions.map((d) => have.get(d.proposalId)).filter((a): a is AiArticle => !!a),
+      pending: pendingCount(toWrite, lang),
+      articles: toWrite.map((d) => have.get(d.proposalId)).filter((a): a is AiArticle => !!a),
       fingerprint: '',
     };
   }
@@ -410,6 +455,43 @@ export interface Layout {
   fingerprint: string;
 }
 
+/**
+ * The statute in force, from the approved statutes written in articles:
+ * each article in the wording of the latest decision that adopted it, in
+ * article order. `from` holds the decisions it was built from, which the
+ * layout then leaves out of the list of decisions.
+ */
+function consolidatedStatute(decisions: Decision[]): {
+  blocks: Array<Omit<Block, 'meta'> & { decision: Decision }>;
+  from: Set<number>;
+} {
+  const latest = new Map<string, { heading: string; body: string; decision: Decision }>();
+  const from = new Set<number>();
+  for (const d of decisions) { // chronological, so a later wording replaces an earlier one
+    if (d.kind !== 'statute') continue;
+    const sections = statuteSections(d.text);
+    if (!sections) continue;
+    from.add(d.proposalId);
+    for (const section of sections) {
+      if (!section.heading) continue;
+      const text = sectionText(d.text, section);
+      latest.set(section.ref, { heading: section.heading, body: text.slice(section.heading.length).trim(), decision: d });
+    }
+  }
+  const order = (ref: string) => {
+    const n = parseInt(ref, 10);
+    return [Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER, ref] as const;
+  };
+  const blocks = [...latest.entries()]
+    .sort(([a], [b]) => {
+      const [na, ra] = order(a);
+      const [nb, rb] = order(b);
+      return na - nb || ra.localeCompare(rb, 'el');
+    })
+    .map(([, a]) => ({ heading: a.heading, proposalId: a.decision.proposalId, body: a.body, decision: a.decision }));
+  return { blocks, from };
+}
+
 /** Arrange the document for one version. Both renderers and the tab print this as-is. */
 export function layout(doc: Constitution, version: Version): Layout {
   const s = L[doc.lang];
@@ -436,12 +518,24 @@ export function layout(doc: Constitution, version: Version): Layout {
   }
 
   if (version === 'raw' || !doc.ai) {
-    return {
-      lang: doc.lang, title: s.title, communityName: doc.communityName, description: doc.description,
-      parts: [rules, {
-        heading: s.part2,
+    // Statutes written in articles read as one statute in force: each
+    // article in its latest approved wording. Everything else stays a list
+    // of decisions.
+    const statute = consolidatedStatute(doc.decisions);
+    const others = doc.decisions.filter((d) => !statute.from.has(d.proposalId));
+    const parts: Part[] = [rules];
+    if (statute.blocks.length > 0) {
+      parts.push({
+        heading: s.statutePart,
+        intro: s.statuteIntro,
+        blocks: statute.blocks.map(({ decision, ...b }) => ({ ...b, meta: sourceLine(decision) })),
+      });
+    }
+    if (others.length > 0 || statute.blocks.length === 0) {
+      parts.push({
+        heading: statute.blocks.length > 0 ? s.decisionsAfterStatute : s.part2,
         intro: s.part2Intro,
-        blocks: doc.decisions.map((d, i) => ({
+        blocks: others.map((d, i) => ({
           heading: `${s.decision} ${i + 1} — ${d.question}`,
           meta: `${s.date}: ${fmtDate(d.date, doc.lang)} · ${s.proposal} #${d.proposalId}`,
           proposalId: d.proposalId,
@@ -449,19 +543,25 @@ export function layout(doc: Constitution, version: Version): Layout {
           result: d.result,
           participation: d.participation,
         })),
-      }],
+      });
+    }
+    return {
+      lang: doc.lang, title: s.title, communityName: doc.communityName, description: doc.description,
+      parts,
       fingerprint: doc.fingerprint,
     };
   }
-
-  // AI version: normative decisions continue the article numbering after
-  // Part I; the rest go to the appendix. A decision without an article yet
-  // appears with its original text so the document is never incomplete.
+  // AI version: the statute in force as it stands (it is already written
+  // in articles); the other normative decisions continue the article
+  // numbering after Part I; the rest go to the appendix. A decision without
+  // an article yet appears with its original text so the document is never
+  // incomplete.
+  const statute = consolidatedStatute(doc.decisions);
   const byId = new Map(doc.ai.articles.map((a) => [a.proposalId, a]));
   const main: Block[] = [];
   const appendix: Block[] = [];
   let n = doc.articles.length;
-  for (const d of doc.decisions) {
+  for (const d of doc.decisions.filter((x) => !statute.from.has(x.proposalId))) {
     const a = byId.get(d.proposalId);
     if (a && !a.normative) {
       appendix.push({ heading: a.title, meta: sourceLine(d), proposalId: d.proposalId, body: a.body });
@@ -472,7 +572,17 @@ export function layout(doc: Constitution, version: Version): Layout {
       ? { heading: `${s.article} ${n} — ${a.title}`, meta: sourceLine(d), proposalId: d.proposalId, body: a.body }
       : { heading: `${s.article} ${n} — ${d.question}`, meta: sourceLine(d), proposalId: d.proposalId, note: s.aiPendingItem, body: d.text });
   }
-  const parts: Part[] = [rules, { heading: s.aiPart2, intro: s.aiPart2Intro, blocks: main }];
+  const parts: Part[] = [rules];
+  if (statute.blocks.length > 0) {
+    parts.push({
+      heading: s.statutePart,
+      intro: s.statuteIntro,
+      blocks: statute.blocks.map(({ decision, ...b }) => ({ ...b, meta: sourceLine(decision) })),
+    });
+  }
+  if (main.length > 0 || statute.blocks.length === 0) {
+    parts.push({ heading: statute.blocks.length > 0 ? s.aiPart3 : s.aiPart2, intro: s.aiPart2Intro, blocks: main });
+  }
   if (appendix.length) parts.push({ heading: s.appendix, intro: s.appendixIntro, blocks: appendix });
   return {
     lang: doc.lang, title: s.title, communityName: doc.communityName, description: doc.description,

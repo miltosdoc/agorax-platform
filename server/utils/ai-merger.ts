@@ -20,6 +20,7 @@ import { db } from '../db';
 import { proposalAmendments, proposals, communities } from '../../shared/schema';
 import { DEFAULT_AMENDMENT_INCLUSION_THRESHOLD } from '../../shared/community-settings';
 import { TEXT_MAX_CHARS, proposalKindOf, type ProposalKind } from '../../shared/proposal-kinds';
+import { buildArticleBallot } from '../../shared/article-ballot';
 import {
   NEW_ARTICLE_REF, appendArticles, articleSectionsFor, nextArticleNumber, opensWithHeading, replaceSections,
   sectionText, type TextSection,
@@ -844,6 +845,23 @@ export async function buildBallotOptions(proposalId: number): Promise<Array<{ id
   const { counterAlternatives: qualified } = partitionAmendments(amendments, threshold);
   const counterAlternatives = qualified.filter(a => a.restyledText != null);
 
+  // A statute laid out in articles is voted article by article and on the
+  // whole (shared/article-ballot.ts); its counter-proposals become versions
+  // of the articles they name instead of whole-text options.
+  if (proposalKindOf(proposal.kind) === 'statute') {
+    const ballot = buildArticleBallot(
+      proposal.finalText || proposal.solution,
+      proposal.solution,
+      counterAlternatives.map(a => ({ id: a.id, articleRef: a.articleRef, text: a.restyledText! })),
+    );
+    if (ballot) {
+      await db.update(proposals)
+        .set({ articleBallot: ballot, ballotOptions: null, updatedAt: new Date() })
+        .where(eq(proposals.id, proposalId));
+      return null;
+    }
+  }
+
   if (counterAlternatives.length === 0) {
     return null; // classic yes/no/abstain ballot
   }
@@ -860,4 +878,21 @@ export async function buildBallotOptions(proposalId: number): Promise<Array<{ id
     .set({ ballotOptions: options, updatedAt: new Date() })
     .where(eq(proposals.id, proposalId));
   return options;
+}
+
+/**
+ * A statute put straight to the vote, without co-drafting, is still voted
+ * article by article and on the whole — unless its author set out options
+ * of their own, which is a different question. Called before the vote
+ * opens, so the ballot is fixed before anyone can cast one.
+ */
+export async function freezeDirectArticleBallot(proposalId: number): Promise<void> {
+  const [proposal] = await db.select().from(proposals).where(eq(proposals.id, proposalId));
+  if (!proposal || proposalKindOf(proposal.kind) !== 'statute') return;
+  if (Array.isArray(proposal.ballotOptions) && proposal.ballotOptions.length > 0) return;
+  const ballot = buildArticleBallot(proposal.solution, proposal.solution, []);
+  if (!ballot) return;
+  await db.update(proposals)
+    .set({ articleBallot: ballot, updatedAt: new Date() })
+    .where(eq(proposals.id, proposalId));
 }

@@ -35,7 +35,10 @@ import {
   meetsMajority, proposalKindOf, refusalOptionLabel, textMaxChars, voteRulesFor, enabledKinds,
   type ProposalKind,
 } from '@shared/proposal-kinds';
-import { validBallotChoices } from '@shared/schema';
+import { BALLOT_CHOICE_MAX_LENGTH, validBallotChoices } from '@shared/schema';
+import {
+  decodeArticleChoice, isArticleBallot, tallyArticleBallot, type ArticleResult,
+} from '@shared/article-ballot';
 import {
   canViewCommunityContentById,
   requireProposalContentAccess,
@@ -49,6 +52,21 @@ import type { VoterView } from '../voting';
 import { createServer, type Server } from 'http';
 
 const greekNumber = (n: number) => n.toLocaleString('el-GR');
+
+/**
+ * Whether a proposal's ballot takes this choice, or why not. A statute voted
+ * article by article carries every answer in one choice string (see
+ * shared/article-ballot.ts); every other ballot takes one of its ids.
+ */
+function ballotRefusal(proposal: { ballotOptions?: unknown; articleBallot?: unknown }, choice: string): string | null {
+  if (isArticleBallot(proposal.articleBallot)) {
+    return decodeArticleChoice(proposal.articleBallot, choice)
+      ? null
+      : 'Το ψηφοδέλτιο δεν ταιριάζει με τα άρθρα αυτής της ψηφοφορίας. Ανανεώστε τη σελίδα και ψηφίστε ξανά.';
+  }
+  const valid = validBallotChoices(proposal);
+  return valid.includes(choice) ? null : `Choice must be one of: ${valid.join(', ')}`;
+}
 
 /**
  * Why a title or a text is too long for its kind, or null. The form counts
@@ -72,7 +90,7 @@ function tooLongMessage(question: string, solution: string, kind: ProposalKind):
  * until the election closes.
  */
 export async function computeVoteResults(
-  proposal: { communityId: number; ballotOptions?: unknown; kind?: string | null },
+  proposal: { communityId: number; ballotOptions?: unknown; articleBallot?: unknown; kind?: string | null },
   view: VoterView,
 ) {
   const kind = proposalKindOf(proposal.kind);
@@ -101,9 +119,13 @@ export async function computeVoteResults(
   const meetsQuorum = participationPct >= minParticipationPct;
 
   const tally = view.tally;
-  const yes = tally?.yes ?? 0;
-  const no = tally?.no ?? 0;
-  const abstain = tally?.abstain ?? 0;
+  // A statute voted article by article: the question on the whole reads as
+  // an ordinary yes/no/abstain, and each article gets its own result.
+  const articleBallot = isArticleBallot((proposal as any).articleBallot) ? (proposal as any).articleBallot : null;
+  const articleTally = articleBallot && tally ? tallyArticleBallot(articleBallot, tally.counts ?? {}, majority) : null;
+  const yes = articleTally ? articleTally.whole.yes : tally?.yes ?? 0;
+  const no = articleTally ? articleTally.whole.no : tally?.no ?? 0;
+  const abstain = articleTally ? articleTally.whole.abstain : tally?.abstain ?? 0;
   const total = tally?.total ?? view.ballotCount;
 
   // Option ballots (deliberation track with counter-proposal alternatives):
@@ -135,10 +157,16 @@ export async function computeVoteResults(
   // (its result stays on view) instead of being archived for turnout.
   const binding = isBindingKind(kind);
   const concludes = binding ? meetsQuorum && hasDecisive : total > 0;
+  // An article enters the statute only if it carries and the whole does.
+  let articles: ArticleResult[] | null = null;
+  if (articleTally) {
+    articles = articleTally.articles.map((a) => ({ ...a, adopted: passes && a.passes }));
+  }
   return {
     yes, no, abstain, total,
     kind, binding, concludes,
-    ballotOptions, counts, winner, hasDecisive,
+    ballotOptions, counts: articleBallot ? null : counts, winner, hasDecisive,
+    articles,
     sealed: view.tallySealed || !tally,
     hasVoted: view.hasVoted,
     ballotCount: view.ballotCount,
@@ -779,10 +807,8 @@ export function registerProposalsRoutes(app: Express): void {
       }
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const validChoices = validBallotChoices(proposal);
-      if (!validChoices.includes(parsed.data.choice)) {
-        return res.status(400).json({ message: `Choice must be one of: ${validChoices.join(', ')}` });
-      }
+      const refusal = ballotRefusal(proposal as any, parsed.data.choice);
+      if (refusal) return res.status(400).json({ message: refusal });
       if (proposal.status !== 'voting') {
         return res.status(409).json({
           message: "Proposal is not currently in the voting phase",
@@ -935,16 +961,14 @@ export function registerProposalsRoutes(app: Express): void {
       if (typeof token !== 'string' || typeof preparedMsg !== 'string' || typeof signature !== 'string') {
         return res.status(400).json({ message: "token + preparedMsg + signature (base64) required" });
       }
-      if (typeof choice !== 'string' || !/^[a-z0-9_]{1,64}$/.test(choice)) {
+      if (typeof choice !== 'string' || choice.length > BALLOT_CHOICE_MAX_LENGTH || !/^[a-z0-9_]+$/.test(choice)) {
         return res.status(400).json({ message: "invalid ballot choice" });
       }
 
       const proposal = await proposalRepo.getProposal(proposalId);
       if (!proposal) return res.status(404).json({ message: "Proposal not found" });
-      const validAnonChoices = validBallotChoices(proposal);
-      if (!validAnonChoices.includes(choice)) {
-        return res.status(400).json({ message: `choice must be one of: ${validAnonChoices.join(', ')}` });
-      }
+      const anonRefusal = ballotRefusal(proposal as any, choice);
+      if (anonRefusal) return res.status(400).json({ message: anonRefusal });
       if (proposal.status !== 'voting') {
         return res.status(409).json({ message: "Proposal is not in the voting phase" });
       }

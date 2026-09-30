@@ -2,16 +2,18 @@
  * Ballot-choice invariant (QA checklist Γ.3α).
  *
  * A vote's choice must always be validated against the proposal's actual
- * option set — classic yes/no/abstain, or the ballotOptions list built from
- * deliberation alternatives. Pins both the pure function and the wiring:
- * every vote-casting route in proposals.ts must consult validBallotChoices
- * before recording a vote.
+ * ballot — classic yes/no/abstain, the ballotOptions list built from
+ * deliberation alternatives, or a statute's article-by-article ballot.
+ * Pins both the pure function and the wiring: every vote-casting route in
+ * proposals.ts must consult the proposal's ballot (ballotRefusal, which
+ * falls back to validBallotChoices) before recording a vote.
  */
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  BALLOT_CHOICE_MAX_LENGTH,
   CLASSIC_BALLOT_CHOICES,
   proposalVoteChoiceSchema,
   validBallotChoices,
@@ -52,14 +54,14 @@ describe('proposalVoteChoiceSchema shape', () => {
   });
 
   it('rejects malformed or dangerous input', () => {
-    for (const bad of ['', 'YES', 'a b', 'x'.repeat(65), "1;drop table votes", '<script>']) {
+    for (const bad of ['', 'YES', 'a b', 'x'.repeat(BALLOT_CHOICE_MAX_LENGTH + 1), "1;drop table votes", '<script>']) {
       expect(proposalVoteChoiceSchema.safeParse(bad).success).toBe(false);
     }
   });
 });
 
 describe('vote route wiring', () => {
-  it('every vote-casting route validates against validBallotChoices', () => {
+  it('every vote-casting route validates against the proposal\'s ballot', () => {
     const src = readFileSync(
       resolve(__dirname, '../../server/routers/proposals.ts'),
       'utf8',
@@ -67,8 +69,12 @@ describe('vote route wiring', () => {
     // Both casting endpoints exist…
     expect(src).toMatch(/app\.post\("\/api\/proposals\/:id\/vote"/);
     expect(src).toMatch(/app\.post\("\/api\/proposals\/:id\/anonymous-vote"/);
-    // …and each consults the proposal's option set before casting.
-    const calls = src.match(/validBallotChoices\(/g) ?? [];
+    // …and each consults the proposal's ballot before casting…
+    const calls = src.match(/ballotRefusal\(proposal as any,/g) ?? []; // the two routes, not the definition
     expect(calls.length).toBeGreaterThanOrEqual(2);
+    // …which, for anything but an article ballot, is its option set.
+    const helper = src.slice(src.indexOf('function ballotRefusal('), src.indexOf('function ballotRefusal(') + 800);
+    expect(helper).toMatch(/validBallotChoices\(proposal\)/);
+    expect(helper).toMatch(/decodeArticleChoice\(/);
   });
 });

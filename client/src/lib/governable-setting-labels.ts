@@ -52,6 +52,7 @@ export const SETTING_LABEL_KEYS: Record<GovernableSettingKey, string> = {
   pollMaxHours: 'community.rule_poll_max_hours',
   electionNominationsEnabled: 'community.rule_election_nominations',
   pollSuggestionsEnabled: 'community.rule_poll_suggestions',
+  constitutionScope: 'community.constitution_scope',
 };
 
 /**
@@ -84,6 +85,7 @@ export const SETTING_VALUE_KEY_PREFIXES: Partial<Record<GovernableSettingKey, st
   synthesisMode: 'community.synthesis_mode_',
   decisionMajority: 'community.majority_',
   statuteMajority: 'community.majority_',
+  constitutionScope: 'community.constitution_scope_',
 };
 
 /**

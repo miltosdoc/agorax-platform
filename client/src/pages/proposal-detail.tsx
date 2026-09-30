@@ -685,6 +685,8 @@ export default function ProposalDetailPage() {
                 proposalAuthorId={proposal.authorId}
                 votingMode={proposal.votingMode}
                 phaseDeadline={(proposal as any).phaseDeadline}
+                articleBallot={(proposal as any).articleBallot}
+                communityId={proposal.communityId}
                 onProposalAdvanced={handleProposalAdvanced}
               />
               {voteError && (
@@ -758,6 +760,8 @@ export default function ProposalDetailPage() {
                   proposalAuthorId={proposal.authorId}
                   votingMode={proposal.votingMode}
                   phaseDeadline={(proposal as any).phaseDeadline}
+                  articleBallot={(proposal as any).articleBallot}
+                  communityId={proposal.communityId}
                   onProposalAdvanced={handleProposalAdvanced}
                 />
                 {voteError && (
