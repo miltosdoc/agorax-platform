@@ -6,9 +6,10 @@
 
 import type { Express, Request, Response } from 'express';
 import { notificationRepo } from '../storage';
+import { parseNotificationListQuery } from '../storage/notifications';
 import { requireAuth } from '../auth';
 import { db } from '../db';
-import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { sortitionNotifications } from '@shared/schema';
 import { notificationBus, type NotificationEvent } from '../utils/notification-bus';
@@ -63,30 +64,15 @@ export function registerNotificationsRoutes(app: Express): void {
     verified: z.boolean()
   });
   app.get("/api/sortition-notifications", requireAuth, async (req: any, res) => {
+    let options;
+    try {
+      options = parseNotificationListQuery(req.query);
+    } catch {
+      return res.status(400).json({ message: "Invalid notification query" });
+    }
     try {
       const userId = req.user!.id;
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
-      const unreadOnly = req.query.unread === 'true';
-      const conditions = unreadOnly
-        ? and(eq(sortitionNotifications.userId, userId), eq(sortitionNotifications.read, false))
-        : eq(sortitionNotifications.userId, userId);
-      const notifications = await db
-        .select()
-        .from(sortitionNotifications)
-        .where(conditions)
-        .orderBy(desc(sortitionNotifications.createdAt))
-        .limit(limit)
-        .offset(offset);
-      const [unread] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(sortitionNotifications)
-        .where(and(eq(sortitionNotifications.userId, userId), eq(sortitionNotifications.read, false)));
-      res.json({
-        notifications,
-        unreadCount: unread?.count ?? 0,
-        total: notifications.length,
-      });
+      res.json(await notificationRepo.getSortitionNotifications(userId, options));
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch notifications" });
     }

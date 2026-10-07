@@ -45,6 +45,7 @@ interface DebatePanelProps {
   proposalId: number;
   /** Omit to leave the composer open — callers that know the phase pass it. */
   proposalStatus?: string;
+  allowParticipation?: boolean;
 }
 
 const EMPTY_STATS: DebateStats = {
@@ -60,7 +61,7 @@ function formatTimestamp(value: string): string {
   return d.toLocaleString();
 }
 
-export function DebatePanel({ proposalId, proposalStatus }: DebatePanelProps) {
+export function DebatePanel({ proposalId, proposalStatus, allowParticipation = true }: DebatePanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -69,7 +70,7 @@ export function DebatePanel({ proposalId, proposalStatus }: DebatePanelProps) {
   // states, posting 409s. Offering an enabled composer that always fails is
   // worse than showing none.
   const debateOpen = proposalStatus == null || isDebateOpen(proposalStatus);
-  const canParticipate = !!user && debateOpen;
+  const canParticipate = !!user && debateOpen && allowParticipation;
 
   const [threads, setThreads] = useState<ThreadNode[]>([]);
   const [stats, setStats] = useState<DebateStats>(EMPTY_STATS);
@@ -168,7 +169,7 @@ export function DebatePanel({ proposalId, proposalStatus }: DebatePanelProps) {
               variant={composerOpen ? 'outline' : 'default'}
               size="sm"
               onClick={() => setComposerOpen((v) => !v)}
-              disabled={!debateOpen}
+              disabled={!debateOpen || !allowParticipation}
               title={debateOpen ? undefined : t('debate.closedNotice')}
               data-testid="debate-new-thread-toggle"
             >
@@ -182,7 +183,7 @@ export function DebatePanel({ proposalId, proposalStatus }: DebatePanelProps) {
         )}
       </div>
 
-      {composerOpen && user && (
+      {composerOpen && canParticipate && (
         <Card>
           <CardContent className="p-4">
             <form onSubmit={handleNewThread} className="space-y-3">

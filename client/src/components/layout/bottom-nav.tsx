@@ -34,7 +34,7 @@ export default function BottomNav({ user }: BottomNavProps) {
       testId: "nav-communities",
     },
     {
-      label: t('nav.newProposal'),
+      label: t('shell.create'),
       icon: PlusCircle,
       path: "/proposals/new",
       testId: "nav-create-proposal",
@@ -62,8 +62,9 @@ export default function BottomNav({ user }: BottomNavProps) {
 
   return (
     <nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-line bg-paper shadow-lg safe-area-inset-bottom"
+      className="platform-bottom-navigation fixed bottom-0 left-0 right-0 z-40 border-t border-line bg-surface/95 backdrop-blur safe-area-inset-bottom"
       data-testid="bottom-navigation"
+      aria-label={t('shell.primaryNavigation')}
     >
       <div className="flex justify-around items-center h-16 px-2">
         {navItems.map((item) => {
@@ -76,11 +77,13 @@ export default function BottomNav({ user }: BottomNavProps) {
               <Link
                 key={item.path}
                 href={item.path}
-                className="flex flex-col items-center justify-center flex-1 relative -mt-5 tap-highlight-none"
+                className="flex flex-col items-center justify-center flex-1 relative tap-highlight-none"
                 data-testid={item.testId}
+                aria-label={t('nav.newProposal')}
+                aria-current={active ? 'page' : undefined}
               >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-paper bg-ink text-paper shadow-lg">
-                  <Icon className="h-7 w-7" />
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-kyanos text-accent-foreground">
+                  <Icon className="h-5 w-5" />
                 </span>
                 <span className={cn("mt-0.5 text-xs font-medium", active ? "text-kyanos" : "text-ink-faint")}>
                   {item.label}
@@ -97,6 +100,7 @@ export default function BottomNav({ user }: BottomNavProps) {
                 active ? "text-kyanos" : "text-ink-faint"
               )}
               data-testid={item.testId}
+              aria-current={active ? 'page' : undefined}
             >
               <Icon
                 className={cn(

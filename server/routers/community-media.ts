@@ -1,8 +1,8 @@
 /**
  * Community Library Router — media posted inside a community.
  *
- * Deliberately decoupled from proposals and from the global /feed: items
- * live on the community page only. Any member can upload; the community's
+ * Deliberately stored independently from proposals: items
+ * appear in the community library and visibility-filtered activity feeds. Any member can upload; the community's
  * contentVisibility gates who can read; founder/admins pin items to the
  * top of the library ("start here" material) and curate.
  *
@@ -18,9 +18,9 @@ import { mkdir, unlink, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import express from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns } from 'drizzle-orm';
 import { db } from '../db';
-import { communityMedia, type CommunityMedia } from '@shared/schema';
+import { communityMedia, users } from '@shared/schema';
 import { communityRepo } from '../storage';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
@@ -115,7 +115,7 @@ export function registerCommunityMediaRoutes(app: Express): void {
         if (kind === 'video') {
           const thumbName = `${kind}-${id}.jpg`;
           try {
-            await extractVideoThumbnail(filePath, path.join(dir, thumbName));
+            await extractVideoThumbnail(filePath, path.join(dir, thumbName), durationS);
             thumbRel = path.posix.join(`c${communityId}`, thumbName);
           } catch (thumbErr: any) {
             logger.warn('library thumbnail extraction failed', { communityId, err: thumbErr?.message });
@@ -159,7 +159,12 @@ export function registerCommunityMediaRoutes(app: Express): void {
       return res.status(403).json({ message: 'library is members-only', contentHidden: true });
     }
 
-    const rows: CommunityMedia[] = await db.select().from(communityMedia)
+    const rows = await db.select({
+      ...getTableColumns(communityMedia),
+      uploaderName: users.name,
+      uploaderUsername: users.username,
+    }).from(communityMedia)
+      .leftJoin(users, eq(users.id, communityMedia.uploaderId))
       .where(eq(communityMedia.communityId, communityId))
       .orderBy(desc(communityMedia.pinned), desc(communityMedia.createdAt));
 

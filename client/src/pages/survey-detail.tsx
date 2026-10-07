@@ -6,13 +6,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import AppShell from '@/components/layout/AppShell';
-import { DiscoveryRail } from '@/components/rails/discovery-rail';
-import { AgoraFeedRail } from '@/components/rails/agora-feed-rail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { AlertTriangle, Lock, Send } from 'lucide-react';
+import { AlertTriangle, Lock, Pencil } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
@@ -92,7 +90,7 @@ export default function SurveyDetailPage() {
 
   useEffect(load, [load]);
 
-  async function action(path: 'field' | 'close') {
+  async function action(path: 'close') {
     setBusy(true);
     setError(null);
     try {
@@ -124,9 +122,8 @@ export default function SurveyDetailPage() {
     <AppShell
       title={poll.title}
       breadcrumb={[{ label: t('surveys.title'), href: '/surveys' }, { label: `#${poll.id}` }]}
-      leftRail={<DiscoveryRail />}
-      rightRail={<AgoraFeedRail />}
     >
+      <div className="mx-auto max-w-4xl">
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <TierBadge tier={poll.tier} />
         <Badge variant="secondary">{t(`surveys.status.${poll.status}`)}</Badge>
@@ -150,10 +147,10 @@ export default function SurveyDetailPage() {
 
       {isCreator && poll.status === 'draft' && (
         <Card className="mb-4">
-          <CardContent className="py-4 flex items-center justify-between gap-3">
-            <p className="text-sm">{t('surveys.detail.draftReady')}</p>
-            <Button onClick={() => action('field')} disabled={busy}>
-              <Send className="w-4 h-4 mr-1" /> {t('surveys.detail.publish')}
+          <CardContent className="py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <p className="text-base">{t('surveys.detail.draftReady')}</p>
+            <Button onClick={() => navigate(`/surveys/${poll.id}/edit`)}>
+              <Pencil className="w-4 h-4 mr-2" /> {t('surveys.previewPublish')}
             </Button>
           </CardContent>
         </Card>
@@ -238,7 +235,7 @@ export default function SurveyDetailPage() {
       {poll.status === 'closed' && poll.methodology && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('surveys.detail.methodology')}</CardTitle>
+            <CardTitle className="text-lg">{t('surveys.detail.methodology')}</CardTitle>
             <CardDescription>{t('surveys.detail.methodologySub')}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -308,9 +305,9 @@ export default function SurveyDetailPage() {
       {/* ── Item preview for drafts ── */}
       {poll.status === 'draft' && (
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">{t('surveys.detail.questions')}</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-lg">{t('surveys.detail.questions')}</CardTitle></CardHeader>
           <CardContent>
-            <ol className="space-y-3 text-sm">
+            <ol className="space-y-4 text-base">
               {items.map((item, i) => (
                 <li key={item.id}>
                   <p className="font-medium">{i + 1}. {item.text} {item.isAttentionCheck && <Badge variant="secondary" className="ml-1 text-xs">{t('surveys.create.attention')}</Badge>}</p>
@@ -326,6 +323,7 @@ export default function SurveyDetailPage() {
       {poll.status === 'live' && !isCreator && (
         <Button onClick={() => navigate(`/surveys/${poll.id}/take`)}>{t('surveys.detail.takeCta')}</Button>
       )}
+      </div>
     </AppShell>
   );
 }

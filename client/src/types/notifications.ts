@@ -16,6 +16,7 @@ export interface SortitionNotification {
     | 'file_lost'
     | 'deliberation_reminder'
     | 'community_invite'
+    | 'forum_reply'
     | 'platform_update';
   title: string;
   message: string | null;
@@ -49,5 +50,6 @@ export const notificationTypeConfig: Record<SortitionNotification['type'], { ico
   file_lost: { icon: '⚠️', color: 'bg-red-50 border-red-200' },
   deliberation_reminder: { icon: '⏳', color: 'bg-amber-50 border-amber-200' },
   community_invite: { icon: '✉️', color: 'bg-sky-50 border-sky-200' },
+  forum_reply: { icon: '💬', color: 'bg-cyan-50 border-cyan-200' },
   platform_update: { icon: '🛠️', color: 'bg-slate-50 border-slate-200' },
 };

@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useErrorToast } from '@/hooks/use-error-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { CommunityJoinAction } from '@/components/community/CommunityJoinAction';
+import { MediaUploadDialog } from '@/components/media/MediaUploadDialog';
 import { useTranslation } from '@/hooks/use-translation';
 import { api, ApiError } from '@/lib/api';
 import { uploadProposalFile, DOCUMENT_ACCEPT } from '@/lib/upload-media';
@@ -34,6 +37,8 @@ interface MediaRow {
   id: number;
   proposalId: number;
   uploaderId: number;
+  uploaderName?: string | null;
+  uploaderUsername?: string | null;
   kind: 'podcast' | 'video' | 'document';
   title: string | null;
   filePath: string;
@@ -58,6 +63,8 @@ interface ScriptResponse {
 interface MediaStudioPanelProps {
   proposalId: number;
   userIsAuthor: boolean;
+  communityId?: number;
+  canParticipate?: boolean;
 }
 
 const KIND_CONFIG = {
@@ -218,7 +225,7 @@ function MediaKindCard(props: {
           onChange={(e) => setScript(e.target.value)}
           placeholder={t('media.scriptPlaceholder')}
           rows={10}
-          className="font-mono text-xs"
+          className="text-sm leading-relaxed"
           data-testid={`media-script-${kind}`}
         />
         {script && (
@@ -354,7 +361,7 @@ function MediaGalleryItem(props: {
   onChange: () => void;
 }) {
   const { media, userIsAuthor, currentUserId, onChange } = props;
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { toast } = useToast();
   const errorToast = useErrorToast();
   const [acting, setActing] = useState(false);
@@ -488,8 +495,9 @@ function MediaGalleryItem(props: {
         </div>
       </div>
 
+      <p className="mb-3 flex flex-wrap gap-x-2 gap-y-1 text-sm text-ink-soft"><span className="font-medium text-ink">{media.uploaderName || (media.uploaderUsername ? `@${media.uploaderUsername}` : t('proposal.userWithId', { id: media.uploaderId }))}</span><time dateTime={media.createdAt}>· {new Date(media.createdAt).toLocaleString(locale === 'el' ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></p>
       {media.title && (
-        <h4 className="font-semibold mb-2">{media.title}</h4>
+        <h4 className="mb-3 text-lg font-semibold leading-snug text-ink">{media.title}</h4>
       )}
 
       {media.kind === 'podcast' ? (
@@ -497,6 +505,7 @@ function MediaGalleryItem(props: {
       ) : media.kind === 'video' ? (
         <video
           controls
+          playsInline
           preload="metadata"
           src={mediaUrl}
           poster={thumbUrl}
@@ -569,17 +578,21 @@ function MediaGalleryItem(props: {
   );
 }
 
-export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelProps) {
+export function MediaStudioPanel({ proposalId, userIsAuthor, communityId, canParticipate = true }: MediaStudioPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [items, setItems] = useState<MediaRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const resp = await api.get<MediaRow[]>(`/api/proposals/${proposalId}/media`);
       setItems(resp.data);
+      setLoadError(false);
     } catch {
+      setLoadError(true);
       setItems([]);
     }
   }, [proposalId]);
@@ -590,20 +603,10 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('media.studio')}</CardTitle>
-          <CardDescription>{t('media.studioDescription')}</CardDescription>
-        </CardHeader>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <MediaKindCard proposalId={proposalId} kind="podcast" onUploaded={refresh} />
-        <MediaKindCard proposalId={proposalId} kind="video" onUploaded={refresh} />
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-5">
+        <div><h2 className="text-xl font-semibold text-ink">{t('proposal.mediaGalleryTitle')}</h2><p className="mt-1 text-base leading-relaxed text-ink-soft">{t('proposal.mediaUploadHelp')}</p></div>
+        {user && canParticipate && communityId ? <div className="flex flex-wrap gap-2"><MediaUploadDialog communityId={communityId} proposalId={proposalId} kind="video" onUploaded={refresh} /><MediaUploadDialog communityId={communityId} proposalId={proposalId} kind="podcast" onUploaded={refresh} /></div> : communityId ? <CommunityJoinAction communityId={communityId} /> : null}
       </div>
-
-      <DocumentUploadCard proposalId={proposalId} onUploaded={refresh} />
-
       <Card>
         <CardHeader>
           <CardTitle>{t('media.gallery')}</CardTitle>
@@ -614,7 +617,8 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
         </CardHeader>
         <CardContent className="space-y-3">
           {loading && <p className="text-sm text-muted-foreground">{t('media.loading')}</p>}
-          {!loading && items.length === 0 && (
+          {!loading && loadError && <div role="alert"><p className="text-sm text-destructive">{t('proposal.loadError')}</p><Button variant="outline" className="mt-3" onClick={refresh}>{t('membership.retry')}</Button></div>}
+          {!loading && !loadError && items.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('media.galleryEmpty')}</p>
           )}
           {items.map((m) => (
@@ -623,11 +627,17 @@ export function MediaStudioPanel({ proposalId, userIsAuthor }: MediaStudioPanelP
               media={m}
               userIsAuthor={userIsAuthor}
               currentUserId={user?.id}
-              onChange={refresh}
+              onChange={() => {
+                void refresh();
+                void queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+                void queryClient.invalidateQueries({ queryKey: [`/api/proposals/${proposalId}/media`] });
+              }}
             />
           ))}
         </CardContent>
       </Card>
+      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('media.documentTitle')}</summary><div className="pt-4"><DocumentUploadCard proposalId={proposalId} onUploaded={refresh} /></div></details>}
+      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('proposal.mediaTools')}</summary><div className="grid gap-4 pt-4 md:grid-cols-2"><MediaKindCard proposalId={proposalId} kind="podcast" onUploaded={refresh} /><MediaKindCard proposalId={proposalId} kind="video" onUploaded={refresh} /></div></details>}
     </div>
   );
 }

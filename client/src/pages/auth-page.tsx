@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -24,13 +24,13 @@ import {
   BUTTON_PRIMARY,
   BUTTON_SECONDARY,
   CHECKBOX_CLASS,
-  EYEBROW,
   INPUT_CLASS,
   LINK_CLASS,
 } from "@/components/auth/auth-styles";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { AgoraLogo } from "@/components/brand/AgoraLogo";
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
+import { safeAuthReturnTo } from '@/lib/auth-return';
 
 // Inside the Capacitor Android wrapper, Google blocks OAuth in the webview,
 // so the flow runs in the system browser with mobile=1: the callback then
@@ -42,8 +42,7 @@ function isNativeApp(): boolean {
 
 function startGoogleAuth() {
   const currentUrl = new URL(window.location.href);
-  const returnToParam = currentUrl.searchParams.get('returnTo') || '/feed';
-  const path = returnToParam.startsWith('http') ? new URL(returnToParam).pathname : returnToParam;
+  const path = safeAuthReturnTo(currentUrl.searchParams.get('returnTo'));
   const mobile = isNativeApp() ? '&mobile=1' : '';
   window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}${mobile}`;
 }
@@ -66,12 +65,13 @@ async function getFingerprint(): Promise<string | undefined> {
 
 export default function AuthPage() {
   const { t } = useTranslation();
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
+  const search = useSearch();
   const { user } = useAuth();
 
   // Extract URL parameters
-  const params = new URLSearchParams(location.split("?")[1]);
-  const returnTo = params.get("returnTo") || "/feed";
+  const params = new URLSearchParams(search);
+  const returnTo = safeAuthReturnTo(params.get("returnTo"));
 
   const [tab, setTab] = useState(() => {
     // Check if URL has a tab parameter
@@ -81,29 +81,25 @@ export default function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      const path = returnTo.startsWith('http') ? new URL(returnTo).pathname : returnTo;
-      navigate(path);
+      navigate(returnTo);
     }
   }, [user, navigate, returnTo]);
 
   const handleAuthenticated = () => {
-    const path = returnTo.startsWith('http') ? new URL(returnTo).pathname : returnTo;
-    navigate(path);
+    navigate(returnTo);
   };
 
   const features = [
     { title: t('auth.heroFeature1Title'), desc: t('auth.heroFeature1Desc') },
     { title: t('auth.heroFeature2Title'), desc: t('auth.heroFeature2Desc') },
     { title: t('auth.heroFeature3Title'), desc: t('auth.heroFeature3Desc') },
-    { title: t('auth.heroFeature4Title'), desc: t('auth.heroFeature4Desc') },
-    { title: t('auth.heroFeature5Title'), desc: t('auth.heroFeature5Desc') },
   ];
 
   const tabClass = (active: boolean) =>
-    `-mb-px border-b-2 pb-3 text-sm transition-colors duration-[120ms] ${
+    `min-h-11 flex-1 rounded-lg px-4 py-3 text-base transition-colors duration-[120ms] ${
       active
-        ? "border-ink font-semibold text-ink"
-        : "border-transparent font-medium text-ink-faint hover:text-ink-soft"
+        ? "bg-primary font-semibold text-primary-foreground"
+        : "font-medium text-ink-soft hover:bg-muted"
     }`;
 
   return (
@@ -125,40 +121,33 @@ export default function AuthPage() {
           <div className="flex items-center gap-4">
             {/* Reachable before you have an account — the people who need help
                 most are the ones who can't get in. */}
-            <ContactDialog triggerClassName="font-mono text-xs uppercase tracking-wide text-ink-soft underline underline-offset-4 hover:text-ink" />
+            <ContactDialog triggerClassName="text-sm text-ink-soft underline underline-offset-4 hover:text-ink" />
             <LanguageSwitcher />
           </div>
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col lg:grid lg:grid-cols-2">
+      <main className="mx-auto grid w-full max-w-5xl flex-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:gap-12 lg:py-12">
         {/* ————— Ink panel: statement band on mobile, full column on desktop ————— */}
-        <aside className="border-b border-line-strong bg-ink text-paper lg:order-2 lg:border-b-0 lg:border-l lg:border-l-line-strong">
-          <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center px-4 py-8 sm:px-6 lg:px-12 lg:py-16">
-            <p className="text-xs uppercase tracking-[0.14em] font-semibold text-bc-ink-soft">
-              {t('brand.name')}
-            </p>
-            <h1 className="mt-3 max-w-[22ch] text-balance font-serif text-2xl font-normal leading-tight text-paper sm:text-3xl lg:mt-5 lg:text-4xl">
-              {t('auth.heroTitle')}
-            </h1>
-            <p className="mt-5 hidden max-w-prose text-base leading-relaxed text-bc-ink-soft lg:block">
-              {t('auth.heroSubtitle')}
-            </p>
+        <aside className="hidden lg:block lg:order-2">
+          <div className="rounded-2xl bg-primary/5 p-8">
+            <h2 className="text-balance text-3xl font-semibold leading-tight text-ink">{t('redesign.personal.authAbout')}</h2>
+            <p className="mt-4 text-base leading-relaxed text-ink-soft">{t('redesign.personal.authAboutHint')}</p>
 
-            <div className="mt-10 hidden divide-y divide-bc-line border-y border-bc-line lg:block">
+            <div className="mt-6 divide-y divide-line">
               {features.map((feature, index) => (
                 <div key={index} className="flex gap-5 py-5">
                   <span
-                    className="font-mono text-xs leading-6 tabular-nums text-bc-ink-soft"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
                     aria-hidden="true"
                   >
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <h3 className="font-serif text-lg font-normal leading-6 text-paper">
+                    <h3 className="text-base font-semibold leading-6 text-ink">
                       {feature.title}
                     </h3>
-                    <p className="mt-1 text-sm leading-relaxed text-bc-ink-soft">
+                    <p className="mt-1 text-sm leading-relaxed text-ink-soft">
                       {feature.desc}
                     </p>
                   </div>
@@ -169,12 +158,13 @@ export default function AuthPage() {
         </aside>
 
         {/* ————— Form column ————— */}
-        <div className="flex flex-1 items-start justify-center px-4 py-10 sm:px-6 lg:order-1 lg:items-center lg:py-16">
-          <div className="w-full max-w-md rounded-sm border border-line bg-surface p-6 sm:p-8">
-            <p className={EYEBROW}>{t('header.digitalDemocracy')}</p>
+        <div className="lg:order-1">
+          <div className="w-full rounded-2xl border border-line bg-surface p-5 shadow-sm sm:p-8">
+            <h1 className="text-2xl font-semibold">{t(tab === 'login' ? 'auth.login' : 'auth.register')}</h1>
+            <p className="mt-2 text-base leading-relaxed text-muted-foreground">{t(tab === 'login' ? 'redesign.personal.authIntro' : 'redesign.personal.registerIntro')}</p>
 
             {/* Underline tab rail */}
-            <div className="mt-5 flex gap-6 border-b border-line" role="tablist">
+            <div className="mt-6 flex gap-2 rounded-xl bg-muted/50 p-1" role="tablist">
               <button
                 type="button"
                 role="tab"
@@ -242,7 +232,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
 
   const handleSubmit = async (values: z.infer<typeof loginUserSchema>) => {
     const deviceFingerprint = await getFingerprint();
-    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/feed';
+    const urlReturnTo = safeAuthReturnTo(new URLSearchParams(window.location.search).get('returnTo'));
     loginMutation.mutate({
       ...values,
       deviceFingerprint,
@@ -348,7 +338,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
   const handleSubmit = async (values: z.infer<typeof registerFormSchema>) => {
     if (!acceptTerms) return;
     const deviceFingerprint = await getFingerprint();
-    const urlReturnTo = new URLSearchParams(window.location.search).get('returnTo') || '/feed';
+    const urlReturnTo = safeAuthReturnTo(new URLSearchParams(window.location.search).get('returnTo'));
     const consentLocale: 'el' | 'en' = locale === 'en' ? 'en' : 'el';
     const { confirmPassword: _drop, ...payload } = values;
     registerMutation.mutate({
@@ -459,7 +449,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
             />
             <label
               htmlFor="terms"
-              className="font-mono text-xs leading-relaxed text-ink-soft peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="text-sm leading-relaxed text-ink-soft peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               {t('auth.acceptTerms')}{" "}
               <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-kyanos transition-colors duration-[120ms] hover:underline underline-offset-2">

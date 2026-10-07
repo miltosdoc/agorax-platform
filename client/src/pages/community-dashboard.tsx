@@ -6,7 +6,12 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useLocation, useParams } from 'wouter';
+import { Link, useLocation, useParams, useSearch } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCommunityMembership } from '@/hooks/use-community-membership';
+import { CommunityJoinAction } from '@/components/community/CommunityJoinAction';
+import { Thumbnail } from '@/components/thumbnails/Thumbnail';
+import { mediaUrl } from '@/components/cards/community-card';
 import AppShell from "@/components/layout/AppShell";
 import {
   CommunityIdentityRail,
@@ -40,6 +45,7 @@ import {
   type CommunitySummary,
 } from '@shared/community-summary';
 import StatusBadge from '@/components/proposal/StatusBadge';
+import { ACTIVE_PROPOSAL_STATES } from '@shared/activity-feed';
 
 interface CommunityForMerge {
   id: number;
@@ -75,14 +81,21 @@ export default function CommunityDashboardPage() {
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const urlSearch = useSearch();
+  const queryClient = useQueryClient();
+  const membership = useCommunityMembership(Number(communityId));
 
   const [summary, setSummary] = useState<CommunitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   // Honor ?tab=… so shared links (e.g. conference invites) land on the right tab
   const [activeTab, setActiveTab] = useState<string>(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return ['forum', 'proposals', 'constitution', 'library', 'members', 'merge'].includes(tab ?? '') ? tab! : 'forum';
+    return ['overview', 'forum', 'proposals', 'constitution', 'library', 'meetings', 'members', 'about', 'merge'].includes(tab ?? '') ? tab! : 'overview';
   });
+  useEffect(() => {
+    const tab = new URLSearchParams(urlSearch).get('tab');
+    setActiveTab(['overview', 'forum', 'proposals', 'constitution', 'library', 'meetings', 'members', 'about', 'merge'].includes(tab ?? '') ? tab! : 'overview');
+  }, [communityId, urlSearch]);
   const [allCommunities, setAllCommunities] = useState<CommunityForMerge[]>([]);
   const [members, setMembers] = useState<CommunityMember[] | null>(null);
   const [membersHidden, setMembersHidden] = useState(false);
@@ -92,9 +105,8 @@ export default function CommunityDashboardPage() {
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [mergeSuccess, setMergeSuccess] = useState(false);
-  const [joinState, setJoinState] = useState<'idle' | 'submitting' | 'pending'>('idle');
   const [showArchived, setShowArchived] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
+  const [proposalView, setProposalView] = useState<'active' | 'all' | 'previous'>('active');
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: number; userId: number; message: string | null; createdAt: string; user: { id: number; username: string; name: string | null; profilePicture: string | null } | null }>>([]);
   const [requestDeciding, setRequestDeciding] = useState<Record<number, boolean>>({});
   const [invites, setInvites] = useState<CommunityInvite[]>([]);
@@ -108,15 +120,22 @@ export default function CommunityDashboardPage() {
 
   useEffect(() => {
     if (!communityId) return;
-
+    let cancelled = false;
+    setLoading(true);
+    setSummary(null);
+    setMembers(null);
+    setShowArchived(false);
+    setProposalView('active');
     Promise.all([
       api.get<CommunitySummary>(`/api/communities/${communityId}/summary`),
       api.get<CommunityForMerge[]>('/api/communities'),
     ]).then(([summaryResp, commResp]) => {
+      if (cancelled) return;
       setSummary(summaryResp.data);
       setAllCommunities(commResp.data);
-    }).catch(() => setSummary(null))
-      .finally(() => setLoading(false));
+    }).catch(() => { if (!cancelled) setSummary(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [communityId]);
 
   type MembersResponse = { membersHidden: boolean; memberCount: number; members: CommunityMember[] };
@@ -134,7 +153,14 @@ export default function CommunityDashboardPage() {
     refreshMembers().finally(() => setMembersLoading(false));
   }, [communityId]);
 
-  const isMember = !!(user && members?.some((m) => m.userId === user.id));
+  const isMember = !!user && (membership.status === 'member' || !!summary?.currentUserRole);
+
+  // Inline joins also refresh the dashboard's legacy state and hidden content.
+  const refreshSummary = () => api.get<CommunitySummary>(`/api/communities/${communityId}/summary`).then((response) => setSummary(response.data));
+  useEffect(() => {
+    if (!communityId || membership.status !== 'member' || summary?.currentUserRole) return;
+    void Promise.all([refreshSummary(), refreshMembers()]).catch(() => undefined);
+  }, [communityId, membership.status, summary?.currentUserRole]);
   const canManageSettingsLive = !!summary?.canManageSettings;
 
   useEffect(() => {
@@ -144,26 +170,10 @@ export default function CommunityDashboardPage() {
       .catch(() => setPendingRequests([]));
   }, [communityId, canManageSettingsLive, members]);
 
-  const applyToJoin = async () => {
-    if (!communityId) return;
-    setJoinState('submitting');
-    setJoinError(null);
-    try {
-      const res = await api.post<{ status?: string } | unknown>(`/api/communities/${communityId}/members`, {});
-      const status = (res.status === 202) ? 'pending' : 'idle';
-      setJoinState(status as 'pending' | 'idle');
-      if (status !== 'pending') {
-        await refreshMembers();
-      }
-    } catch (error: any) {
-      setJoinError(error.response?.data?.message || t('community.join_failed') || 'Failed to apply');
-      setJoinState('idle');
-    }
-  };
-
   const decideJoinRequest = async (requestId: number, decision: 'approve' | 'reject') => {
     if (!communityId) return;
     setRequestDeciding((s) => ({ ...s, [requestId]: true }));
+    setInviteError(null);
     try {
       await api.post(`/api/communities/${communityId}/join-requests/${requestId}/${decision}`, {});
       setPendingRequests((rows) => rows.filter((r) => r.id !== requestId));
@@ -171,7 +181,7 @@ export default function CommunityDashboardPage() {
         await refreshMembers();
       }
     } catch {
-      // surface inline failure on the row if needed; keep silent for now
+      setInviteError(t('membership.failed'));
     } finally {
       setRequestDeciding((s) => ({ ...s, [requestId]: false }));
     }
@@ -281,13 +291,26 @@ export default function CommunityDashboardPage() {
   }
 
   const { community, proposals, memberCount, canManageSettings, currentUserRole } = summary;
+  const activeStatuses = new Set<string>(ACTIVE_PROPOSAL_STATES);
+  const activeProposals = proposals.filter((proposal) => activeStatuses.has(proposal.status));
+  const visibleProposals = proposals.filter((proposal) =>
+    (showArchived || proposal.status !== 'archived') &&
+    (proposalView === 'all' || (proposalView === 'active' ? activeStatuses.has(proposal.status) : !activeStatuses.has(proposal.status))),
+  );
+  const changeTab = (tab: string) => {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
 
   async function handleLeave() {
     if (!communityId) return;
     if (!window.confirm(t('community.leave_confirm') || 'Να αποχωρήσετε από αυτή την κοινότητα;')) return;
     try {
       await api.delete(`/api/communities/${communityId}/members`);
-      window.location.reload();
+      await queryClient.invalidateQueries({ queryKey: ['/api/communities'] });
+      await Promise.all([refreshSummary(), refreshMembers()]);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to leave community');
     }
@@ -305,143 +328,65 @@ export default function CommunityDashboardPage() {
   const viewerCanPropose = !!summary?.viewerCanPropose;
   const proposalPolicy = summary?.proposalPolicy ?? 'all_members';
 
-  // The join control lives with the page (it owns joinState), but the comps
-  // put it at the foot of the identity card, so it is handed to the rail.
-  const joinAction = user && !isMember && community.joinPolicy !== 'invite_only' && joinState !== 'pending' ? (
-    <Button size="sm" className="w-full" disabled={joinState === 'submitting'} onClick={applyToJoin}>
-      {community.joinPolicy === 'approval'
-        ? (t('community.apply_to_join') || 'Apply to join')
-        : (t('community.join') || 'Join')}
+  const joinAction = !isMember ? <CommunityJoinAction communityId={community.id} onJoined={() => { void Promise.all([refreshSummary(), refreshMembers()]); }} className="w-full" /> : viewerCanPropose ? (
+    <Button className="min-h-11 rounded-xl" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
+      <Plus className="mr-2 h-4 w-4" />{t('home.submitProposal')}
     </Button>
-  ) : user && isMember && viewerCanPropose ? (
-    <Button size="sm" className="w-full" onClick={() => setLocation(`/proposals/new?community=${communityId}`)}>
-      <Plus className="w-4 h-4 mr-2" />
-      {t('home.submitProposal')}
-    </Button>
-  ) : user && isMember ? (
-    // A member who cannot propose is still a full member: the forum, the
-    // debate and the ballot are all open to them. Saying who may propose,
-    // rather than showing nothing, keeps that legible instead of looking
-    // like a page that failed to load a button.
-    <p className="text-xs leading-relaxed text-ink-faint" data-testid="community-propose-restricted">
-      {proposalPolicy === 'founder'
-        ? t('community.proposeFounderOnly')
-        : t('community.proposeAdminsOnly')}
-    </p>
-  ) : undefined;
+  ) : <p className="text-sm leading-relaxed text-ink-soft" data-testid="community-propose-restricted">{t(proposalPolicy === 'founder' ? 'community.proposeFounderOnly' : 'community.proposeAdminsOnly')}</p>;
 
   return (
-    <AppShell
-      breadcrumb={[{ label: t('nav.communities'), href: '/communities' }, { label: community.name }]}
-      leftRail={
-        <>
-          <CommunityIdentityRail
-            community={community as any}
-            memberCount={memberCount}
-            adminCount={adminCount}
-            joinAction={joinAction}
-            canEditAppearance={
-              // Mirrors canEditAppearance in server/routers/discovery.ts.
-              canManageSettings || !!user?.isAdmin || (community.type === 'autonomous' && isMember)
-            }
-          />
-          <CommunityStatsRail
-            memberCount={memberCount}
-            proposalCount={metrics.proposalCount}
-            activeCount={metrics.activeProposalCount}
-            decidedCount={metrics.decidedProposalCount}
-            democracyScore={democracyScore}
-          />
-          <CommunityMeetingsRail communityId={community.id} />
-        </>
-      }
-      rightRail={
-        <>
-          <CommunityActivityRail communityId={community.id} />
-          <CommunityDocumentsRail communityId={community.id} />
-          <CommunityTagsRail communityId={community.id} />
-        </>
-      }
-    >
-      {/* ── Community banner ──
-          Comp 4 fills this with "ΚΕΝΤΡΙΚΟ BANNER ΚΟΙΝΟΤΗΤΑΣ + TAGLINE"; the
-          real thing carries the community's own name and tagline. */}
-      <section className="mb-5 rounded-sm border border-line bg-ink px-6 py-12 text-center sm:px-10 sm:py-16">
-        <h1 className="font-serif text-3xl leading-tight text-paper sm:text-4xl">{community.name}</h1>
-        {(community.tagline || description) && (
-          <p className="mx-auto mt-3 max-w-[52ch] text-sm leading-relaxed text-bc-ink-soft">
-            {community.tagline || description}
-          </p>
-        )}
-      </section>
-
-      {/* The name, description, join button and share now live in the identity
-          rail and the banner; what stays here is the governance state and the
-          controls that only make sense next to the community's own content. */}
-      {/* A slim bar, not a card: governance state and the membership controls.
-          The numbers that used to sit here are in the side rail — they are
-          reference, and having them first pushed the forum and the calls,
-          which are what people actually come for, below the fold. */}
-      <div className="mb-5 flex flex-wrap items-center gap-2 border-b border-line pb-4">
-        <Badge variant="secondary">{governanceLabel}</Badge>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {user && !isMember && myInvite && (
-            <Button size="sm" onClick={() => setLocation(`/invite/${myInvite.token}`)} data-testid="community-accept-invite">
-              <MailOpen className="w-4 h-4 mr-2" />
-              {t('community.invite_accept') || 'Αποδοχή πρόσκλησης'}
-            </Button>
-          )}
-          {user && !isMember && !myInvite && community.joinPolicy === 'invite_only' && (
-            <Badge variant="outline">{t('community.invite_only') || 'Invite only'}</Badge>
-          )}
-          {user && !isMember && joinState === 'pending' && (
-            <Badge variant="outline">{t('community.request_pending') || 'Request pending'}</Badge>
-          )}
-          {joinError && (
-            <span className="text-sm text-destructive" data-testid="join-error">{joinError}</span>
-          )}
-          {user && (canManageSettings || isMember || community.type === 'autonomous') && (
-            <Button variant="outline" size="sm" onClick={() => setLocation(`/communities/${communityId}/settings`)}>
-              <Settings className="w-4 h-4 mr-2" />
-              {community.type === 'autonomous'
-                ? (t('community.settings_vote_title') || t('community.settings_title'))
-                : t('community.settings_title')}
-            </Button>
-          )}
-          {/* Founders can't leave — they'd orphan the community. */}
-          {user && isMember && currentUserRole !== 'founder' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-red-600 hover:bg-red-50"
-              onClick={handleLeave}
-              data-testid="community-leave"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              {t('community.leave') || 'Αποχώρηση'}
-            </Button>
-          )}
+    <AppShell breadcrumb={[{ label: t('nav.communities'), href: '/communities' }, { label: community.name }]}>
+      <header className="mb-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-16 shrink-0 sm:w-20"><Thumbnail src={mediaUrl(community.avatarPath || community.coverPath)} thumbnailKey={community.thumbnailKey} seed={`community-avatar-${community.id}`} subject="community" ratio="1:1" compact className="rounded-2xl" /></div>
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-2xl font-semibold leading-tight text-ink sm:text-3xl">{community.name}</h1>
+            <p className="mt-2 text-sm text-ink-soft">{t('community.memberSummary', { count: memberCount, active: activeProposals.length })}</p>
+            <p className="mt-1 text-sm text-ink-faint">{governanceLabel}</p>
+          </div>
         </div>
-      </div>
-
-      <CommunityRoomsSection
-        communityId={community.id}
-        viewerIsAdmin={canManageSettings}
-        viewerIsMember={isMember}
-      />
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* The comps show eight tabs on a wide screen; five already overflow a
-            375px phone, so the bar scrolls sideways instead of pushing the
-            page wider than the viewport. */}
-        <TabsList className="flex w-full justify-start overflow-x-auto">
-          <TabsTrigger value="forum">{t('community.tab_forum')}</TabsTrigger>
-          <TabsTrigger value="proposals">{t('community.tab_proposals')}</TabsTrigger>
-          <TabsTrigger value="constitution">{t('community.tab_constitution')}</TabsTrigger>
-          <TabsTrigger value="library">{t('community.tab_library')}</TabsTrigger>
-          <TabsTrigger value="members">{t('community.tab_members')}</TabsTrigger>
-          <TabsTrigger value="merge">{t('community.tab_merge')}</TabsTrigger>
+        {(community.tagline || description) && <p className="mt-4 max-w-prose text-base leading-relaxed text-ink-soft">{community.tagline || description}</p>}
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          {user && !isMember && myInvite ? <Button className="min-h-11 rounded-xl" onClick={() => setLocation(`/invite/${myInvite.token}`)} data-testid="community-accept-invite"><MailOpen className="mr-2 h-4 w-4" />{t('community.invite_accept')}</Button> : joinAction}
+          {isMember && <Badge className="min-h-8 rounded-full bg-kyanos-wash text-kyanos" variant="secondary">{t('membership.member')}</Badge>}
+          {user && (canManageSettings || isMember || community.type === 'autonomous') && <Button variant="outline" className="min-h-11 rounded-xl" onClick={() => setLocation(`/communities/${communityId}/settings`)}><Settings className="mr-2 h-4 w-4" />{t(community.type === 'autonomous' ? 'community.settings_vote_title' : 'community.settings_title')}</Button>}
+          <ShareButton url={`/communities/${community.id}`} title={community.name} />
+        </div>
+      </header>
+      <Tabs value={activeTab} onValueChange={changeTab}>
+        <TabsList className="mb-5 flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-1">
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="overview">{t('community.now')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="forum">{t('community.tab_forum')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="proposals">{t('community.tab_proposals')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="library">{t('community.tab_library')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="meetings">{t('community.liveAction')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="members">{t('community.tab_members')}</TabsTrigger>
+          <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value="about">{t('community.aboutTitle')}</TabsTrigger>
+          {(activeTab === 'constitution' || activeTab === 'merge') && <TabsTrigger className="min-h-11 rounded-lg px-4 text-sm" value={activeTab}>{t(activeTab === 'constitution' ? 'community.tab_constitution' : 'community.tab_merge')}</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {canManageSettings && pendingRequests.length > 0 && <button type="button" onClick={() => changeTab('members')} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-kyanos/25 bg-kyanos-wash p-4 text-left text-base font-medium text-kyanos"><span>{t('community.requestManagement', { count: pendingRequests.length })}</span><MailOpen className="h-5 w-5 shrink-0" /></button>}
+          <section>
+            <h2 className="text-xl font-semibold text-ink">{t('community.currentTopics')}</h2>
+            <p className="mt-1 mb-4 text-base leading-relaxed text-ink-soft">{t('community.activeHelp')}</p>
+            {(summary as any).contentHidden ? <div className="rounded-2xl border border-line bg-surface p-5"><p className="mb-4 text-base leading-relaxed text-ink-soft">{t('community.content_hidden_note')}</p><CommunityJoinAction communityId={community.id} onJoined={() => void refreshSummary()} /></div> : activeProposals.length ? <div className="space-y-3">{activeProposals.slice(0, 4).map((proposal) => <Link key={proposal.id} href={`/proposals/${proposal.id}`} className="block rounded-2xl border border-line bg-surface p-5 transition-colors hover:border-kyanos/35"><div className="mb-2"><StatusBadge status={proposal.status} /></div><h3 className="text-lg font-semibold leading-snug text-ink">{proposal.question}</h3><p className="mt-2 text-sm text-ink-soft">{proposal.authorLabel} · {new Date(proposal.createdAt).toLocaleDateString()}</p></Link>)}<Button variant="outline" className="min-h-11 rounded-xl" onClick={() => { setProposalView('active'); changeTab('proposals'); }}>{t('community.viewActive')}</Button></div> : <p className="rounded-2xl border border-dashed border-line p-5 text-base leading-relaxed text-ink-soft">{t('community.noActive')}</p>}
+          </section>
+          <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => changeTab('forum')} className="flex min-h-14 items-center gap-3 rounded-xl border border-line bg-surface p-4 text-left text-base font-medium text-ink hover:bg-sunken"><Users className="h-5 w-5 text-kyanos" />{t('community.discussionsAction')}</button><button type="button" onClick={() => changeTab('library')} className="flex min-h-14 items-center gap-3 rounded-xl border border-line bg-surface p-4 text-left text-base font-medium text-ink hover:bg-sunken"><FileText className="h-5 w-5 text-kyanos" />{t('community.libraryAction')}</button></div>
+          <CommunityRoomsSection communityId={community.id} viewerIsAdmin={canManageSettings} viewerIsMember={isMember} />
+        </TabsContent>
+
+        <TabsContent value="meetings" className="space-y-5">
+          <CommunityRoomsSection communityId={community.id} viewerIsAdmin={canManageSettings} viewerIsMember={isMember} />
+          <CommunityMeetingsRail communityId={community.id} />
+        </TabsContent>
+
+        <TabsContent value="about" className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2"><CommunityIdentityRail community={community as any} memberCount={memberCount} adminCount={adminCount} canEditAppearance={canManageSettings || !!user?.isAdmin || (community.type === 'autonomous' && isMember)} /><div><CommunityStatsRail memberCount={memberCount} proposalCount={metrics.proposalCount} activeCount={activeProposals.length} decidedCount={metrics.decidedProposalCount} democracyScore={democracyScore} /><CommunityTagsRail communityId={community.id} /></div></div>
+          <div className="flex flex-wrap gap-2"><Button className="min-h-11 rounded-xl" variant="outline" onClick={() => changeTab('constitution')}>{t('community.tab_constitution')}</Button>{canManageSettings && <Button className="min-h-11 rounded-xl" variant="outline" onClick={() => changeTab('merge')}>{t('community.tab_merge')}</Button>}{isMember && currentUserRole !== 'founder' && <Button className="min-h-11 rounded-xl text-destructive" variant="outline" onClick={handleLeave} data-testid="community-leave"><LogOut className="mr-2 h-4 w-4" />{t('community.leave')}</Button>}</div>
+          <CommunityDocumentsRail communityId={community.id} />
+          <CommunityActivityRail communityId={community.id} />
+        </TabsContent>
 
         <TabsContent value="forum">
           <CommunityForum
@@ -470,15 +415,19 @@ export default function CommunityDashboardPage() {
               <CardTitle>{t('community.tab_proposals')}</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="mb-5 flex flex-wrap gap-2" aria-label={t('community.tab_proposals')}>
+                {(['active', 'all', 'previous'] as const).map((view) => <button key={view} type="button" aria-pressed={proposalView === view} onClick={() => setProposalView(view)} className={`min-h-11 rounded-xl px-4 text-sm font-medium ${proposalView === view ? 'bg-kyanos text-white' : 'border border-line text-ink-soft hover:bg-sunken'}`}>{t(view === 'active' ? 'community.currentTopics' : view === 'all' ? 'community.allTopics' : 'community.previousTopics')}</button>)}
+              </div>
+              {proposalView !== 'active' && !showArchived && proposals.some((proposal) => proposal.status === 'archived') && <button type="button" onClick={() => setShowArchived(true)} className="mb-4 min-h-11 rounded-xl border border-line px-4 text-sm font-medium text-ink-soft" data-testid="show-archived-proposals">{t('community.show_archived')} ({proposals.filter((proposal) => proposal.status === 'archived').length})</button>}
               {(summary as any).contentHidden ? (
                 <p className="text-muted-foreground">
                   {t('community.content_hidden_note') || 'Το περιεχόμενο αυτής της κοινότητας είναι ορατό μόνο στα μέλη της. Γίνετε μέλος για να δείτε τις προτάσεις και τις συζητήσεις.'}
                 </p>
-              ) : proposals.length === 0 ? (
+              ) : visibleProposals.length === 0 ? (
                 <p className="text-muted-foreground">{t('community.no_proposals')}</p>
               ) : (
                 <div className="space-y-2">
-                  {(showArchived ? proposals : proposals.filter((p) => p.status !== 'archived')).map((proposal) => (
+                  {visibleProposals.map((proposal) => (
                     <div
                       key={proposal.id}
                       role="link"
@@ -490,11 +439,11 @@ export default function CommunityDashboardPage() {
                           setLocation(`/proposals/${proposal.id}`);
                         }
                       }}
-                      className="flex items-center justify-between gap-3 p-3 border rounded cursor-pointer hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="flex flex-col items-start justify-between gap-3 rounded-xl border border-line p-4 cursor-pointer hover:bg-sunken focus:outline-none focus:ring-2 focus:ring-ring sm:flex-row sm:items-center"
                       data-testid={`community-proposal-${proposal.id}`}
                     >
                       <div>
-                        <div className="font-medium">{proposal.question}</div>
+                        <div className="text-lg font-semibold leading-snug">{proposal.question}</div>
                         <div className="text-sm text-muted-foreground">
                           {t(`proposal.kind_${proposal.kind || 'decision'}`)} · 
                           {t('common.by')} {proposal.authorLabel} · {new Date(proposal.createdAt).toLocaleDateString()}
@@ -503,16 +452,6 @@ export default function CommunityDashboardPage() {
                       <StatusBadge status={proposal.status} />
                     </div>
                   ))}
-                  {!showArchived && proposals.some((p) => p.status === 'archived') && (
-                    <button
-                      type="button"
-                      className="text-sm text-muted-foreground underline-offset-2 hover:underline"
-                      onClick={() => setShowArchived(true)}
-                      data-testid="show-archived-proposals"
-                    >
-                      {(t('community.show_archived') || 'Εμφάνιση αρχειοθετημένων')} ({proposals.filter((p) => p.status === 'archived').length})
-                    </button>
-                  )}
                 </div>
               )}
             </CardContent>

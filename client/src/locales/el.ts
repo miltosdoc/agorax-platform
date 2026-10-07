@@ -3,6 +3,18 @@
  */
 import { TranslationDictionary } from '../lib/i18n-types';
 
+import { redesignShellEl } from './redesign-shell';
+
+import { redesignCommunityEl } from './redesign-community';
+
+import { redesignSurveysEl } from './redesign-surveys';
+
+import { redesignFeedEl } from './redesign-feed';
+
+import { redesignMediaEl } from './redesign-media';
+
+import { redesignPersonalEl } from './redesign-personal';
+
 const el: TranslationDictionary = {
   // Navigation
   'nav.home': 'Αρχική',
@@ -2268,6 +2280,12 @@ const el: TranslationDictionary = {
   'community.rule_election_nominations_help': 'Αν ο συντάκτης μιας εκλογής μπορεί να ανοίξει φάση όπου τα μέλη δηλώνουν ή προτείνουν υποψηφίους.',
   'community.rule_poll_suggestions': 'Δημοσκόπηση κοινότητας: προτάσεις απαντήσεων πριν από την ψηφοφορία',
   'community.rule_poll_suggestions_help': 'Αν ο συντάκτης μιας δημοσκόπησης μπορεί να ανοίξει φάση όπου τα μέλη προσθέτουν απαντήσεις.',
+  ...(redesignShellEl as TranslationDictionary),
+  ...(redesignCommunityEl as TranslationDictionary),
+  ...(redesignSurveysEl as TranslationDictionary),
+  ...(redesignFeedEl as TranslationDictionary),
+  ...(redesignMediaEl as TranslationDictionary),
+  ...(redesignPersonalEl as TranslationDictionary),
 };
 
 export default el;

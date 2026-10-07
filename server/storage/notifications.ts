@@ -6,10 +6,45 @@
  */
 
 import { db } from '../db';
-import { pollNotifications, polls, pollOptions, votes, type PollNotification, type Poll, type PollWithOptions } from '../../shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { pollNotifications, polls, pollOptions, votes, sortitionNotifications, type Poll } from '../../shared/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
+
+export interface NotificationListOptions {
+  limit: number;
+  offset: number;
+  unreadOnly: boolean;
+}
+
+/** Reject ambiguous inputs and cap a page before it reaches the database. */
+export function parseNotificationListQuery(query: Record<string, unknown>): NotificationListOptions {
+  const integer = (value: unknown, fallback: number, minimum: number): number => {
+    if (value === undefined) return fallback;
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) throw new Error('Invalid notification pagination');
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new Error('Invalid notification pagination');
+    return parsed;
+  };
+  const limit = Math.min(integer(query.limit, 50, 1), 100);
+  const offset = integer(query.offset, 0, 0);
+  if (offset > 2_147_483_647) throw new Error('Invalid notification offset');
+  if (query.unread !== undefined && query.unread !== 'true' && query.unread !== 'false') throw new Error('Invalid notification filter');
+  return { limit, offset, unreadOnly: query.unread === 'true' };
+}
 
 export class NotificationRepository {
+
+  /** Recipient-scoped notifications with counts independent of the page size. */
+  async getSortitionNotifications(userId: number, { limit, offset, unreadOnly }: NotificationListOptions) {
+    const unreadConditions = and(eq(sortitionNotifications.userId, userId), eq(sortitionNotifications.read, false));
+    const conditions = unreadOnly ? unreadConditions : eq(sortitionNotifications.userId, userId);
+    const [notifications, [unread], [total]] = await Promise.all([
+      db.select().from(sortitionNotifications).where(conditions)
+        .orderBy(desc(sortitionNotifications.createdAt), desc(sortitionNotifications.id)).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(sortitionNotifications).where(unreadConditions),
+      db.select({ count: sql<number>`count(*)::int` }).from(sortitionNotifications).where(conditions),
+    ]);
+    return { notifications, unreadCount: unread?.count ?? 0, total: total?.count ?? 0 };
+  }
 
   /**
    * Get all notifications for a user.
@@ -93,4 +128,3 @@ export class NotificationRepository {
   }
 
 }
-

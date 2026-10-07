@@ -9,12 +9,13 @@ import {  communityRepo, proposalRepo, sortitionRepo , storage, discoveryRepo } 
 
 import { db } from '../db';
 import { requireAuth } from '../auth';
-import { eq, and, desc, sql, inArray, or } from 'drizzle-orm';
+import { eq, ne, and, desc, sql, inArray, or } from 'drizzle-orm';
 import {
   sortitionMembers,
   sortitionBodies,
   sortitionNotifications,
   communityMembers,
+  communityJoinRequests,
   proposals,
   proposalSupport,
   users,
@@ -25,6 +26,8 @@ import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommu
   effectiveProposalPolicy,
 } from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
+import { getCommunityJoinStatus } from '@shared/community-membership';
+import { ACTIVE_PROPOSAL_STATES } from '@shared/activity-feed';
 import {
   isActiveGovernableSettingKey,
   isGovernableSettingKey,
@@ -66,7 +69,10 @@ export function registerCommunitiesRoutes(app: Express): void {
           createdAt: proposals.createdAt,
         })
         .from(proposals)
-        .where(inArray(proposals.communityId, ids))
+        .where(and(
+          inArray(proposals.communityId, ids),
+          userId ? or(ne(proposals.status, 'draft'), eq(proposals.authorId, userId)) : ne(proposals.status, 'draft'),
+        ))
         .orderBy(desc(proposals.createdAt));
       const latestByCommunity = new Map<number, typeof latestRows[number]>();
       for (const row of latestRows) {
@@ -108,7 +114,10 @@ export function registerCommunitiesRoutes(app: Express): void {
           count: sql<number>`cast(count(*) as int)`,
         })
         .from(proposals)
-        .where(inArray(proposals.communityId, ids))
+        .where(and(
+          inArray(proposals.communityId, ids),
+          userId ? or(ne(proposals.status, 'draft'), eq(proposals.authorId, userId)) : ne(proposals.status, 'draft'),
+        ))
         .groupBy(proposals.communityId);
       const proposalCounts = new Map(proposalCountRows.map((r) => [r.communityId, r.count]));
 
@@ -135,6 +144,22 @@ export function registerCommunitiesRoutes(app: Express): void {
         : [];
       const roleOf = new Map(viewerMemberRows.map((r) => [r.communityId, r.role ?? 'member']));
       const memberOf = new Set(viewerMemberRows.map((r) => r.communityId));
+      // Only THIS viewer's pending state is exposed in the public directory.
+      // Request messages and other applicants remain in the admin endpoint.
+      const pendingRows = userId ? await db
+        .select({ communityId: communityJoinRequests.communityId })
+        .from(communityJoinRequests)
+        .where(and(
+          eq(communityJoinRequests.userId, userId),
+          eq(communityJoinRequests.status, 'pending'),
+          inArray(communityJoinRequests.communityId, ids),
+        )) : [];
+      const pendingIn = new Set(pendingRows.map((row) => row.communityId));
+      const activeStatuses = new Set<string>(ACTIVE_PROPOSAL_STATES);
+      const activeCounts = new Map<number, number>();
+      for (const row of latestRows) {
+        if (activeStatuses.has(row.status)) activeCounts.set(row.communityId, (activeCounts.get(row.communityId) ?? 0) + 1);
+      }
 
       // Members-only content stays out of the public directory: the row is
       // listed (name, description, member count), but proposal teasers are
@@ -147,6 +172,13 @@ export function registerCommunitiesRoutes(app: Express): void {
         proposalCount: proposalCounts.get(c.id) ?? 0,
         savedByViewer: savedIds.has(c.id),
         viewerIsMember: memberOf.has(c.id),
+        viewerRole: roleOf.get(c.id) ?? null,
+        viewerJoinStatus: getCommunityJoinStatus({
+          isMember: memberOf.has(c.id),
+          hasPendingRequest: pendingIn.has(c.id),
+          joinPolicy: c.joinPolicy,
+        }),
+        activeProposalCount: visibleContent.has(c.id) ? (activeCounts.get(c.id) ?? 0) : 0,
         // So the compose picker can leave out communities that would refuse
         // the proposal after it was written.
         viewerCanPropose: memberOf.has(c.id) && canSubmitProposal({
@@ -213,8 +245,14 @@ export function registerCommunitiesRoutes(app: Express): void {
       const visibleProposals = proposals.filter(
         (p) => p.status !== 'draft' || p.authorId === req.user?.id,
       );
+      const authorIds = Array.from(new Set(visibleProposals.map((proposal) => proposal.authorId)));
+      const authorRows = authorIds.length ? await db.select({ id: users.id, name: users.name, username: users.username })
+        .from(users).where(inArray(users.id, authorIds)) : [];
+      const authorLabels = new Map(authorRows.map((author) => [author.id, author.name || `@${author.username}`]));
+      const summary = buildCommunitySummary(community, visibleProposals, members.length, currentUserRole, req.user?.id);
       res.json({
-        ...buildCommunitySummary(community, visibleProposals, members.length, currentUserRole, req.user?.id),
+        ...summary,
+        proposals: summary.proposals.map((proposal) => ({ ...proposal, authorLabel: authorLabels.get(proposal.authorId) ?? proposal.authorLabel })),
         contentHidden: !canViewContent,
       });
     } catch (error) {
@@ -435,6 +473,12 @@ export function registerCommunitiesRoutes(app: Express): void {
         return res.status(403).json({ message: "Not authorized" });
       }
 
+      // Verify ownership before changing state; an officer of one community
+      // must not be able to decide another community's application by id.
+      const [request] = await db.select({ id: communityJoinRequests.id })
+        .from(communityJoinRequests)
+        .where(and(eq(communityJoinRequests.id, requestId), eq(communityJoinRequests.communityId, communityId), eq(communityJoinRequests.status, 'pending')));
+      if (!request) return res.status(404).json({ message: "Pending request not found" });
       const decided = await communityRepo.decideJoinRequest(requestId, decision, req.user.id);
       if (!decided) return res.status(404).json({ message: "Pending request not found" });
       if (decided.communityId !== communityId) return res.status(400).json({ message: "Request does not belong to this community" });

@@ -1,12 +1,22 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { SortitionNotification, NotificationsResponse } from "@/types/notifications";
+import type { NotificationsResponse } from "@/types/notifications";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/hooks/use-translation";
 
 // Shared with use-notification-stream — keep the channel id in sync.
 const ANDROID_CHANNEL_ID = 'agorax-default-high';
+// Header instances come and go during SPA navigation. The app session outlives
+// those instances, and logout reloads the document, clearing this set.
+const recoveredNativeViewers = new Set<number>();
 
-async function fireLocalNotification(title: string, body: string): Promise<void> {
+function isCurrentViewer(viewerId: number): boolean {
+  return queryClient.getQueryData<{ id: number } | null>(['/api/user'])?.id === viewerId;
+}
+
+async function fireLocalNotification(title: string, body: string, viewerId: number): Promise<void> {
   const plugin = window.Capacitor?.Plugins?.LocalNotifications;
   const isNative = window.Capacitor?.isNativePlatform?.();
   if (!plugin || !isNative) return;
@@ -26,6 +36,7 @@ async function fireLocalNotification(title: string, body: string): Promise<void>
         });
       } catch { /* already exists */ }
     }
+    if (!isCurrentViewer(viewerId)) return;
     await plugin.schedule({
       notifications: [{
         id: Date.now() % 2_147_483_647,
@@ -39,41 +50,65 @@ async function fireLocalNotification(title: string, body: string): Promise<void>
   }
 }
 
+/** Recover existing unread items once per viewer, independently of UI mounts. */
+export async function recoverInitialNativeNotification(viewerId: number, unreadCount: number): Promise<void> {
+  if (!isCurrentViewer(viewerId) || recoveredNativeViewers.has(viewerId)) return;
+  recoveredNativeViewers.add(viewerId);
+  if (unreadCount <= 0 || typeof window === 'undefined' || !window.Capacitor?.isNativePlatform?.()) return;
+  try {
+    const response = await apiRequest('GET', '/api/sortition-notifications?limit=1&unread=true');
+    const data = await response.json() as NotificationsResponse;
+    const notification = Array.isArray(data.notifications) ? data.notifications[0] : undefined;
+    if (isCurrentViewer(viewerId) && notification?.userId === viewerId) {
+      await fireLocalNotification(notification.title, notification.message ?? '', viewerId);
+    }
+  } catch {
+    // Initial recovery is best-effort; incoming notifications use SSE.
+  }
+}
+
 export function useUnreadCount() {
+  const { user } = useAuth();
   const query = useQuery<{ count: number }>({
-    queryKey: ["/api/sortition-notifications/unread-count"],
+    queryKey: ["/api/sortition-notifications/unread-count", { viewerId: user?.id ?? 0 }],
+    queryFn: async () => (await apiRequest('GET', '/api/sortition-notifications/unread-count')).json(),
+    enabled: !!user,
     refetchInterval: 30000,
   });
 
-  // Fire a local notification when unread count increases or on initial load with unread
-  const prevCount = useRef<number | null>(null);
+  // SSE already schedules incoming native notifications. Only recover unread
+  // items on the first successful load, avoiding a second toast after each SSE.
   useEffect(() => {
-    if (!query.isSuccess) return;
-    const current = query.data?.count ?? 0;
-    const isNew = prevCount.current === null;
-    const increased = prevCount.current !== null && current > prevCount.current;
-    if ((isNew || increased) && current > 0) {
-      apiRequest("GET", "/api/sortition-notifications?limit=1&unread=true")
-        .then((res: any) => {
-          const n = (Array.isArray(res) ? res : res.notifications?.[0]) ?? null;
-          if (n) fireLocalNotification(n.title ?? "Νέα ειδοποίηση", n.message ?? "");
-        })
-        .catch(() => {});
-    }
-    prevCount.current = current;
-  }, [query.data?.count, query.isSuccess]);
+    if (user && query.isSuccess) void recoverInitialNativeNotification(user.id, query.data?.count ?? 0);
+  }, [user?.id, query.data?.count, query.isSuccess]);
 
   return query;
 }
 
-export function useNotifications(options?: { unreadOnly?: boolean; limit?: number }) {
-  const { unreadOnly = false, limit = 50 } = options || {};
+export function useNotifications(options?: { unreadOnly?: boolean; limit?: number; enabled?: boolean }) {
+  const { user } = useAuth();
+  const { unreadOnly = false, enabled = true } = options || {};
+  const limit = Math.min(100, Math.max(1, Math.trunc(options?.limit ?? 50) || 50));
   return useQuery<NotificationsResponse>({
-    queryKey: ["/api/sortition-notifications", { unreadOnly, limit }],
+    queryKey: ["/api/sortition-notifications", { viewerId: user?.id ?? 0, unreadOnly, limit }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: String(limit), unread: String(unreadOnly) });
+      return (await apiRequest('GET', `/api/sortition-notifications?${params}`)).json();
+    },
+    enabled: !!user && enabled,
+    staleTime: 30_000,
+    refetchOnMount: 'always',
   });
 }
 
+function useNotificationMutationError() {
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  return () => toast({ title: t('notification.title'), description: t('notification.actionFailed'), variant: 'destructive' });
+}
+
 export function useMarkAsRead() {
+  const onError = useNotificationMutationError();
   return useMutation({
     mutationFn: async (notificationId: number) => {
       return await apiRequest("POST", `/api/sortition-notifications/${notificationId}/read`);
@@ -82,10 +117,12 @@ export function useMarkAsRead() {
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
     },
+    onError,
   });
 }
 
 export function useMarkAllAsRead() {
+  const onError = useNotificationMutationError();
   return useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/sortition-notifications/mark-all-read");
@@ -94,10 +131,12 @@ export function useMarkAllAsRead() {
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
     },
+    onError,
   });
 }
 
 export function useDeleteNotification() {
+  const onError = useNotificationMutationError();
   return useMutation({
     mutationFn: async (notificationId: number) => {
       return await apiRequest("DELETE", `/api/sortition-notifications/${notificationId}`);
@@ -106,11 +145,13 @@ export function useDeleteNotification() {
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
     },
+    onError,
   });
 }
 
 /** Clears read notifications by default; pass false to clear everything. */
 export function useClearNotifications() {
+  const onError = useNotificationMutationError();
   return useMutation({
     mutationFn: async (readOnly: boolean = true) => {
       return await apiRequest("DELETE", `/api/sortition-notifications?readOnly=${readOnly}`);
@@ -119,5 +160,6 @@ export function useClearNotifications() {
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sortition-notifications/unread-count"] });
     },
+    onError,
   });
 }

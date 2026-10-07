@@ -2,6 +2,14 @@
  * English (en) translations for Agora
  */
 import type { TranslationDictionary } from '../lib/i18n-types';
+import { redesignShellEn } from './redesign-shell';
+import { redesignCommunityEn } from './redesign-community';
+import { redesignSurveysEn } from './redesign-surveys';
+import { redesignFeedEn } from './redesign-feed';
+
+import { redesignMediaEn } from './redesign-media';
+
+import { redesignPersonalEn } from './redesign-personal';
 
 const en: TranslationDictionary = {
   // Navigation
@@ -2266,6 +2274,12 @@ const en: TranslationDictionary = {
   'community.rule_election_nominations_help': 'Whether an election may open with a phase in which members stand or put candidates forward.',
   'community.rule_poll_suggestions': 'Community poll: answer suggestions before the vote',
   'community.rule_poll_suggestions_help': 'Whether a poll may open with a phase in which members add answers.',
+  ...(redesignShellEn as TranslationDictionary),
+  ...(redesignCommunityEn as TranslationDictionary),
+  ...(redesignSurveysEn as TranslationDictionary),
+  ...(redesignFeedEn as TranslationDictionary),
+  ...(redesignMediaEn as TranslationDictionary),
+  ...(redesignPersonalEn as TranslationDictionary),
 };
 
 export default en;

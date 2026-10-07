@@ -1,0 +1,10 @@
+{
+  "videoPlayback": true,
+  "mobileFilters": true,
+  "playback": {
+    "width": 640,
+    "height": 360,
+    "error": null
+  },
+  "errors": []
+}

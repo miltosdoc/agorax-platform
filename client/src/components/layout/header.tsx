@@ -17,34 +17,29 @@ import {
 import {
   UserCircle, LogOut, User, BarChart3, Users, Bell, FileText, MessageSquare,
   MessageSquarePlus, Menu, Coins, Home, Smartphone, Check, Bookmark, X,
-  Settings, HelpCircle, PlusCircle, Plus,
+  Settings, HelpCircle, PlusCircle, Plus, Search,
 } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { AgoraLogo } from "@/components/brand/AgoraLogo";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 
-import { useUnreadCount, useNotifications } from "@/hooks/use-notifications";
-import { NotificationItem } from "@/components/notifications/notification-item";
+import { useUnreadCount } from "@/hooks/use-notifications";
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 import type { SortitionNotification } from "@/types/notifications";
+import { notificationTarget } from "@/lib/notification-target";
 import SearchBar from "@/components/SearchBar";
 import { downloadApk } from "@/lib/download-apk";
 import { isFeedbackWidgetEnabled, setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
 import { initials } from "@/lib/initials";
 
-/**
- * The AGORA 2026 masthead.
- *
- * Three columns on desktop — wordmark, centred primary nav, icon cluster —
- * mirroring the comps. The design's green is not reproduced: every accent here
- * resolves to Kyanós (--kyanos), the platform's flag blue, so the new layout
- * arrives without a rebrand.
- */
-export default function Header() {
+/** Compact masthead for the personal shell; standalone pages retain direct links. */
+export default function Header({ compact = false }: { compact?: boolean } = {}) {
   const { user, logoutMutation } = useAuth();
   const { t } = useTranslation();
   const [location, navigate] = useLocation();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [feedbackOn, setFeedbackOn] = useState(isFeedbackWidgetEnabled);
@@ -71,35 +66,21 @@ export default function Header() {
   };
 
   const { data: unreadCountData } = useUnreadCount();
-  const { data: notificationsData, isLoading: notificationsLoading } = useNotifications({ limit: 20 });
 
-  // Navigation only: NotificationItem marks the notification read itself, and
-  // calls this back solely when there is somewhere to go — a message that is
-  // clipped expands in place instead, so the reader never has to leave the
-  // popover to finish reading it.
+  // The item marks itself read before invoking this SPA navigation.
   const handleNotificationClick = (notification: SortitionNotification) => {
     setIsNotificationsOpen(false);
-    if (notification.actionUrl) {
-      navigate(notification.actionUrl);
-    } else if (notification.proposalId) {
-      navigate(`/proposals/${notification.proposalId}`);
-    } else {
-      navigate("/notifications");
-    }
+    navigate(notificationTarget(notification));
   };
 
   const unreadCount = unreadCountData?.count || 0;
-  const notifications = notificationsData?.notifications || [];
 
-  // The primary nav: Αρχική · Κοινότητες · Ψηφοφορίες · Podcasts · Βίντεο.
-  // Shown to everyone: a signed-out visitor can browse the votes and the
-  // media shelves, and hits the auth wall only where the route itself is
-  // protected. The profile is in the account menu; the panel surveys wait
-  // for their own release and stay reachable from there too.
+  // Browsing remains available to visitors; protected actions require login.
   const navItems: { label: string; href: string; match: (l: string) => boolean }[] = [
     { label: t('nav.home'), href: user ? "/feed" : "/", match: (l) => l === "/" || l === "/feed" || l === "/home" },
     { label: t('nav.communities'), href: "/communities", match: (l) => l.startsWith("/communities") },
     { label: t('nav.proposals'), href: "/proposals", match: (l) => l.startsWith("/proposals") },
+    { label: t('nav.surveys'), href: "/surveys", match: (l) => l.startsWith("/surveys") },
     { label: t('nav.podcasts'), href: "/podcasts", match: (l) => l.startsWith("/podcasts") },
     { label: t('nav.videos'), href: "/videos", match: (l) => l.startsWith("/videos") },
   ];
@@ -112,22 +93,19 @@ export default function Header() {
     }`;
 
   const iconButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken hover:text-ink";
+    "inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-soft transition-colors duration-[120ms] hover:bg-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kyanos";
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-paper">
-      {/* Institutional signature: solid ink rule across the very top */}
-      <div className="h-1 bg-ink" aria-hidden="true" />
-
-      <div className="mx-auto flex max-w-[1680px] items-center gap-3 px-4 py-2.5 lg:gap-6 lg:px-6">
+    <header className="platform-header sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur" data-shell={compact || undefined}>
+      <div className="mx-auto flex max-w-[1480px] items-center gap-2 px-4 py-3 sm:gap-3 lg:gap-5 lg:px-6">
         {/* ── Wordmark ── */}
         <Link
           href={user ? "/feed" : "/"}
-          className="flex min-w-0 flex-1 items-center gap-2 lg:w-[220px] lg:flex-none xl:w-[260px]"
+          className={`flex min-w-0 items-center gap-2 ${compact ? "mr-auto shrink-0 md:mr-3 xl:w-[228px]" : "mr-auto shrink-0"}`}
           data-testid="logo-link"
         >
           <span className="relative flex-shrink-0">
-            <AgoraLogo title={t('brand.name')} className="h-7 w-auto sm:h-9" />
+            <AgoraLogo title={t('brand.name')} className="h-6 w-auto min-[380px]:h-7 sm:h-8" />
             {/* The platform is not finished and should never pretend to be:
                 votes are advisory (Terms §7) and the rules still move. It
                 hangs under the letters, where the full logo has its tagline. */}
@@ -141,7 +119,7 @@ export default function Header() {
         </Link>
 
         {/* ── Primary nav (desktop) ── */}
-        <nav className="hidden flex-1 items-center justify-center gap-5 lg:flex xl:gap-8" aria-label="Primary">
+        {!compact && <nav className="hidden flex-1 items-center justify-center gap-4 xl:flex 2xl:gap-6" aria-label={t('shell.primaryNavigation')}>
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -152,21 +130,34 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-        </nav>
+        </nav>}
+
+        {compact && user && (
+          <div className="hidden min-w-0 flex-1 md:block lg:max-w-[560px]">
+            <SearchBar />
+          </div>
+        )}
 
         {/* ── Icon cluster ── */}
-        <div className="ml-auto flex flex-shrink-0 items-center gap-1 lg:ml-0">
+        <div className="ml-auto flex flex-shrink-0 items-center gap-0.5 sm:gap-1">
           {user && (
-            <div className="hidden w-56 2xl:block">
-              <SearchBar />
-            </div>
+            <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className={`${iconButtonClass} ${compact ? "md:hidden" : ""}`} aria-label={t('search.placeholder')} data-testid="button-open-search">
+                  <Search className="h-5 w-5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-[min(92vw,420px)] rounded-xl border-line p-3">
+                <SearchBar />
+              </PopoverContent>
+            </Popover>
           )}
 
-          <span className="hidden sm:inline-flex">
+          <span className="hidden 2xl:inline-flex">
             <LanguageSwitcher />
           </span>
 
-          <ThemeSwitcher />
+          <span className="hidden sm:inline-flex"><ThemeSwitcher /></span>
 
           {user ? (
             <>
@@ -184,39 +175,14 @@ export default function Header() {
                     )}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="mt-2 w-80 rounded-sm border-line p-0" data-testid="popover-notifications">
-                  <div className="border-b border-line px-4 py-3">
-                    <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
-                      {t('notification.title')}
-                    </h3>
-                  </div>
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {notificationsLoading ? (
-                      <div className="p-4 text-center text-sm text-ink-faint" data-testid="text-loading-notifications">
-                        {t('notification.loading')}
-                      </div>
-                    ) : notifications.length > 0 ? (
-                      <div data-testid="list-notifications">
-                        {notifications.map((notification) => (
-                          <NotificationItem
-                            key={notification.id}
-                            notification={notification}
-                            onClick={() => handleNotificationClick(notification)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center text-sm text-ink-faint" data-testid="text-no-notifications">
-                        {t('notification.empty')}
-                      </div>
-                    )}
-                  </div>
+                <PopoverContent align="end" sideOffset={8} collisionPadding={12} className="flex max-h-[min(640px,calc(100dvh-96px))] w-[min(420px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border-line p-0 shadow-xl" data-testid="popover-notifications" aria-label={t('notification.title')}>
+                  <NotificationsDropdown unreadCount={unreadCount} onOpenNotification={handleNotificationClick} onClose={() => setIsNotificationsOpen(false)} />
                 </PopoverContent>
               </Popover>
 
               <Link
                 href="/bookmarks"
-                className={`hidden sm:inline-flex ${iconButtonClass}`}
+                className={`hidden lg:inline-flex ${iconButtonClass}`}
                 data-testid="link-bookmarks"
                 aria-label={t('nav.bookmarks')}
               >
@@ -226,7 +192,7 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() => navigate("/proposals/new")}
-                className="hidden h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep md:inline-flex"
+                className={`hidden h-11 items-center gap-1.5 rounded-full bg-kyanos px-4 text-sm font-semibold text-accent-foreground transition-colors duration-[120ms] hover:bg-kyanos-deep ${compact ? "min-[1200px]:inline-flex" : "min-[1600px]:inline-flex"}`}
                 data-testid="button-new-proposal"
               >
                 <span>{t('nav.newProposal')}</span>
@@ -239,33 +205,37 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="ml-0.5 flex h-9 items-center gap-1.5 rounded-full border border-line pl-0.5 pr-2 transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken"
+                    className="ml-0.5 flex h-11 items-center gap-1.5 rounded-full border border-line pl-1 pr-1 sm:pr-2.5 transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken"
                     data-testid="button-user-menu"
                     aria-label={t('nav.account')}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-kyanos font-sans text-[11px] font-semibold tracking-wide text-paper">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-kyanos font-sans text-xs font-semibold tracking-wide text-paper">
                       {initials(user.name)}
                     </span>
                     {isAccountOpen ? (
-                      <X className="h-4 w-4 text-ink-soft" />
+                      <X className="hidden h-4 w-4 text-ink-soft sm:block" />
                     ) : (
-                      <Menu className="h-4 w-4 text-ink-soft" />
+                      <Menu className="hidden h-4 w-4 text-ink-soft sm:block" />
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="mt-2 w-72 rounded-sm border-line p-0">
+                <DropdownMenuContent align="end" className="mt-2 max-h-[calc(100dvh-100px)] w-72 overflow-y-auto rounded-xl border-line p-0 [&_[role=menuitem]]:min-h-11">
                   <div className="border-b border-line px-4 py-3">
                     <p className="font-serif text-lg leading-tight text-ink">{t('nav.account')}</p>
                     <p className="mt-0.5 truncate text-xs text-ink-faint">{user.name}</p>
                   </div>
+                  <div className="flex items-center justify-between border-b border-line px-4 py-2 2xl:hidden">
+                    <span className="text-xs text-ink-faint">{t('shell.appearanceLanguage')}</span>
+                    <div className="flex items-center gap-1"><LanguageSwitcher /><span className="sm:hidden"><ThemeSwitcher /></span></div>
+                  </div>
                   <div className="py-1">
                     {/* First item: the account card above names the member, so
                         the way to edit that is where they look for it. */}
-                    <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer" data-testid="menu-profile">
+                    <DropdownMenuItem onClick={() => navigate("/profile")} className="min-h-11 cursor-pointer" data-testid="menu-profile">
                       <User className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.profile')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/bookmarks")} className="cursor-pointer sm:hidden" data-testid="menu-bookmarks">
+                    <DropdownMenuItem onClick={() => navigate("/bookmarks")} className="cursor-pointer lg:hidden" data-testid="menu-bookmarks">
                       <Bookmark className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.bookmarks')}
                     </DropdownMenuItem>
@@ -273,7 +243,7 @@ export default function Header() {
                       <FileText className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.myProposals')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate("/communities")} className="cursor-pointer" data-testid="menu-communities">
+                    <DropdownMenuItem onClick={() => navigate("/communities?view=mine")} className="cursor-pointer" data-testid="menu-communities">
                       <Users className="mr-2.5 h-4 w-4 text-ink-faint" />
                       {t('nav.myCommunities')}
                     </DropdownMenuItem>
@@ -346,7 +316,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => navigate("/auth")}
-              className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+              className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
               data-testid="button-login"
             >
               {t('auth.login')}
@@ -359,14 +329,14 @@ export default function Header() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className={`${iconButtonClass} lg:hidden`}
+                className={`${iconButtonClass} ${compact ? "min-[1100px]:hidden" : "xl:hidden"}`}
                 data-testid="button-mobile-nav"
-                aria-label={t('nav.home')}
+                aria-label={t('shell.openNavigation')}
               >
                 <Menu className="h-5 w-5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="mt-2 w-56 rounded-sm border-line">
+            <DropdownMenuContent align="end" className="mt-2 max-h-[calc(100dvh-100px)] w-64 overflow-y-auto rounded-xl border-line [&_[role=menuitem]]:min-h-11">
               {navItems.map((item) => (
                 <DropdownMenuItem key={item.href} onClick={() => navigate(item.href)} className="cursor-pointer">
                   {item.label}
@@ -391,6 +361,10 @@ export default function Header() {
               {user && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/communities?view=mine")} className="cursor-pointer">
+                    <Users className="mr-2 h-4 w-4" />
+                    {t('nav.myCommunities')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/proposals/new")} className="cursor-pointer">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     {t('nav.newProposal')}
@@ -413,13 +387,6 @@ export default function Header() {
       {/* Ornament slot: empty in every theme but Marble, which draws a meander here. */}
       <div className="theme-rule" aria-hidden="true" />
 
-      {/* Search drops to its own line below 2xl so it never squeezes the nav
-          or pushes «Νέο» off the edge on a laptop screen. */}
-      {user && (
-        <div className="border-t border-line px-4 py-2 2xl:hidden">
-          <SearchBar />
-        </div>
-      )}
     </header>
   );
 }

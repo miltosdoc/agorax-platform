@@ -32,6 +32,9 @@ export interface EntityCardProps {
   bookmarkKind?: BookmarkKind;
   /** Extra content shown only in the quick-view popup — a player, a chart. */
   detail?: ReactNode;
+  /** Membership or another contextual action, rendered without navigation. */
+  actions?: ReactNode;
+  inlineDetail?: boolean;
 }
 
 /**
@@ -63,6 +66,8 @@ export function EntityCard({
   thumbSrc,
   bookmarkKind,
   detail,
+  actions,
+  inlineDetail = false,
 }: EntityCardProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -70,35 +75,23 @@ export function EntityCard({
   return (
     <>
       <article
-        className="group flex gap-4 rounded-sm border border-line bg-surface p-4 transition-colors duration-[120ms] hover:border-line-strong"
+        className="group flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 transition-colors duration-[120ms] hover:border-line-strong sm:p-6"
         data-testid={`card-${subject}-${id}`}
       >
-        {/* ── Picture ── */}
-        <Link href={href} className="hidden w-24 flex-shrink-0 sm:block" tabIndex={-1} aria-hidden="true">
-          <Thumbnail
-            src={thumbSrc}
-            thumbnailKey={thumbnailKey}
-            seed={`${subject}-${id}`}
-            subject={subject}
-            ratio="1:1"
-            compact
-          />
-        </Link>
-
         <div className="flex min-w-0 flex-1 flex-col">
           {/* ── Eyebrow ── */}
           <div className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            <span className="inline-flex items-center gap-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+            <span className="inline-flex items-center gap-1.5 font-sans text-sm font-medium text-ink-soft">
               <MotifIcon subject={subject} size={13} />
               {kindLabel}
             </span>
             {tag && (
               tagHref ? (
-                <Link href={tagHref}>
-                  <Chip tone="accent">{tag}</Chip>
+                <Link href={tagHref} className="inline-flex min-h-8 items-center rounded-lg bg-kyanos-wash px-2.5 py-1 text-sm font-medium leading-snug text-kyanos hover:underline">
+                  {tag}
                 </Link>
               ) : (
-                <Chip tone="accent">{tag}</Chip>
+                <span className="inline-flex min-h-8 items-center rounded-lg bg-kyanos-wash px-2.5 py-1 text-sm font-medium leading-snug text-kyanos">{tag}</span>
               )
             )}
             {badge && <span className="ml-auto">{badge}</span>}
@@ -106,22 +99,24 @@ export function EntityCard({
 
           {/* ── Title ── */}
           <Link href={href} className="block">
-            <h3 className="font-serif text-lg leading-snug text-ink group-hover:text-kyanos">
+            <h3 className="font-sans text-xl font-semibold leading-snug text-ink sm:text-2xl group-hover:text-kyanos">
               {title}
             </h3>
           </Link>
 
           {excerpt && (
-            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">{excerpt}</p>
+            <p className="mt-3 line-clamp-3 text-base leading-relaxed text-ink-soft">{excerpt}</p>
           )}
 
-          {meta && <div className="mt-2">{meta}</div>}
+          {meta && <div className="mt-3 text-sm text-ink-soft">{meta}</div>}
+          {inlineDetail && detail && <div className="mt-4 overflow-hidden rounded-xl">{detail}</div>}
+          {actions && <div className="mt-4 border-t border-line pt-4">{actions}</div>}
 
           {/* ── Actions ── */}
-          <div className="mt-3.5 flex items-center gap-2 pt-0.5">
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
             <Link
               href={href}
-              className="inline-flex h-9 items-center rounded-sm bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+              className="inline-flex min-h-11 items-center rounded-sm bg-ink px-3.5 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
               data-testid={`card-open-${subject}-${id}`}
             >
               {ctaLabel ?? t('rail.learnMore')}
@@ -130,7 +125,7 @@ export function EntityCard({
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-line bg-surface text-ink-soft transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken hover:text-ink"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-sm border border-line bg-surface text-ink-soft transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken hover:text-ink"
               aria-label={t('card.quickView')}
               title={t('card.quickView')}
               data-testid={`card-quickview-${subject}-${id}`}
@@ -151,14 +146,14 @@ export function EntityCard({
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <div className="mb-1 flex flex-wrap items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+              <span className="inline-flex items-center gap-1.5 font-sans text-sm font-medium text-ink-soft">
                 <MotifIcon subject={subject} size={13} />
                 {kindLabel}
               </span>
               {tag && <Chip tone="accent">{tag}</Chip>}
               {badge}
             </div>
-            <DialogTitle className="text-left font-serif text-2xl font-normal leading-snug">
+            <DialogTitle className="text-left font-sans text-2xl font-semibold leading-snug">
               {title}
             </DialogTitle>
           </DialogHeader>
@@ -175,19 +170,20 @@ export function EntityCard({
             </div>
             <div className="min-w-0 flex-1">
               {excerpt && (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink-soft">{excerpt}</p>
+                <p className="whitespace-pre-line text-base leading-relaxed text-ink-soft">{excerpt}</p>
               )}
               {meta && <div className="mt-3">{meta}</div>}
             </div>
           </div>
 
           {detail && <div className="mt-4 border-t border-line pt-4">{detail}</div>}
+          {actions && <div className="mt-4">{actions}</div>}
 
           <div className="mt-5 flex items-center gap-2 border-t border-line pt-4">
             <Link
               href={href}
               onClick={() => setOpen(false)}
-              className="inline-flex h-9 items-center rounded-sm bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
+              className="inline-flex min-h-11 items-center rounded-sm bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
             >
               {ctaLabel ?? t('rail.learnMore')}
             </Link>

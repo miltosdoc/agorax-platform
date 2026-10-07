@@ -61,15 +61,20 @@ export async function probeMedia(filePath: string): Promise<ProbeResult> {
 }
 
 /**
- * Extract a JPEG poster frame at 1 second into the video, written to
+ * Extract a JPEG poster frame within the video's duration, written to
  * `outPath`. Resolves with the output path on success. If ffmpeg fails
  * (corrupt file, missing seek frame), throws — caller decides whether
  * to swallow.
  */
-export async function extractVideoThumbnail(inPath: string, outPath: string): Promise<string> {
+export function thumbnailSeekSeconds(durationS?: number): number {
+  if (durationS === undefined) return 1;
+  return Number.isFinite(durationS) && durationS > 0 ? Math.min(1, durationS / 2) : 0;
+}
+
+export async function extractVideoThumbnail(inPath: string, outPath: string, durationS?: number): Promise<string> {
   await exec('ffmpeg', [
     '-y',
-    '-ss', '1',
+    '-ss', String(thumbnailSeekSeconds(durationS)),
     '-i', inPath,
     '-vframes', '1',
     '-q:v', '4',

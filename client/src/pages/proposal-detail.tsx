@@ -7,8 +7,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'wouter';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Link, useLocation, useSearch } from 'wouter';
+import { useCommunityMembership } from '@/hooks/use-community-membership';
+import { CommunityJoinAction } from '@/components/community/CommunityJoinAction';
+import { type ProposalActionTarget } from '@/components/proposal/NextActionPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -72,29 +74,23 @@ interface FinalReviewData {
   authorRefineInstruction?: string | null;
 }
 
-type ValidationCategory = 'return' | 'sortition' | 'auto_approve';
-
-function categoryFromScore(score: number | null): ValidationCategory | null {
-  if (score === null) return null;
-  if (score < 20) return 'return';
-  if (score > 90) return 'auto_approve';
-  return 'sortition';
-}
-
-function scoreColor(score: number): string {
-  if (score < 20) return 'text-red-700 bg-red-50 border-red-200';
-  if (score > 90) return 'text-green-700 bg-green-50 border-green-200';
-  return 'text-amber-700 bg-amber-50 border-amber-200';
-}
-
 export default function ProposalDetailPage() {
   const [location, setLocation] = useLocation();
   const proposalId = location.split('/').pop();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const search = useSearch();
   const { user } = useAuth();
   const { toast } = useToast();
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const membership = useCommunityMembership(proposal?.communityId ?? 0);
+  const [loadError, setLoadError] = useState<number | null>(null);
+  const [participationTab, setParticipationTab] = useState(() => new URLSearchParams(window.location.search).get('tab') === 'media' ? 'media' : 'debate');
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get('tab');
+    if (tab === 'media' || tab === 'amendments' || tab === 'debate') setParticipationTab(tab);
+    if (tab === 'media' && proposal) window.requestAnimationFrame(() => document.getElementById('proposal-participation')?.scrollIntoView({ block: 'start' }));
+  }, [search, proposal?.id]);
   const [finalReview, setFinalReview] = useState<FinalReviewData | null>(null);
   const [finalReviewLoading, setFinalReviewLoading] = useState(false);
   const [acceptingFinal, setAcceptingFinal] = useState(false);
@@ -113,25 +109,17 @@ export default function ProposalDetailPage() {
 
   useEffect(() => {
     if (!proposalId) return;
-
+    let cancelled = false;
+    setLoading(true);
+    setProposal(null);
+    setFinalReview(null);
+    setBallotCount(null);
+    setLoadError(null);
     api.get<Proposal>(`/api/proposals/${proposalId}`)
-      .then(resp => setProposal(resp.data))
-      .catch(() => {
-        // Fallback to demo data
-        setProposal({
-          id: parseInt(proposalId) || 1,
-          question: 'Πώς μπορούμε να βελτιώσουμε τη δημόσια συγκοινωνία;',
-          solution: 'Εισαγωγή ηλεκτρικών λεωφορείων και επέκταση ποδηλατοδρόμων.',
-          status: 'voting',
-          authorId: 1,
-          authorName: 'Δημοκράτης Παπαδόπουλος',
-          authorUsername: 'dimokratis',
-          communityId: 1,
-          communityName: 'Πολίτες Αθήνας',
-          createdAt: new Date().toISOString(),
-        });
-      })
-      .finally(() => setLoading(false));
+      .then((response) => { if (!cancelled) setProposal(response.data); })
+      .catch((error) => { if (!cancelled) setLoadError(error instanceof ApiError ? error.status : 500); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [proposalId]);
 
   useEffect(() => {
@@ -321,13 +309,23 @@ export default function ProposalDetailPage() {
   if (!proposal) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center min-h-[40vh]">{t('proposal.notFound')}</div>
+        <div className="mx-auto max-w-xl rounded-2xl border border-line bg-surface p-6" role="alert"><h1 className="text-2xl font-semibold text-ink">{t(loadError === 403 ? 'proposal.membersOnlyTitle' : 'proposal.notFound')}</h1><p className="mt-3 text-base leading-relaxed text-ink-soft">{t(loadError === 403 ? 'proposal.membersOnlyHelp' : loadError === 404 ? 'proposal.notFoundHelp' : 'proposal.loadError')}</p><Link href="/communities" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-kyanos px-4 text-sm font-semibold text-white">{t('communities.discover')}</Link></div>
       </AppShell>
     );
   }
 
   const userIsAuthor = !!user && user.id === proposal.authorId;
-  const isVoting = proposal.status === 'voting';
+  const canParticipate = !!user && (membership.status === 'member' || userIsAuthor);
+  const navigateToAction = (target: ProposalActionTarget) => {
+    if (target === 'debate' || target === 'amendments' || target === 'media') changeParticipationTab(target);
+    const id = target === 'vote' ? 'proposal-ballot' : target === 'options' ? 'proposal-options' : target === 'finalReview' ? 'proposal-final-review' : 'proposal-participation';
+    window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const changeParticipationTab = (tab: string) => {
+    setParticipationTab(tab);
+    const url = new URL(window.location.href); url.searchParams.set('tab', tab);
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
   // Displayed merged text during final_review: the endpoint's copy wins,
   // proposal.finalText is the fallback if the fetch failed.
   const finalReviewText = finalReview?.finalText ?? proposal.finalText ?? '';
@@ -342,7 +340,6 @@ export default function ProposalDetailPage() {
   // none of the amendment/final-text/AI-score apparatus.
   const collectsOptions = !isDirectVote && kindCollectsOptions(kind);
   const isTextCodrafting = !isDirectVote && !collectsOptions;
-  const ballotInMain = isDirectVote || collectsOptions;
   // A poll or an election may be nothing but its question and options.
   const hasText = proposal.solution.trim() !== '';
   const hasDistinctFinalText = !!proposal.finalText
@@ -358,58 +355,13 @@ export default function ProposalDetailPage() {
       ]}
       leftRail={<CommunityContextRail communityId={proposal.communityId} excludeProposalId={proposal.id} />}
     >
-      <Button variant="ghost" className="mb-4" onClick={() => window.history.back()}>
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        {t('general.back')}
-      </Button>
-
-      {/* While the LLM is scoring (status='review'), tell the user what's
-          happening — the page polls every 3s and updates itself. */}
-      {proposal.status === 'review' && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-3" data-testid="proposal-validation-banner">
-          <span className="text-lg leading-none">🤖</span>
-          <span>{t('proposal.validating')}</span>
-        </div>
-      )}
-
-      {/* Draft call-to-action — the sidebar button alone is easy to miss
-          (it falls below the fold on mobile), so the path from draft to
-          deliberation is spelled out right at the top. */}
-      {userIsAuthor && proposal.status === 'draft' && (
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" data-testid="proposal-draft-banner">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <span className="flex-1">{t('workspace.action.draft')}</span>
-            <Button
-              size="sm"
-              className="shrink-0"
-              disabled={submittingDraft}
-              onClick={handleSubmitDraft}
-              data-testid="proposal-draft-submit"
-            >
-              {submittingDraft ? t('proposal.submitting_review') : t('workspace.action.draftButton')}
-            </Button>
-          </div>
-          {draftSubmitError && <p className="mt-2 text-xs text-red-600">{draftSubmitError}</p>}
-        </div>
-      )}
-
-      {/* Slim lifecycle strip — the one piece of process chrome above the fold */}
-      <div className="mb-6 rounded-lg border bg-background px-4 py-3">
-        <LifecycleStepper status={proposal.status} track={proposal.track} kind={kind} />
-      </div>
-
-      {/* Two-column deliberation layout: the proposal text and the people
-          (debate + amendments) own the main column; process widgets (next
-          action, votes, sortition, AI score) live in a sticky sidebar. */}
-      <div className="lg:grid lg:grid-cols-3 lg:gap-8 lg:items-start">
-        <div className="lg:col-span-2 min-w-0">
           {/* Proposal header — no card chrome, generous type */}
           <header className="mb-6">
-            <div className="flex items-start justify-between gap-3">
-              <h1 className="text-2xl md:text-3xl font-semibold leading-snug flex-1 min-w-0">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+              <h1 className="min-w-0 flex-1 break-words text-2xl font-semibold leading-snug text-ink sm:text-3xl">
                 {proposal.question}
               </h1>
-              <div className="flex items-center gap-2 shrink-0 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
                 <ShareButton
                   url={`/proposals/${proposal.id}`}
                   title={proposal.question}
@@ -471,8 +423,9 @@ export default function ProposalDetailPage() {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>
-                {t('proposal.by')} {proposal.authorName || proposal.authorUsername || t('proposal.userWithId', { id: proposal.authorId })} · {new Date(proposal.createdAt).toLocaleDateString()}
+                {t('proposal.by')} <span className="font-medium text-ink">{proposal.authorName || proposal.authorUsername || t('proposal.userWithId', { id: proposal.authorId })}</span> · <time dateTime={proposal.createdAt}>{new Date(proposal.createdAt).toLocaleString(locale === 'el' ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
               </span>
+              <Link href={`/communities/${proposal.communityId}`} className="font-medium text-kyanos hover:underline">{proposal.communityName || membership.community?.name || t('proposal.communityWithId', { id: proposal.communityId })}</Link>
               <StatusBadge status={proposal.status} />
               <Badge variant="outline" data-testid="proposal-kind-badge">
                 {t(`proposal.kind_${kind}`)}
@@ -481,6 +434,24 @@ export default function ProposalDetailPage() {
             </div>
           </header>
 
+      <NextActionPanel status={proposal.status} proposalId={proposal.id} userIsAuthor={userIsAuthor} communityId={proposal.communityId} canParticipate={canParticipate} kind={kind} onNavigate={navigateToAction} onSubmitDraft={handleSubmitDraft} submittingDraft={submittingDraft} draftSubmitError={draftSubmitError} />
+      {['author_review', 'community_signal'].includes(proposal.status) && (proposal as any).phaseDeadline && <div className="mb-6"><PhaseCountdown deadline={(proposal as any).phaseDeadline} /></div>}
+      {/* While the LLM is scoring (status='review'), tell the user what's
+          happening — the page polls every 3s and updates itself. */}
+      {proposal.status === 'review' && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-3" data-testid="proposal-validation-banner">
+          <span className="text-lg leading-none">🤖</span>
+          <span>{t('proposal.validating')}</span>
+        </div>
+      )}
+
+      <details className="mb-6 rounded-2xl border border-line bg-surface p-4">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-base font-medium text-ink">{t('proposal.processDetails')}<ChevronDown className="h-4 w-4 text-ink-faint" /></summary>
+        <div className="pt-4"><LifecycleStepper status={proposal.status} track={proposal.track} kind={kind} /></div>
+      </details>
+      {/* One readable flow on desktop, tablet and mobile. */}
+      <div className="space-y-6">
+        <div className="min-w-0">
           {/* Unjudged amendments are silently dropped from the merge — the
               one failure in this flow that a user cannot see coming. */}
           {pendingAmendments > 0 && (
@@ -591,7 +562,7 @@ export default function ProposalDetailPage() {
               text and the ballot alternatives; the author additionally gets
               accept + AI-refine controls. */}
           {(proposal.status === 'final_review' || (proposal.status === 'community_signal' && finalReviewText.trim() !== '')) && (
-            <section className="mb-8" data-testid="final-review-section">
+            <section id="proposal-final-review" className="mb-8 scroll-mt-24" data-testid="final-review-section">
               <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 {t('proposal.final_review_title') || 'Τελικό κείμενο προς ψηφοφορία'}
               </h2>
@@ -680,13 +651,11 @@ export default function ProposalDetailPage() {
           )}
 
           {/* An election or a poll building its list: the list is the page */}
-          {collectsOptions && proposal.status === 'community_signal' && (
-            <OptionCollectionPanel proposalId={proposal.id} kind={kind as 'election' | 'poll'} />
-          )}
+          {collectsOptions && proposal.status === 'community_signal' && <section id="proposal-options" className="scroll-mt-24"><OptionCollectionPanel proposalId={proposal.id} kind={kind as 'election' | 'poll'} allowParticipation={canParticipate} /></section>}
 
           {/* Direct vote: the ballot is the main event, right under the text */}
-          {ballotInMain && ['voting', 'decided', 'archived'].includes(proposal.status) && (
-            <section className="mb-8" data-testid="direct-vote-panel">
+          {['voting', 'decided', 'archived'].includes(proposal.status) && (
+            <section id="proposal-ballot" className="mb-8 scroll-mt-24" data-testid="direct-vote-panel">
               <VotePanel
                 proposalId={proposal.id}
                 proposalStatus={proposal.status}
@@ -695,6 +664,8 @@ export default function ProposalDetailPage() {
                 phaseDeadline={(proposal as any).phaseDeadline}
                 articleBallot={(proposal as any).articleBallot}
                 communityId={proposal.communityId}
+                canParticipate={canParticipate}
+                joinAction={<CommunityJoinAction communityId={proposal.communityId} />}
                 onVoteResultsChange={handleVoteResults}
                 onProposalAdvanced={handleProposalAdvanced}
               />
@@ -705,27 +676,28 @@ export default function ProposalDetailPage() {
           )}
 
           {/* Participation — the people's surface, always visible */}
-          <section>
-            <Tabs defaultValue={isTextCodrafting && ['author_review', 'community_signal'].includes(proposal.status) ? 'amendments' : 'debate'}>
-              <TabsList className={`grid w-full ${isTextCodrafting ? 'grid-cols-3' : 'grid-cols-2'} h-auto gap-1`}>
-                <TabsTrigger value="debate" className="gap-1 py-2">
+          <section id="proposal-participation" className="scroll-mt-24">
+            {!canParticipate && <div className="mb-4 rounded-xl border border-line bg-surface p-4"><p className="mb-3 text-sm text-ink-soft">{t('proposal.joinToParticipate')}</p><CommunityJoinAction communityId={proposal.communityId} /></div>}
+            <Tabs value={participationTab} onValueChange={changeParticipationTab}>
+              <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-1">
+                <TabsTrigger value="debate" className="min-h-11 gap-2 rounded-lg px-4 text-sm">
                   <MessageSquare className="w-4 h-4 sm:mr-1" />
-                  <span className="text-xs sm:text-sm">{t('workspace.tabs.debate')}</span>
+                  <span className="text-sm">{t('workspace.tabs.debate')}</span>
                 </TabsTrigger>
                 {isTextCodrafting && (
-                  <TabsTrigger value="amendments" className="gap-1 py-2">
+                  <TabsTrigger value="amendments" className="min-h-11 gap-2 rounded-lg px-4 text-sm">
                     <FileText className="w-4 h-4 sm:mr-1" />
-                    <span className="text-xs sm:text-sm">{t('workspace.tabs.amendments')}</span>
+                    <span className="text-sm">{t('workspace.tabs.amendments')}</span>
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="media" className="gap-1 py-2">
+                <TabsTrigger value="media" className="min-h-11 gap-2 rounded-lg px-4 text-sm">
                   <Mic className="w-4 h-4 sm:mr-1" />
-                  <span className="text-xs sm:text-sm">{t('media.tabLabel')}</span>
+                  <span className="text-sm">{t('media.tabLabel')}</span>
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="debate">
-                <DebatePanel proposalId={proposal.id} proposalStatus={proposal.status} />
+                <DebatePanel proposalId={proposal.id} proposalStatus={proposal.status} allowParticipation={canParticipate} />
               </TabsContent>
 
               {isTextCodrafting && (
@@ -734,52 +706,21 @@ export default function ProposalDetailPage() {
                     proposalId={proposal.id}
                     proposalStatus={proposal.status}
                     userIsAuthor={userIsAuthor}
+                    allowParticipation={canParticipate}
                     articles={articleSectionsFor(kind, proposal.solution ?? '')}
                   />
                 </TabsContent>
               )}
 
               <TabsContent value="media">
-                <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} />
+                <MediaStudioPanel proposalId={proposal.id} userIsAuthor={userIsAuthor} communityId={proposal.communityId} canParticipate={canParticipate} />
               </TabsContent>
             </Tabs>
           </section>
         </div>
 
-        {/* Sidebar — process widgets, sticky on desktop */}
-        <aside className="mt-8 lg:mt-0 lg:col-span-1">
-          <div className="lg:sticky lg:top-20 space-y-4">
-            {/* Phase timer — voting shows its own countdown inside VotePanel */}
-            {['author_review', 'community_signal'].includes(proposal.status) && (proposal as any).phaseDeadline && (
-              <PhaseCountdown deadline={(proposal as any).phaseDeadline} />
-            )}
-            {(isTextCodrafting || proposal.status === 'draft') && (
-              <NextActionPanel
-                status={proposal.status}
-                proposalId={proposal.id}
-                userIsAuthor={userIsAuthor}
-              />
-            )}
-
-            {isTextCodrafting && ['voting', 'decided', 'archived'].includes(proposal.status) && (
-              <div>
-                <VotePanel
-                  proposalId={proposal.id}
-                  proposalStatus={proposal.status}
-                  proposalAuthorId={proposal.authorId}
-                  votingMode={proposal.votingMode}
-                  phaseDeadline={(proposal as any).phaseDeadline}
-                  articleBallot={(proposal as any).articleBallot}
-                  communityId={proposal.communityId}
-                  onVoteResultsChange={handleVoteResults}
-                  onProposalAdvanced={handleProposalAdvanced}
-                />
-                {voteError && (
-                  <div className="mt-2 text-red-600 text-sm text-center">{voteError}</div>
-                )}
-              </div>
-            )}
-
+        <aside className="space-y-4">
+          <div className="space-y-4">
             {/* Sortition is dormant: the panel appears only while a jury is
                 actually convened (manual dispute path), never as a "skipped"
                 explainer on ordinary proposals. */}
@@ -790,7 +731,7 @@ export default function ProposalDetailPage() {
               />
             )}
 
-            {isTextCodrafting && (() => {
+            {isTextCodrafting && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('proposal.validationDetails')}</summary><div className="pt-4">{(() => {
               const numericScore = proposal.llmScore != null ? Number(proposal.llmScore) : null;
               const score = Number.isFinite(numericScore) ? (numericScore as number) : null;
               if (score === null) {
@@ -819,7 +760,7 @@ export default function ProposalDetailPage() {
                   )}
                 </div>
               );
-            })()}
+            })()}</div></details>}
           </div>
         </aside>
       </div>

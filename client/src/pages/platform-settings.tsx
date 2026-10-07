@@ -5,6 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { LogoLoader } from "@/components/brand/LogoLoader";
+import { Button } from '@/components/ui/button';
 
 interface PlatformSetting {
   id: number;
@@ -78,12 +79,16 @@ export function PlatformSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     loadSettings();
   }, []);
 
   async function loadSettings() {
+    setLoading(true);
+    setLoadFailed(false);
     try {
       const res = await api.get<PlatformSetting[]>("/api/platform-settings");
       const next: Record<string, string> = { ...ALL_DEFAULTS };
@@ -91,16 +96,17 @@ export function PlatformSettingsPage() {
         next[s.key] = s.value;
       }
       setValues(next);
+      setDirty(false);
     } catch (err) {
       console.error("Failed to load settings:", err);
-      // Fall back to defaults so the page is still usable on a fresh DB.
-      setValues({ ...ALL_DEFAULTS });
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSave() {
+    if (loadFailed || !dirty) return;
     setSaving(true);
     setSaved(false);
     setError(null);
@@ -109,6 +115,7 @@ export function PlatformSettingsPage() {
         await api.patch("/api/platform-settings", { key, value });
       }
       setSaved(true);
+      setDirty(false);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -120,6 +127,8 @@ export function PlatformSettingsPage() {
 
   function handleChange(key: string, value: string) {
     setValues(prev => ({ ...prev, [key]: value }));
+    setDirty(true);
+    setSaved(false);
   }
 
   // These are platform-wide settings, not account ones, so a member who
@@ -128,8 +137,8 @@ export function PlatformSettingsPage() {
   if (!user?.isAdmin) {
     return (
       <AppShell title={t("platformSettings.title")}>
-        <div className="max-w-xl rounded-sm border border-line bg-surface p-6" data-testid="platform-settings-denied">
-          <p className="text-sm leading-relaxed text-ink-soft">{t('platformSettings.adminOnly')}</p>
+        <div className="mx-auto max-w-xl rounded-xl border border-line bg-surface p-6" data-testid="platform-settings-denied">
+          <p className="text-base leading-relaxed text-ink-soft">{t('platformSettings.adminOnly')}</p>
         </div>
       </AppShell>
     );
@@ -147,47 +156,51 @@ export function PlatformSettingsPage() {
 
   return (
     <AppShell title={t("platformSettings.title")}>
-      <div className="max-w-4xl space-y-8">
+      <div className="mx-auto max-w-3xl space-y-5">
+        <p className="text-base leading-relaxed text-muted-foreground">{t('redesign.personal.settingsIntro')}</p>
+        {loadFailed && <div role="alert" className="space-y-3 rounded-lg border p-5">
+          <p>{t('redesign.personal.settingsLoadFailed')}</p>
+          <Button variant="outline" onClick={loadSettings}>{t('redesign.personal.tryAgain')}</Button>
+        </div>}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
         {saved && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+          <div role="status" className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
             {t("platformSettings.saved")}
           </div>
         )}
 
-        {SETTINGS_GROUPS.map((group) => (
-          <div key={group.title} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">{t(group.title)}</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
+        <fieldset disabled={saving || loadFailed} className="space-y-4">
+        {SETTINGS_GROUPS.map((group, index) => (
+          <details key={group.title} open={index === 0} className="overflow-hidden rounded-xl border bg-surface">
+            <summary className="cursor-pointer bg-muted/30 px-5 py-5 text-lg font-semibold">{t(group.title)}</summary>
+            <div className="divide-y divide-border border-t">
               {group.settings.map((setting) => (
                 <div key={setting.key} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <label className="flex-1 text-sm font-medium text-gray-700" htmlFor={`setting-${setting.key}`}>
+                  <label className="flex-1 text-base font-medium" htmlFor={`setting-${setting.key}`}>
                     {t(setting.label)}
                   </label>
                   {setting.type === "textarea" ? (
                     <textarea
                       id={`setting-${setting.key}`}
-                      className="w-full sm:flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                      rows={2}
+                      className="w-full sm:flex-1 rounded-lg border border-input bg-background px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                      rows={3}
                       value={values[setting.key] ?? ""}
                       onChange={(e) => handleChange(setting.key, e.target.value)}
                     />
                   ) : setting.type === "select" ? (
                     <select
                       id={`setting-${setting.key}`}
-                      className="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className="min-h-11 w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary"
                       value={values[setting.key] ?? ""}
                       onChange={(e) => handleChange(setting.key, e.target.value)}
                     >
                       {setting.options?.map((opt) => (
                         <option key={opt} value={opt}>
-                          {opt}
+                          {opt === 'autonomous' || opt === 'managed' ? t(`community.type_${opt}`) : opt === 'el' ? 'Ελληνικά' : opt === 'en' ? 'English' : opt}
                         </option>
                       ))}
                     </select>
@@ -196,13 +209,14 @@ export function PlatformSettingsPage() {
                       id={`setting-${setting.key}`}
                       data-testid={`toggle-${setting.key}`}
                       checked={values[setting.key] === "true"}
+                      disabled={saving || loadFailed}
                       onCheckedChange={(checked) => handleChange(setting.key, checked ? "true" : "false")}
                     />
                   ) : (
                     <input
                       id={`setting-${setting.key}`}
                       type={setting.type}
-                      className="w-full sm:w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      className="min-h-11 w-full sm:w-48 rounded-lg border border-input bg-background px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary"
                       value={values[setting.key] ?? ""}
                       onChange={(e) => handleChange(setting.key, e.target.value)}
                     />
@@ -210,17 +224,18 @@ export function PlatformSettingsPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </details>
         ))}
+        </fieldset>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <button
+        <div className="sticky bottom-20 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-4 shadow-sm sm:bottom-4">
+          <p role="status" className="text-sm text-muted-foreground">{dirty && t('redesign.personal.unsaved')}</p>
+          <Button
             onClick={handleSave}
-            disabled={saving}
-            className="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            disabled={saving || !dirty || loadFailed}
           >
             {saving ? t("platformSettings.saving") : t("platformSettings.save")}
-          </button>
+          </Button>
         </div>
       </div>
     </AppShell>

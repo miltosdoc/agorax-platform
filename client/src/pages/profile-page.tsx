@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import AppShell from "@/components/layout/AppShell";
-import { ProfileSummaryRail, MyProposalsRail } from '@/components/rails/personal-rails';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import { api, ApiError } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 import { usernameChangeAvailableAt } from "@shared/user-identity";
 import { LogoLoader } from '@/components/brand/LogoLoader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
  * Editing the two identity fields.
@@ -76,7 +76,7 @@ function IdentityEditor({ user }: { user: { username: string; name: string; user
         <label htmlFor="profile-username" className="text-sm font-medium text-muted-foreground">
           {t('auth.username')}
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             id="profile-username"
             value={username}
@@ -95,7 +95,7 @@ function IdentityEditor({ user }: { user: { username: string; name: string; user
             {savingUsername ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.save')}
           </Button>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {lockedUntil
             ? t('profile.usernameLocked', { date: lockedUntil.toLocaleDateString() })
             : t('profile.usernameHelp')}
@@ -106,7 +106,7 @@ function IdentityEditor({ user }: { user: { username: string; name: string; user
         <label htmlFor="profile-name" className="text-sm font-medium text-muted-foreground">
           {t('profile.name')}
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             id="profile-name"
             value={name}
@@ -124,7 +124,7 @@ function IdentityEditor({ user }: { user: { username: string; name: string; user
             {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.save')}
           </Button>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">{t('profile.nameHelp')}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{t('profile.nameHelp')}</p>
       </div>
     </div>
   );
@@ -212,10 +212,8 @@ export default function ProfilePage() {
     <AppShell
       title={t('profile.accountSettings')}
       actions={headerActions}
-      leftRail={<ProfileSummaryRail />}
-      rightRail={<MyProposalsRail />}
     >
-      <div data-testid="page-profile-settings">
+      <div data-testid="page-profile-settings" className="mx-auto max-w-3xl">
         <Button
           variant="ghost"
           size="sm"
@@ -230,8 +228,14 @@ export default function ProfilePage() {
           {t('profile.accountSettingsDescription')}
         </p>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <Tabs defaultValue="account">
+          <TabsList className="mb-6 flex h-auto flex-wrap justify-start gap-1">
+            <TabsTrigger value="account" className="min-h-11">{t('redesign.personal.accountTab')}</TabsTrigger>
+            <TabsTrigger value="devices" className="min-h-11">{t('redesign.personal.devicesTab')}</TabsTrigger>
+            <TabsTrigger value="delete" className="min-h-11">{t('redesign.personal.deleteTab')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="account" className="space-y-5">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
@@ -266,12 +270,14 @@ export default function ProfilePage() {
               <Separator />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">{t('profile.accountStatus')}</p>
-                <p>{effectiveUser.accountStatus || 'active'}</p>
+                <p>{!effectiveUser.accountStatus || effectiveUser.accountStatus === 'active' ? t('redesign.personal.activeStatus') : effectiveUser.accountStatus}</p>
               </div>
             </CardContent>
           </Card>
+          <Button variant="outline" onClick={() => setLocation('/notifications/settings')}>{t('redesign.personal.notificationLink')}</Button>
+          </TabsContent>
 
-          <div className="space-y-6 lg:col-span-2">
+          <TabsContent value="devices" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -320,8 +326,8 @@ export default function ProfilePage() {
                   </Button>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input readOnly value={exportCode} className="font-mono text-xs" />
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input readOnly value={exportCode} className="font-mono text-sm" aria-label={t('redesign.personal.transferCode')} />
                       <Button
                         size="sm"
                         variant="outline"
@@ -338,18 +344,19 @@ export default function ProfilePage() {
                         {t('panel.copy')}
                       </Button>
                     </div>
-                    <p className="text-xs text-amber-700">{t('anon.exportWarning')}</p>
+                    <p className="text-sm text-amber-700">{t('anon.exportWarning')}</p>
                   </div>
                 )}
 
                 <div className="border-t pt-4 space-y-2">
                   <p className="text-sm font-medium">{t('anon.importTitle')}</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={importCode}
                       onChange={(e) => setImportCode(e.target.value)}
                       placeholder={t('anon.importPlaceholder')}
-                      className="font-mono text-xs"
+                      className="font-mono text-sm"
+                      aria-label={t('redesign.personal.importCode')}
                       data-testid="anon-import-input"
                     />
                     <Button
@@ -365,8 +372,10 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <Card>
+          <TabsContent value="delete">
+            <Card className="border-destructive/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Trash2 className="h-5 w-5 text-destructive" />
@@ -378,8 +387,8 @@ export default function ProfilePage() {
                 <DeleteAccount />
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppShell>
   );

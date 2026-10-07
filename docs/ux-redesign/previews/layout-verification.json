@@ -1,0 +1,459 @@
+{
+  "checks": 64,
+  "membership": true,
+  "pendingPersists": true,
+  "mediaRouting": true,
+  "visibility": true,
+  "pagination": true,
+  "errors": [],
+  "layout": [
+    {
+      "viewport": "desktop",
+      "route": "/feed",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/communities",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/communities/24",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/proposals",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/proposals/109",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/videos",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/podcasts",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/surveys",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/surveys/new",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/profile",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/notifications",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/notifications/settings",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/home",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/appearance",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/proposals/new",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "desktop",
+      "route": "/communities/new",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/feed",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/communities",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/communities/24",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/proposals",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/proposals/109",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/videos",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/podcasts",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/surveys",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/surveys/new",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/profile",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/notifications",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/notifications/settings",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/home",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/appearance",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/proposals/new",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-portrait",
+      "route": "/communities/new",
+      "width": 768,
+      "scroll": 768,
+      "body": 768
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/feed",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/communities",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/communities/24",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/proposals",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/proposals/109",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/videos",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/podcasts",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/surveys",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/surveys/new",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/profile",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/notifications",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/notifications/settings",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/home",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/appearance",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/proposals/new",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "tablet-landscape",
+      "route": "/communities/new",
+      "width": 1024,
+      "scroll": 1024,
+      "body": 1024
+    },
+    {
+      "viewport": "phone",
+      "route": "/feed",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/communities",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/communities/24",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/proposals",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/proposals/109",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/videos",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/podcasts",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/surveys",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/surveys/new",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/profile",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/notifications",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/notifications/settings",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/home",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/appearance",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/proposals/new",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "viewport": "phone",
+      "route": "/communities/new",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    }
+  ]
+}

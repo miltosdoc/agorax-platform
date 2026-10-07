@@ -26,7 +26,7 @@ interface OptionsPayload {
   items: Array<{ id: number; label: string; standing: boolean; mine: boolean; canRemove: boolean }>;
 }
 
-export function OptionCollectionPanel({ proposalId, kind }: { proposalId: number; kind: Extract<ProposalKind, 'election' | 'poll'> }) {
+export function OptionCollectionPanel({ proposalId, kind, allowParticipation = true }: { proposalId: number; kind: Extract<ProposalKind, 'election' | 'poll'>; allowParticipation?: boolean }) {
   const { t, locale } = useTranslation();
   const { user } = useAuth();
   const [data, setData] = useState<OptionsPayload | null>(null);
@@ -121,7 +121,7 @@ export function OptionCollectionPanel({ proposalId, kind }: { proposalId: number
         </ul>
       )}
 
-      {data?.open && user && (
+      {data?.open && user && allowParticipation && (
         <div className="space-y-3 border-t pt-4">
           {kind === 'election' && !data.iAmStanding && (
             <Button type="button" onClick={stand} disabled={busy} data-testid="option-stand">

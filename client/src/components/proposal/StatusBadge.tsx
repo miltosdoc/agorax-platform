@@ -28,7 +28,7 @@ export default function StatusBadge({ status, className = '' }: { status: string
   const s = STAGE_STYLE[stage];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border px-2 py-0.5 text-xs font-medium ${s.chip} ${className}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-sm font-medium ${s.chip} ${className}`}
       data-testid="status-badge"
       data-stage={stage}
     >

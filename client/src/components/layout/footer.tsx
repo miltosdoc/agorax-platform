@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Heart, ArrowRight, Smartphone, Loader2 } from "lucide-react";
+import { Heart, Smartphone, Loader2, ChevronDown } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { useToast } from "@/hooks/use-toast";
 import { AgoraLogo } from "@/components/brand/AgoraLogo";
@@ -9,21 +9,13 @@ import { downloadApk } from "@/lib/download-apk";
 import { LOCALE_NAMES, SUPPORTED_LOCALES } from "@/lib/i18n-types";
 import { setFeedbackWidgetEnabled } from "@/components/FeedbackWidget";
 
-/**
- * The AGORA 2026 colophon: wordmark and support block, three link columns, and
- * the newsletter sign-up, over a solid ink ground.
- *
- * The comps render this block in the design's green; here it stays on --ink
- * with Kyanós accents, which is the same shape in the platform's own colours.
- */
-
 function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-bc-ink-soft">
+      <h3 className="font-sans text-sm font-semibold text-ink">
         {title}
       </h3>
-      <ul className="mt-4 space-y-2.5">{children}</ul>
+      <ul className="mt-3 space-y-1.5">{children}</ul>
     </div>
   );
 }
@@ -34,7 +26,7 @@ function FooterAction({ onClick, children }: { onClick: () => void; children: Re
       <button
         type="button"
         onClick={onClick}
-        className="text-left text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+        className="inline-flex min-h-11 items-center text-left text-sm text-ink-soft transition-colors duration-[120ms] hover:text-kyanos"
       >
         {children}
       </button>
@@ -47,7 +39,7 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
     <li>
       <Link
         href={href}
-        className="text-sm text-bc-ink-soft transition-colors duration-[120ms] hover:text-paper"
+        className="inline-flex min-h-11 items-center text-sm text-ink-soft transition-colors duration-[120ms] hover:text-kyanos"
       >
         {children}
       </Link>
@@ -83,20 +75,20 @@ function NewsletterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-4" data-testid="form-newsletter">
-      <div className="flex items-center gap-2 rounded-full border border-bc-line bg-bc-panel p-1 pl-4">
+      <div className="flex items-center gap-2 rounded-full border border-line bg-sunken p-1 pl-4">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t('footer.newsletterPlaceholder')}
           aria-label={t('footer.newsletterBody')}
-          className="min-w-0 flex-1 bg-transparent text-sm text-paper outline-none placeholder:text-bc-ink-soft"
+          className="min-w-0 flex-1 bg-transparent h-11 text-base text-ink outline-none placeholder:text-ink-faint"
           data-testid="input-newsletter-email"
         />
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-full bg-paper px-4 text-sm font-medium text-ink transition-colors duration-[120ms] hover:bg-sunken disabled:opacity-60"
+          className="inline-flex h-11 flex-shrink-0 items-center gap-1.5 rounded-full bg-kyanos px-4 text-sm font-medium text-accent-foreground transition-colors duration-[120ms] hover:bg-kyanos-deep disabled:opacity-60"
           data-testid="button-newsletter-submit"
         >
           {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -126,123 +118,56 @@ export default function Footer() {
   }
 
   return (
-    <footer className="border-t border-line-strong bg-ink text-paper">
-      <div className="mx-auto max-w-[1680px] px-4 lg:px-6">
-        <div className="grid grid-cols-1 gap-x-8 gap-y-10 py-14 md:grid-cols-2 lg:grid-cols-12">
-          {/* ── Wordmark, tagline, support ── */}
-          <div className="lg:col-span-3">
-            <Link href="/" className="inline-block" aria-label={t('brand.name')}>
-              <AgoraLogo tone="ink" tagline className="h-16 w-auto" />
-            </Link>
-            <p className="mt-4 max-w-[34ch] text-sm leading-relaxed text-bc-ink-soft">
-              {t('footer.tagline')}
-            </p>
-
-            {/* The panel is dark in every theme (bc-*), so its text is too:
-                in Spray and Parliament the footer itself turns light. */}
-            <div className="mt-6 rounded-sm border border-bc-line bg-bc-panel p-4">
-              <p className="font-serif text-lg leading-tight text-bc-ink">{t('footer.supportTitle')}</p>
-              <p className="mt-1 text-xs leading-relaxed text-bc-ink-soft">{t('footer.supportBody')}</p>
-              <Link
-                href="/support"
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-sm border border-bc-line px-3 py-2 text-sm font-medium text-bc-ink transition-colors duration-[120ms] hover:bg-bc-line"
-                data-testid="link-donate"
-              >
-                <Heart className="h-4 w-4" />
-                <span className="flex-1 text-center">{t('footer.donate')}</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
+    <footer className="platform-footer border-t border-line bg-surface text-ink">
+      <div className="mx-auto max-w-[1480px] px-4 py-6 lg:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" aria-label={t('brand.name')}><AgoraLogo className="h-7 w-auto" /></Link>
+            <p className="m-0 text-xs text-ink-faint">© {new Date().getFullYear()} {t('brand.name')}</p>
           </div>
-
-          {/* ── Link columns ── */}
-          <div className="lg:col-span-2">
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm" aria-label={t('footer.useful')}>
+            <Link href="/walkthrough" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.userGuide')}</Link>
+            <Link href="/privacy" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.privacy')}</Link>
+            <Link href="/terms" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.terms')}</Link>
+            <Link href="/support" className="inline-flex min-h-11 items-center gap-2 font-medium text-kyanos" data-testid="link-donate"><Heart className="h-4 w-4" />{t('footer.donate')}</Link>
+          </nav>
+        </div>
+        <details className="group mt-2 border-t border-line pt-2">
+          <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 text-sm text-ink-faint marker:content-none">
+            {t('shell.moreFooter')}<ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="grid gap-x-8 gap-y-6 py-6 sm:grid-cols-2 lg:grid-cols-4">
             <FooterColumn title={t('footer.navigation')}>
-              <FooterLink href="/">{t('nav.home')}</FooterLink>
               <FooterLink href="/communities">{t('nav.communities')}</FooterLink>
               <FooterLink href="/proposals">{t('nav.proposals')}</FooterLink>
               <FooterLink href="/surveys">{t('nav.surveys')}</FooterLink>
               <FooterLink href="/podcasts">{t('nav.podcasts')}</FooterLink>
               <FooterLink href="/videos">{t('nav.videos')}</FooterLink>
             </FooterColumn>
-          </div>
-
-          <div className="lg:col-span-2">
             <FooterColumn title={t('footer.useful')}>
               <FooterLink href="/how-it-works">{t('footer.about')}</FooterLink>
               <FooterLink href="/verify">{t('footer.verify')}</FooterLink>
-              <FooterLink href="/terms">{t('footer.terms')}</FooterLink>
-              <FooterLink href="/privacy">{t('footer.privacy')}</FooterLink>
               <FooterLink href="/faq">{t('footer.faq')}</FooterLink>
-            </FooterColumn>
-          </div>
-
-          <div className="lg:col-span-2">
-            <FooterColumn title={t('footer.support')}>
-              <FooterLink href="/faq">{t('footer.helpCentre')}</FooterLink>
-              <FooterLink href="/walkthrough">{t('footer.userGuide')}</FooterLink>
-              {/* There is no /feedback page — reporting happens through the
-                  in-app widget, so these switch it on rather than pretending
-                  to navigate somewhere. */}
               <FooterAction onClick={openFeedback}>{t('footer.reportProblem')}</FooterAction>
               <FooterAction onClick={openFeedback}>{t('footer.improvements')}</FooterAction>
             </FooterColumn>
-          </div>
-
-          {/* ── Newsletter + app ── */}
-          <div className="md:col-span-2 lg:col-span-3">
-            <h3 className="font-sans text-xs font-semibold uppercase tracking-[0.14em] text-paper">
-              {t('footer.newsletterTitle')}
-            </h3>
-            <p className="mt-2 text-sm text-bc-ink-soft">{t('footer.newsletterBody')}</p>
-            <NewsletterForm />
-
-            {/* Only Android exists. The comps show an App Store badge too; a
-                store badge that leads nowhere is a promise the project cannot
-                keep, so it is not drawn until there is an iOS build. */}
-            <button
-              type="button"
-              onClick={handleApkDownload}
-              className="mt-6 inline-flex items-center gap-2.5 rounded-sm border border-bc-line px-4 py-2.5 text-sm text-paper transition-colors duration-[120ms] hover:bg-bc-panel"
-              data-testid="button-footer-android"
-            >
-              <Smartphone className="h-5 w-5" />
-              <span className="text-left leading-tight">
-                <span className="block text-[10px] uppercase tracking-[0.12em] text-bc-ink-soft">
-                  {t('footer.getAndroid')}
-                </span>
-                <span className="block text-sm font-medium">Android APK</span>
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── Legal row ── */}
-        <div className="flex flex-col gap-3 border-t border-bc-line py-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-bc-ink-soft">
-            {t('footer.madeWith')}
-          </p>
-          <div className="flex items-center gap-4">
-            <p className="font-mono text-xs tabular-nums text-bc-ink-soft">
-              © {new Date().getFullYear()} {t('brand.name')}
-            </p>
-            <div className="flex items-center gap-2">
-              {SUPPORTED_LOCALES.map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setLocale(code)}
-                  className={`text-xs uppercase tracking-[0.1em] transition-colors duration-[120ms] ${
-                    locale === code ? "text-paper" : "text-bc-ink-soft hover:text-paper"
-                  }`}
-                  data-testid={`footer-locale-${code}`}
-                >
-                  {LOCALE_NAMES[code]}
-                </button>
-              ))}
+            <div>
+              <h3 className="text-sm font-semibold text-ink">{t('shell.appearanceLanguage')}</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {SUPPORTED_LOCALES.map((code) => (
+                  <button key={code} type="button" onClick={() => setLocale(code)} className={`min-h-11 rounded-full border px-4 text-sm ${locale === code ? 'border-kyanos bg-kyanos-wash text-kyanos' : 'border-line text-ink-soft hover:bg-sunken'}`} data-testid={`footer-locale-${code}`}>{LOCALE_NAMES[code]}</button>
+                ))}
+              </div>
+              <button type="button" onClick={handleApkDownload} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-4 text-sm text-ink-soft hover:bg-sunken" data-testid="button-footer-android"><Smartphone className="h-4 w-4" /><span>{t('footer.getAndroid')}</span></button>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">{t('footer.newsletterTitle')}</h3>
+              <p className="mt-3 text-sm text-ink-faint">{t('footer.newsletterBody')}</p>
+              <NewsletterForm />
             </div>
           </div>
-        </div>
+          <p className="mt-1 text-xs text-ink-faint">{t('footer.madeWith')}</p>
+        </details>
       </div>
     </footer>
   );

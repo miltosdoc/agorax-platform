@@ -65,15 +65,26 @@ export default function NotificationSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadFailed(false);
     api.get<PrefsResponse>('/api/email-preferences')
-      .then((r) => setPrefs(r.data))
-      .catch((err: any) => errorToast(t('emailPrefs.loadFailed'), err?.message))
-      .finally(() => setLoading(false));
+      .then((r) => { if (!cancelled) setPrefs(r.data); })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setLoadFailed(true);
+          errorToast(t('emailPrefs.loadFailed'), err?.message);
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
     // errorToast/t are stable for the lifetime of the page
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reload]);
 
   const setMaster = (value: boolean) => {
     setPrefs((p) => (p ? { ...p, masterEnabled: value } : p));
@@ -109,8 +120,8 @@ export default function NotificationSettingsPage() {
 
   return (
     <AppShell title={t('emailPrefs.title')}>
-      <div className="mx-auto w-full max-w-2xl space-y-6 p-4">
-        <p className="text-sm text-muted-foreground">{t('emailPrefs.intro')}</p>
+      <div className="mx-auto w-full max-w-3xl space-y-5">
+        <p className="text-base leading-relaxed text-muted-foreground">{t('emailPrefs.intro')}</p>
 
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -118,6 +129,10 @@ export default function NotificationSettingsPage() {
             {t('general.loading')}…
           </div>
         )}
+        {loadFailed && <div role="alert" className="space-y-3 rounded-lg border p-5">
+          <p>{t('redesign.personal.prefsFailed')}</p>
+          <Button variant="outline" onClick={() => setReload((value) => value + 1)}>{t('redesign.personal.tryAgain')}</Button>
+        </div>}
 
         {prefs && !prefs.mailConfigured && (
           <div
@@ -136,13 +151,13 @@ export default function NotificationSettingsPage() {
                 address they would go to was never proved. */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="text-lg flex items-center gap-2">
                   {emailVerified
                     ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                     : <ShieldAlert className="h-4 w-4 text-amber-600" />}
                   {t('verifyEmail.statusTitle')}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm leading-relaxed">
                   {emailVerified ? t('verifyEmail.statusVerified') : t('verifyEmail.statusUnverified')}
                 </CardDescription>
               </CardHeader>
@@ -163,17 +178,18 @@ export default function NotificationSettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">{t('emailPrefs.masterTitle')}</CardTitle>
-                <CardDescription>{t('emailPrefs.masterHint')}</CardDescription>
+                <CardTitle className="text-lg">{t('emailPrefs.masterTitle')}</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">{t('emailPrefs.masterHint')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between gap-4">
-                  <Label htmlFor="email-master" className="text-sm font-medium">
+                  <Label htmlFor="email-master" className="text-base font-medium">
                     {t('emailPrefs.masterLabel')}
                   </Label>
                   <Switch
                     id="email-master"
                     checked={prefs.masterEnabled}
+                    disabled={saving}
                     onCheckedChange={setMaster}
                     data-testid="email-master-switch"
                   />
@@ -183,26 +199,26 @@ export default function NotificationSettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">{t('emailPrefs.categoriesTitle')}</CardTitle>
+                <CardTitle className="text-lg">{t('emailPrefs.categoriesTitle')}</CardTitle>
                 <CardDescription>{t('emailPrefs.categoriesHint')}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-1">
+              <CardContent className={`space-y-1 ${prefs.masterEnabled ? '' : 'opacity-60'}`}>
                 {prefs.categories.map((c, i) => (
                   <div key={c.key}>
-                    {i > 0 && <Separator className="my-3" />}
-                    <div className="flex items-start justify-between gap-4">
+                    {i > 0 && <Separator className="my-5" />}
+                    <div className="flex items-start justify-between gap-5 py-1">
                       <div className="space-y-0.5">
-                        <Label htmlFor={`cat-${c.key}`} className="text-sm font-medium">
+                        <Label htmlFor={`cat-${c.key}`} className="text-base font-medium">
                           {t(c.labelKey as any)}
                         </Label>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                           {t(c.descriptionKey as any)}
                         </p>
                       </div>
                       <Switch
                         id={`cat-${c.key}`}
                         checked={c.enabled}
-                        disabled={!prefs.masterEnabled}
+                        disabled={!prefs.masterEnabled || saving}
                         onCheckedChange={(v) => setCategory(c.key, v)}
                         data-testid={`email-category-${c.key}`}
                       />
@@ -212,27 +228,21 @@ export default function NotificationSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t('emailPrefs.languageTitle')}</CardTitle>
-                <CardDescription>{t('emailPrefs.languageHint')}</CardDescription>
-              </CardHeader>
-            </Card>
+            <details className="rounded-lg border bg-muted/30 p-5">
+              <summary className="cursor-pointer font-medium">{t('redesign.personal.emailDetails')}</summary>
+              <div className="mt-4 space-y-5 text-sm leading-relaxed text-muted-foreground">
+                <div><h2 className="mb-1 font-medium text-foreground">{t('emailPrefs.languageTitle')}</h2><p>{t('emailPrefs.languageHint')}</p></div>
+                <div><h2 className="mb-1 font-medium text-foreground">{t('emailPrefs.alwaysTitle')}</h2><p>{t('emailPrefs.alwaysHint')}</p></div>
+              </div>
+            </details>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t('emailPrefs.alwaysTitle')}</CardTitle>
-                <CardDescription>{t('emailPrefs.alwaysHint')}</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <div className="flex items-center gap-3">
+            <div className="sticky bottom-20 z-10 flex flex-wrap items-center gap-3 rounded-xl border bg-background/95 p-4 shadow-sm sm:bottom-4">
               <Button onClick={save} disabled={saving || !dirty} data-testid="email-prefs-save">
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {t('emailPrefs.save')}
               </Button>
               {dirty && (
-                <span className="text-xs text-muted-foreground">{t('emailPrefs.unsaved')}</span>
+                <span role="status" className="text-sm text-muted-foreground">{t('emailPrefs.unsaved')}</span>
               )}
             </div>
           </>

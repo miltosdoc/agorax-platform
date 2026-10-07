@@ -5,8 +5,8 @@
  *   1. schema + migration shapes (kind/status CHECKs, pin columns);
  *   2. route gates — upload requires auth + membership, list respects
  *      community content visibility, pinning is admin-only;
- *   3. THE FEED INVARIANT: the global /api/feed must never read
- *      community_media — library items live on the community page only;
+ *   3. THE FEED INVARIANT: only published audio/video from readable
+ *      communities can appear in the activity feed; documents stay in the library;
  *   4. General community activation: auto-enroll on BOTH signup paths.
  */
 
@@ -64,16 +64,20 @@ describe('community library routes', () => {
   });
 });
 
-describe('THE FEED INVARIANT — library media never reaches the global feed', () => {
-  it('/api/feed and the media repo never touch community_media', () => {
-    const mediaRouter = read('server/routers/media.ts');
-    const mediaRepo = read('server/storage/media.ts');
-    expect(mediaRouter).not.toMatch(/communityMedia|community_media/);
-    expect(mediaRepo).not.toMatch(/communityMedia|community_media/);
+describe('library feed visibility contract', () => {
+  it('routes the global feed through the scoped activity repository', () => {
+    expect(read('server/routers/media.ts')).toMatch(/getActivityFeed/);
+    const feed = read('server/storage/activity-feed.ts');
+    expect(feed).toMatch(/eq\(communityMedia.status, 'published'\)/);
+    expect(feed).toMatch(/inArray\(communityMedia.kind, mediaKinds\)/);
+    expect(feed).toMatch(/'podcast', 'video'/);
+    expect(feed).toMatch(/ne\(communities.contentVisibility, 'members'\), member/);
+    expect(feed).toMatch(/where\(and\(\.\.\.common/);
+    expect(feed).toMatch(/source === 'community-media' \? null/);
   });
-
-  it('the community router defines no feed route', () => {
-    expect(read('server/routers/community-media.ts')).not.toMatch(/\/api\/feed/);
+  it('keeps uploads and curation in the community router', () => {
+    expect(read('server/routers/community-media.ts')).toMatch(/isCommunityMember\(communityId, userId\)/);
+    expect(read('server/routers/community-media.ts')).not.toMatch(/app\.get\('\/api\/feed/);
   });
 });
 

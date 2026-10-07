@@ -70,6 +70,7 @@ interface AmendmentsPanelProps {
   proposalId: number;
   proposalStatus: string;
   userIsAuthor?: boolean;
+  allowParticipation?: boolean;
   /**
    * A statute's articles. When set, every amendment names the article it
    * changes, and the merge rewrites only that article.
@@ -77,7 +78,7 @@ interface AmendmentsPanelProps {
   articles?: TextSection[] | null;
 }
 
-export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, articles }: AmendmentsPanelProps) {
+export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, articles, allowParticipation = true }: AmendmentsPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [amendments, setAmendments] = useState<Amendment[]>([]);
@@ -95,7 +96,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
   // Every comment on every amendment of this proposal, keyed by amendment id.
   const [comments, setComments] = useState<Record<number, AmendmentComment[]>>({});
   // Discussion outlives the amendment phase — it stays open through the vote.
-  const canComment = isDebateOpen(proposalStatus);
+  const canComment = allowParticipation && isDebateOpen(proposalStatus);
 
   const refresh = () =>
     api.get<Amendment[]>(`/api/proposals/${proposalId}/amendments`)
@@ -120,7 +121,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
   }
 
   async function castVote(amendmentId: number, vote: 1 | -1, current: number) {
-    if (!user || voting[amendmentId]) return;
+    if (!user || !allowParticipation || voting[amendmentId]) return;
     setVoting(prev => ({ ...prev, [amendmentId]: true }));
     try {
       // Toggle off if clicking the same vote again.
@@ -137,7 +138,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
     }
   }
 
-  const canSubmit = ['draft', 'author_review', 'community_signal'].includes(proposalStatus);
+  const canSubmit = allowParticipation && ['draft', 'author_review', 'community_signal'].includes(proposalStatus);
 
   // An amendment on a counter-proposal takes the counter's article, so the
   // choice is only asked of a top-level amendment.
@@ -179,11 +180,11 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
   // amendment is what pulls the text into the AI merge, so this decision must
   // be reachable from the amendment itself, not only from a separate page.
   const canReviewTopLevel = (a: Amendment) =>
-    !!user && !!userIsAuthor && a.parentAmendmentId == null && !a.authorDecision && reviewablePhase;
+    allowParticipation && !!user && !!userIsAuthor && a.parentAmendmentId == null && !a.authorDecision && reviewablePhase;
 
   // The counter-proposal's author judges the amendments on their counter.
   const canReviewChild = (child: Amendment, parent: Amendment | undefined) =>
-    !!user && !!parent && parent.authorId === user.id && !child.authorDecision && reviewablePhase;
+    allowParticipation && !!user && !!parent && parent.authorId === user.id && !child.authorDecision && reviewablePhase;
 
   async function reviewAmendment(a: Amendment, decision: 'accepted' | 'rejected') {
     if (reviewing[a.id]) return;
@@ -423,7 +424,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
                           </Button>
                         </div>
                       )}
-                      {user && (
+                      {user && allowParticipation && (
                         <div className="flex items-center gap-1">
                           <Button
                             size="sm"
@@ -526,7 +527,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
                                     </Button>
                                   </>
                                 )}
-                                {user && (
+                                {user && allowParticipation && (
                                   <div className="flex items-center gap-1">
                                     <Button
                                       size="sm"
@@ -652,12 +653,11 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
                 children: [],
               })),
             }}
-            onAction={(id, action) => {
-              const status = action === 'accept' ? 'accepted' : 'rejected';
-              api.put(`/api/proposals/${proposalId}/amendments/${id}/review`, { status })
-                .then(() => refresh())
-                .catch(() => {});
-            }}
+            onAction={allowParticipation && userIsAuthor && reviewablePhase ? (id, action) => {
+              const amendment = amendments.find((row) => row.id === id);
+              if (!amendment || !canReviewTopLevel(amendment)) return;
+              void reviewAmendment(amendment, action === 'accept' ? 'accepted' : 'rejected');
+            } : undefined}
           />
         )}
       </CardContent>

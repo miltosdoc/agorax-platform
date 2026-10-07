@@ -8,6 +8,7 @@ import HomePage from "@/pages/home-page";
 import LandingPage from "@/pages/landing-page";
 import AuthPage from "@/pages/auth-page";
 import Header from "@/components/layout/header";
+import AppShell from "@/components/layout/AppShell";
 import Footer from "@/components/layout/footer";
 import ProfilePage from "@/pages/profile-page";
 import HowItWorksPage from "@/pages/how-it-works";
@@ -81,25 +82,19 @@ function ProposalFormPage({ editId }: { editId?: number }) {
   const fromArticlesRaw = params.get('fromArticles');
   const fromArticlesOf = fromArticlesRaw && /^\d+$/.test(fromArticlesRaw) ? parseInt(fromArticlesRaw, 10) : undefined;
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
+    <AppShell>
+      <div className="mx-auto max-w-3xl">
         <ProposalForm communityId={communityId} editProposalId={editId} fromPostId={fromPostId} fromArticlesOf={fromArticlesOf} />
       </div>
-      <Footer />
-    </div>
+    </AppShell>
   );
 }
 
 function CommunityFormPage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <div className="container mx-auto py-6 px-4 max-w-3xl flex-grow">
-        <CommunityForm />
-      </div>
-      <Footer />
-    </div>
+    <AppShell>
+      <div className="mx-auto max-w-3xl"><CommunityForm /></div>
+    </AppShell>
   );
 }
 
@@ -166,9 +161,7 @@ function AppRouter() {
         <Route path="/surveys/create">
           <Redirect to="/proposals/new" />
         </Route>
-        <Route path="/surveys/:id/edit">
-          <Redirect to="/home" />
-        </Route>
+        <ProtectedRoute path="/surveys/:id/edit" component={SurveyCreatePage} />
         <Route path="/surveys/:id" component={SurveyDetailPage} />
         <ProtectedRoute path="/analytics" component={AnalyticsDashboard} />
         <ProtectedRoute path="/admin/accounts" component={AdminAccountsPage} />

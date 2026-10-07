@@ -1,221 +1,88 @@
-import { useMemo, useState } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
-import AppShell from "@/components/layout/AppShell";
-import { useTranslation } from "@/hooks/use-translation";
-import { useAuth } from "@/hooks/use-auth";
-import { DiscoveryRail } from "@/components/rails/discovery-rail";
-import { AgoraFeedRail } from "@/components/rails/agora-feed-rail";
-import { CommunityCard, type CommunityCardData } from "@/components/cards/community-card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearch } from 'wouter';
+import { Plus, Search, Users, Compass, ArrowUpDown, X, Clock3 } from 'lucide-react';
+import AppShell from '@/components/layout/AppShell';
+import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/hooks/use-auth';
+import { useCommunityDirectory } from '@/hooks/use-community-membership';
+import { CommunityCard, type CommunityCardData } from '@/components/cards/community-card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-/** The browse filters of the comps. 'all' is not a stored category. */
-const CATEGORIES = [
-  "all", "koinonia", "perivallon", "politiki", "politismos", "oikonomia", "allilengyi", "ygeia",
-] as const;
-
+const CATEGORIES = ['all', 'koinonia', 'perivallon', 'politiki', 'politismos', 'oikonomia', 'allilengyi', 'ygeia'] as const;
 const SORTS = [
-  { key: "suggested", labelKey: "communities.sortSuggested" },
-  { key: "newest", labelKey: "communities.sortNewest" },
-  { key: "oldest", labelKey: "communities.sortOldest" },
-  { key: "largest", labelKey: "communities.sortLargest" },
-  { key: "smallest", labelKey: "communities.sortSmallest" },
+  { key: 'suggested', labelKey: 'communities.sortSuggested' },
+  { key: 'newest', labelKey: 'communities.sortNewest' },
+  { key: 'largest', labelKey: 'communities.sortLargest' },
 ] as const;
-
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 8;
+const searchable = (value: string) => value.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export default function CommunitiesPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const [category, setCategory] = useState<string>("all");
-  const [sort, setSort] = useState<string>("suggested");
-  const [page, setPage] = useState(0);
-
-  const { data: communities, isLoading } = useQuery<CommunityCardData[]>({
-    queryKey: ["/api/communities"],
-  });
-
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [sort, setSort] = useState('suggested');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const directory = useCommunityDirectory();
+  const urlSearch = useSearch();
+  useEffect(() => {
+    const view = new URLSearchParams(urlSearch).get('view');
+    if (directory.isLoading || (view !== 'mine' && view !== 'discover')) return;
+    document.getElementById(view === 'mine' ? 'my-communities-heading' : 'discover-communities-heading')?.scrollIntoView({ block: 'start' });
+  }, [urlSearch, directory.isLoading]);
+  const all = directory.data ?? [];
+  const mine = all.filter((community) => community.viewerIsMember);
+  const pending = all.filter((community) => !community.viewerIsMember && community.viewerJoinStatus === 'pending');
+  const searchMatches = (community: CommunityCardData) => {
+    const query = searchable(search.trim());
+    const normalized = searchable(`${community.name} ${community.description ?? ''} ${community.tagline ?? ''} ${community.region ?? ''}`);
+    return (!query || normalized.includes(query)) && (category === 'all' || community.category === category);
+  };
+  const filteredMine = mine.filter(searchMatches);
   const filtered = useMemo(() => {
-    const list = (communities ?? []).filter(
-      (c) => category === "all" || c.category === category,
-    );
+    const query = searchable(search.trim());
+    const list = all.filter((community) => !community.viewerIsMember &&
+      (category === 'all' || community.category === category) &&
+      (!query || searchable(`${community.name} ${community.description ?? ''} ${community.tagline ?? ''} ${community.region ?? ''}`).includes(query)));
+    return [...list].sort((a, b) => sort === 'newest'
+      ? new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      : sort === 'largest' ? (b.memberCount ?? 0) - (a.memberCount ?? 0)
+      : (b.activeProposalCount ?? 0) - (a.activeProposalCount ?? 0) || (b.memberCount ?? 0) - (a.memberCount ?? 0));
+  }, [directory.data, search, category, sort]);
+  const loadingCards = <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2" aria-busy="true">{[0, 1].map((i) => <div key={i} className="h-64 animate-pulse rounded-2xl border border-line bg-sunken" />)}</div>;
+  const resetFilters = () => { setSearch(''); setCategory('all'); setVisibleCount(PAGE_SIZE); };
 
-    const byDate = (c: CommunityCardData) =>
-      c.createdAt ? new Date(c.createdAt).getTime() : 0;
-
-    switch (sort) {
-      case "newest":
-        return [...list].sort((a, b) => byDate(b) - byDate(a));
-      case "oldest":
-        return [...list].sort((a, b) => byDate(a) - byDate(b));
-      case "largest":
-        return [...list].sort((a, b) => (b.memberCount ?? 0) - (a.memberCount ?? 0));
-      case "smallest":
-        return [...list].sort((a, b) => (a.memberCount ?? 0) - (b.memberCount ?? 0));
-      default:
-        // "Suggested" is liveliness — where something is actually happening —
-        // rather than an opaque score. Members break the tie.
-        return [...list].sort(
-          (a, b) =>
-            (b.proposalCount ?? 0) - (a.proposalCount ?? 0) ||
-            (b.memberCount ?? 0) - (a.memberCount ?? 0),
-        );
-    }
-  }, [communities, category, sort]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-
-  return (
-    <AppShell
-      breadcrumb={[{ label: t('communities.allCommunities') }]}
-      leftRail={<DiscoveryRail />}
-      rightRail={<AgoraFeedRail />}
-      actions={
-        user ? (
-          <Link
-            href="/communities/new"
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-medium text-paper transition-colors duration-[120ms] hover:bg-kyanos-deep"
-            data-testid="button-create-community"
-          >
-            <Plus className="h-4 w-4" />
-            {t('communities.create')}
-          </Link>
-        ) : undefined
-      }
-    >
-      {/* ── Hero ──
-          The comps mark this slot "ΚΕΝΤΡΙΚΟ BANNER ΣΕΛΙΔΑΣ + TAGLINE". It
-          carries the platform's real tagline rather than the placeholder: a
-          banner that says "banner" is a wireframe instruction, not content. */}
-      <section className="mb-8 rounded-sm border border-line bg-kyanos-wash px-6 py-12 text-center sm:px-10 sm:py-16">
-        <h1 className="font-serif text-3xl leading-tight text-ink sm:text-4xl">
-          {t('nav.communities')}
-        </h1>
-        <p className="mx-auto mt-3 max-w-[52ch] text-sm leading-relaxed text-ink-soft sm:text-base">
-          {t('footer.tagline')}
-        </p>
-      </section>
-
-      {/* ── Browse by category ── */}
-      <h2 className="mb-3 font-serif text-xl text-ink">{t('communities.browseByCategory')}</h2>
-
-      <div className="mb-5 flex flex-wrap items-center gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5" role="tablist" aria-label={t('communities.browseByCategory')}>
-          {CATEGORIES.map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={category === key}
-              onClick={() => { setCategory(key); setPage(0); }}
-              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors duration-[120ms] ${
-                category === key
-                  ? "bg-ink text-paper"
-                  : "border border-line text-ink-soft hover:bg-sunken hover:text-ink"
-              }`}
-              data-testid={`filter-category-${key}`}
-            >
-              {t(`category.${key}`)}
-            </button>
-          ))}
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-full border border-line px-3.5 text-xs text-ink-soft transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken hover:text-ink"
-              data-testid="button-sort"
-            >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              {t('communities.sort')}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-sm border-line">
-            {SORTS.map((option) => (
-              <DropdownMenuItem
-                key={option.key}
-                onClick={() => { setSort(option.key); setPage(0); }}
-                className={`cursor-pointer ${sort === option.key ? "font-semibold text-kyanos" : ""}`}
-                data-testid={`sort-${option.key}`}
-              >
-                {t(option.labelKey)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+  return <AppShell breadcrumb={[{ label: t('nav.communities') }]} actions={user ? <Link href="/communities/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-kyanos px-4 text-sm font-semibold text-white hover:bg-kyanos-deep" data-testid="button-create-community"><Plus className="h-4 w-4" />{t('communities.create')}</Link> : undefined}>
+    <header className="mb-6">
+      <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{t('nav.communities')}</h1>
+      <p className="mt-2 max-w-2xl text-base leading-relaxed text-ink-soft">{t('communities.pageHelp')}</p>
+    </header>
+    <div className="mb-8 space-y-3 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+      <label className="relative block">
+        <span className="sr-only">{t('communities.searchLabel')}</span>
+        <Search className="pointer-events-none absolute left-3.5 top-3.5 h-5 w-5 text-ink-faint" />
+        <Input type="search" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(PAGE_SIZE); }} placeholder={t('communities.searchPlaceholder')} className="h-12 rounded-xl pl-11 text-base" data-testid="search-communities" />
+      </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Select value={category} onValueChange={(value) => { setCategory(value); setVisibleCount(PAGE_SIZE); }}><SelectTrigger className="h-11 rounded-xl sm:flex-1" aria-label={t('communities.browseByCategory')} data-testid="filter-community-category"><SelectValue /></SelectTrigger><SelectContent>{CATEGORIES.map((key) => <SelectItem key={key} value={key}>{t(`category.${key}`)}</SelectItem>)}</SelectContent></Select>
+        <Select value={sort} onValueChange={(value) => { setSort(value); setVisibleCount(PAGE_SIZE); }}><SelectTrigger className="h-11 rounded-xl sm:w-56" aria-label={t('communities.sort')} data-testid="button-sort"><ArrowUpDown className="mr-2 h-4 w-4" /><SelectValue /></SelectTrigger><SelectContent>{SORTS.map((option) => <SelectItem key={option.key} value={option.key}>{t(option.labelKey)}</SelectItem>)}</SelectContent></Select>
+        {(search || category !== 'all') && <button type="button" onClick={resetFilters} className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 text-sm text-ink-soft hover:text-ink"><X className="h-4 w-4" />{t('communities.clearFilters')}</button>}
       </div>
-
-      <p className="mb-3 text-xs text-ink-faint" data-testid="text-community-count">
-        {t('communities.count').replace('{count}', String(filtered.length))}
-      </p>
-
-      {/* ── Grid ── */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-80 animate-pulse rounded-sm border border-line bg-sunken" />
-          ))}
-        </div>
-      ) : visible.length === 0 ? (
-        <p className="rounded-sm border border-dashed border-line px-6 py-16 text-center text-sm text-ink-faint">
-          {t('communities.noResults')}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="grid-communities">
-          {visible.map((community) => (
-            <CommunityCard key={community.id} community={community} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Pagination ──
-          Drawn only when there is more than one page. The comps show "1 2 3 …
-          99"; with 18 communities that would be a fiction, so the control
-          reflects the real count. */}
-      {pageCount > 1 && (
-        <nav className="mt-8 flex items-center justify-center gap-1" aria-label="Pagination">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={safePage === 0}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken disabled:opacity-40"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          {Array.from({ length: pageCount }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setPage(i)}
-              aria-current={i === safePage ? "page" : undefined}
-              className={`inline-flex h-8 min-w-8 items-center justify-center rounded-sm px-2 font-mono text-xs tabular-nums transition-colors duration-[120ms] ${
-                i === safePage ? "bg-ink text-paper" : "text-ink-soft hover:bg-sunken"
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-            disabled={safePage >= pageCount - 1}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-ink-soft transition-colors duration-[120ms] hover:bg-sunken disabled:opacity-40"
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </nav>
-      )}
-    </AppShell>
-  );
+    </div>
+    {directory.isError ? <div className="rounded-2xl border border-line bg-surface p-6" role="alert"><p className="text-ink-soft">{t('communities.loadError')}</p><button type="button" onClick={() => void directory.refetch()} className="mt-3 min-h-11 rounded-xl bg-kyanos px-4 text-sm font-medium text-white">{t('membership.retry')}</button></div> : <>
+      <section className="mb-10" aria-labelledby="my-communities-heading">
+        <div className="mb-4 flex items-center gap-3"><Users className="h-6 w-6 text-kyanos" /><h2 id="my-communities-heading" className="text-2xl font-semibold text-ink">{t('communities.my')}</h2>{mine.length > 0 && <span className="rounded-full bg-kyanos-wash px-2.5 py-1 text-sm font-medium text-kyanos">{mine.length}</span>}</div>
+        {directory.isLoading ? loadingCards : filteredMine.length ? <div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2" data-testid="grid-my-communities">{filteredMine.map((community) => <CommunityCard key={community.id} community={community} />)}</div> : <div className="rounded-2xl border border-dashed border-line bg-surface p-6 text-base leading-relaxed text-ink-soft">{user ? (mine.length ? t('communities.noResults') : t('communities.noMemberships')) : <><p>{t('communities.signInHelp')}</p><Link href="/auth?returnTo=%2Fcommunities" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-kyanos px-4 text-sm font-semibold text-white">{t('auth.login')}</Link></>}</div>}
+      </section>
+      {pending.length > 0 && !search && category === 'all' && <section className="mb-10"><h2 className="mb-3 flex items-center gap-2 text-xl font-semibold text-ink"><Clock3 className="h-5 w-5 text-ink-soft" />{t('communities.pendingTitle')}</h2><div className="flex flex-wrap gap-2">{pending.map((community) => <Link key={community.id} href={`/communities/${community.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm text-ink">{community.name}<span className="text-ink-faint">· {t('membership.pendingShort')}</span></Link>)}</div></section>}
+      <section aria-labelledby="discover-communities-heading">
+        <div className="mb-2 flex items-center gap-3"><Compass className="h-6 w-6 text-kyanos" /><h2 id="discover-communities-heading" className="text-2xl font-semibold text-ink">{t('communities.discover')}</h2></div>
+        <p className="mb-5 text-base text-ink-soft">{t('communities.discoverHelp')}</p>
+        <p className="mb-3 text-sm text-ink-faint" data-testid="text-community-count">{t('communities.count', { count: filtered.length })}</p>
+        {directory.isLoading ? loadingCards : filtered.length ? <><div className="grid grid-cols-1 gap-4 min-[700px]:grid-cols-2" data-testid="grid-communities">{filtered.slice(0, visibleCount).map((community) => <CommunityCard key={community.id} community={community} />)}</div>{visibleCount < filtered.length && <button type="button" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="mt-5 min-h-11 w-full rounded-xl border border-line bg-surface px-4 text-base font-medium text-ink hover:bg-sunken">{t('communities.showMore')}</button>}</> : <p className="rounded-2xl border border-dashed border-line p-6 text-base text-ink-soft">{t('communities.noResults')}</p>}
+      </section>
+    </>}
+  </AppShell>;
 }

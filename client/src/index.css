@@ -45,14 +45,13 @@
     --bc-ink: #F2F6FA;     --bc-ink-soft: #93A6BA;
     --bc-yper: #56A96E;    --bc-kata: #C75A50;   --bc-apochi: #66788C;  --bc-live: #D0342C;
     /* ── Type ── */
-    /* Tektur for titles, whose squared letters answer the logo's; Play for
-       the smaller headings and all text. Both carry full Greek. */
-    --font-display: "Tektur", "Play", system-ui, sans-serif;
-    --font-heading: "Play", Inter, system-ui, sans-serif;
-    --font-ui:      "Play", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* A familiar UI face keeps Greek body copy and headings easy to scan. */
+    --font-display: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-heading: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-ui:      system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-data:    "IBM Plex Mono", Menlo, Consolas, monospace;
-    --display-weight: 500;
-    --heading-weight: 400;
+    --display-weight: 650;
+    --heading-weight: 600;
     /* ── Space (4px base) ── */
     --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem; --sp-4: 1rem;
     --sp-6: 1.5rem;  --sp-8: 2rem;   --sp-12: 3rem;   --sp-16: 4rem; --sp-24: 6rem;
@@ -539,15 +538,16 @@
     font-size: 16px;
   }
 
-  /* Desktop renders ~10% smaller. At 100% browser zoom the UI otherwise
-     reads as over-sized with a mouse; phones keep the full 16px base.
-     Everything is rem-based, so this scales text, spacing and controls
-     together — equivalent to viewing the desktop at ~90% zoom. */
-  @media (min-width: 768px) {
-    html {
-      font-size: 14.5px;
-    }
+  /* Text stays at the same comfortable size on desktop, tablet and phone. */
+  html { scroll-padding-top: 100px; }
+
+  :focus-visible {
+    outline: 2px solid var(--kyanos);
+    outline-offset: 3px;
   }
+
+  img, video { max-width: 100%; }
+  [role="dialog"] { overflow-wrap: anywhere; }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
@@ -610,9 +610,7 @@
     font-size: 1rem;
   }
 
-  /* 44px touch targets on touch devices only. On desktop (a fine pointer)
-     controls keep their natural sizing — the global 44px minimum made the
-     whole UI read as zoomed-in with a mouse. */
+  /* Tablet and phone controls remain easy to touch in both orientations. */
   @media (pointer: coarse) {
     button, a, [role="button"] {
       min-height: 44px;
@@ -738,5 +736,127 @@
       border-top-left-radius: 1rem;
       border-top-right-radius: 1rem;
     }
+  }
+}
+
+
+@layer components {
+  .platform-shell {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+  }
+  .platform-skip-link {
+    position: fixed;
+    top: 8px;
+    left: 16px;
+    z-index: 100;
+    transform: translateY(-160%);
+    border-radius: 8px;
+    background: var(--kyanos);
+    color: white;
+    padding: 12px 20px;
+  }
+  .platform-skip-link:focus { transform: translateY(0); }
+  .platform-body {
+    display: grid;
+    flex: 1;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 16px 32px;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 28px;
+  }
+  .platform-navigation { display: none; min-width: 0; }
+  .platform-navigation-sticky {
+    position: sticky;
+    top: 92px;
+    max-height: calc(100dvh - 112px);
+    overflow-y: auto;
+    padding: 4px 0 24px;
+    scrollbar-width: thin;
+  }
+  .platform-navigation-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.35;
+    transition: background var(--t-fast), color var(--t-fast);
+  }
+  .platform-navigation-link:hover { background: var(--sunken); }
+  .platform-navigation-link-active {
+    background: var(--kyanos-wash);
+    color: var(--kyanos);
+    font-weight: 650;
+  }
+  .platform-navigation-create {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px 6px 28px;
+    border-radius: 999px;
+    background: var(--kyanos);
+    color: hsl(var(--accent-foreground));
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .platform-navigation-create:hover { background: var(--kyanos-deep); }
+  .platform-navigation-communities {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+  }
+  .platform-community-shortcuts {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 14px 0 2px;
+    scrollbar-width: thin;
+  }
+  .platform-main { width: 100%; padding: 24px 0 32px; }
+  .platform-context { min-width: 0; padding-bottom: 24px; }
+  .platform-context-disclosure > summary::-webkit-details-marker { display: none; }
+  .platform-bottom-navigation { display: block; }
+  .platform-header [data-testid="search-input"] { height: 44px; border-radius: 999px; }
+  .platform-header p { margin-bottom: 0; }
+  .platform-navigation p { margin-bottom: 0; }
+
+  @media (min-width: 900px) {
+    .platform-shell { padding-bottom: 0; }
+    .platform-bottom-navigation { display: none; }
+    .platform-body { grid-template-columns: 64px minmax(0, 1fr); padding-top: 24px; }
+    .platform-navigation { display: block; }
+    .platform-navigation-label, .platform-navigation-communities { display: none; }
+    .platform-navigation-link { justify-content: center; padding: 12px; }
+    .platform-navigation-create { margin-left: 6px; margin-right: 6px; }
+    .platform-community-shortcuts { display: none; }
+    .platform-main { padding-top: 4px; }
+    .platform-context { grid-column: 2; }
+  }
+  @media (min-width: 1100px) {
+    .platform-body { grid-template-columns: 232px minmax(0, 1fr); padding: 28px 24px 40px; gap: 32px; }
+    .platform-navigation-label, .platform-navigation-communities { display: block; }
+    .platform-navigation-link { justify-content: flex-start; padding: 12px 14px; }
+  }
+  @media (min-width: 1440px) {
+    .platform-body-with-context { max-width: 1480px; grid-template-columns: 232px minmax(0, 1fr) 272px; gap: 28px; }
+    .platform-body-with-context .platform-context { grid-column: 3; grid-row: 1; padding-top: 4px; }
+  }
+}
+
+@layer components {
+  /* Pages that use Header/Footer directly still clear the tablet bottom bar. */
+  @media (max-width: 899px) {
+    .platform-footer { margin-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+    .platform-shell .platform-footer { margin-bottom: 0; }
+    .platform-header [data-testid="button-theme"] { width: 44px; height: 44px; }
   }
 }

@@ -85,7 +85,7 @@ export function FeedbackWidget() {
       <Button
         type="button"
         size="sm"
-        className="fixed bottom-20 sm:bottom-6 right-4 z-40 shadow-lg gap-2"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] min-[900px]:bottom-6 right-4 z-40 shadow-lg gap-2"
         onClick={() => setOpen(true)}
         data-testid="feedback-open"
       >

@@ -1,0 +1,45 @@
+{
+  "steps": [
+    {
+      "name": "login preserves surveys return destination",
+      "url": "http://localhost:3001/surveys"
+    },
+    {
+      "name": "creates local draft",
+      "pollId": 13,
+      "generator": "fallback"
+    },
+    {
+      "name": "saved draft reload hydrates title and all editable questions"
+    },
+    {
+      "name": "edits save and survive reload; fixed quality questions preserved"
+    },
+    {
+      "name": "mobile draft editor has no horizontal overflow"
+    },
+    {
+      "name": "publishes the existing edited draft",
+      "status": "live"
+    },
+    {
+      "name": "published draft cannot reopen as editable"
+    },
+    {
+      "name": "community poll link presets poll kind and custom answers"
+    },
+    {
+      "name": "mobile community poll form has no horizontal overflow"
+    }
+  ],
+  "screenshots": [
+    "/private/tmp/agorax-survey-ui-verification/surveys-hub-desktop.png",
+    "/private/tmp/agorax-survey-ui-verification/survey-draft-desktop.png",
+    "/private/tmp/agorax-survey-ui-verification/survey-draft-mobile.png",
+    "/private/tmp/agorax-survey-ui-verification/survey-published-mobile.png",
+    "/private/tmp/agorax-survey-ui-verification/community-poll-desktop.png",
+    "/private/tmp/agorax-survey-ui-verification/community-poll-mobile.png"
+  ],
+  "errors": [],
+  "ok": true
+}

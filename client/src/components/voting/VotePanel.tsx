@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -119,6 +119,9 @@ interface VotePanelProps {
   articleBallot?: unknown;
   /** Where a new co-drafting for articles that did not pass is filed. */
   communityId?: number;
+  /** Presentation gate only; the server remains authoritative for voting. */
+  canParticipate?: boolean;
+  joinAction?: ReactNode;
   onVoteResultsChange?: (results: VoteResults) => void;
   onProposalAdvanced?: (newStatus: string) => void;
 }
@@ -132,6 +135,8 @@ export default function VotePanel({
   ballotOptions: ballotOptionsProp,
   articleBallot: articleBallotProp,
   communityId,
+  canParticipate = true,
+  joinAction,
   onVoteResultsChange,
   onProposalAdvanced,
 }: VotePanelProps) {
@@ -418,7 +423,7 @@ export default function VotePanel({
 
   // Anonymous mode is one-shot — no "change vote" path. For pseudonymous,
   // members can re-cast and that flips superseded_by_id server-side.
-  const showVoteButtons = isVoting && (!userVoted || (changing && !isAnonymous));
+  const showVoteButtons = isVoting && canParticipate && (!userVoted || (changing && !isAnonymous));
 
   return (
     <Card data-testid="vote-panel">
@@ -498,7 +503,8 @@ export default function VotePanel({
             {tk('vote.phaseHint') || 'Φάση: Ψηφοφορία. Η δεσμευτική ψήφος γίνεται στο τελικό κείμενο. Όταν ο συγγραφέας ή ένας διαχειριστής οριστικοποιήσει την ψηφοφορία, η πρόταση μεταβαίνει στο «Αποφασίστηκε» ή στο «Αρχειοθετήθηκε» (αν δεν καλύφθηκε η απαρτία ή δεν υπήρξε αποφασιστική ψήφος).'}
           </div>
         )}
-        {!user && isVoting && (
+        {!canParticipate && isVoting && joinAction && <div className="rounded-xl border border-line bg-surface p-4"><p className="mb-3 text-sm text-ink-soft">{t('proposal.joinToVote')}</p>{joinAction}</div>}
+        {!user && isVoting && !joinAction && (
           <div className="p-3 bg-muted rounded text-sm text-muted-foreground">
             {t('auth.loginToVote')}
           </div>
@@ -704,7 +710,7 @@ export default function VotePanel({
                 )}
               </span>
             </div>
-            {isVoting && !isAnonymous && (
+            {isVoting && canParticipate && !isAnonymous && (
               <Button variant="outline" size="sm" onClick={() => setChanging(true)} data-testid="vote-change">
                 {t('vote.changeVote')}
               </Button>
@@ -778,7 +784,9 @@ export default function VotePanel({
 
         {/* Ballot-box fingerprint — copyable, with a link to the public audit. */}
         {box && (
-          <div className="rounded-md border bg-muted/20 p-3 space-y-1.5" data-testid="ballot-box-fingerprint">
+          <details className="rounded-xl border border-line bg-surface p-4">
+            <summary className="min-h-11 cursor-pointer text-sm font-medium text-ink">{t('proposal.verifyVote')}</summary>
+          <div className="pt-3 space-y-1.5" data-testid="ballot-box-fingerprint">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Fingerprint className="w-4 h-4 text-muted-foreground" />
               <span>{t('vote.boxTitle')}</span>
@@ -819,6 +827,7 @@ export default function VotePanel({
               </a>
             </div>
           </div>
+          </details>
         )}
 
         {isVoting && userIsAuthor && (

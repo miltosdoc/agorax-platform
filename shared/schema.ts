@@ -954,8 +954,8 @@ export const platformSettings = pgTable("platform_settings", {
 // the user takes that script to NotebookLM (or similar) externally to
 // produce media, then uploads the result here. The proposal author
 // curates: any community member can submit, but the author can feature,
-// hide, or delete. The "featured" entry is what appears in the global
-// /feed and on the public share routes.
+// hide, or delete. Published audio/video also appear in visibility-filtered
+// activity feeds; featuring chooses the proposal's public share preview.
 export const proposalMedia = pgTable("proposal_media", {
   id: serial("id").primaryKey(),
   proposalId: integer("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
@@ -976,9 +976,9 @@ export const proposalMedia = pgTable("proposal_media", {
 }));
 
 // ─── Community Media (Βιβλιοθήκη κοινότητας) ────────────────────────────────
-// Media posted INSIDE a community — audio, video, documents — deliberately
-// decoupled from proposals and from the global /feed. Items live on the
-// community page only, gated by the community's contentVisibility.
+// Media posted INSIDE a community — audio, video, documents — independently
+// of proposals. Published audio/video also appear in activity feeds, gated
+// by the community's contentVisibility; documents stay in the library.
 // Founder/admins can pin items to the top of the library ("start here"
 // material). Kind reuses the proposal-media vocabulary so the upload
 // validation pipeline (media-rules.ts) is shared.

@@ -20,7 +20,7 @@ import {
   AlertCircle, BarChart3, ChevronDown, FileText, Loader2, Paperclip, Plus,
   ScrollText, Sparkles, UserCheck, Vote, X,
 } from 'lucide-react';
-import { useLocation } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 import { ThumbnailPicker } from "@/components/thumbnails/Thumbnail";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 export function ProposalForm({ communityId, editProposalId, fromPostId, fromArticlesOf }: ProposalFormProps) {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { t, locale } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,7 +160,9 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
   const [aiFilled, setAiFilled] = useState(false);
 
   // What is being voted. Chosen at creation; a draft keeps its kind.
-  const [kind, setKind] = useState<ProposalKind>('decision');
+  const [kind, setKind] = useState<ProposalKind>(() => editProposalId
+    ? 'decision'
+    : proposalKindOf(new URLSearchParams(search).get('kind')));
   const kinds = useMemo(() => enabledKinds(targetCommunity), [targetCommunity]);
   const rules = voteRulesFor(targetCommunity, kind);
   const votingMin = rules.minHours;
@@ -167,7 +170,10 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
   // Switching to a community that does not hold this kind falls back to a
   // decision, which every community holds.
   useEffect(() => {
-    if (!editProposalId && targetCommunity && !kinds.includes(kind)) setKind('decision');
+    if (!editProposalId && targetCommunity && !kinds.includes(kind)) {
+      setKind('decision');
+      setUseOptions(false);
+    }
   }, [editProposalId, targetCommunity, kinds, kind]);
   // Deliberation is opt-in. The track follows from the switch *and* the
   // kind, so switching to an election can never leave a deliberation track
@@ -186,7 +192,7 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
 
   // Yes/no or the author's own options. An election always has options (its
   // candidates); a poll starts with them because most polls are a choice.
-  const [useOptions, setUseOptions] = useState(false);
+  const [useOptions, setUseOptions] = useState(kind === 'poll');
   const [voteOptions, setVoteOptions] = useState<string[]>(['', '']);
   const optionBallot = kindRequiresOptions(kind) || useOptions;
   const showsOptions = optionBallot || collecting;
