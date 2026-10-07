@@ -29,13 +29,13 @@ import path from 'path';
 import express from 'express';
 import { mediaRepo, proposalRepo, communityRepo } from '../storage';
 import { db } from '../db';
-import { users } from '@shared/schema';
-import { inArray } from 'drizzle-orm';
+import { proposals, communities, users, surveyPolls } from '@shared/schema';
+import { desc, eq, inArray, notInArray } from 'drizzle-orm';
 import { getActivityFeed } from '../storage/activity-feed';
 import { decodeFeedCursor, type FeedKind, type FeedScope, type FeedStage } from '@shared/activity-feed';
 import { requireAuth } from '../auth';
 import { probeMedia, extractVideoThumbnail } from '../utils/media-probe';
-import { canViewProposal, requireProposalContentAccess } from '../utils/community-visibility';
+import { canViewProposal, requireProposalContentAccess, visibleCommunityIdSet } from '../utils/community-visibility';
 import { generatePodcastScript, generateTeaserScript } from '../utils/media-scripts';
 import { logger } from '../utils/logger';
 import { notifyFileLost } from '../utils/notifications';
@@ -414,8 +414,120 @@ export function registerMediaRoutes(app: Express): void {
     }
   });
 
+  // Legacy native feed: retain numeric cursors and the existing response shape.
+  // ── Global feed ──────────────────────────────────────────────────────
+  // type=podcast|video      → media only, cursor-paginated (original behavior)
+  // type=proposal|survey    → that stream only, newest first
+  // type omitted / 'all'    → unified stream: media + non-draft proposals +
+  //                           live/closed survey polls, merged by date.
+  // Every item carries feedType so the client can render the right card.
+
+  app.get('/api/feed', async (req, res) => {
+    try {
+      const kindRaw = (req.query.type as string | undefined);
+      const kind = kindRaw === 'podcast' || kindRaw === 'video' ? kindRaw : undefined;
+      const cursorRaw = req.query.cursor as string | undefined;
+      const cursor = cursorRaw ? parseInt(cursorRaw, 10) : undefined;
+      const limit = req.query.limit ? Math.min(50, parseInt(req.query.limit as string, 10)) : 20;
+
+      if (kind) {
+        const rows = await mediaRepo.feed({ kind, cursor: Number.isFinite(cursor!) ? cursor : undefined, limit });
+        const withFiles = filterMissingFiles(rows).filter((r) => !r.fileMissing);
+        const filtered = await filterMediaByCommunityVisibility(withFiles, (req as any).user?.id);
+        res.json({
+          items: filtered.map((r) => ({ feedType: 'media' as const, ...r })),
+          nextCursor: filtered.length === limit ? filtered[filtered.length - 1].id : null,
+        });
+        return;
+      }
+
+      const wantProposals = kindRaw === undefined || kindRaw === 'all' || kindRaw === 'proposal';
+      const wantSurveys = kindRaw === undefined || kindRaw === 'all' || kindRaw === 'survey';
+      const wantMedia = kindRaw === undefined || kindRaw === 'all';
+
+      const [mediaRows, proposalRows, surveyRows] = await Promise.all([
+        wantMedia ? mediaRepo.feed({ limit: 20 }).then((rows) => filterMissingFiles(rows).filter((x) => !x.fileMissing)) : Promise.resolve([]),
+        wantProposals
+          ? db.select({
+              id: proposals.id,
+              question: proposals.question,
+              solution: proposals.solution,
+              status: proposals.status,
+              kind: proposals.kind,
+              thumbnailKey: proposals.thumbnailKey,
+              createdAt: proposals.createdAt,
+              communityId: proposals.communityId,
+              communityName: communities.name,
+              authorName: users.name,
+            })
+            .from(proposals)
+            .innerJoin(communities, eq(proposals.communityId, communities.id))
+            .innerJoin(users, eq(proposals.authorId, users.id))
+            .where(notInArray(proposals.status, ['draft', 'archived']))
+            .orderBy(desc(proposals.createdAt))
+            .limit(20)
+          : Promise.resolve([]),
+        wantSurveys
+          ? db.select()
+              .from(surveyPolls)
+              .where(inArray(surveyPolls.status, ['live', 'closed']))
+              .orderBy(desc(surveyPolls.createdAt))
+              .limit(20)
+          : Promise.resolve([]),
+      ]);
+
+      // Per-community content visibility: drop items from members-only
+      // communities the viewer doesn't belong to.
+      const viewerId = (req as any).user?.id;
+      const visibleMediaRows = await filterMediaByCommunityVisibility(mediaRows, viewerId);
+      const visibleSet = await visibleCommunityIdSet(proposalRows.map((p) => p.communityId), viewerId);
+      const visibleProposalRows = proposalRows.filter((p) => visibleSet.has(p.communityId));
+      const visibleSurveyCommunities = await visibleCommunityIdSet(
+        surveyRows.map((s) => s.communityId).filter((id): id is number => id !== null), viewerId,
+      );
+      const visibleSurveyRows = surveyRows.filter((s) => s.communityId === null || visibleSurveyCommunities.has(s.communityId));
+
+      const items = [
+        ...visibleMediaRows.map((r: any) => ({ feedType: 'media' as const, sortAt: r.createdAt, ...r })),
+        ...visibleProposalRows.map((p) => ({
+          feedType: 'proposal' as const,
+          sortAt: p.createdAt,
+          id: p.id,
+          question: p.question,
+          solution: p.solution?.slice(0, 200) ?? '',
+          status: p.status,
+          kind: p.kind,
+          thumbnailKey: p.thumbnailKey,
+          createdAt: p.createdAt,
+          communityId: p.communityId,
+          communityName: p.communityName,
+          authorName: p.authorName,
+        })),
+        ...visibleSurveyRows.map((s) => ({
+          feedType: 'survey' as const,
+          sortAt: s.createdAt,
+          id: s.id,
+          title: s.title,
+          topicTag: s.topicTag,
+          tier: s.tier,
+          status: s.status,
+          createdAt: s.createdAt,
+        })),
+      ]
+        .sort((a, b) => new Date(b.sortAt as any).getTime() - new Date(a.sortAt as any).getTime())
+        .slice(0, limit > 20 ? limit : 40)
+        .map(({ sortAt, ...rest }) => rest);
+
+      res.json({ items, nextCursor: null });
+    } catch (err: any) {
+      logger.error('feed failed', { err: err?.message });
+      res.status(500).json({ message: 'failed to load feed' });
+    }
+  });
+
+  // Web activity feed uses opaque cursors on its own endpoint.
   // Published activity is scoped and visibility-filtered before pagination.
-  app.get('/api/feed', async (req: any, res) => {
+  app.get('/api/activity-feed', async (req: any, res) => {
     try {
       const kind = String(req.query.type ?? 'all');
       const scope = String(req.query.scope ?? 'all');
@@ -486,6 +598,29 @@ export function registerMediaRoutes(app: Express): void {
       logger.error('share route failed', { err: err?.message });
       next();
     }
+  });
+}
+
+/**
+ * Feed helper: keep only media rows whose proposal's community content the
+ * viewer may read. Draft, missing and unlinked proposals never enter the feed.
+ */
+async function filterMediaByCommunityVisibility<T extends { proposalId?: number | null }>(
+  rows: T[],
+  viewerId?: number,
+): Promise<T[]> {
+  const proposalIds = Array.from(new Set(rows.map((r) => r.proposalId).filter((x): x is number => !!x)));
+  if (proposalIds.length === 0) return [];
+  const linkRows = await db
+    .select({ id: proposals.id, communityId: proposals.communityId, status: proposals.status })
+    .from(proposals)
+    .where(inArray(proposals.id, proposalIds));
+  const communityByProposal = new Map(linkRows.filter((r) => r.status !== 'draft').map((r) => [r.id, r.communityId]));
+  const visible = await visibleCommunityIdSet(Array.from(communityByProposal.values()), viewerId);
+  return rows.filter((r) => {
+    if (!r.proposalId) return false;
+    const cid = communityByProposal.get(r.proposalId);
+    return cid !== undefined && visible.has(cid);
   });
 }
 

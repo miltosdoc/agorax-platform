@@ -143,6 +143,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
       if (fileRef.current) fileRef.current.value = '';
       await load();
       await queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
     } catch (err: any) {
       toast({ title: t('library.uploadFailed'), description: err?.message, variant: 'destructive' });
     } finally {
@@ -155,6 +156,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
       await api.patch(`/api/communities/${communityId}/media/${item.id}`, { pinned: !item.pinned });
       await load();
       await queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
     } catch (err: any) {
       toast({ title: t('library.actionFailed'), description: err?.message, variant: 'destructive' });
     }
@@ -166,6 +168,7 @@ export function CommunityLibrary({ communityId, isMember, canManage, contentHidd
       await api.delete(`/api/communities/${communityId}/media/${item.id}`);
       await load();
       await queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
     } catch (err: any) {
       toast({ title: t('library.actionFailed'), description: err?.message, variant: 'destructive' });
     }

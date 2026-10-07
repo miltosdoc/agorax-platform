@@ -55,7 +55,7 @@ export function useCommunityMembership(communityId: number) {
       void client.invalidateQueries({ predicate: (query) => {
         const path = String(query.queryKey[0]);
         return path.startsWith('/api/communities') || path.startsWith('/api/community') ||
-          path.startsWith('/api/feed') || path.startsWith('/api/discovery') ||
+          path.startsWith('/api/feed') || path.startsWith('/api/activity-feed') || path.startsWith('/api/discovery') ||
           path.startsWith('/api/proposals') || path.startsWith('/api/user/communities') ||
           path.startsWith('/api/surveys') || path.startsWith('/api/media');
       } });

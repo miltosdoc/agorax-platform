@@ -86,6 +86,7 @@ export function MediaUploadDialog({ kind: initialKind = 'video', communityId, pr
       await uploadProposalFile(file, url, title.trim());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['/api/feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] }),
         queryClient.invalidateQueries({ queryKey: [`/api/communities/${selectedCommunity}/media`] }),
         ...(selectedProposal ? [queryClient.invalidateQueries({ queryKey: [`/api/proposals/${selectedProposal}/media`] })] : []),
       ]);

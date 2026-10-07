@@ -83,22 +83,22 @@ export default function FeedPage() {
     window.history.replaceState(null, '', `/feed${params.size ? `?${params}` : ''}`);
   }, [scope, stage, kind, community, term]);
   const query = useInfiniteQuery({
-    queryKey: ['/api/feed', { viewer: user?.id, scope, stage, kind, community, q: term }],
+    queryKey: ['/api/activity-feed', { viewer: user?.id, scope, stage, kind, community, q: term }],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({ scope, stage, type: kind, limit: '8' });
       if (pageParam) params.set('cursor', pageParam);
       if (community) params.set('community', community);
       if (term) params.set('q', term);
-      return (await api.get<ActivityPage>(`/api/feed?${params}`)).data;
+      return (await api.get<ActivityPage>(`/api/activity-feed?${params}`)).data;
     },
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!user,
   });
   const items = Array.from(new Map((query.data?.pages.flatMap(page => page.items) ?? []).map(item => [item.feedKey, item])).values());
   const openTopics = useQuery({
-    queryKey: ['/api/feed', 'open-topics', user?.id],
-    queryFn: async () => (await api.get<ActivityPage>('/api/feed?scope=mine&stage=active&type=proposal&limit=3')).data,
+    queryKey: ['/api/activity-feed', 'open-topics', user?.id],
+    queryFn: async () => (await api.get<ActivityPage>('/api/activity-feed?scope=mine&stage=active&type=proposal&limit=3')).data,
     enabled: !!user,
   });
   const reset = () => { setSearch(''); setCommunity(''); setKind('all'); setStage('active'); };

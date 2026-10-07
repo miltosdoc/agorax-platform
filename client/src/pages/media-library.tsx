@@ -67,13 +67,13 @@ export default function MediaLibraryPage({ kind }: { kind: 'podcast' | 'video' }
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250); return () => window.clearTimeout(timer); }, [search]);
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery<ActivityPage>({
-    queryKey: ['/api/feed', 'media-shelf', kind, scope, debouncedSearch, { viewerId: user?.id ?? 0 }],
+    queryKey: ['/api/activity-feed', 'media-shelf', kind, scope, debouncedSearch, { viewerId: user?.id ?? 0 }],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({ type: kind, scope, limit: '12' });
       if (pageParam) params.set('cursor', String(pageParam));
       if (debouncedSearch) params.set('q', debouncedSearch);
-      const response = await fetch(`/api/feed?${params}`, { credentials: 'include' });
+      const response = await fetch(`/api/activity-feed?${params}`, { credentials: 'include' });
       if (!response.ok) throw new Error(t('redesignMedia.loadError'));
       return response.json();
     },

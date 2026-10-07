@@ -630,6 +630,7 @@ export function MediaStudioPanel({ proposalId, userIsAuthor, communityId, canPar
               onChange={() => {
                 void refresh();
                 void queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+                void queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
                 void queryClient.invalidateQueries({ queryKey: [`/api/proposals/${proposalId}/media`] });
               }}
             />
