@@ -83,7 +83,7 @@ export default function HomePage() {
   const directory = useCommunityDirectory();
   const communities = (directory.data ?? []).filter((community) => community.viewerIsMember);
   const proposalQuery = useQuery<Proposal[]>({ queryKey: ['/api/proposals', { viewerId: user?.id ?? 0 }], queryFn: async () => (await apiRequest('GET', '/api/proposals')).json(), enabled: !!user });
-  const activeQuery = useQuery<ActivityPage>({ queryKey: ['/api/activity-feed', { scope: 'mine', type: 'proposal', stage: 'active', limit: 4, viewerId: user?.id ?? 0 }], enabled: !!user });
+  const activeQuery = useQuery<ActivityPage>({ queryKey: ['/api/activity-feed', { scope: 'mine', type: 'proposal', stage: 'active', limit: 4, viewerId: user?.id ?? 0 }], staleTime: 0, enabled: !!user });
   const bodiesQuery = useQuery<SortitionBody[]>({ queryKey: ['/api/sortition/my-bodies', { viewerId: user?.id ?? 0 }], enabled: !!user });
   const myProposals = (proposalQuery.data ?? []).filter((proposal) => proposal.authorId === user?.id).sort((a, b) => Number(b.status === 'draft') - Number(a.status === 'draft') || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const activeBodies = (bodiesQuery.data ?? []).filter((body) => !['completed', 'archived'].includes(body.status));

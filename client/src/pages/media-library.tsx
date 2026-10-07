@@ -68,6 +68,7 @@ export default function MediaLibraryPage({ kind }: { kind: 'podcast' | 'video' }
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250); return () => window.clearTimeout(timer); }, [search]);
   const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery<ActivityPage>({
     queryKey: ['/api/activity-feed', 'media-shelf', kind, scope, debouncedSearch, { viewerId: user?.id ?? 0 }],
+    staleTime: 0,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams({ type: kind, scope, limit: '12' });

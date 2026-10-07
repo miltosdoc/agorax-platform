@@ -597,6 +597,13 @@ export function MediaStudioPanel({ proposalId, userIsAuthor, communityId, canPar
     }
   }, [proposalId]);
 
+  const onMediaChanged = useCallback(() => {
+    void refresh();
+    void queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
+    void queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
+    void queryClient.invalidateQueries({ queryKey: [`/api/proposals/${proposalId}/media`] });
+  }, [proposalId, queryClient, refresh]);
+
   useEffect(() => {
     refresh().finally(() => setLoading(false));
   }, [refresh]);
@@ -627,18 +634,13 @@ export function MediaStudioPanel({ proposalId, userIsAuthor, communityId, canPar
               media={m}
               userIsAuthor={userIsAuthor}
               currentUserId={user?.id}
-              onChange={() => {
-                void refresh();
-                void queryClient.invalidateQueries({ queryKey: ['/api/feed'] });
-                void queryClient.invalidateQueries({ queryKey: ['/api/activity-feed'] });
-                void queryClient.invalidateQueries({ queryKey: [`/api/proposals/${proposalId}/media`] });
-              }}
+              onChange={onMediaChanged}
             />
           ))}
         </CardContent>
       </Card>
-      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('media.documentTitle')}</summary><div className="pt-4"><DocumentUploadCard proposalId={proposalId} onUploaded={refresh} /></div></details>}
-      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('proposal.mediaTools')}</summary><div className="grid gap-4 pt-4 md:grid-cols-2"><MediaKindCard proposalId={proposalId} kind="podcast" onUploaded={refresh} /><MediaKindCard proposalId={proposalId} kind="video" onUploaded={refresh} /></div></details>}
+      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('media.documentTitle')}</summary><div className="pt-4"><DocumentUploadCard proposalId={proposalId} onUploaded={onMediaChanged} /></div></details>}
+      {user && canParticipate && <details className="rounded-2xl border border-line bg-surface p-4"><summary className="min-h-11 cursor-pointer text-base font-medium text-ink">{t('proposal.mediaTools')}</summary><div className="grid gap-4 pt-4 md:grid-cols-2"><MediaKindCard proposalId={proposalId} kind="podcast" onUploaded={onMediaChanged} /><MediaKindCard proposalId={proposalId} kind="video" onUploaded={onMediaChanged} /></div></details>}
     </div>
   );
 }
