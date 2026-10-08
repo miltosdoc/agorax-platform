@@ -398,6 +398,72 @@ export function sendSecurityEmailInBackground(args: SecurityMailArgs): void {
   });
 }
 
+// ─── Notice-and-action mail ──────────────────────────────────────────────────
+// Transactional correspondence. Notification preferences and the optional
+// email deployment switch do not apply. The caller durably records each
+// attempt; no tracking secret, complaint text or recipient enters the jobs
+// table. A receipt can be retried without retaining a raw tracking token.
+export interface ContentNoticeMailArgs {
+  reference: string;
+  kind: 'acknowledgement' | 'decision' | 'affected_user';
+  locale: 'el' | 'en';
+  email?: string | null;
+  recipientUserId?: number | null;
+  contentUrl?: string;
+  outcome?: 'no_action' | 'action_taken' | 'more_information';
+  reason?: string;
+  basis?: string;
+  measure?: string | null;
+}
+
+export async function sendContentNoticeEmail(args: ContentNoticeMailArgs): Promise<'sent' | 'unavailable' | 'failed'> {
+  if (!isMailConfigured()) return 'unavailable';
+  let to = args.email;
+  let locale = args.locale;
+  if (args.kind === 'affected_user') {
+    const recipient = args.recipientUserId ? await loadRecipient(args.recipientUserId) : null;
+    if (!recipient) return 'unavailable';
+    to = recipient.email;
+    locale = recipient.locale;
+  }
+  if (!to) return 'unavailable';
+  const english = locale === 'en';
+  const statusUrl = `${publicUrl()}/report-content`;
+  const reviewUrl = args.kind === 'affected_user'
+    ? `${statusUrl}?relatedReference=${encodeURIComponent(args.reference)}${args.contentUrl ? `&contentUrl=${encodeURIComponent(args.contentUrl)}` : ''}`
+    : statusUrl;
+  const heading = args.kind === 'acknowledgement'
+    ? (english ? 'Content notice received' : 'Παραλάβαμε την αναφορά περιεχομένου')
+    : (english ? 'Content notice decision' : 'Απόφαση για αναφορά περιεχομένου');
+  const lines = [heading, `${english ? 'Reference' : 'Αριθμός αναφοράς'}: ${args.reference}`];
+  if (args.kind === 'acknowledgement') {
+    lines.push(english ? 'Your notice is recorded and awaits human review. Keep the tracking key shown after submission.'
+      : 'Η αναφορά καταχωρίστηκε και αναμένει ανθρώπινη εξέταση. Φυλάξτε το κλειδί παρακολούθησης που εμφανίστηκε μετά την υποβολή.');
+  } else if (args.kind === 'affected_user') {
+    // The admin's reason goes to the affected member, without disclosing
+    // who reported the content or reproducing the original notice.
+    const outcome = { no_action: english ? 'No action' : 'Χωρίς μέτρο', action_taken: english ? 'Measure performed' : 'Εφαρμόστηκε μέτρο',
+      more_information: english ? 'More information requested' : 'Ζητούνται περισσότερες πληροφορίες' };
+    lines.push(`${english ? 'Outcome' : 'Αποτέλεσμα'}: ${args.outcome ? outcome[args.outcome] : ''}`,
+      `${english ? 'Reason' : 'Αιτιολογία'}: ${args.reason ?? ''}`, `${english ? 'Legal or terms basis' : 'Νομική βάση ή όροι χρήσης'}: ${args.basis ?? ''}`);
+    if (args.measure) lines.push(`${english ? 'Measure already performed' : 'Μέτρο που έχει ήδη εφαρμοστεί'}: ${args.measure}`);
+    lines.push(english ? 'You can request review by submitting a new notice with this related reference. Do not include another person’s private details.'
+      : 'Μπορείτε να ζητήσετε επανεξέταση με νέα αναφορά και αυτόν τον σχετικό αριθμό αναφοράς. Μην συμπεριλαμβάνετε ιδιωτικά στοιχεία άλλου προσώπου.');
+  } else {
+    // Reporter addresses have not been verified. Sensitive decision detail
+    // remains behind the tracking key, never in an unsolicited email.
+    lines.push(english ? 'A human reviewer recorded a decision. Use your saved tracking key to read the reasons and request review.'
+      : 'Ένας άνθρωπος εξέτασε την αναφορά και καταχώρισε απόφαση. Χρησιμοποιήστε το κλειδί παρακολούθησης για την αιτιολογία και αίτημα επανεξέτασης.');
+  }
+  lines.push(`${english ? 'Tracking and review' : 'Παρακολούθηση και επανεξέταση'}: ${reviewUrl}`);
+  const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
+  try {
+    const result = await sendMail({ to, subject: `AgoraX — ${heading}`, text: lines.join('\n\n'),
+      html: lines.map(line => `<p>${escape(line)}</p>`).join('') });
+    return result.ok ? 'sent' : result.reason === 'not_configured' ? 'unavailable' : 'failed';
+  } catch { return 'failed'; }
+}
+
 // ─── Optional mail ──────────────────────────────────────────────────────────
 
 export type OptionalTemplate =

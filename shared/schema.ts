@@ -2071,3 +2071,53 @@ export type InsertDemocracyAchievement = InferInsertModel<typeof democracyAchiev
 // Tables live in their own file to keep this one navigable; re-exported here
 // so drizzle-kit and `import * as schema from '@shared/schema'` pick them up.
 export * from "./polling-schema";
+
+// Public illegal-content notices. A submission records a concern, never a
+// removal instruction. The tracking secret itself is never stored.
+export const contentNotices = pgTable('content_notices', {
+  reference: text('reference').primaryKey(),
+  trackingTokenHash: text('tracking_token_hash').notNull(),
+  contentUrl: text('content_url').notNull(),
+  name: text('name'),
+  email: text('email'),
+  explanation: text('explanation').notNull(),
+  category: text('category').notNull().default('illegal_content'),
+  locale: text('locale').notNull().default('el'),
+  goodFaith: boolean('good_faith').notNull(),
+  relatedReference: text('related_reference'),
+  status: text('status').notNull().default('received'),
+  outcome: text('outcome'),
+  reason: text('reason'),
+  basis: text('basis'),
+  measure: text('measure'),
+  affectedUserId: integer('affected_user_id').references(() => users.id, { onDelete: 'set null' }),
+  reviewedBy: integer('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
+  emailStatus: text('email_status').notNull().default('unavailable'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ contentNoticesPendingIdx: index('content_notices_pending_idx').on(table.status, table.createdAt) }));
+
+export const contentNoticeEvents = pgTable('content_notice_events', {
+  id: serial('id').primaryKey(),
+  noticeReference: text('notice_reference').notNull().references(() => contentNotices.reference),
+  event: text('event').notNull(),
+  actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  details: jsonb('details').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ contentNoticeEventsReferenceIdx: index('content_notice_events_reference_idx').on(table.noticeReference, table.id) }));
+
+export const contentNoticeEmails = pgTable('content_notice_emails', {
+  id: serial('id').primaryKey(),
+  noticeReference: text('notice_reference').notNull().references(() => contentNotices.reference),
+  kind: text('kind').notNull(),
+  recipientUserId: integer('recipient_user_id').references(() => users.id, { onDelete: 'set null' }),
+  // Decision snapshot for a retry; contains no reporter identity, complaint
+  // text or tracking token. SMTP is in-process, never a queued job.
+  payload: jsonb('payload').notNull().default({}),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, table => ({ contentNoticeEmailsReferenceIdx: index('content_notice_emails_reference_idx').on(table.noticeReference, table.id) }));
+
+export type ContentNoticeRecord = InferSelectModel<typeof contentNotices>;

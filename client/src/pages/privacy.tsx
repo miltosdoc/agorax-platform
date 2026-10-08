@@ -2,6 +2,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Separator } from "@/components/ui/separator";
+import { LEGAL_NOTICE_VERSION } from "@shared/legal-notice-version";
 
 /**
  * Privacy Notice — Art. 13 transparency.
@@ -15,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
  * Bilingual (el / en) — switches on the active locale.
  */
 
-const LAST_UPDATED = "2026-05-25";
+const LAST_UPDATED = LEGAL_NOTICE_VERSION;
 
 export default function PrivacyPage() {
   const { locale } = useTranslation();
@@ -41,8 +42,8 @@ export default function PrivacyPage() {
             <div className="bg-muted p-6 rounded-lg mt-8 text-sm">
               <p className="text-muted-foreground">
                 {isEnglish
-                  ? `Last updated: ${LAST_UPDATED}. We will notify members of material changes by email and in-app banner.`
-                  : `Τελευταία ενημέρωση: ${LAST_UPDATED}. Θα ενημερώσουμε τα μέλη για ουσιαστικές αλλαγές μέσω email και ενδοεφαρμογικού banner.`}
+                  ? `Last updated: ${LAST_UPDATED}. Signed-in members see an in-app notice of material changes. Recorded consent versions are separate.`
+                  : `Τελευταία ενημέρωση: ${LAST_UPDATED}. Τα συνδεδεμένα μέλη βλέπουν ενημέρωση μέσα στην εφαρμογή για ουσιαστικές αλλαγές. Οι καταγεγραμμένες εκδόσεις συγκατάθεσης είναι χωριστές.`}
               </p>
             </div>
           </div>
@@ -93,6 +94,14 @@ function GreekContent() {
           <li>
             <strong className="text-foreground">Συγκατάθεση:</strong> έκδοση κειμένου, hash κειμένου, γλώσσα,
             χρόνος αποδοχής — Άρθρο 7 ΓΚΠΔ.
+          </li>
+          <li>
+            <strong className="text-foreground">Αναφορές περιεχομένου:</strong> σύνδεσμος περιεχομένου,
+            εξήγηση και στοιχεία που παρέχετε, όνομα και email επικοινωνίας, αριθμός αναφοράς,
+            ιστορικό εξέτασης και αποφάσεων, αποτελέσματα αποστολής email και hash του ιδιωτικού
+            κλειδιού παρακολούθησης. Στην ειδική κατηγορία αναφορών πιθανής σεξουαλικής κακοποίησης
+            παιδιών μπορείτε να παραλείψετε όνομα και email. Η διαδικασία λειτουργεί χωρίς λογαριασμό.
+            Υποβάλετε μόνο τα απαραίτητα στοιχεία· μη στέλνετε παράνομο υλικό ή περιττά ευαίσθητα δεδομένα.
           </li>
         </ul>
         <p className="mt-3">
@@ -157,6 +166,10 @@ function GreekContent() {
             <strong className="text-foreground">Άρθρο 9(2)(δ):</strong> καρβ-άουτ μη κερδοσκοπικής
             ένωσης — επικουρική βάση για την επεξεργασία πολιτικών απόψεων μελών.
           </li>
+          <li>
+            <strong className="text-foreground">Άρθρο 6(1)(γ):</strong> εξέταση αναφορών παράνομου
+            περιεχομένου και ενημέρωση για αποφάσεις, για συμμόρφωση με τις σχετικές νομικές υποχρεώσεις.
+          </li>
         </ul>
       </section>
 
@@ -172,6 +185,18 @@ function GreekContent() {
           <li>
             <strong className="text-foreground">Google OAuth (προαιρετικό):</strong> εάν επιλέξετε σύνδεση
             μέσω Google, μοιράζεστε email, όνομα, provider id. Δείτε τους όρους της Google.
+          </li>
+          <li>
+            <strong className="text-foreground">Αναφορές περιεχομένου:</strong> ο φάκελος είναι
+            διαθέσιμος στη διαχείριση για ανθρώπινη εξέταση. Η ιδιωτική παρακολούθηση παρέχει
+            κατάσταση και απόφαση μόνο με τον αριθμό αναφοράς και το ιδιωτικό κλειδί.
+            Τα στοιχεία επικοινωνίας και το κείμενο της αναφοράς δεν δημοσιεύονται ούτε
+            διαβιβάζονται στον συντάκτη του αναφερόμενου περιεχομένου από αυτή τη διαδικασία.
+          </li>
+          <li>
+            <strong className="text-foreground">Πάροχος email:</strong> όταν έχει ρυθμιστεί η αποστολή,
+            λαμβάνει τη διεύθυνση παραλήπτη και την επιβεβαίωση ή ενημέρωση της υπόθεσης.
+            Η αναφορά αποθηκεύεται ακόμη και αν το email δεν μπορεί να αποσταλεί.
           </li>
           <li>
             <strong className="text-foreground">Καμία μεταφορά εκτός ΕΟΧ.</strong>
@@ -197,6 +222,7 @@ function GreekContent() {
           <li>Συγκατάθεση: επ' αόριστον (αρχείο audit — απόδειξη νομιμότητας).</li>
           <li>IP / αναγνωριστικά συσκευής: 12 μήνες κυλιόμενα.</li>
           <li>Αιτήματα διαγραφής: επ' αόριστον (αρχείο συμμόρφωσης).</li>
+          <li>Αναφορές περιεχομένου: όσο απαιτείται για εξέταση, επανεξέταση και τυχόν νομικές αξιώσεις. Η διαχείριση επανεξετάζει περιοδικά την ανάγκη διατήρησης· η διαγραφή δεν είναι αυτόματη.</li>
         </ul>
       </section>
 
@@ -315,6 +341,13 @@ function EnglishContent() {
             <strong className="text-foreground">Consent record:</strong> notice version, text hash, locale,
             acceptance timestamp — Art. 7 GDPR.
           </li>
+          <li>
+            <strong className="text-foreground">Content notices:</strong> content link, explanation
+            and evidence you provide, contact name and email, reference, review and decision history,
+            email delivery results and a hash of the private tracking key. Name and email may be
+            omitted for the specific category of suspected child sexual abuse. No account is required.
+            Provide only necessary information; do not send illegal material or unnecessary sensitive data.
+          </li>
         </ul>
         <p className="mt-3">
           <strong className="text-foreground">We do NOT store:</strong> your ID-card number, parents'
@@ -378,6 +411,10 @@ function EnglishContent() {
             <strong className="text-foreground">Art. 9(2)(d):</strong> not-for-profit association carve-out
             — secondary basis for processing members' political opinions.
           </li>
+          <li>
+            <strong className="text-foreground">Art. 6(1)(c):</strong> reviewing illegal-content
+            notices and communicating decisions to comply with the relevant legal obligations.
+          </li>
         </ul>
       </section>
 
@@ -393,6 +430,17 @@ function EnglishContent() {
           <li>
             <strong className="text-foreground">Google OAuth (optional):</strong> if you sign in via
             Google, you share email, name, provider id. See Google's terms.
+          </li>
+          <li>
+            <strong className="text-foreground">Content notices:</strong> administrators access
+            the case for human review. Private tracking provides status and decision only with
+            the reference and private key. Contact details and the notice text are not published
+            or forwarded to the reported content's author through this workflow.
+          </li>
+          <li>
+            <strong className="text-foreground">Email provider:</strong> when sending is configured,
+            receives the recipient address and case acknowledgement or update. The notice is
+            saved even if email cannot be sent.
           </li>
           <li>
             <strong className="text-foreground">No transfers outside the EEA.</strong>
@@ -417,6 +465,7 @@ function EnglishContent() {
           <li>Consent record: indefinite (audit trail — proof of lawfulness).</li>
           <li>IP / device fingerprints: 12 months rolling.</li>
           <li>Erasure requests: indefinite (compliance record).</li>
+          <li>Content notices: as needed for handling, review and any legal claims. Administrators periodically review the need to retain them; deletion is not automatic.</li>
         </ul>
       </section>
 

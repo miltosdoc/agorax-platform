@@ -129,6 +129,7 @@ export default function Footer() {
             <Link href="/walkthrough" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.userGuide')}</Link>
             <Link href="/privacy" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.privacy')}</Link>
             <Link href="/terms" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos">{t('footer.terms')}</Link>
+            <Link href="/report-content" className="inline-flex min-h-11 items-center text-ink-soft hover:text-kyanos" data-testid="link-report-content">{locale === 'en' ? 'Report content' : 'Αναφορά περιεχομένου'}</Link>
             <Link href="/support" className="inline-flex min-h-11 items-center gap-2 font-medium text-kyanos" data-testid="link-donate"><Heart className="h-4 w-4" />{t('footer.donate')}</Link>
           </nav>
         </div>

@@ -1,6 +1,6 @@
 # Ενημέρωση για την Επεξεργασία Προσωπικών Δεδομένων / Privacy Notice
 
-**Version 2026-05-25** — bilingual (el / en). Bilingual presence required by Art. 13 transparency for a Greek-language platform with English-speaking members.
+**Version 2026-10-08** — bilingual (el / en). The published notice version is separate from the consent version recorded when a member accepted the consent text.
 
 ---
 
@@ -22,6 +22,9 @@
 | Πολιτικές απόψεις (**ειδική κατηγορία**) | Ψήφοι, σχόλια, προτάσεις, αντιπροτάσεις | **Άρθρο 9(2)(α) ρητή συγκατάθεση** + 9(2)(δ) μη κερδοσκοπικός σκοπός |
 | Άμυνα κατά κατάχρησης | IP, αναγνωριστικό συσκευής, ιστορικό συνδέσεων | Άρθρο 6(1)(στ) — έννομο συμφέρον |
 | Συγκατάθεση | Έκδοση, hash κειμένου, γλώσσα, χρόνος αποδοχής | Άρθρο 6(1)(γ) — υποχρέωση τεκμηρίωσης |
+| Αναφορές παράνομου περιεχομένου | Σύνδεσμος, εξήγηση και παρεχόμενα στοιχεία, όνομα/email επικοινωνίας, αριθμός αναφοράς, ιστορικό εξέτασης και αποφάσεων, αποτελέσματα αποστολής email, hash ιδιωτικού κλειδιού παρακολούθησης | Άρθρο 6(1)(γ) — σχετικές υποχρεώσεις εξέτασης αναφορών και ενημέρωσης |
+
+Η αναφορά λειτουργεί χωρίς λογαριασμό. Στην ειδική κατηγορία πιθανής σεξουαλικής κακοποίησης παιδιών μπορεί να παραλειφθεί όνομα και email. Υποβάλετε μόνο αναγκαία στοιχεία, χωρίς παράνομο υλικό ή περιττά ευαίσθητα δεδομένα. Ο φάκελος είναι διαθέσιμος στη διαχείριση για ανθρώπινη εξέταση. Η ιδιωτική παρακολούθηση απαιτεί αριθμό αναφοράς και ιδιωτικό κλειδί και παρέχει μόνο κατάσταση και απόφαση. Η διαδικασία δεν δημοσιεύει ούτε διαβιβάζει στον συντάκτη τα στοιχεία επικοινωνίας ή το κείμενο του αναφέροντος. Όταν η αποστολή email έχει ρυθμιστεί, ο πάροχος email επεξεργάζεται τη διεύθυνση παραλήπτη και την επιβεβαίωση ή ενημέρωση της υπόθεσης. Αποτυχία αποστολής δεν ακυρώνει την αποθηκευμένη αναφορά.
 
 **Δεν αποθηκεύουμε:** τον αριθμό της αστυνομικής σας ταυτότητας, ονόματα γονέων, διεύθυνση κατοικίας πέραν δήμου, ημερομηνία/τόπο γέννησης, τηλέφωνο, ακριβείς συντεταγμένες GPS. Το ίδιο το αρχείο PDF της Υπεύθυνης Δήλωσης **δεν αποθηκεύεται** — διαβάζεται στη μνήμη, εξάγονται τα παραπάνω hashes και αυτό απορρίπτεται.
 
@@ -56,6 +59,7 @@
 | Συγκατάθεση (αρχείο audit) | Επ' αόριστον (απόδειξη νομιμότητας) |
 | IP / αναγνωριστικά συσκευής | 12 μήνες |
 | Αιτήματα διαγραφής | Επ' αόριστον (αρχείο συμμόρφωσης) |
+| Αναφορές περιεχομένου | Όσο απαιτείται για εξέταση, επανεξέταση και τυχόν νομικές αξιώσεις· περιοδική χειροκίνητη επανεξέταση της ανάγκης διατήρησης από τη διαχείριση, χωρίς αυτόματη διαγραφή |
 
 ### 7. Τα δικαιώματά σας
 
@@ -100,6 +104,9 @@ Right to complain: https://www.imy.se.
 | Political opinions (**special category**) | Votes, comments, proposals, counter-proposals | **Art. 9(2)(a) explicit consent** + 9(2)(d) not-for-profit |
 | Abuse defense | IP address, device fingerprint, login history | Art. 6(1)(f) — legitimate interest |
 | Consent record | Version, text hash, locale, acceptance timestamp | Art. 6(1)(c) — documentation duty |
+| Illegal-content notices | Link, explanation and supplied evidence, contact name/email, reference, review and decision history, email delivery results, private tracking-key hash | Art. 6(1)(c) — relevant notice-handling and communication obligations |
+
+No account is required. Name and email may be omitted for the specific suspected child-sexual-abuse category. Supply only necessary information, without illegal material or unnecessary sensitive data. Administrators access the case for human review. Private tracking requires the reference and private key and provides only status and decision. This workflow does not publish or forward the reporter's contact details or notice text to the content's author. When sending is configured, the email provider processes the recipient address and case acknowledgement or update. A failed email does not invalidate the saved notice.
 
 **We do NOT store:** your ID-card number, parents' names, street address (beyond municipality), date or place of birth, phone number, precise GPS coordinates. The Solemn Declaration PDF itself **is not retained** — it is read in memory, the above hashes are extracted, and the file is discarded.
 
@@ -134,6 +141,7 @@ You may withdraw consent at any time (Art. 7(3)). Withdrawal does not affect the
 | Consent audit record | Indefinite (lawfulness evidence) |
 | IP / device fingerprints | 12 months |
 | Erasure requests | Indefinite (compliance record) |
+| Content notices | As needed for handling, review and any legal claims; administrators periodically review retention manually, without automatic deletion |
 
 ### 7. Your rights
 

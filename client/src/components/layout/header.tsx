@@ -36,7 +36,7 @@ import { initials } from "@/lib/initials";
 /** Compact masthead for the personal shell; standalone pages retain direct links. */
 export default function Header({ compact = false }: { compact?: boolean } = {}) {
   const { user, logoutMutation } = useAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [location, navigate] = useLocation();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -279,6 +279,12 @@ export default function Header({ compact = false }: { compact?: boolean } = {}) 
                       <DropdownMenuItem onClick={() => navigate("/admin/accounts")} className="cursor-pointer" data-testid="menu-admin-accounts">
                         <Users className="mr-2.5 h-4 w-4 text-ink-faint" />
                         {t('nav.adminAccounts')}
+                      </DropdownMenuItem>
+                    )}
+                    {user.isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate("/admin/content-notices")} className="cursor-pointer" data-testid="menu-admin-content-notices">
+                        <FileText className="mr-2.5 h-4 w-4 text-ink-faint" />
+                        {locale === 'en' ? 'Content notices' : 'Αναφορές περιεχομένου'}
                       </DropdownMenuItem>
                     )}
 

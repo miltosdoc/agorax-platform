@@ -20,6 +20,7 @@
 | [ROPA.md](ROPA.md) | ✅ Draft | Record of Processing Activities (Art. 30) |
 | [PRIVACY_NOTICE.md](PRIVACY_NOTICE.md) | ✅ Draft | Privacy Notice (Art. 13) — bilingual el/en; consent text canonical source is `shared/consent.ts` |
 | [INTERNAL_POLICIES.md](INTERNAL_POLICIES.md) | ✅ Draft for sign-off | Access control, retention/deletion (incl. erasure-vs-hash-chain resolution), breach runbook |
+| [CONTENT_NOTICE_OPERATIONS.md](CONTENT_NOTICE_OPERATIONS.md) | Implemented channel; manual handling | Public content notices, private tracking, admin decisions and email retries; existing removal limits and retention duties |
 
 ---
 

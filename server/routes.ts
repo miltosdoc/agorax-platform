@@ -48,6 +48,7 @@ import { registerEmailPrefsRoutes } from "./routers/email-prefs";
 import { registerSurveysRoutes } from "./routers/surveys";
 import { registerMiscRoutes } from "./routers/misc";
 import { registerDiscoveryRoutes } from "./routers/discovery";
+import { registerContentNoticeRoutes } from "./routers/content-notices";
 
 /**
  * Register all application routes.
@@ -80,6 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerEmailPrefsRoutes(app);
   registerSurveysRoutes(app);
   registerDiscoveryRoutes(app);
+  registerContentNoticeRoutes(app);
   registerMiscRoutes(app);
 
   // Create and return the server
@@ -90,4 +92,3 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return server;
 }
-

@@ -18,6 +18,8 @@ interface AppShellProps {
   /** Optional contextual content. It is disclosed on demand, separate from navigation. */
   leftRail?: ReactNode;
   rightRail?: ReactNode;
+  /** Public legal/contact channels stay usable without participation consent. */
+  requireConsent?: boolean;
   children: ReactNode;
 }
 
@@ -32,7 +34,7 @@ function RailRegion({ label, children }: { label: string; children: ReactNode })
   );
 }
 
-export default function AppShell({ title, breadcrumb, actions, leftRail, rightRail, children }: AppShellProps) {
+export default function AppShell({ title, breadcrumb, actions, leftRail, rightRail, requireConsent = true, children }: AppShellProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
   useNotificationStream(!!user);
@@ -80,7 +82,7 @@ export default function AppShell({ title, breadcrumb, actions, leftRail, rightRa
         )}
       </div>
       <Footer />
-      <ConsentInterstitial />
+      {requireConsent && <ConsentInterstitial />}
     </div>
   );
 }

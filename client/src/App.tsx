@@ -17,6 +17,8 @@ import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import AdminAccountsPage from "@/pages/admin-accounts";
+import AdminContentNoticesPage from "@/pages/admin-content-notices";
+import ReportContentPage from "@/pages/report-content";
 import CommunityDashboardPage from "@/pages/community-dashboard";
 import CommunitiesPage from "@/pages/communities";
 import MediaLibraryPage from "@/pages/media-library";
@@ -31,6 +33,7 @@ import VerifyEmailPage from "@/pages/verify-email";
 import UnsubscribePage from "@/pages/unsubscribe";
 import { LocaleSync } from "@/components/auth/LocaleSync";
 import { ThemeSync } from "@/components/auth/ThemeSync";
+import LegalUpdateNotice from "@/components/legal-update-notice";
 import VerifyBallotPage from "@/pages/verify-ballot";
 import InviteAcceptPage from "@/pages/invite-accept";
 import CommunitySettingsPage from "@/pages/community-settings";
@@ -165,6 +168,7 @@ function AppRouter() {
         <Route path="/surveys/:id" component={SurveyDetailPage} />
         <ProtectedRoute path="/analytics" component={AnalyticsDashboard} />
         <ProtectedRoute path="/admin/accounts" component={AdminAccountsPage} />
+        <ProtectedRoute path="/admin/content-notices" component={AdminContentNoticesPage} />
         <ProtectedRoute path="/profile" component={ProfilePage} />
         <Route path="/groups">
           <Redirect to="/communities" />
@@ -211,6 +215,7 @@ function AppRouter() {
         <Route path="/how-it-works" component={HowItWorksPage} />
         <Route path="/faq" component={FAQPage} />
         <Route path="/terms" component={TermsPage} />
+        <Route path="/report-content" component={ReportContentPage} />
         <Route path="/privacy" component={PrivacyPage} />
         <Route component={NotFound} />
       </Switch>
@@ -226,6 +231,7 @@ function App() {
         <AuthProvider>
           <LocaleSync />
           <ThemeSync />
+          <LegalUpdateNotice />
           <AppRouter />
           <FeedbackWidget />
           <Toaster />

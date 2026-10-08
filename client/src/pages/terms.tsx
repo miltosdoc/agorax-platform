@@ -2,6 +2,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Separator } from "@/components/ui/separator";
+import { LEGAL_NOTICE_VERSION } from "@shared/legal-notice-version";
 
 /**
  * Terms of Service.
@@ -16,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
  *  - Privacy details live in /privacy, not here.
  */
 
-const LAST_UPDATED = "2026-08-18";
+const LAST_UPDATED = LEGAL_NOTICE_VERSION;
 
 export default function TermsPage() {
   const { locale } = useTranslation();
@@ -42,8 +43,8 @@ export default function TermsPage() {
             <div className="bg-muted p-6 rounded-lg mt-8 text-sm">
               <p>
                 {isEnglish
-                  ? `Last updated: ${LAST_UPDATED}. Continued use after material updates constitutes acceptance.`
-                  : `Τελευταία ενημέρωση: ${LAST_UPDATED}. Η συνεχιζόμενη χρήση μετά από ουσιαστικές αλλαγές συνιστά αποδοχή.`}
+                  ? `Last updated: ${LAST_UPDATED}. This date identifies the version published on this page.`
+                  : `Τελευταία ενημέρωση: ${LAST_UPDATED}. Η ημερομηνία προσδιορίζει την έκδοση που δημοσιεύεται σε αυτή τη σελίδα.`}
               </p>
             </div>
           </div>
@@ -79,6 +80,7 @@ function GreekTerms() {
           <li>Δικαίωμα προαιρετικής ταυτοποίησης μέσω Gov.gr.</li>
           <li>Υποχρέωση μη μεταβίβασης των στοιχείων σύνδεσής σας — ένα μέλος, ένας λογαριασμός.</li>
           <li>Υποχρέωση τήρησης κοσμιότητας στις διαβουλεύσεις.</li>
+          <li>Υποχρέωση τήρησης της ισχύουσας νομοθεσίας και σεβασμού των δικαιωμάτων τρίτων στο περιεχόμενο που υποβάλλετε.</li>
         </ul>
       </section>
 
@@ -145,11 +147,13 @@ function GreekTerms() {
           <li>Προσπάθεια επαναπροσδιορισμού (re-identification) ψηφοφόρων.</li>
         </ul>
         <p className="mt-4">
-          Ο κατάλογος αυτός είναι <strong className="text-foreground">εξαντλητικός</strong> ως προς το
-          περιεχόμενο των προτάσεων: ο αυτόματος έλεγχος της παραγράφου 3 δεν επιτρέπεται να
-          μπλοκάρει πρόταση για λόγο που δεν αναφέρεται εδώ. Η άσκηση κριτικής — και οξείας — σε
-          πρόσωπα με δημόσιο αξίωμα, σε κόμματα, στον δήμο ή σε οποιονδήποτε θεσμό δεν συνιστά
-          απαγορευμένη πράξη.
+          Ο κατάλογος αυτός είναι <strong className="text-foreground">εξαντλητικός αποκλειστικά
+          ως προς τους λόγους του αυτόματου ελέγχου</strong> της παραγράφου 3: ο έλεγχος αυτός δεν
+          επιτρέπεται να μπλοκάρει πρόταση για λόγο που δεν αναφέρεται εδώ. Δεν περιορίζει την
+          ανθρώπινη εξέταση παράνομου περιεχομένου ή τις υποχρεώσεις της πλατφόρμας βάσει νόμου,
+          όπως περιγράφονται στην παράγραφο 13. Η νόμιμη άσκηση κριτικής — και οξείας — σε πρόσωπα
+          με δημόσιο αξίωμα, σε κόμματα, στον δήμο ή σε οποιονδήποτε θεσμό επιτρέπεται. Η διαφωνία
+          ή η ενόχληση που προκαλεί μια άποψη δεν αρκεί από μόνη της για την αφαίρεσή της.
         </p>
       </section>
 
@@ -160,7 +164,8 @@ function GreekTerms() {
         <p>
           <strong className="text-foreground">Οι ψηφοφορίες είναι συμβουλευτικές</strong> — δεν παράγουν
           δεσμευτικές νομικές πράξεις. Αποτελούν έκφραση της συλλογικής βούλησης των μελών της
-          πλατφόρμας και τροφοδοτούν τη συλλογική συζήτηση.
+          πλατφόρμας και τροφοδοτούν τη συλλογική συζήτηση. Η αποδοχή μιας πρότασης από τα μέλη
+          δεν την καθιστά επίσημη θέση της πλατφόρμας.
         </p>
       </section>
 
@@ -194,8 +199,10 @@ function GreekTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">10. Τροποποίηση των όρων</h2>
         <p>
-          Μπορεί να ενημερώνουμε τους παρόντες όρους περιοδικά. Ουσιαστικές αλλαγές κοινοποιούνται μέσω
-          email και ενδοεφαρμογικού banner. Η συνεχιζόμενη χρήση μετά την αλλαγή συνιστά αποδοχή.
+          Μπορεί να ενημερώνουμε τους παρόντες όρους περιοδικά. Οι αλλαγές δημοσιεύονται σε αυτή
+          τη σελίδα με νέα ημερομηνία έκδοσης. Για τις ουσιαστικές αλλαγές εμφανίζεται ενημέρωση
+          στα συνδεδεμένα μέλη μέσα στην εφαρμογή. Το κλείσιμο της ενημέρωσης δεν καταγράφεται
+          ως συγκατάθεση ή αποδοχή των όρων. Τυχόν συγκατάθεση που απαιτεί ο νόμος ζητείται χωριστά.
         </p>
       </section>
 
@@ -206,6 +213,69 @@ function GreekTerms() {
         <p>
           Για ερωτήσεις σχετικά με τους όρους χρήσης, επικοινωνήστε με τη διαχείριση μέσω της
           πλατφόρμας.
+        </p>
+      </section>
+
+      <Separator />
+
+      <section>
+        <h2 className="text-xl font-semibold text-foreground mb-3">12. Περιεχόμενο χρηστών και ευθύνη της πλατφόρμας</h2>
+        <p className="mb-3">
+          Οι προτάσεις, τροπολογίες, σχόλια και αναρτήσεις των χρηστών εκφράζουν τις απόψεις των
+          συντακτών τους. Κάθε συντάκτης είναι υπεύθυνος για το περιεχόμενο που υποβάλλει και για
+          τα δικαιώματα που απαιτούνται για τη δημοσίευσή του. Η φιλοξενία, η προβολή, η αξιολόγηση
+          ή η ψήφισή του δεν σημαίνει ότι η πλατφόρμα το υιοθετεί ή επιβεβαιώνει την ακρίβεια ή τη
+          νομιμότητά του.
+        </p>
+        <p className="mb-3">
+          Περιεχόμενο που συντάσσει και δημοσιεύει η ίδια η πλατφόρμα ως επίσημη ανακοίνωση ή θέση
+          διακρίνεται από το περιεχόμενο χρηστών. Η χρήση τεχνητής νοημοσύνης για τη σύνταξη τέτοιου
+          περιεχομένου δεν αίρει την ευθύνη της πλατφόρμας για τη δημοσίευσή του. Όταν χρήστης
+          υποβάλλει κείμενο που δημιουργήθηκε με τεχνητή νοημοσύνη, εξακολουθεί να έχει τις ίδιες
+          υποχρεώσεις ως συντάκτης. Αυτόματες βαθμολογίες ή βοηθητικά αποτελέσματα δεν αποτελούν
+          επίσημη θέση ή εγγύηση ακρίβειας.
+        </p>
+        <p>
+          Η ευθύνη της πλατφόρμας κρίνεται από την ισχύουσα νομοθεσία και τον ρόλο της σε κάθε
+          περίπτωση. Οι παρόντες όροι δεν αποκλείουν υποχρεωτικές νομικές ευθύνες ή δικαιώματα
+          χρηστών και δεν παρέχουν γενική απαλλαγή από την ευθύνη για παράνομο περιεχόμενο.
+        </p>
+      </section>
+
+      <Separator />
+
+      <section>
+        <h2 className="text-xl font-semibold text-foreground mb-3">13. Αναφορές περιεχομένου και ανθρώπινη εξέταση</h2>
+        <p className="mb-3">
+          Οποιοσδήποτε μπορεί να αναφέρει περιεχόμενο που θεωρεί παράνομο μέσω της δημόσιας{" "}
+          <a href="/report-content" className="text-primary hover:underline">φόρμας αναφοράς περιεχομένου</a>,
+          χωρίς λογαριασμό ή συμμετοχή στην κοινότητα. Αναφέρετε τον ακριβή σύνδεσμο ή τη θέση
+          του περιεχομένου, εξηγήστε γιατί το θεωρείτε παράνομο και προσθέστε τυχόν στοιχεία που
+          βοηθούν την εξέταση. Η διαφωνία με μια πολιτική άποψη δεν αποτελεί από μόνη της λόγο
+          αναφοράς ως παράνομης.
+        </p>
+        <p className="mb-3">
+          Οι αναφορές εξετάζονται από άνθρωπο. Η εξέταση λαμβάνει υπόψη το περιεχόμενο, το πλαίσιο,
+          τα διαθέσιμα στοιχεία και τα δικαιώματα των εμπλεκομένων, συμπεριλαμβανομένης της
+          ελευθερίας έκφρασης. Όταν η πλατφόρμα αποκτήσει γνώση παράνομου περιεχομένου, ενεργεί
+          χωρίς αδικαιολόγητη καθυστέρηση για την αφαίρεση ή τον αποκλεισμό πρόσβασης σε αυτό,
+          σύμφωνα με τον νόμο. Οι νόμιμες υποχρεώσεις της πλατφόρμας δεν εξαρτώνται από ψηφοφορία
+          της κοινότητας. Η υποβολή αναφοράς δεν αποκρύπτει αυτόματα το περιεχόμενο.
+        </p>
+        <p className="mb-3">
+          Η απόφαση καταγράφεται με αιτιολόγηση, η οποία εξηγεί τα βασικά πραγματικά περιστατικά,
+          τη νομική ή συμβατική βάση και τυχόν περιορισμό που επιβλήθηκε. Η ενημέρωση του αναφέροντος
+          και του συντάκτη γίνεται μέσω διαθέσιμων στοιχείων επικοινωνίας και της πλατφόρμας,
+          με την επιφύλαξη νόμιμων περιορισμών. Κρατήστε τον αριθμό αναφοράς και το ιδιωτικό
+          κλειδί πρόσβασης που παρέχει η φόρμα για να παρακολουθείτε τη συγκεκριμένη υπόθεση.
+        </p>
+        <p>
+          Αν διαφωνείτε με απόφαση σχετικά με αναφορά ή περιορισμό του περιεχομένου σας, μπορείτε
+          να ζητήσετε ανθρώπινη επανεξέταση από την ίδια{" "}
+          <a href="/report-content" className="text-primary hover:underline">φόρμα</a>, αναφέροντας
+          τον αριθμό αναφοράς και τους λόγους της διαφωνίας σας ή νέα στοιχεία. Η δυνατότητα αυτή
+          δεν περιορίζει άλλα μέσα προσφυγής που προβλέπει ο νόμος. Η διαδικασία της παρούσας
+          παραγράφου είναι χωριστή από τον αυτόματο έλεγχο προτάσεων της παραγράφου 3.
         </p>
       </section>
     </>
@@ -236,6 +306,7 @@ function EnglishTerms() {
           <li>Right to optional Gov.gr identity verification.</li>
           <li>Obligation not to share your credentials — one member, one account.</li>
           <li>Obligation to keep deliberation civil.</li>
+          <li>Obligation to comply with applicable law and respect others' rights in the content you submit.</li>
         </ul>
       </section>
 
@@ -302,11 +373,13 @@ function EnglishTerms() {
           <li>Attempting to re-identify other voters.</li>
         </ul>
         <p className="mt-4">
-          As regards the content of proposals this list is
-          <strong className="text-foreground"> exhaustive</strong>: the automated check described in
-          section 3 may not block a proposal on any ground not stated here. Criticism — including
-          harsh criticism — of public office holders, parties, the municipality or any institution is
-          not a prohibited act.
+          This list is <strong className="text-foreground">exhaustive only for the grounds of the
+          automated check</strong> in section 3: that check may not block a proposal on any ground
+          not stated here. It does not limit human review of illegal content or the platform's
+          statutory duties, as described in section 13. Lawful criticism — including harsh
+          criticism — of public office holders, parties, the municipality or any institution is
+          allowed. Disagreement or offence caused by an opinion alone is not sufficient grounds
+          for its removal.
         </p>
       </section>
 
@@ -317,7 +390,8 @@ function EnglishTerms() {
         <p>
           <strong className="text-foreground">Votes are consultative</strong> — they do not produce
           binding legal acts. They express the collective will of the platform's members and feed into
-          the community's deliberation.
+          the community's deliberation. Members' approval of a proposal does not make it an official
+          platform position.
         </p>
       </section>
 
@@ -351,8 +425,10 @@ function EnglishTerms() {
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">10. Changes to these terms</h2>
         <p>
-          We may update these terms from time to time. Material changes are communicated by email and
-          in-app banner. Continued use after a change constitutes acceptance.
+          We may update these terms from time to time. Changes are published on this page with a new
+          version date. Signed-in members see an in-app notice of material changes. Dismissing that
+          notice does not record consent or acceptance of these terms. Any consent required by law
+          is requested separately.
         </p>
       </section>
 
@@ -362,6 +438,65 @@ function EnglishTerms() {
         <h2 className="text-xl font-semibold text-foreground mb-3">11. Contact</h2>
         <p>
           For questions about these terms, contact the administrators through the platform.
+        </p>
+      </section>
+
+      <Separator />
+
+      <section>
+        <h2 className="text-xl font-semibold text-foreground mb-3">12. User content and platform responsibility</h2>
+        <p className="mb-3">
+          Users' proposals, amendments, comments and posts express their authors' views. Each author
+          is responsible for the content they submit and for obtaining the rights needed to publish
+          it. Hosting, displaying, evaluating or voting on content does not mean that the platform
+          endorses it or confirms its accuracy or legality.
+        </p>
+        <p className="mb-3">
+          Content authored and published by the platform as an official announcement or position is
+          distinct from user content. Using artificial intelligence to draft that content does not
+          remove the platform's responsibility for publishing it. A user submitting AI-generated
+          text retains the same obligations as its author. Automated scores or supporting outputs
+          are not official positions or guarantees of accuracy.
+        </p>
+        <p>
+          The platform's liability depends on applicable law and its role in each case. These terms
+          do not exclude mandatory legal responsibilities or user rights and do not provide blanket
+          immunity for illegal content.
+        </p>
+      </section>
+
+      <Separator />
+
+      <section>
+        <h2 className="text-xl font-semibold text-foreground mb-3">13. Content notices and human review</h2>
+        <p className="mb-3">
+          Anyone may report content they believe is illegal through the public{" "}
+          <a href="/report-content" className="text-primary hover:underline">content reporting form</a>,
+          without an account or community membership. Identify the exact link or location of the
+          content, explain why you believe it is illegal and include any evidence that helps its
+          review. Disagreement with a political opinion alone is not grounds for reporting it as
+          illegal.
+        </p>
+        <p className="mb-3">
+          A human reviews notices, considering the content, its context, available evidence and the
+          rights of those involved, including freedom of expression. When the platform becomes aware
+          of illegal content, it acts without undue delay to remove it or disable access in
+          accordance with the law. The platform's statutory duties do not depend on a community vote.
+          Submitting a notice does not automatically hide the content.
+        </p>
+        <p className="mb-3">
+          The decision is recorded with reasons explaining the main facts, its legal or contractual
+          basis and any restriction imposed. The reporter and author are informed through available
+          contact details and the platform, subject to lawful restrictions. Keep the reference number
+          and private access key provided by the form to follow the case.
+        </p>
+        <p>
+          If you disagree with a decision about a notice or a restriction on your content, you may
+          request human review through the same{" "}
+          <a href="/report-content" className="text-primary hover:underline">form</a>, quoting the
+          reference number and explaining your disagreement or providing new evidence. This option
+          does not limit other remedies available under the law. The process in this section is
+          separate from the automated proposal check in section 3.
         </p>
       </section>
     </>
