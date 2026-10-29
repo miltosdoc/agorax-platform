@@ -15,7 +15,7 @@
  *      re-prompts them (see migrations/0057_agora_consent.sql).
  */
 
-export const CURRENT_CONSENT_VERSION = '2026-09-30.1';
+export const CURRENT_CONSENT_VERSION = '2026-10-29.1';
 
 export type ConsentLocale = 'el' | 'en';
 
@@ -33,7 +33,7 @@ export const CONSENT_TEXT: Record<ConsentLocale, string> = {
 2. Στην ταυτοποίησή μου μέσω Gov.gr (αποθηκεύεται μόνο το hash του ΑΦΜ και τα ονομαστικά στοιχεία της Υπεύθυνης Δήλωσης — όχι το ίδιο το PDF).
 3. Στην καταγραφή της δραστηριότητάς μου για λόγους πρόληψης κατάχρησης (διεύθυνση IP, αναγνωριστικό συσκευής).
 
-Οι ψήφοι δεν είναι ανώνυμοι. Η σύνδεση ψήφος↔ταυτότητα είναι ανακτήσιμη από διαχειριστές της βάσης δεδομένων. Δείτε το Privacy Notice για όλες τις λεπτομέρειες.
+Στις προτάσεις με ανώνυμη ψηφοφορία, που είναι η προεπιλογή, η ψήφος μου καταγράφεται χωρίς σύνδεση με την ταυτότητά μου και ούτε οι διαχειριστές της βάσης δεδομένων μπορούν να ανακτήσουν την επιλογή μου. Στις προτάσεις με ψευδώνυμη ψηφοφορία, που επισημαίνεται ρητά στη σελίδα της πρότασης πριν ψηφίσω, η ψήφος μου αποθηκεύεται μαζί με την ταυτότητά μου και η σύνδεση ψήφος↔ταυτότητα είναι ανακτήσιμη από διαχειριστές της βάσης δεδομένων. Τα σχόλια και οι προτάσεις μου συνδέονται πάντα με τον λογαριασμό μου. Δείτε την Ενημέρωση για την Επεξεργασία Δεδομένων για όλες τις λεπτομέρειες.
 
 Έχω το δικαίωμα να αποσύρω τη συγκατάθεσή μου ανά πάσα στιγμή (Άρθρο 7(3) ΓΚΠΔ), να ζητήσω πρόσβαση/διαγραφή των δεδομένων μου (Άρθρα 15–17), και να υποβάλω καταγγελία στη Σουηδική Αρχή Προστασίας Δεδομένων (IMY).`,
 
@@ -45,7 +45,7 @@ By registering on the Agora platform I explicitly consent to:
 2. Identity verification via Gov.gr (only the salted hash of my AFM and the named demographics from the Solemn Declaration are retained — never the PDF itself).
 3. Activity logging for abuse prevention (IP address, device fingerprint).
 
-Votes are not anonymous. The vote↔identity linkage is reconstructable by database administrators. See the Privacy Notice for full details.
+On proposals with anonymous voting, which is the default, my vote is recorded without any link to my identity and not even database administrators can recover my choice. On proposals with pseudonymous voting, which is marked explicitly on the proposal page before I vote, my vote is stored with my identity and the vote↔identity linkage is reconstructable by database administrators. My comments and proposals are always linked to my account. See the Privacy Notice for full details.
 
 I have the right to withdraw consent at any time (Art. 7(3) GDPR), to request access to or erasure of my data (Art. 15–17), and to lodge a complaint with the Swedish Authority for Privacy Protection (IMY).`,
 };

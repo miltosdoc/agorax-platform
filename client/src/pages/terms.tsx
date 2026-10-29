@@ -175,7 +175,7 @@ function GreekTerms() {
         <h2 className="text-xl font-semibold text-foreground mb-3">8. Προστασία προσωπικών δεδομένων</h2>
         <p>
           Η επεξεργασία προσωπικών δεδομένων διέπεται από την{" "}
-          <a href="/privacy" className="text-primary hover:underline">Ενημέρωση Προστασίας Δεδομένων</a>{" "}
+          <a href="/privacy" className="text-primary hover:underline">Ενημέρωση για την Επεξεργασία Δεδομένων</a>{" "}
           μας, η οποία αποτελεί αναπόσπαστο μέρος των παρόντων όρων. Μην χρησιμοποιήσετε την πλατφόρμα
           εάν δεν συμφωνείτε με την Ενημέρωση.
         </p>

@@ -26,6 +26,37 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CONSENT_TEXT, CURRENT_CONSENT_VERSION } from "@shared/consent";
 
+// Title of the /privacy page as the consent text names it, per locale.
+const PRIVACY_NOTICE_PHRASE: Record<"el" | "en", string> = {
+  el: "Ενημέρωση για την Επεξεργασία Δεδομένων",
+  en: "Privacy Notice",
+};
+
+/**
+ * Render the privacy-notice title in the canonical text as a link to /privacy.
+ * Done at render time so CONSENT_TEXT (and its recorded hash) stays unchanged.
+ */
+function withPrivacyLink(text: string, locale: "el" | "en") {
+  const phrase = PRIVACY_NOTICE_PHRASE[locale];
+  const parts = text.split(phrase);
+  return parts.flatMap((part, i) =>
+    i === 0
+      ? [part]
+      : [
+          <a
+            key={i}
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            {phrase}
+          </a>,
+          part,
+        ],
+  );
+}
+
 export function ConsentInterstitial() {
   const { user, logoutMutation } = useAuth();
   const { locale, t } = useTranslation();
@@ -81,9 +112,12 @@ export function ConsentInterstitial() {
         </DialogHeader>
 
         <div className="max-h-[50vh] overflow-y-auto rounded border bg-muted/30 p-4 text-sm whitespace-pre-line">
-          {showFullText
-            ? CONSENT_TEXT[consentLocale]
-            : CONSENT_TEXT[consentLocale].split("\n\n").slice(0, 3).join("\n\n")}
+          {withPrivacyLink(
+            showFullText
+              ? CONSENT_TEXT[consentLocale]
+              : CONSENT_TEXT[consentLocale].split("\n\n").slice(0, 3).join("\n\n"),
+            consentLocale,
+          )}
         </div>
         {!showFullText && (
           <Button

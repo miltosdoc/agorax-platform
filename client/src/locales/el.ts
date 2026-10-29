@@ -71,7 +71,7 @@ const el: TranslationDictionary = {
   'footer.howItWorks': 'Πώς λειτουργεί',
   'footer.faq': 'Συχνές Ερωτήσεις',
   'footer.terms': 'Όροι Χρήσης',
-  'footer.privacy': 'Πολιτική Απορρήτου',
+  'footer.privacy': 'Ενημέρωση για την Επεξεργασία Δεδομένων',
   'footer.contact': 'Επικοινωνία',
 
   // Auth
@@ -93,7 +93,7 @@ const el: TranslationDictionary = {
   'auth.acceptTerms': 'Αποδέχομαι τους',
   'auth.termsOfService': 'Όρους Χρήσης',
   'auth.and': 'και την',
-  'auth.privacyPolicy': 'Πολιτική Απορρήτου',
+  'auth.privacyPolicy': 'Ενημέρωση για την Επεξεργασία Δεδομένων',
   'auth.passwordMinLength': 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες',
   'auth.confirmPassword': 'Επαλήθευση κωδικού',
   'admin.resetLink': 'Επαναφορά κωδικού',

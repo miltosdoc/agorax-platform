@@ -67,7 +67,7 @@ const en: TranslationDictionary = {
   'footer.howItWorks': 'How it works',
   'footer.faq': 'FAQ',
   'footer.terms': 'Terms of Service',
-  'footer.privacy': 'Privacy Policy',
+  'footer.privacy': 'Privacy Notice',
   'footer.contact': 'Contact',
 
   // Auth
@@ -89,7 +89,7 @@ const en: TranslationDictionary = {
   'auth.acceptTerms': 'I accept the',
   'auth.termsOfService': 'Terms of Service',
   'auth.and': 'and',
-  'auth.privacyPolicy': 'Privacy Policy',
+  'auth.privacyPolicy': 'Privacy Notice',
   'auth.passwordMinLength': 'Password must be at least 8 characters',
   'auth.confirmPassword': 'Confirm password',
   'admin.resetLink': 'Reset password',
