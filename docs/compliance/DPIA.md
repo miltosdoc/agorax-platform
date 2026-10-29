@@ -69,7 +69,7 @@
 - Blind signatures ensure mathematical unlinkability
 - No identifier stored with vote
 - No IP logged on vote path
-- No timing correlation possible (30-minute decoupling)
+- No timing correlation possible (90–180-second decoupling)
 
 ---
 
@@ -82,7 +82,7 @@
 | Vote↔identity linkage | LOW | HIGH | Blind signatures, service separation |
 | AFM brute-force | LOW | HIGH | Salted hash, not stored |
 | IP correlation | LOW | MEDIUM | No IP on vote path, 90-day TTL on login |
-| Timing correlation | LOW | MEDIUM | 30-minute decoupling, minute-precision timestamps |
+| Timing correlation | LOW | MEDIUM | 90–180-second decoupling, minute-precision timestamps |
 | DB breach | MEDIUM | HIGH | Encryption at rest, blind signatures break linkage |
 | Rogue admin | LOW | HIGH | Blind signatures prevent linkage even for admin |
 | SQLi | LOW | MEDIUM | Drizzle ORM parameterizes all queries |
@@ -105,7 +105,7 @@
 - **CSPRNG** — OS-level randomness for token generation
 - **Encryption at rest** — AES-GCM for private keys
 - **Logging exclusions** — Vote endpoints excluded from application logs
-- **Time decoupling** — 30-minute minimum between token issuance and casting
+- **Time decoupling** — 90-second minimum plus up to 90 s random jitter between token issuance and casting
 - **Timestamp coarsening** — Minute-precision for anonymous votes
 
 ### 4.2 Organizational Measures

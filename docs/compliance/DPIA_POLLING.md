@@ -30,7 +30,7 @@ voting design ([04_ANONYMOUS_VOTING_DESIGN.md](04_ANONYMOUS_VOTING_DESIGN.md)).
 
 ## 3. Residual risks (to assess before scale)
 
-1. **Timing correlation at enrollment.** Unlike anonymous voting (30-minute
+1. **Timing correlation at enrollment.** Unlike anonymous voting (90–180-second
    minimum delay), panel registration follows the blind signature within
    seconds. An operator logging both requests could correlate by timestamp.
    *Mitigation candidates:* client-side randomized delay; batch issuance

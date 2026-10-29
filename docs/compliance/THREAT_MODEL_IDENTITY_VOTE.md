@@ -111,7 +111,7 @@ Blind signatures protect against server-side linkage but not against a coerced v
 - **Database-only:** NO — `proposal_votes` stores `vote_token` (40 bytes: 32 random + 8 expiry) with `user_id = NULL`. The token is a random value with no derivable relationship to AFM.
 - **Database + application logs:** NO — vote endpoints (`/blind-sign`, `/anonymous-vote`, `/verify-receipt`, `/blind-key`) are excluded from application logging (§G7 fix).
 - **Database + logs + session cookies:** NO — anonymous-vote request uses `credentials: 'omit'` (§G5 fix), so no session cookies are sent.
-- **Database + logs + timing:** NO — token embeds a minimum cast time (30 minutes after issuance). Server rejects votes cast before this time (§G2 fix). Timestamps in the row hash are coarsened to minute precision for anonymous votes (§G12 fix).
+- **Database + logs + timing:** NO — token embeds a minimum cast time (90 s after issuance plus up to 90 s random jitter). Server rejects votes cast before this time (§G2 fix). Timestamps in the row hash are coarsened to minute precision for anonymous votes (§G12 fix).
 - **Database + logs + device fingerprint:** NO — device fingerprint is captured on the authenticated path (login/signup) but not on the anonymous-vote path.
 - **Database + logs + IP:** NO — no IP logging on vote endpoints. `account_activity` table logs IP for login/registration only, not voting.
 

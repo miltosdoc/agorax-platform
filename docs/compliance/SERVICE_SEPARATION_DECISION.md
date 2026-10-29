@@ -24,7 +24,7 @@ For the closed bench-test deployment (100–1,000 invited members):
 | DB breach | HIGH — identity + votes in same DB | Blind signatures break linkage even with full DB dump |
 | Rogue admin | MEDIUM — can query both sides | Blind signatures prevent linkage; admin cannot reconstruct vote↔identity |
 | SQLi | LOW — Drizzle ORM parameterizes all queries | No raw SQL in vote path |
-| Timing correlation | LOW — vote endpoints excluded from logs | 30-minute decoupling + minute-precision timestamps |
+| Timing correlation | LOW — vote endpoints excluded from logs | 90–180-second decoupling + minute-precision timestamps |
 | Memory correlation | LOW — no shared in-memory state between paths | Separate code paths, no shared variables |
 
 ### Two-Service Benefit Analysis
@@ -56,7 +56,7 @@ For the closed bench-test deployment (100–1,000 invited members):
 4. **Existing mitigations** — The current implementation already addresses the main risks:
    - Vote endpoints excluded from logging (G7)
    - No session cookies on anonymous-vote (G5)
-   - 30-minute time decoupling (G2)
+   - 90–180-second time decoupling (G2)
    - Minute-precision timestamps (G12)
    - Blind signatures break cryptographic linkage
 
@@ -96,7 +96,7 @@ Until then, Option B with hard internal separation is sufficient for the product
 - [x] Code audit: vote path does not import identity storage
 - [x] Cryptographic separation: B1 closed — RFC 9474 library (`@cloudflare/blindrsa-ts` v0.4.4)
 - [x] Logging: vote endpoints excluded (verified in server/index.ts)
-- [x] Timing: 30-minute decoupling enforced (verified in blind-sig.ts)
+- [x] Timing: 90–180-second decoupling enforced (`client/src/lib/anonymous-vote.ts`, checked server-side in `server/routers/proposals.ts`)
 - [ ] DB grants: separate users for eligibility vs voting (scale-up only)
 
 ---

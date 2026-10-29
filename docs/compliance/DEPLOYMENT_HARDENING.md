@@ -109,7 +109,7 @@ The blind-signature implementation (`shared/blind-sig.ts`) uses pure BigInt arit
 - **Database-only:** NO — `proposal_votes` stores `vote_token` (40 bytes: 32 random + 8 expiry) with `user_id = NULL`.
 - **Database + application logs:** NO — vote endpoints excluded from logging.
 - **Database + logs + session cookies:** NO — `credentials: 'omit'` on anonymous-vote fetch.
-- **Database + logs + timing:** NO — 30-minute time decoupling enforced. Timestamps coarsened to minute precision.
+- **Database + logs + timing:** NO — 90–180-second time decoupling enforced (90 s minimum plus random jitter of up to 90 s). Timestamps coarsened to minute precision.
 - **Database + logs + device fingerprint:** NO — device fingerprint not captured on anonymous-vote path.
 - **Database + logs + IP:** NO — no IP logging on vote endpoints. `account_activity` only logs login/registration.
 - **Reverse proxy logs:** DEPENDS — must be configured per the nginx/caddy instructions above.

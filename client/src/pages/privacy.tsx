@@ -116,30 +116,40 @@ function GreekContent() {
 
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">
-          3. Ανωνυμία ψήφου — δύο modes
+          3. Ανωνυμία ψήφου
         </h2>
-        <p className="mb-3">
-          Κάθε πρόταση δηλώνει ένα από δύο modes ψηφοφορίας:
-        </p>
         <ul className="list-disc pl-6 space-y-2 mb-3">
           <li>
-            <strong className="text-foreground">Ανώνυμη ψηφοφορία (προεπιλογή για νέες προτάσεις):</strong>{" "}
-            Η ψήφος σας καταγράφεται με ένα τυχαίο token που δημιουργείτε στον φυλλομετρητή σας, τυφλά
-            υπογράφεται από τον server (ο server βλέπει μόνο το τυφλωμένο token, ποτέ το πρωτότυπο) και
-            αποθηκεύεται χωρίς αναφορά στην ταυτότητά σας.{" "}
-            <strong className="text-foreground">Ακόμη και διαχειριστής της βάσης δεδομένων δεν μπορεί να
-            ανακτήσει την επιλογή σας.</strong> Καμία επανάληψη ψήφου — μία ψήφος ανά μέλος ανά πρόταση.
+            <strong className="text-foreground">Η ψήφος σας στις ψηφοφορίες των προτάσεων είναι ανώνυμη.</strong>{" "}
+            Καταγράφεται με ένα τυχαίο token που δημιουργείτε στον φυλλομετρητή σας και που ο server υπογράφει
+            τυφλά (βλέπει μόνο το τυφλωμένο token, ποτέ το πρωτότυπο). Αποθηκεύεται χωρίς αναφορά στην
+            ταυτότητά σας, οπότε η επιλογή σας δεν μπορεί να ανακτηθεί από τη βάση δεδομένων. Μία ψήφος ανά
+            μέλος ανά πρόταση, χωρίς δυνατότητα αλλαγής.
           </li>
           <li>
-            <strong className="text-foreground">Ψευδώνυμη ψηφοφορία (επιλέξιμη ανά πρόταση):</strong>{" "}
-            Η ψήφος σας αποθηκεύεται μαζί με την ταυτότητά σας. Χρησιμοποιείται για διαφανείς δεσμευτικές
-            ψηφοφορίες όπου η αποδοτικότητα είναι σκόπιμη. Σε αυτό το mode ο διαχειριστής μπορεί να
-            ανακτήσει «μέλος Χ → επιλογή Υ».
+            <strong className="text-foreground">Καταγράφεται ότι συμμετείχατε,</strong> δηλαδή ότι πήρατε
+            token για την πρόταση, ώστε κανείς να μην ψηφίσει δύο φορές. Σε μικρές ψηφοφορίες, η συμμετοχή
+            μαζί με το αποτέλεσμα μπορεί να επιτρέψει συμπεράσματα.
+          </li>
+          <li>
+            <strong className="text-foreground">Τα αιτήματα ψήφου δεν καταγράφονται</strong> σε αρχεία
+            καταγραφής, ούτε της εφαρμογής ούτε του web server, ώστε η IP και η ώρα της υπογραφής του token να
+            μην μπορούν να συνδεθούν με την IP και την ώρα της ψήφου. Το ίδιο ισχύει για την εγγραφή στο πάνελ
+            δημοσκοπήσεων και τις απαντήσεις σε δημοσκοπήσεις.
           </li>
         </ul>
+        <p className="mb-3">
+          <strong className="text-foreground">Όριο:</strong> την πλατφόρμα τη λειτουργεί ένας φορέας, χωρίς
+          ανεξάρτητη εφορευτική επιτροπή. Η ανωνυμία σάς προστατεύει αν διαρρεύσει ή διαβαστεί η βάση
+          δεδομένων· δεν σας προστατεύει από διαχειριστή του server που θα ενεργούσε κακόβουλα και θα άλλαζε
+          τη ρύθμιση ή τον κώδικα ώστε να συνδέει μελλοντικές ψήφους με ψηφοφόρους.
+        </p>
+        <p className="mb-3">
+          Δύο παλαιότερες προτάσεις (#15 και #16) είχαν ψευδώνυμη ψηφοφορία, στην οποία η ψήφος αποθηκεύτηκε
+          μαζί με την ταυτότητα. Νέες ψευδώνυμες ψηφοφορίες δεν δημιουργούνται.
+        </p>
         <p>
-          Το mode εμφανίζεται ρητά στη σελίδα της πρότασης πριν ψηφίσετε. Για την ανώνυμη ψηφοφορία
-          κρατάμε τοπικά στον φυλλομετρητή σας ένα receipt (token + υπογραφή) ώστε να μπορείτε να
+          Κρατάμε τοπικά στον φυλλομετρητή σας ένα receipt (token + υπογραφή) ώστε να μπορείτε να
           επαληθεύσετε αργότερα ότι η ψήφος σας μετρήθηκε — αλλά κανείς άλλος δεν μπορεί να συνδέσει το
           receipt αυτό με εσάς.
         </p>
@@ -362,30 +372,41 @@ function EnglishContent() {
 
       <section>
         <h2 className="text-xl font-semibold text-foreground mb-3">
-          3. Vote anonymity — two modes
+          3. Vote anonymity
         </h2>
-        <p className="mb-3">
-          Every proposal declares one of two voting modes:
-        </p>
         <ul className="list-disc pl-6 space-y-2 mb-3">
           <li>
-            <strong className="text-foreground">Anonymous (default for new proposals):</strong> Your vote
-            is recorded with a random token you generate in your browser, blindly signed by the server
-            (the server sees only the blinded token, never the original) and stored without any reference
-            to your identity.{" "}
-            <strong className="text-foreground">Even a database administrator cannot recover your
-            choice.</strong> No re-voting — one vote per member per proposal.
+            <strong className="text-foreground">Your vote in proposal ballots is anonymous.</strong> It is
+            recorded with a random token you generate in your browser and the server signs blindly (it sees
+            only the blinded token, never the original). It is stored without any reference to your identity,
+            so your choice cannot be recovered from the database. One vote per member per proposal, with no
+            re-voting.
           </li>
           <li>
-            <strong className="text-foreground">Pseudonymous (opt-in per proposal):</strong> Your vote is
-            stored alongside your identity. Used for transparent ratification votes where attribution is
-            deliberate. In this mode an administrator can reconstruct "member X → choice Y."
+            <strong className="text-foreground">The fact that you took part is recorded,</strong> that is,
+            that you obtained a token for the proposal, so nobody can vote twice. In small ballots,
+            participation together with the result can allow inferences.
+          </li>
+          <li>
+            <strong className="text-foreground">Voting requests are not logged,</strong> neither by the
+            application nor by the web server, so the IP address and time of the token signature cannot be
+            matched with the IP address and time of the vote. The same applies to joining the polling panel
+            and answering surveys.
           </li>
         </ul>
+        <p className="mb-3">
+          <strong className="text-foreground">Limit:</strong> one operator runs the platform, with no
+          independent election committee. Anonymity protects you if the database leaks or is read; it does
+          not protect you from a server administrator acting in bad faith who changed the configuration or
+          the code to link future votes to voters.
+        </p>
+        <p className="mb-3">
+          Two older proposals (#15 and #16) used pseudonymous voting, in which the vote was stored with the
+          voter&apos;s identity. No new pseudonymous ballots are created.
+        </p>
         <p>
-          The mode is shown explicitly on the proposal page before you vote. For anonymous votes we keep
-          a local receipt (token + signature) in your browser so you can verify later that your vote was
-          counted — but nobody else can tie that receipt back to you.
+          We keep a local receipt (token + signature) in your browser so you can verify later that your vote
+          was counted — but nobody else can tie that receipt back to you.
         </p>
       </section>
 

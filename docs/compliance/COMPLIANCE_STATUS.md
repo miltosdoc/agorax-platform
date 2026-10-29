@@ -3,7 +3,7 @@
 **Date:** 2026-05-31
 **Reference:** `docs/compliance/AUDIT_IDENTITY_VOTE_ANONYMITY.md`
 **Scope:** Production deployment (bench-test: 100–1,000 invited members)
-**Status:** B1 ✅ CLOSED. B2 ❌ OPEN (pending production run). B3 ✅ CLOSED (grant-enforced).
+**Status:** B1 ✅ CLOSED. B2 ✅ CLOSED for new requests (2026-10-29; historical log lines pending deletion). B3 ✅ CLOSED (grant-enforced).
 
 ---
 
@@ -36,9 +36,11 @@
 
 ### B2 — Reverse-proxy log exclusion (was G10)
 
-**Status:** ❌ OPEN — Script written, not run against production
+**Status:** ✅ CLOSED for new requests (2026-10-29). Lines written before then are still in the rotated nginx logs until they are deleted.
 
-**Evidence:**
+**Done 2026-10-29:** `/etc/nginx/sites-available/agorax` (copy in `docs/compliance/nginx_agorax.conf`) proxies the anonymous paths through a location with `access_log off` and `error_log /dev/null emerg`: `/api/proposals/:id/{blind-key,blind-sign,anonymous-vote,verify-receipt,receipt-inclusion}`, `/api/panel/{enroll/key,enroll/sign,register,me,profile}`, `/api/surveys/:id/{instrument,respond}`. Checked with live requests: those paths returned the application's responses and were not logged; other paths were. journald for `agorax.service` over the last 30 days has no vote or panel lines.
+
+**Earlier state (2026-05-31):**
 - `docs/compliance/DEPLOYMENT_HARDENING.md` — nginx/caddy configuration for vote endpoint exclusion
 - `scripts/verify_production_logs.sh` — Automated verification script for production deployment
 - Application-level exclusions verified in `server/index.ts` (G7 fix) — app logs to stdout, no file logging
@@ -87,15 +89,15 @@
 
 ### V2 — Time decoupling prevents login↔vote correlation
 
-**Status:** ✅ VERIFIED — 30-minute minimum enforced
+**Status:** ✅ VERIFIED — 90–180-second decoupling enforced (shortened from 30 minutes on 2026-09-16)
 
 **Evidence:**
-- `shared/blind-sig.ts` — Token embeds `minCastTime` (30 minutes after issuance)
+- `client/src/lib/anonymous-vote.ts` — Token embeds `minCastTime` (90 s after issuance plus up to 90 s random jitter)
 - `server/routers/proposals.ts` — Server-side validation rejects tokens before `minCastTime`
 - `server/utils/vote-chain.ts` — Anonymous votes use minute-precision timestamps
 - Login/registration logs use millisecond precision but are 90-day TTL (G6)
 
-**Correlation analysis:** With 100–1,000 cohort and 30-minute minimum gap, adjacency correlation is infeasible. Login at 14:32 cannot correlate with vote at 15:03+ (minimum).
+**Correlation analysis:** The delay only spreads the cast over a 90-second window; it does not make correlation infeasible on its own. It protects only together with B2 (no vote-path request is logged with IP and time).
 
 ---
 
@@ -165,14 +167,16 @@
 - Database-only: NO — `proposal_votes` stores `vote_token` (40 bytes: 256-bit random + 8 bytes expiry) with `user_id = NULL`
 - Database + application logs: NO — vote endpoints excluded from logging
 - Database + logs + session cookies: NO — `credentials: 'omit'` on anonymous-vote fetch
-- Database + logs + timing: NO — 30-minute time decoupling enforced; timestamps coarsened to minute precision
+- Database + logs + timing: NO — vote-path requests are not logged (B2); 90–180-second time decoupling; timestamps coarsened to minute precision
 - Database + logs + device fingerprint: NO — device fingerprint not captured on anonymous-vote path
 - Database + logs + IP: NO — no IP logging on vote endpoints; `account_activity` only logs login/registration with 90-day TTL
-- Reverse proxy logs: **QUALIFIED** — nginx/caddy config documented but not yet verified against production (B2 OPEN)
+- Reverse proxy logs: NO for requests since 2026-10-29 (B2); older rotated nginx logs still hold vote-path lines until deleted
 - Full DB breach: NO — blind signatures break cryptographic linkage; operator cannot reconstruct vote↔identity
 - Runtime observation: NO — vote path runs under `agorax_vote` DB role; PostgreSQL refuses cross-table reads (B3 grant-enforced)
 
 **Qualification (B2 — logs):** Reverse proxy access logs not yet verified against production. App-level exclusion verified in code. Nginx config documented; script ready to run. Until run, the answer is "NO, provided reverse proxy is configured."
+
+**Scope:** this answer assumes an operator who hands over stored data. It does not hold against a malicious operator who changes the proxy configuration or the client code to link future votes: one operator runs the whole platform and there is no independent election committee.
 
 **The system is constructively incapable of answering the question from stored data or runtime observation.** The acceptance test passes with one qualification:
 1. Cryptographic unlinkability enforced by RFC 9474 library (`@cloudflare/blindrsa-ts` v0.4.4) — vetted, reviewed, authored by RFC co-authors
@@ -185,10 +189,10 @@
 ## Production Readiness Checklist
 
 - [x] B1: Crypto replaced with vetted library (`@cloudflare/blindrsa-ts` v0.4.4, RFC 9474)
-- [ ] B2: Log exclusion verified against production (script ready, not run)
+- [x] B2: Log exclusion applied and verified against production (2026-10-29); historical lines pending deletion
 - [x] B3: DB-grant enforcement (agorax_vote role, REVOKE on identity tables, verified)
 - [x] V1: Deprecated paths gated with hard error (501)
-- [x] V2: Time decoupling verified (30-minute minimum)
+- [x] V2: Time decoupling verified (90–180 seconds)
 - [x] V3: Token secret lifecycle verified (r and m never touch server)
 - [x] GDPR: DPIA complete, lawful basis documented, data minimization verified
 - [x] Tests: All passing (6/6 blind-sig tests, TypeScript clean)

@@ -30,7 +30,9 @@
 
 ### 3. Σημαντική ειδοποίηση για τις ψήφους
 
-**Οι ψήφοι σας ΔΕΝ είναι ανώνυμοι.** Η αντιστοίχιση ψήφος↔ταυτότητα είναι ανακτήσιμη από έναν διαχειριστή της βάσης δεδομένων. Η τρέχουσα έκδοση του συστήματος υποστηρίζει **μόνο συμβουλευτικές ψηφοφορίες** — δεσμευτικές ψηφοφορίες δεν θα τρέχουν μέχρι την ολοκλήρωση κρυπτογραφικής ανωνυμοποίησης (SDK Phase 6+7 + αναδιάρθρωση σχήματος). Λεπτομέρειες: [01_VOTE_LINKAGE_AUDIT.md](01_VOTE_LINKAGE_AUDIT.md).
+**Η ψήφος σας στις ψηφοφορίες των προτάσεων είναι ανώνυμη.** Καταγράφεται με τυχαίο token που ο server υπογράφει τυφλά και αποθηκεύεται χωρίς αναφορά στην ταυτότητά σας, οπότε η επιλογή σας δεν μπορεί να ανακτηθεί από τη βάση δεδομένων. Καταγράφεται μόνο ότι συμμετείχατε, ώστε κανείς να μην ψηφίσει δύο φορές. Τα αιτήματα ψήφου, η εγγραφή στο πάνελ δημοσκοπήσεων και οι απαντήσεις σε δημοσκοπήσεις δεν καταγράφονται σε αρχεία καταγραφής (logs).
+
+**Όριο:** την πλατφόρμα τη λειτουργεί ένας φορέας, χωρίς ανεξάρτητη εφορευτική επιτροπή. Η ανωνυμία προστατεύει αν διαρρεύσει ή διαβαστεί η βάση δεδομένων, όχι από διαχειριστή του server που θα ενεργούσε κακόβουλα. Δύο παλαιότερες προτάσεις (#15, #16) είχαν ψευδώνυμη ψηφοφορία· νέες ψευδώνυμες ψηφοφορίες δεν δημιουργούνται. Λεπτομέρειες: [04_ANONYMOUS_VOTING_DESIGN.md](04_ANONYMOUS_VOTING_DESIGN.md).
 
 ### 4. Πώς αποκτούμε τη συγκατάθεσή σας
 
@@ -112,7 +114,9 @@ No account is required. Name and email may be omitted for the specific suspected
 
 ### 3. Important notice about votes
 
-**Your votes are NOT anonymous.** The vote↔identity linkage is reconstructable by a database administrator. The current system supports **consultative votes only** — binding votes will not run until cryptographic anonymisation is complete (SDK Phase 6+7 + ballot-schema refactor). Details: [01_VOTE_LINKAGE_AUDIT.md](01_VOTE_LINKAGE_AUDIT.md).
+**Your vote in proposal ballots is anonymous.** It is recorded with a random token the server signs blindly and stored without any reference to your identity, so your choice cannot be recovered from the database. Only the fact that you took part is recorded, so nobody can vote twice. Voting requests, joining the polling panel and survey answers are not written to any log.
+
+**Limit:** one operator runs the platform, with no independent election committee. Anonymity protects you if the database leaks or is read, not from a server administrator acting in bad faith. Two older proposals (#15, #16) used pseudonymous voting; no new pseudonymous ballots are created. Details: [04_ANONYMOUS_VOTING_DESIGN.md](04_ANONYMOUS_VOTING_DESIGN.md).
 
 ### 4. How we obtain your consent
 
