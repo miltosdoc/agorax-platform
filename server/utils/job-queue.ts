@@ -31,7 +31,8 @@ export type JobType =
   | 'refresh_final_text'    // Live re-merge of the AI final text during deliberation
   | 'send_email'            // One optional notification email to one member
   | 'send_juror_email'      // "You were drawn by lot" — always sent, ignores preferences
-  | 'chain_anchor';         // Publish vote-chain head hashes to the external anchor repo
+  | 'chain_anchor'          // Publish vote-chain head hashes to the external anchor repo
+  | 'removal_vote_sweep';   // Settle member-removal votes past their deadline
 
 export interface JobPayload {
   type: JobType;

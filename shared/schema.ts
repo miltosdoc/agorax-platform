@@ -403,6 +403,55 @@ export const communitySettingVotes = pgTable("community_setting_votes", {
   communitySettingVoteUnique: uniqueIndex('community_setting_votes_unique_idx').on(table.communityId, table.settingKey, table.userId),
 }));
 
+// ─── Member removal (migration 0064) ──────────────────────────────
+// Rules live in shared/member-removal.ts. A managed community's admins
+// remove directly; an autonomous community votes (⅔ of votes cast).
+// A removal blocks rejoining until rejoinAfter unless an admin lifts it.
+
+export const communityRemovalVotes = pgTable("community_removal_votes", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  targetUserId: integer("target_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  openedByUserId: integer("opened_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
+  targetResponse: text("target_response"),
+  status: text("status").notNull().default("open"), // 'open' | 'passed' | 'rejected' | 'cancelled'
+  // Frozen at decision time so the log stays readable after people leave.
+  yesCount: integer("yes_count").notNull().default(0),
+  noCount: integer("no_count").notNull().default(0),
+  eligibleCount: integer("eligible_count").notNull().default(0),
+  closesAt: timestamp("closes_at").notNull(),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const communityRemovalBallots = pgTable("community_removal_ballots", {
+  id: serial("id").primaryKey(),
+  voteId: integer("vote_id").notNull().references(() => communityRemovalVotes.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  choice: text("choice").notNull(), // 'yes' | 'no'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  removalBallotUnique: uniqueIndex('removal_ballot_unique').on(table.voteId, table.userId),
+}));
+
+export const communityRemovals = pgTable("community_removals", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  removedByUserId: integer("removed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  voteId: integer("vote_id").references(() => communityRemovalVotes.id, { onDelete: "set null" }),
+  reason: text("reason").notNull(),
+  rejoinAfter: timestamp("rejoin_after").notNull(),
+  liftedAt: timestamp("lifted_at"),
+  liftedByUserId: integer("lifted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type CommunityRemovalVote = typeof communityRemovalVotes.$inferSelect;
+export type CommunityRemoval = typeof communityRemovals.$inferSelect;
+
 // ─── Proposals (Προβουλεύματα) ────────────────────────────────────
 
 export const proposals = pgTable("proposals", {

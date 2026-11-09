@@ -40,6 +40,8 @@ export type NotificationType =
   // author is told, and only about their own topic: a forum that notifies
   // every participant on every message teaches people to switch the bell off.
   | 'forum_reply'
+  // Removed from a community, or a vote on removing someone opened/closed.
+  | 'community_membership'
   // Platform-wide announcement: a change to how the platform itself works,
   // addressed to every member rather than to a proposal or a body.
   | 'platform_update';

@@ -441,6 +441,12 @@ async function handleConferenceReminder(_payload: JobPayload): Promise<void> {
  * tamper-evident to someone who already trusts the server — see
  * docs/VOTE_CHAIN_ANCHORING.md. A no-op when ANCHOR_GITHUB_* is unset.
  */
+async function handleRemovalVoteSweep(_payload: JobPayload): Promise<void> {
+  const { sweepRemovalVotes } = await import('./member-removal');
+  const settled = await sweepRemovalVotes();
+  if (settled > 0) console.log(`[removal] settled ${settled} removal vote(s) past their deadline`);
+}
+
 async function handleChainAnchor(_payload: JobPayload): Promise<void> {
   const { runAnchorSweep, runOtsSweep, isAnchoringConfigured } = await import('./chain-anchor');
   if (!isAnchoringConfigured()) return;
@@ -470,6 +476,7 @@ export function registerAllHandlers(): void {
   registerHandler('send_email', handleSendEmail);
   registerHandler('send_juror_email', handleSendJurorEmail);
   registerHandler('chain_anchor', handleChainAnchor);
+  registerHandler('removal_vote_sweep', handleRemovalVoteSweep);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────
@@ -537,8 +544,16 @@ export function startJobQueue(): () => void {
     enqueueJob({ type: 'chain_anchor', data: {}, priority: 'low' }).catch(() => {});
   }, 2 * 60_000);
 
+  // Member-removal votes close on their own deadline. Votes also settle the
+  // moment anyone looks at them, so a quarter of an hour is only the
+  // backstop for a vote nobody opens.
+  const removalSweepId = setInterval(() => {
+    enqueueJob({ type: 'removal_vote_sweep', data: {}, priority: 'low' }).catch(() => {});
+  }, 15 * 60_000);
+
   return () => {
     stopWorker();
+    clearInterval(removalSweepId);
     clearInterval(anchorSweepId);
     clearTimeout(firstAnchorId);
     clearInterval(autoAdvanceId);

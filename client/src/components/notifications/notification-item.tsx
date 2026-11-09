@@ -18,7 +18,7 @@ const icons: Record<string, LucideIcon> = {
   proposal_advanced: FileText, amendment_ready: MessageSquare, vote_started: Vote,
   conference_scheduled: Mic, conference_starting: Mic, sortition_room_opened: Mic,
   new_proposal: FileText, new_media: Video, file_lost: AlertTriangle,
-  deliberation_reminder: Clock, community_invite: Mail, platform_update: Megaphone,
+  deliberation_reminder: Clock, community_invite: Mail, platform_update: Megaphone, community_membership: Users,
   forum_reply: MessageSquare,
 };
 

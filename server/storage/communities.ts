@@ -132,6 +132,19 @@ export class CommunityRepository {
         .where(eq(communities.id, communityId));
     }
 
+    // Same for their votes on the community's settings: a departed member
+    // must not keep tipping an autonomous community's choices.
+    const settingVotes = await db
+      .delete(communitySettingVotes)
+      .where(and(
+        eq(communitySettingVotes.communityId, communityId),
+        eq(communitySettingVotes.userId, userId),
+      ))
+      .returning({ key: communitySettingVotes.settingKey });
+    for (const key of Array.from(new Set(settingVotes.map((v) => v.key)))) {
+      if (isGovernableSettingKey(key)) await this.recomputeAutonomousSetting(communityId, key);
+    }
+
     return true;
   }
 

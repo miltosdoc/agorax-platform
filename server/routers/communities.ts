@@ -26,6 +26,15 @@ import { sanitizeCommunityCreateInput, sanitizeCommunityUpdateInput, assertCommu
   effectiveProposalPolicy,
 } from '@shared/community-settings';
 import { buildCommunitySummary } from '@shared/community-summary';
+import {
+  REMOVAL_REASON_MAX, REMOVAL_REASON_MIN, REMOVAL_RESPONSE_MAX,
+  directRemovalBlocker, isRemovalChoice, removalModeFor,
+} from '@shared/member-removal';
+import {
+  RemovalError, activeRemoval, cancelRemovalVote, castRemovalBallot, cooldownMessage, getRemovalVote,
+  liftRemoval, openRemovalVote, removalOverview, removeMember, setRemovalResponse,
+} from '../utils/member-removal';
+import { logAdminAction } from '../utils/admin-action-logger';
 import { getCommunityJoinStatus } from '@shared/community-membership';
 import { ACTIVE_PROPOSAL_STATES } from '@shared/activity-feed';
 import {
@@ -415,6 +424,11 @@ export function registerCommunitiesRoutes(app: Express): void {
         return res.status(409).json({ message: "Already a member" });
       }
 
+      const removal = await activeRemoval(communityId, userId);
+      if (removal) {
+        return res.status(403).json({ message: cooldownMessage(removal), rejoinAfter: removal.rejoinAfter });
+      }
+
       const policy = community.joinPolicy ?? 'open';
 
       if (policy === 'invite_only') {
@@ -479,6 +493,14 @@ export function registerCommunitiesRoutes(app: Express): void {
         .from(communityJoinRequests)
         .where(and(eq(communityJoinRequests.id, requestId), eq(communityJoinRequests.communityId, communityId), eq(communityJoinRequests.status, 'pending')));
       if (!request) return res.status(404).json({ message: "Pending request not found" });
+      if (decision === 'approved') {
+        const [pending] = await db.select({ userId: communityJoinRequests.userId })
+          .from(communityJoinRequests).where(eq(communityJoinRequests.id, requestId));
+        const removal = pending ? await activeRemoval(communityId, pending.userId) : null;
+        if (removal) {
+          return res.status(409).json({ message: `This person was removed and can rejoin after ${removal.rejoinAfter.toISOString().slice(0, 10)}. Lift the removal in the members list first.` });
+        }
+      }
       const decided = await communityRepo.decideJoinRequest(requestId, decision, req.user.id);
       if (!decided) return res.status(404).json({ message: "Pending request not found" });
       if (decided.communityId !== communityId) return res.status(400).json({ message: "Request does not belong to this community" });
@@ -552,6 +574,10 @@ export function registerCommunitiesRoutes(app: Express): void {
 
         if (await communityRepo.isCommunityMember(communityId, target.id)) {
           return res.status(409).json({ message: "That user is already a member" });
+        }
+        const removal = await activeRemoval(communityId, target.id);
+        if (removal) {
+          return res.status(409).json({ message: `This person was removed and can rejoin after ${removal.rejoinAfter.toISOString().slice(0, 10)}. Lift the removal in the members list first.` });
         }
         const outstanding = await communityRepo.getPendingInviteForUser(communityId, target.id);
         if (outstanding) {
@@ -709,6 +735,12 @@ export function registerCommunitiesRoutes(app: Express): void {
         return res.status(409).json({ message: "Already a member" });
       }
 
+      // Checked before redeeming so a removed member does not spend the token.
+      const removal = await activeRemoval(preview.communityId, req.user.id);
+      if (removal) {
+        return res.status(403).json({ message: cooldownMessage(removal), rejoinAfter: removal.rejoinAfter });
+      }
+
       // Single atomic gate — see redeemInvite. Anything that makes the token
       // unusable (revoked, expired, exhausted, addressed to someone else) comes
       // back as undefined rather than a row we would have to re-check.
@@ -781,6 +813,175 @@ export function registerCommunitiesRoutes(app: Express): void {
       res.status(500).json({ message: "Failed to update member role" });
     }
   });
+  // ─── Member removal (shared/member-removal.ts) ──────────────────────────
+  // Managed: admins remove directly. Autonomous: members vote, ⅔ of votes
+  // cast. A reason is always required and every member can read the log.
+
+  const readReason = (body: any): string | null => {
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    return reason.length >= REMOVAL_REASON_MIN && reason.length <= REMOVAL_REASON_MAX ? reason : null;
+  };
+  const removalFailure = (res: Response, error: unknown, fallback: string) => {
+    if (error instanceof RemovalError) return res.status(error.status).json({ message: error.message });
+    console.error(`[removal] ${fallback}:`, error);
+    return res.status(500).json({ message: fallback });
+  };
+
+  app.get("/api/communities/:id/removals", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (!await communityRepo.isCommunityMember(communityId, req.user.id)) {
+        return res.status(403).json({ message: "Only members can see this" });
+      }
+      res.json(await removalOverview(communityId, req.user.id));
+    } catch (error) {
+      removalFailure(res, error, "Failed to fetch removals");
+    }
+  });
+
+  app.post("/api/communities/:id/members/:userId/remove", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const targetUserId = parseInt(req.params.userId);
+      if (!Number.isFinite(communityId) || !Number.isFinite(targetUserId)) {
+        return res.status(400).json({ message: "Invalid community or user id" });
+      }
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+      if (removalModeFor(community.type) !== 'admin') {
+        return res.status(409).json({ message: "In this community members are removed by a vote of the members" });
+      }
+      if (targetUserId === req.user.id) {
+        return res.status(409).json({ message: "Use 'Leave community' to leave" });
+      }
+      const reason = readReason(req.body);
+      if (!reason) {
+        return res.status(400).json({ message: `Give a reason (${REMOVAL_REASON_MIN}–${REMOVAL_REASON_MAX} characters)` });
+      }
+      const [actorRole, targetRole] = await Promise.all([
+        communityRepo.getCommunityMemberRole(communityId, req.user.id),
+        communityRepo.getCommunityMemberRole(communityId, targetUserId),
+      ]);
+      const blocker = directRemovalBlocker(actorRole, targetRole);
+      if (blocker) {
+        const messages: Record<string, [number, string]> = {
+          not_member: [404, "This person is not a member"],
+          founder: [409, "The founder cannot be removed"],
+          not_admin: [403, "Only admins or the founder can remove members"],
+          admin_needs_founder: [403, "Only the founder can remove an admin"],
+        };
+        const [status, message] = messages[blocker];
+        return res.status(status).json({ message });
+      }
+      const removal = await removeMember({ communityId, userId: targetUserId, reason, removedByUserId: req.user.id });
+      await logAdminAction(req.user.id, communityId, 'manage_membership', targetUserId, {
+        action: 'remove', reason, removalId: removal.id, rejoinAfter: removal.rejoinAfter,
+      }).catch(() => {});
+      res.json({ success: true, rejoinAfter: removal.rejoinAfter });
+    } catch (error) {
+      removalFailure(res, error, "Failed to remove member");
+    }
+  });
+
+  app.post("/api/communities/:id/removals/:removalId/lift", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const removalId = parseInt(req.params.removalId);
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+      if (removalModeFor(community.type) !== 'admin') {
+        return res.status(409).json({ message: "In this community the waiting period simply runs out" });
+      }
+      const role = await communityRepo.getCommunityMemberRole(communityId, req.user.id);
+      if (role !== 'admin' && role !== 'founder') {
+        return res.status(403).json({ message: "Only admins or the founder can do this" });
+      }
+      if (!await liftRemoval(communityId, removalId, req.user.id)) {
+        return res.status(404).json({ message: "Removal not found" });
+      }
+      await logAdminAction(req.user.id, communityId, 'manage_membership', null, { action: 'lift_removal', removalId }).catch(() => {});
+      res.json({ success: true });
+    } catch (error) {
+      removalFailure(res, error, "Failed to lift removal");
+    }
+  });
+
+  app.post("/api/communities/:id/removal-votes", requireAuth, async (req: any, res) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      const targetUserId = Number(req.body?.userId);
+      if (!Number.isFinite(communityId) || !Number.isInteger(targetUserId)) {
+        return res.status(400).json({ message: "Invalid community or user id" });
+      }
+      const community = await communityRepo.getCommunity(communityId);
+      if (!community) return res.status(404).json({ message: "Community not found" });
+      if (removalModeFor(community.type) !== 'vote') {
+        return res.status(409).json({ message: "In this community the admins decide on removals" });
+      }
+      if (targetUserId === req.user.id) {
+        return res.status(409).json({ message: "Use 'Leave community' to leave" });
+      }
+      const reason = readReason(req.body);
+      if (!reason) {
+        return res.status(400).json({ message: `Give a reason (${REMOVAL_REASON_MIN}–${REMOVAL_REASON_MAX} characters)` });
+      }
+      const [actorRole, targetRole] = await Promise.all([
+        communityRepo.getCommunityMemberRole(communityId, req.user.id),
+        communityRepo.getCommunityMemberRole(communityId, targetUserId),
+      ]);
+      if (!actorRole) return res.status(403).json({ message: "Only members can start a removal vote" });
+      if (!targetRole) return res.status(404).json({ message: "This person is not a member" });
+      if (targetRole === 'founder') return res.status(409).json({ message: "The founder cannot be removed" });
+      const vote = await openRemovalVote({ communityId, targetUserId, openedByUserId: req.user.id, reason });
+      res.status(201).json({ id: vote.id });
+    } catch (error) {
+      removalFailure(res, error, "Failed to start removal vote");
+    }
+  });
+
+  /** The vote, checked to belong to the community in the URL. */
+  const loadVote = async (req: any) => {
+    const vote = await getRemovalVote(parseInt(req.params.voteId));
+    if (!vote || vote.communityId !== parseInt(req.params.id)) throw new RemovalError(404, "Vote not found");
+    return vote;
+  };
+
+  app.post("/api/communities/:id/removal-votes/:voteId/ballot", requireAuth, async (req: any, res) => {
+    try {
+      const choice = req.body?.choice;
+      if (!isRemovalChoice(choice)) return res.status(400).json({ message: "Choice must be 'yes' or 'no'" });
+      const vote = await loadVote(req);
+      await castRemovalBallot(vote, req.user.id, choice);
+      res.json({ success: true });
+    } catch (error) {
+      removalFailure(res, error, "Failed to record vote");
+    }
+  });
+
+  app.put("/api/communities/:id/removal-votes/:voteId/response", requireAuth, async (req: any, res) => {
+    try {
+      const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+      if (text.length > REMOVAL_RESPONSE_MAX) {
+        return res.status(400).json({ message: `Keep it under ${REMOVAL_RESPONSE_MAX} characters` });
+      }
+      const vote = await loadVote(req);
+      await setRemovalResponse(vote, req.user.id, text);
+      res.json({ success: true });
+    } catch (error) {
+      removalFailure(res, error, "Failed to save response");
+    }
+  });
+
+  app.delete("/api/communities/:id/removal-votes/:voteId", requireAuth, async (req: any, res) => {
+    try {
+      const vote = await loadVote(req);
+      await cancelRemovalVote(vote, req.user.id);
+      res.json({ success: true });
+    } catch (error) {
+      removalFailure(res, error, "Failed to withdraw vote");
+    }
+  });
+
   // ─── Proposal Routes ────────────────────────────────────────────
   app.post("/api/communities/:id/merge", requireAuth, async (req: any, res) => {
     try {

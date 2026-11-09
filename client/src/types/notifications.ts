@@ -17,6 +17,7 @@ export interface SortitionNotification {
     | 'deliberation_reminder'
     | 'community_invite'
     | 'forum_reply'
+    | 'community_membership'
     | 'platform_update';
   title: string;
   message: string | null;
@@ -51,5 +52,6 @@ export const notificationTypeConfig: Record<SortitionNotification['type'], { ico
   deliberation_reminder: { icon: '⏳', color: 'bg-amber-50 border-amber-200' },
   community_invite: { icon: '✉️', color: 'bg-sky-50 border-sky-200' },
   forum_reply: { icon: '💬', color: 'bg-cyan-50 border-cyan-200' },
+  community_membership: { icon: '👥', color: 'bg-amber-50 border-amber-200' },
   platform_update: { icon: '🛠️', color: 'bg-slate-50 border-slate-200' },
 };

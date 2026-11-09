@@ -37,6 +37,8 @@ import { useTranslation } from '@/hooks/use-translation';
 import { CommunityLibrary } from '@/components/community/CommunityLibrary';
 import { CommunityConstitution } from '@/components/community/CommunityConstitution';
 import { CommunityForum } from '@/components/community/CommunityForum';
+import { RemovalPanel, RemoveMemberButton, useRemovalOverview } from '@/components/community/MemberRemoval';
+import { removalModeFor } from '@shared/member-removal';
 import ShareButton from '@/components/ShareButton';
 import {
   getCommunityDashboardMetrics,
@@ -154,6 +156,7 @@ export default function CommunityDashboardPage() {
   }, [communityId]);
 
   const isMember = !!user && (membership.status === 'member' || !!summary?.currentUserRole);
+  const removals = useRemovalOverview(communityId, isMember);
 
   // Inline joins also refresh the dashboard's legacy state and hidden content.
   const refreshSummary = () => api.get<CommunitySummary>(`/api/communities/${communityId}/summary`).then((response) => setSummary(response.data));
@@ -459,6 +462,16 @@ export default function CommunityDashboardPage() {
         </TabsContent>
         
         <TabsContent value="members">
+          {isMember && (
+            <div className="mb-4">
+              <RemovalPanel
+                communityId={community.id}
+                overview={removals.data}
+                canLift={canManageSettings && removalModeFor(community.type) === 'admin'}
+                onChange={() => { refreshMembers(); removals.reload(); }}
+              />
+            </div>
+          )}
           {canManageSettings && (
             <Card className="mb-4">
               <CardHeader>
@@ -666,6 +679,22 @@ export default function CommunityDashboardPage() {
                             : (t('community.promote') || 'Προαγωγή σε διαχειριστή')}
                         </Button>
                       )}
+                      {(() => {
+                        if (!user || !isMember || m.userId === user.id || m.role === 'founder') return null;
+                        const mode = removalModeFor(community.type);
+                        if (mode === 'admin' && !(canManageSettings && (m.role !== 'admin' || currentUserRole === 'founder'))) return null;
+                        if (removals.data?.votes.some((v) => v.status === 'open' && v.target?.id === m.userId)) {
+                          return <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-300">{t('removal.vote_open_badge')}</Badge>;
+                        }
+                        return (
+                          <RemoveMemberButton
+                            communityId={community.id}
+                            member={m}
+                            mode={mode}
+                            onDone={() => { refreshMembers(); removals.reload(); }}
+                          />
+                        );
+                      })()}
                     </li>
                   ))}
                 </ul>
