@@ -79,7 +79,7 @@ export function DiscordSettingsCard({ communityId }: { communityId: string | num
   );
 
   return (
-    <Card className="mt-6">
+    <Card className="mb-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><SiDiscord className="h-5 w-5 text-[#5865F2]" />Discord</CardTitle>
         <CardDescription>{t('discord.card_help')}</CardDescription>

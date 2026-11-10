@@ -188,6 +188,7 @@ export default function CommunitySettingsPage() {
         {t('common.back')}
       </Button>
 
+        {communityId && user && <DiscordSettingsCard communityId={communityId} />}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -540,7 +541,6 @@ export default function CommunitySettingsPage() {
             )}
           </CardContent>
         </Card>
-        {communityId && user && <DiscordSettingsCard communityId={communityId} />}
     </AppShell>
   );
 }

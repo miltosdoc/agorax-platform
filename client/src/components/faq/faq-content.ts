@@ -241,6 +241,23 @@ const el: FaqCopy = {
           ],
         },
         {
+          id: 'remove-member',
+          q: 'Μπορεί κάποιος να αφαιρεθεί από μια κοινότητα;',
+          short: 'Ναι, με αιτιολογία. Σε κοινότητα με διαχειριστές τον αφαιρεί ένας διαχειριστής. Σε αυτόνομη κοινότητα αποφασίζουν τα μέλη με ψηφοφορία.',
+          body: [
+            'Ο ιδρυτής δεν αφαιρείται ποτέ. Σε κοινότητα με διαχειριστές, οι διαχειριστές αφαιρούν μέλη και μόνο ο ιδρυτής αφαιρεί διαχειριστή. Σε αυτόνομη κοινότητα, όποιο μέλος θέλει ξεκινά ψηφοφορία από τη λίστα μελών:',
+          ],
+          bullets: [
+            'Όλα τα μέλη ειδοποιούνται, και το μέλος μπορεί να απαντήσει πριν ψηφίσουν οι άλλοι.',
+            'Η αφαίρεση περνά με τα ⅔ των ψήφων και τουλάχιστον 3 ψηφίσαντες (ή την απαρτία της κοινότητας, αν είναι μεγαλύτερη).',
+            'Η ψηφοφορία διαρκεί 7 ημέρες και κλείνει νωρίτερα μόλις το αποτέλεσμα είναι βέβαιο.',
+            'Ψηφίζουν μόνο όσοι ήταν μέλη πριν ανοίξει, και φαίνονται μόνο τα σύνολα, ποτέ ποιος ψήφισε τι.',
+            'Αν η ψηφοφορία δεν περάσει, νέα ψηφοφορία για το ίδιο άτομο γίνεται μόνο μετά από 30 ημέρες.',
+            'Όποιος αφαιρεθεί ενημερώνεται για τον λόγο και μπορεί να ξαναγίνει μέλος μετά από 30 ημέρες. Οι προτάσεις, τα σχόλια και οι ψήφοι που έχει ήδη δώσει παραμένουν.',
+            'Κάθε αφαίρεση καταγράφεται στο αρχείο αφαιρέσεων, που βλέπουν όλα τα μέλη.',
+          ],
+        },
+        {
           id: 'constitution',
           q: 'Τι είναι το Σύνταγμα της κοινότητας;',
           short: 'Ένα κείμενο που γράφεται μόνο του: οι κανόνες που ισχύουν και οι αποφάσεις που πέρασαν, σε μία σελίδα.',
@@ -559,6 +576,23 @@ const en: FaqCopy = {
             'In an autonomous community every rule is a vote that never closes: change or withdraw your vote whenever you like.',
             'The option with the most votes wins; a tie keeps the current value.',
             'Not even the founder can change a rule alone, though only the founder can change the kind of community.',
+          ],
+        },
+        {
+          id: 'remove-member',
+          q: 'Can someone be removed from a community?',
+          short: 'Yes, with a stated reason. In a community with admins, an admin removes them. In an autonomous community, the members decide by vote.',
+          body: [
+            'The founder can never be removed. In a community with admins, admins remove members and only the founder removes an admin. In an autonomous community, any member can start a vote from the member list:',
+          ],
+          bullets: [
+            'All members are notified, and the person can reply before the others vote.',
+            "Removal passes with ⅔ of the votes cast and at least 3 voters (or the community's quorum, if higher).",
+            'The vote runs for 7 days and closes early once the result is certain.',
+            'Only people who were members when it opened can vote, and only totals are shown, never who voted which way.',
+            'If the vote fails, a new vote on the same person can only start after 30 days.',
+            'Someone removed is told why and can rejoin after 30 days. Their proposals, comments and votes already cast stay.',
+            'Every removal is recorded in the removal log, which all members can see.',
           ],
         },
         {
