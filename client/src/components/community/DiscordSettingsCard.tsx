@@ -131,6 +131,17 @@ export function DiscordSettingsCard({ communityId }: { communityId: string | num
             </div>
           </>
         )}
+        <details className="rounded-lg border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">{t('discord.posted_title')}</summary>
+          <ul className="mt-2 space-y-1 text-muted-foreground">
+            <li>📝 {t('discord.posted_new')}</li>
+            <li>🗳️ {t('discord.posted_vote')}</li>
+            <li>⏰ {t('discord.posted_closing')}</li>
+            <li>✅ {t('discord.posted_decided')}</li>
+            <li>🎙️ {t('discord.posted_meeting')}</li>
+          </ul>
+          <p className="mt-2 text-muted-foreground">{t('discord.posted_once')}</p>
+        </details>
         <p className="text-xs text-muted-foreground">{t('discord.what_is_posted')}</p>
         {notice && <p className="text-sm">{notice}</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
