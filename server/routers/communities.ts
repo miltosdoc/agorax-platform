@@ -35,6 +35,7 @@ import {
   liftRemoval, openRemovalVote, removalOverview, removeMember, setRemovalResponse,
 } from '../utils/member-removal';
 import { logAdminAction } from '../utils/admin-action-logger';
+import { registerDiscordRoutes } from './discord';
 import { getCommunityJoinStatus } from '@shared/community-membership';
 import { ACTIVE_PROPOSAL_STATES } from '@shared/activity-feed';
 import {
@@ -49,6 +50,8 @@ import {
 } from '../utils/community-visibility';
 
 export function registerCommunitiesRoutes(app: Express): void {
+  // Discord sign-in and each community's Discord channel (routers/discord.ts).
+  registerDiscordRoutes(app);
   app.get("/api/communities", async (req, res) => {
     try {
       const userId = req.user?.id;

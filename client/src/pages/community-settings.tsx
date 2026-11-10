@@ -27,6 +27,7 @@ import {
   type CommunityVisibilityLevel, type ConstitutionScope,
 } from '@shared/community-settings';
 import { AutonomousSettingsView } from './community-settings-autonomous';
+import { DiscordSettingsCard } from '@/components/community/DiscordSettingsCard';
 import { VoteRulesSection, type VoteRulesForm } from '@/components/community/VoteRulesSection';
 import { voteRulesFor } from '@shared/proposal-kinds';
 import { useAuth } from '@/hooks/use-auth';
@@ -539,6 +540,7 @@ export default function CommunitySettingsPage() {
             )}
           </CardContent>
         </Card>
+        {communityId && user && <DiscordSettingsCard communityId={communityId} />}
     </AppShell>
   );
 }

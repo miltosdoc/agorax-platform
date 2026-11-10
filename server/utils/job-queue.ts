@@ -32,7 +32,8 @@ export type JobType =
   | 'send_email'            // One optional notification email to one member
   | 'send_juror_email'      // "You were drawn by lot" — always sent, ignores preferences
   | 'chain_anchor'          // Publish vote-chain head hashes to the external anchor repo
-  | 'removal_vote_sweep';   // Settle member-removal votes past their deadline
+  | 'removal_vote_sweep'    // Settle member-removal votes past their deadline
+  | 'discord_closing_sweep'; // "Vote closes soon" posts to connected Discord channels
 
 export interface JobPayload {
   type: JobType;

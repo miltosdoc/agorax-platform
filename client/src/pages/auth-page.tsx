@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { loginUserSchema, registerUserSchema } from "@shared/schema";
 import { CURRENT_CONSENT_VERSION } from "@shared/consent";
 import { FcGoogle } from "react-icons/fc";
+import { SiDiscord } from "react-icons/si";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   BUTTON_PRIMARY,
@@ -45,6 +46,36 @@ function startGoogleAuth() {
   const path = safeAuthReturnTo(currentUrl.searchParams.get('returnTo'));
   const mobile = isNativeApp() ? '&mobile=1' : '';
   window.location.href = `/auth/google?returnTo=${encodeURIComponent(path)}${mobile}`;
+}
+
+// Sign in with Discord (server/routers/discord.ts). Web only: the Android
+// app's deep-link handoff exists for Google alone, so the button is hidden
+// there, and it only appears once the server has Discord credentials.
+function startDiscordAuth() {
+  const currentUrl = new URL(window.location.href);
+  const path = safeAuthReturnTo(currentUrl.searchParams.get('returnTo'));
+  window.location.href = `/auth/discord?returnTo=${encodeURIComponent(path)}`;
+}
+
+function DiscordButton({ label }: { label: string }) {
+  const { t } = useTranslation();
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    if (isNativeApp()) return;
+    fetch('/api/auth/providers').then((r) => r.json()).then((p) => setEnabled(!!p?.discord)).catch(() => {});
+  }, []);
+  const error = new URLSearchParams(window.location.search).get('error');
+  const errorKey = error && error.startsWith('discord_') ? `auth.${error}` : null;
+  if (!enabled) return null;
+  return (
+    <>
+      {errorKey && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{t(errorKey)}</p>}
+      <button type="button" className={BUTTON_SECONDARY} onClick={startDiscordAuth}>
+        <SiDiscord className="h-5 w-5 text-[#5865F2]" />
+        {label}
+      </button>
+    </>
+  );
 }
 
 async function getFingerprint(): Promise<string | undefined> {
@@ -305,6 +336,7 @@ function LoginForm({ onSubmit, onSwitchToRegister }: { onSubmit: () => void; onS
           <FcGoogle className="h-5 w-5" />
           {t('auth.signInWithGoogle')}
         </button>
+        <DiscordButton label={t('auth.signInWithDiscord')} />
       </form>
     </Form>
   );
@@ -488,6 +520,7 @@ function RegisterForm({ onSubmit, onSwitchToLogin }: { onSubmit: () => void; onS
           <FcGoogle className="h-5 w-5" />
           {t('auth.signUpWithGoogle')}
         </button>
+        <DiscordButton label={t('auth.signUpWithDiscord')} />
       </form>
     </Form>
   );

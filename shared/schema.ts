@@ -452,6 +452,37 @@ export const communityRemovals = pgTable("community_removals", {
 export type CommunityRemovalVote = typeof communityRemovalVotes.$inferSelect;
 export type CommunityRemoval = typeof communityRemovals.$inferSelect;
 
+// ─── Discord bridge (migration 0065) ──────────────────────────────
+// A community's Discord channel webhook. Separate from `communities`
+// because that row is served publicly and the webhook URL is a secret.
+// See server/utils/discord.ts.
+
+export const communityDiscord = pgTable("community_discord", {
+  communityId: integer("community_id").primaryKey().references(() => communities.id, { onDelete: "cascade" }),
+  webhookUrl: text("webhook_url").notNull(),
+  channelId: text("channel_id"),
+  guildId: text("guild_id"),
+  webhookName: text("webhook_name"),
+  // Post even though the community's content is members-only: the admin
+  // confirmed the Discord channel is limited to the community's members.
+  allowPrivate: boolean("allow_private").notNull().default(false),
+  setByUserId: integer("set_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// One row per announcement already posted, so nothing posts twice.
+export const discordPosts = pgTable("discord_posts", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  subjectId: integer("subject_id").notNull(),
+  postedAt: timestamp("posted_at").notNull().defaultNow(),
+}, (table) => ({
+  discordPostsOnce: uniqueIndex('discord_posts_once').on(table.communityId, table.event, table.subjectId),
+}));
+
 // ─── Proposals (Προβουλεύματα) ────────────────────────────────────
 
 export const proposals = pgTable("proposals", {

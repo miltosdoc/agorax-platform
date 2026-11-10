@@ -441,6 +441,11 @@ async function handleConferenceReminder(_payload: JobPayload): Promise<void> {
  * tamper-evident to someone who already trusts the server — see
  * docs/VOTE_CHAIN_ANCHORING.md. A no-op when ANCHOR_GITHUB_* is unset.
  */
+async function handleDiscordClosingSweep(_payload: JobPayload): Promise<void> {
+  const { sweepClosingVotes } = await import('./discord');
+  await sweepClosingVotes();
+}
+
 async function handleRemovalVoteSweep(_payload: JobPayload): Promise<void> {
   const { sweepRemovalVotes } = await import('./member-removal');
   const settled = await sweepRemovalVotes();
@@ -477,6 +482,7 @@ export function registerAllHandlers(): void {
   registerHandler('send_juror_email', handleSendJurorEmail);
   registerHandler('chain_anchor', handleChainAnchor);
   registerHandler('removal_vote_sweep', handleRemovalVoteSweep);
+  registerHandler('discord_closing_sweep', handleDiscordClosingSweep);
 }
 
 // ─── Start the worker ───────────────────────────────────────────────────────
@@ -550,10 +556,15 @@ export function startJobQueue(): () => void {
   const removalSweepId = setInterval(() => {
     enqueueJob({ type: 'removal_vote_sweep', data: {}, priority: 'low' }).catch(() => {});
   }, 15 * 60_000);
+  // "Closes in under a day" posts for Discord-connected communities.
+  const discordSweepId = setInterval(() => {
+    enqueueJob({ type: 'discord_closing_sweep', data: {}, priority: 'low' }).catch(() => {});
+  }, 15 * 60_000);
 
   return () => {
     stopWorker();
     clearInterval(removalSweepId);
+    clearInterval(discordSweepId);
     clearInterval(anchorSweepId);
     clearTimeout(firstAnchorId);
     clearInterval(autoAdvanceId);

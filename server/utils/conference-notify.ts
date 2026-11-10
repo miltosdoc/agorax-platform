@@ -39,6 +39,8 @@ export async function notifyConferenceScheduled(
   authorUserId: number,
   kind: 'conference_scheduled' | 'conference_starting' = 'conference_scheduled',
 ): Promise<void> {
+  // Once per room into the community's Discord channel, if it has one.
+  void import('./discord').then((d) => d.announceMeeting(input)).catch(() => {});
   try {
     const members = await db
       .select({ userId: communityMembers.userId })

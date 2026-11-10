@@ -164,6 +164,8 @@ export async function notifyNewProposal(
   authorUserId: number,
   opts: { kind?: string | null; collecting?: boolean } = {},
 ): Promise<number> {
+  // Also into the community's Discord channel, if it has one. Never awaited.
+  void import('./discord').then((d) => d.announceNewProposal(proposalId, { collecting: opts.collecting })).catch(() => {});
   const members = await db.execute(sql`
     SELECT cm.user_id FROM community_members cm
     WHERE cm.community_id = ${communityId} AND cm.user_id <> ${authorUserId}
@@ -330,6 +332,9 @@ export async function notifyProposalAdvanced(
   newStatus: string,
   proposalTitle: string
 ): Promise<number> {
+  if (newStatus === 'decided') {
+    void import('./discord').then((d) => d.announceDecided(proposalId)).catch(() => {});
+  }
   // Get all community members
   const members = await db.execute(sql`
     SELECT cm.user_id FROM community_members cm
@@ -473,6 +478,7 @@ export async function notifyVoteStarted(
   proposalTitle: string,
   kind?: string | null,
 ): Promise<number> {
+  void import('./discord').then((d) => d.announceVoteStarted(proposalId)).catch(() => {});
   const members = await db.execute(sql`
     SELECT cm.user_id FROM community_members cm
     WHERE cm.community_id = ${communityId}
