@@ -94,12 +94,16 @@ async function findOrCreateUser(profile: DiscordProfile): Promise<SignInResult> 
     // An account already tied to Google keeps that link (one provider per
     // row); later Discord sign-ins find it again through the verified email.
     const keepProvider = existing.provider && existing.provider !== 'local' && existing.provider !== 'discord';
+    const changes = {
+      ...(keepProvider ? {} : { provider: 'discord', providerId: profile.id }),
+      ...(existing.profilePicture || !avatar ? {} : { profilePicture: avatar }),
+      ...(!existing.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {}),
+    };
+    // Often nothing to change (a Google-linked, verified account with a
+    // picture), and an empty update is an error, not a no-op.
+    if (Object.keys(changes).length === 0) return { user: existing };
     const [updated] = await db.update(users)
-      .set({
-        ...(keepProvider ? {} : { provider: 'discord', providerId: profile.id }),
-        ...(existing.profilePicture ? {} : { profilePicture: avatar }),
-        ...(!existing.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {}),
-      })
+      .set(changes)
       .where(eq(users.id, existing.id))
       .returning();
     return { user: updated };
