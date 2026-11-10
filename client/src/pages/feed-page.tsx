@@ -124,13 +124,24 @@ export default function FeedPage() {
       <section className="space-y-4" aria-label={t('activity.filters')}>
         <div className="flex flex-wrap gap-2 border-b border-line pb-3" role="group" aria-label={t('activity.scope')}>
           {(['mine', 'discover', 'all'] as FeedScope[]).map(value => <button key={value} type="button" aria-pressed={scope === value} onClick={() => { setScope(value); setCommunity(''); }} className={`min-h-11 rounded-full px-3 text-sm font-medium transition-colors sm:px-4 sm:text-base ${scope === value ? 'bg-ink text-paper' : 'bg-surface text-ink-soft hover:bg-sunken'}`} data-testid={`feed-scope-${value}`}><span className="sm:hidden">{t(value === 'all' ? 'feed.filterAll' : `activity.${value}`)}</span><span className="hidden sm:inline">{t(`activity.${value}`)}</span></button>)}
+          {/* Stage: quiet text, not another row of pills. It used to sit only
+              in the folded filters, so most people never learned completed
+              topics exist at all. */}
+          <div className="ml-auto flex items-center text-sm" role="group" aria-label={t('activity.stageLabel')} data-testid="feed-stage-switch">
+            {(['active', 'completed', 'all'] as FeedStage[]).map((value, i) => <span key={value} className="flex items-center">
+              {i > 0 && <span aria-hidden="true" className="text-ink-faint">·</span>}
+              <button type="button" aria-pressed={stage === value} onClick={() => setStage(value)}
+                className={`min-h-11 px-2 underline-offset-4 transition-colors ${stage === value ? 'font-medium text-ink underline decoration-2 decoration-kyanos' : 'text-ink-soft hover:text-ink'}`}>
+                {t(`activity.stageShort.${value}`)}
+              </button>
+            </span>)}
+          </div>
         </div>
         <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-5 w-5 text-ink-faint" /><Input aria-label={t('activity.searchLabel')} placeholder={t('activity.search')} value={search} onChange={event => setSearch(event.target.value)} className="pl-10" data-testid="feed-search" /></div>
         <div className="flex flex-wrap items-center gap-2" data-testid="feed-filter">{filters.map(([value, key]) => <button type="button" key={value} aria-pressed={kind === value} onClick={() => setKind(value)} className={`hidden min-h-11 items-center rounded-lg px-3 text-sm font-medium sm:inline-flex ${kind === value ? 'bg-kyanos-wash text-kyanos' : 'text-ink-soft hover:bg-sunken'}`}>{t(key)}</button>)}
           <details className="ml-auto"><summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm text-ink-soft"><SlidersHorizontal className="h-4 w-4" />{t('activity.filters')}</summary>
             <div className="mt-2 flex flex-wrap gap-3 rounded-xl border border-line bg-surface p-4">
               <label className="grid gap-2 text-sm text-ink-soft sm:hidden">{t('activity.contentLabel')}<select value={kind} onChange={event => setKind(event.target.value as FeedKind)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink" data-testid="feed-kind-mobile">{filters.map(([value, key]) => <option key={value} value={value}>{t(key)}</option>)}</select></label>
-              <label className="grid gap-2 text-sm text-ink-soft">{t('activity.stageLabel')}<select value={stage} onChange={event => setStage(event.target.value as FeedStage)} className="min-h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink" data-testid="feed-stage"><option value="active">{t('activity.current')}</option><option value="all">{t('activity.everyStage')}</option><option value="completed">{t('activity.completed')}</option></select></label>
               <label className="grid gap-2 text-sm text-ink-soft">{t('activity.communityLabel')}<select value={community} onChange={event => setCommunity(event.target.value)} className="min-h-11 max-w-full rounded-lg border border-line bg-surface px-3 text-base text-ink" data-testid="feed-community"><option value="">{t('activity.allCommunities')}</option>{directory.data?.filter(c => scope !== 'mine' || c.viewerIsMember).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             </div>
           </details>
@@ -138,8 +149,12 @@ export default function FeedPage() {
       </section>
       {query.isPending ? <div className="space-y-4" aria-busy="true">{[0, 1, 2].map(i => <div key={i} className="h-56 animate-pulse rounded-xl border border-line bg-surface" />)}</div>
         : query.isError ? <div role="alert" className="rounded-xl border border-line bg-surface p-6"><p>{t('activity.loadFailed')}</p><Button variant="outline" onClick={() => void query.refetch()} className="mt-4">{t('activity.retry')}</Button></div>
-        : items.length === 0 ? <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-10 text-center"><Users className="mx-auto mb-4 h-8 w-8 text-kyanos" /><h2 className="text-xl font-semibold">{t(scope === 'mine' ? 'activity.emptyMine' : 'activity.empty')}</h2><p className="mt-3 text-base text-ink-soft">{t('activity.emptyHint')}</p><div className="mt-5 flex flex-wrap justify-center gap-3"><Button asChild><Link href="/communities?view=discover">{t('activity.exploreCommunities')}</Link></Button><Button variant="outline" onClick={reset}>{t('activity.reset')}</Button></div></div>
+        : items.length === 0 ? <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-10 text-center"><Users className="mx-auto mb-4 h-8 w-8 text-kyanos" /><h2 className="text-xl font-semibold">{t(scope === 'mine' ? 'activity.emptyMine' : 'activity.empty')}</h2><p className="mt-3 text-base text-ink-soft">{t('activity.emptyHint')}</p><div className="mt-5 flex flex-wrap justify-center gap-3"><Button asChild><Link href="/communities?view=discover">{t('activity.exploreCommunities')}</Link></Button>{stage === 'active' && <Button variant="outline" onClick={() => setStage('completed')}>{t('activity.seeCompleted')}</Button>}<Button variant="outline" onClick={reset}>{t('activity.reset')}</Button></div></div>
         : <div className="space-y-5" data-testid="activity-feed-list">{items.map(item => <ActivityFeedCard key={item.feedKey} item={item} />)}</div>}
+      {stage === 'active' && !query.isPending && !query.isError && !query.hasNextPage && items.length > 0 && <p className="text-center text-sm text-ink-soft">
+        {t('activity.endOfCurrent')}{' '}
+        <button type="button" onClick={() => { setStage('completed'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="min-h-11 font-medium text-kyanos underline-offset-4 hover:underline">{t('activity.seeCompleted')} →</button>
+      </p>}
       {query.hasNextPage && <div className="flex justify-center"><Button variant="outline" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{t('activity.loadMore')}</Button></div>}
     </div>
   </AppShell>;
