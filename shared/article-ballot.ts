@@ -17,7 +17,7 @@
 
 import { meetsMajority, type MajorityRule } from './proposal-kinds';
 import {
-  NEW_ARTICLE_REF, PREAMBLE_REF, sectionText, statuteSections, type TextSection,
+  NEW_ARTICLE_REF, PREAMBLE_REF, headingLabel, sectionText, statuteSections, type TextSection,
 } from './statute-articles';
 
 export interface ArticleQuestion {
@@ -214,7 +214,7 @@ export function buildArticleBallot(
     const text = sectionText(finalText, s);
     return {
       ref: s.ref,
-      heading: s.heading,
+      heading: headingLabel(s.heading),
       versions: [text],
       counterIds: [],
       changed: originalOf(s.ref) !== normalise(text),
@@ -231,7 +231,7 @@ export function buildArticleBallot(
       for (const s of alt) {
         if (!s.heading || questions.some((q) => q.ref === s.ref)) continue;
         questions.push({
-          ref: s.ref, heading: s.heading, versions: [sectionText(counter.text, s)], counterIds: [counter.id], changed: true,
+          ref: s.ref, heading: headingLabel(s.heading), versions: [sectionText(counter.text, s)], counterIds: [counter.id], changed: true,
         });
       }
       continue;

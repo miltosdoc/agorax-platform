@@ -224,7 +224,10 @@ describe('proposal compiler — kinds', () => {
       kind: 'statute', question: 'Νέο καταστατικό του Συλλόγου', solution: statute, category: 'governance',
     }));
     const draft = await compileProposal(statute);
-    expect(chatCompletion).toHaveBeenCalledTimes(1);
+    // A long paste: the model sees its opening only and the text is used as
+    // pasted (the calls after the first are the attempt to lay it out in
+    // articles, which fails here and leaves the text as it was).
+    expect(String(chatCompletion.mock.calls[0][0].messages[1].content).length).toBeLessThan(4000);
     expect(draft.solution).toBe(statute);
   });
 

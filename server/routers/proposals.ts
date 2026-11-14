@@ -493,6 +493,23 @@ export function registerProposalsRoutes(app: Express): void {
         res.status(500).json({ message: 'Δεν ήταν δυνατό να διαβαστεί το έγγραφο.' });
       }
     });
+  // Lay a statute's text out in articles, so it can be voted article by
+  // article (utils/statute-structurer.ts). The form offers it when a statute
+  // has no articles the platform can read; the author checks the result.
+  app.post("/api/proposals/statute-structure", requireAuth, async (req: any, res) => {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (text.length < 30 || text.length > TEXT_MAX_CHARS) {
+      return res.status(400).json({ message: `Γράψτε από 30 έως ${greekNumber(TEXT_MAX_CHARS)} χαρακτήρες.` });
+    }
+    if (!isLlmConfigured()) return res.status(503).json({ message: 'Το AI δεν είναι διαθέσιμο αυτή τη στιγμή.' });
+    try {
+      const { structureStatute } = await import('../utils/statute-structurer');
+      res.json({ text: await structureStatute(text) });
+    } catch (err: any) {
+      console.warn(`[statute-structurer] failed (${text.length} chars): ${err?.message ?? err}`);
+      res.status(502).json({ message: 'Δεν ήταν δυνατό να χωριστεί σε άρθρα. Δοκιμάστε ξανά σε λίγο· το κείμενό σας έμεινε όπως ήταν.' });
+    }
+  });
   // AI-assisted drafting: natural-language intent → editable form fields.
   // Mirrors the poll compiler UX (/api/surveys). The result is a draft the
   // author edits before submitting — the validation gate still runs on submit.

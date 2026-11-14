@@ -8,11 +8,12 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Pencil } from 'lucide-react';
+import { AlertTriangle, Loader2, Pencil, Sparkles } from 'lucide-react';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useTranslation } from '@/hooks/use-translation';
-import { replaceSections, sectionText, statuteSections } from '@shared/statute-articles';
+import { headingLabel, repeatedArticleRefs, replaceSections, sectionText, statuteSections } from '@shared/statute-articles';
 
 interface ArticlePreviewProps {
   text: string;
@@ -62,7 +63,7 @@ export function ArticlePreview({ text, onChange, withOptions, codrafted }: Artic
             <li key={s.ref} data-testid={`article-preview-${s.ref}`}>
               <details open={isEditing || undefined}>
                 <summary className="cursor-pointer px-3 py-2 text-sm">
-                  {s.heading ?? <span className="text-foreground/70">{t('proposal.ballot_preview_preamble')}</span>}
+                  {s.heading ? headingLabel(s.heading) : <span className="text-foreground/70">{t('proposal.ballot_preview_preamble')}</span>}
                 </summary>
                 <div className="space-y-2 px-3 pb-3">
                   {isEditing ? (
@@ -107,6 +108,54 @@ export function ArticlePreview({ text, onChange, withOptions, codrafted }: Artic
         })}
       </ol>
       <p className="text-xs text-foreground/70">{t('proposal.ballot_preview_headings')}</p>
+    </section>
+  );
+}
+
+/**
+ * A statute whose articles the platform cannot read would be voted only on
+ * the whole. Say so, and offer to have the AI lay it out in articles; the
+ * preview above then shows each article for the author to check.
+ */
+export function StatuteStructureHint({ text, onChange }: { text: string; onChange: (text: string) => void }) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (text.trim().length < 30) return null;
+  const repeated = repeatedArticleRefs(text);
+  if (repeated.length > 0) {
+    return (
+      <p className="flex items-start gap-2 rounded-lg border border-kata/30 bg-kata-wash/40 p-4 text-sm text-foreground" data-testid="statute-repeated-articles">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kata" />
+        {t('proposal.statute_repeated', { refs: repeated.map((r) => `${t('workspace.amendments.articleShort', { ref: r })}`).join(', ') })}
+      </p>
+    );
+  }
+
+  const structure = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post<{ text: string }>('/api/proposals/statute-structure', { text });
+      onChange(r.data.text);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || t('proposal.statute_structure_failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="space-y-3 rounded-lg border border-kata/30 bg-kata-wash/40 p-4" data-testid="statute-structure-hint">
+      <p className="flex items-start gap-2 text-sm text-foreground">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-kata" />
+        {t('proposal.statute_no_articles')}
+      </p>
+      <Button type="button" variant="outline" className="gap-2" onClick={structure} disabled={busy} data-testid="statute-structure-button">
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        {busy ? t('proposal.statute_structuring') : t('proposal.statute_structure')}
+      </Button>
+      {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
     </section>
   );
 }

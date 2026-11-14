@@ -25,7 +25,7 @@ import {
 } from '@shared/proposal-kinds';
 import { constitutionKinds, synthesisJuryTerms } from '@shared/community-settings';
 import { adoptedText, isArticleBallot } from '@shared/article-ballot';
-import { sectionText, statuteSections } from '@shared/statute-articles';
+import { headingLabel, sectionText, statuteSections } from '@shared/statute-articles';
 import { canViewCommunityContentById } from './community-visibility';
 import { aiAvailable, ensureArticles, getCachedArticles, pendingCount, type AiArticle } from './constitution-ai';
 
@@ -475,7 +475,7 @@ function consolidatedStatute(decisions: Decision[]): {
     for (const section of sections) {
       if (!section.heading) continue;
       const text = sectionText(d.text, section);
-      latest.set(section.ref, { heading: section.heading, body: text.slice(section.heading.length).trim(), decision: d });
+      latest.set(section.ref, { heading: headingLabel(section.heading), body: text.slice(section.heading.length).trim(), decision: d });
     }
   }
   const order = (ref: string) => {

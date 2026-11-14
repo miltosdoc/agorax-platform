@@ -13,9 +13,12 @@ import {
   NEW_ARTICLE_REF,
   PREAMBLE_REF,
   appendArticles,
+  composeStatute,
+  headingLabel,
   articleSectionsFor,
   isArticleRef,
   nextArticleNumber,
+  repeatedArticleRefs,
   opensWithHeading,
   replaceSections,
   sectionText,
@@ -182,5 +185,59 @@ describe('statute articles — merging', () => {
     ]);
     expect(merged.text).toBe('Όλο το κείμενο, συγχωνευμένο.');
     expect(String(chatCompletion.mock.calls[0][0].messages[1].content)).toContain('Ιδρύεται σωματείο');
+  });
+});
+
+describe('headings pasted with Markdown or a comma', () => {
+  const pasted = [
+    '**Καταστατικό ΕΜΕΙΣ**', '',
+    '**Άρθρο 1, βασικές αρχές.**', '', '1. Πρώτη αρχή.', '',
+    '**Άρθρο 2, λήψη αποφάσεων.**', '', '1. Αποφασίζουμε μαζί.', '',
+    '## Άρθρο 3 - Νέα μέλη', '', '1. Συνάντηση.', '',
+    '**Άρθρο 4**', '', '1. Κώδικας.',
+  ].join('\n');
+
+  it('finds every article and keeps the text byte for byte', () => {
+    const sections = statuteSections(pasted)!;
+    expect(sections.map((s) => s.ref)).toEqual([PREAMBLE_REF, '1', '2', '3', '4']);
+    expect(sections.map((s) => pasted.slice(s.start, s.end)).join('')).toBe(pasted);
+  });
+
+  it('shows headings without the Markdown', () => {
+    const labels = statuteSections(pasted)!.filter((s) => s.heading).map((s) => headingLabel(s.heading!));
+    expect(labels).toEqual(['Άρθρο 1, βασικές αρχές.', 'Άρθρο 2, λήψη αποφάσεων.', 'Άρθρο 3 - Νέα μέλη', 'Άρθρο 4']);
+  });
+
+  it('still ignores a reference inside a paragraph', () => {
+    expect(statuteSections('Κείμενο\nΣύμφωνα με το άρθρο 5, ισχύει.\nΆρθρο 1 - Α\nx\nΆρθρο 2 - Β\ny')!.map((s) => s.ref))
+      .toEqual([PREAMBLE_REF, '1', '2']);
+  });
+});
+
+describe('composeStatute', () => {
+  it('writes articles in the one heading form the platform reads', () => {
+    const text = composeStatute('Καταστατικό', [
+      { number: '1', title: '**Βασικές αρχές.**', body: '1. Πρώτη.\n\n2. Δεύτερη.' },
+      { number: '2', title: '', body: 'Κείμενο.' },
+    ]);
+    expect(text).toBe('Καταστατικό\n\nΆρθρο 1 - Βασικές αρχές\n1. Πρώτη.\n\n2. Δεύτερη.\n\nΆρθρο 2\nΚείμενο.');
+    expect(statuteSections(text)!.map((s) => s.ref)).toEqual([PREAMBLE_REF, '1', '2']);
+  });
+});
+
+describe('model statutes', () => {
+  it('reads «Άρθρο 3ο (για …)» and a title in capitals on the next line', () => {
+    const text = 'Πρότυπο\nΆρθρο 1ο ΣΥΣΤΑΣΗ\n1. Κείμενο.\nΆρθρο 2ο (για Ένταξης)\nΣΚΟΠΟΣ\n1. Σκοπός.\nΆρθρο 3ο\nΣΥΝΘΕΣΗ ΚΑΙ ΘΗΤΕΙΑ\n1. Η διοίκηση.\nΆρθρο 4ο\n1. Χωρίς τίτλο.';
+    const sections = statuteSections(text)!;
+    expect(sections.map((s) => s.ref)).toEqual([PREAMBLE_REF, '1', '2', '3', '4']);
+    expect(sections.filter((s) => s.heading).map((s) => headingLabel(s.heading!)))
+      .toEqual(['Άρθρο 1ο ΣΥΣΤΑΣΗ', 'Άρθρο 2ο (για Ένταξης) ΣΚΟΠΟΣ', 'Άρθρο 3ο ΣΥΝΘΕΣΗ ΚΑΙ ΘΗΤΕΙΑ', 'Άρθρο 4ο']);
+    expect(sections.map((s) => text.slice(s.start, s.end)).join('')).toBe(text);
+  });
+
+  it('names an article that is there in more than one version', () => {
+    const text = 'Άρθρο 1 - Α\nx\nΆρθρο 2ο (για Α)\ny\nΆρθρο 2ο (για Β)\nz';
+    expect(statuteSections(text)).toBeNull();
+    expect(repeatedArticleRefs(text)).toEqual(['2']);
   });
 });

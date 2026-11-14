@@ -31,7 +31,46 @@ export const PREAMBLE_REF = 'preamble';
 // the line, a separator, or a capitalised title. «Άρθρο 5 του ν. …» inside a
 // paragraph is a reference, not a heading, and does not match. Pasted Word
 // text brings non-breaking spaces and, now and then, a decomposed «Ά».
-const HEADING = /^[ \t\u00A0]*(?:Άρθρο|Α\u0301ρθρο|ΑΡΘΡΟ|ΆΡΘΡΟ|Αρθρο)[ \t\u00A0]+(\d{1,3}[Α-ΩA-Z]?)(?:ον|ο)?(?=[ \t\u00A0]*(?:$|[-–—:.)]|\p{Lu}))[^\n]*/gmu;
+// Text pasted from a chat or a Markdown editor wraps the heading in bold or
+// starts it with «#», and many statutes write «Άρθρο 1, Βασικές αρχές» or
+// «Άρθρο 3ο (για …)». A title in capitals on the next line belongs to the
+// heading («Άρθρο 19ο» / «ΣΥΝΘΕΣΗ ΚΑΙ ΘΗΤΕΙΑ»): a line with no lower-case
+// letter and at least three capitals in a row.
+//
+// A chapter heading right above an article («ΚΕΦΑΛΑΙΟ Β΄ – Μέλη») is taken
+// into that article's heading, so it neither trails the article before it
+// nor is lost: it opens the chapter's first article, and is voted with it.
+const SP = '[ \\t\\u00A0]';
+const MD = '(?:\\*\\*|__|#{1,6}[ \\t]+)?';
+const ARTICLE_WORD = '(?:Άρθρο|Α\\u0301ρθρο|ΑΡΘΡΟ|ΆΡΘΡΟ|Αρθρο)';
+const CAPS_LINE = `\\n${SP}*(?=[^\\n]*\\p{Lu}{3})[^\\n\\p{Ll}]{3,150}`;
+const CHAPTER_LINE = `${MD}(?:ΚΕΦΑΛΑΙΟ|Κεφάλαιο|ΜΕΡΟΣ|Μέρος|ΤΜΗΜΑ|Τμήμα)${SP}+(?:[Α-Ω]{1,4}|\\d{1,3}|[IVXLC]{1,6})(?=${SP}|[΄'’ʹ.:–—-]|$)[^\\n]*(?:${CAPS_LINE})*`;
+const ARTICLE_LINE = `${MD}${ARTICLE_WORD}${SP}+(\\d{1,3}[Α-ΩA-Z]?)(?:ον|ο)?(?=${SP}*(?:$|[-–—:.,()*_]|\\p{Lu}))[^\\n]*(?:${CAPS_LINE}(?=\\n|$))?`;
+const HEADING = new RegExp(`^${SP}*(?:${CHAPTER_LINE}\\n(?:${SP}*\\n)*${SP}*)?${ARTICLE_LINE}`, 'gmu');
+const ARTICLE_START = new RegExp(`(?:^|\\n)${SP}*${MD}${ARTICLE_WORD}${SP}+\\d`, 'u');
+
+/** A heading's two parts: the chapter heading above the article, if any, and the article's own. */
+export function splitHeading(heading: string): { chapter: string | null; article: string } {
+  const m = heading.match(ARTICLE_START);
+  if (!m || m.index === 0) return { chapter: null, article: heading.trim() };
+  return { chapter: heading.slice(0, m.index).trim(), article: heading.slice(m.index).trim() };
+}
+
+/** A heading as shown to people: the article's own, without the Markdown around it. */
+export const headingLabel = (heading: string) =>
+  splitHeading(heading).article.replace(/^(?:\*\*|__|#{1,6}[ \t]+)/, '').replace(/(?:\*\*|__)[ \t]*$/, '')
+    .replace(/\s*\n\s*/g, ' ').trim();
+
+/**
+ * Article numbers that head more than one article — a model statute that
+ * offers alternative versions of an article («Άρθρο 3ο (για …)» three times).
+ * Only the author can choose which one is put to the vote.
+ */
+export function repeatedArticleRefs(text: string): string[] {
+  const seen = new Map<string, number>();
+  for (const m of text.matchAll(HEADING)) seen.set(m[1], (seen.get(m[1]) ?? 0) + 1);
+  return [...seen].filter(([, n]) => n > 1).map(([ref]) => ref);
+}
 
 /**
  * The text's sections — the preamble, if there is one, and each article —
@@ -39,11 +78,13 @@ const HEADING = /^[ \t\u00A0]*(?:Άρθρο|Α\u0301ρθρο|ΑΡΘΡΟ|ΆΡΘΡ
  * same number twice (a quoted law, say), which would leave an amendment's
  * article ambiguous.
  */
-export function statuteSections(text: string): TextSection[] | null {
+export function statuteSections(text: string, opts: { allowRepeats?: boolean } = {}): TextSection[] | null {
   const heads = Array.from(text.matchAll(HEADING));
   if (heads.length < 2) return null;
   const refs = heads.map((m) => m[1]);
-  if (new Set(refs).size !== refs.length) return null;
+  // allowRepeats is for the form's editor only, which shows the repeats so
+  // the author can keep one; nothing that votes or amends asks for it.
+  if (!opts.allowRepeats && new Set(refs).size !== refs.length) return null;
 
   const sections: TextSection[] = [];
   const firstStart = heads[0].index!;
@@ -109,4 +150,24 @@ export function appendArticles(text: string, articles: string): string {
 export function nextArticleNumber(sections: TextSection[]): number {
   const numbers = sections.map((s) => parseInt(s.ref, 10)).filter(Number.isFinite);
   return (numbers.length > 0 ? Math.max(...numbers) : 0) + 1;
+}
+
+/** One article as the AI hands it back: its number, a short title and the text under the heading. */
+export interface StatuteArticle {
+  number: string;
+  title: string;
+  body: string;
+}
+
+/**
+ * A statute written out in the one heading form the platform always reads:
+ * the preamble, then «Άρθρο N - Τίτλος» on its own line above each article.
+ */
+export function composeStatute(preamble: string, articles: StatuteArticle[]): string {
+  const parts = preamble.trim() ? [preamble.trim()] : [];
+  for (const a of articles) {
+    const title = headingLabel(a.title).replace(/[.:]\s*$/, '').trim();
+    parts.push(`${title ? `Άρθρο ${a.number} - ${title}` : `Άρθρο ${a.number}`}\n${a.body.trim()}`);
+  }
+  return parts.join('\n\n');
 }

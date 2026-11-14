@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { chatCompletion, LlmUnavailableError } from './llm-client';
 import { PROPOSAL_KINDS, TEXT_MAX_CHARS, kindRequiresText, type ProposalKind } from '../../shared/proposal-kinds';
+import { repeatedArticleRefs, statuteSections } from '../../shared/statute-articles';
 
 export const PROPOSAL_CATEGORIES = [
   'education', 'healthcare', 'infrastructure', 'environment',
@@ -127,12 +128,31 @@ export function restoreVerbatim(intent: string, solution: string): string {
   const tokens = intent.trim().split(/(\s+)/); // words at even indices, whitespace between
   const inWords = tokens.filter((_, i) => i % 2 === 0);
   if (inWords.length < out.length) return solution;
-  const start = inWords.length - out.length;
-  let same = 0;
-  for (let i = 0; i < out.length; i++) if (inWords[start + i] === out[i]) same++;
-  if (same === out.length || same / out.length < 0.98) return solution;
-  return tokens.slice(start * 2).join('');
+  // Where in the paste the copy starts: the paste itself, or its tail after
+  // a line of instruction, or (for one article) somewhere in the middle.
+  // Anchored on any of the first three words, in case the first was altered.
+  let best = -1, bestSame = 0;
+  const tried = new Set<number>();
+  for (let j = 0; j < 3 && j < out.length; j++) {
+    for (let k = 0; k < inWords.length; k++) {
+      if (inWords[k] !== out[j]) continue;
+      const start = k - j;
+      if (start < 0 || start + out.length > inWords.length || tried.has(start)) continue;
+      tried.add(start);
+      let same = 0;
+      for (let i = 0; i < out.length; i++) if (inWords[start + i] === out[i]) same++;
+      if (same > bestSame) { best = start; bestSame = same; }
+    }
+  }
+  // A slip or two, not a rewrite: up to 2% of the words, and at least one
+  // (a short article of 30 words would otherwise allow none).
+  if (best < 0 || out.length - bestSame > Math.max(1, Math.floor(out.length * 0.02))) return solution;
+  return tokens.slice(best * 2, (best + out.length) * 2 - 1).join('');
 }
+
+/** Over this, the intent is a pasted document (see compileProposal). */
+const PASTE_CHARS = 4000;
+const PASTE_PREVIEW_CHARS = 3000;
 
 export async function compileProposal(
   intent: string,
@@ -145,6 +165,14 @@ export async function compileProposal(
   const system = allowed.length < PROPOSAL_KINDS.length
     ? `${SYSTEM_PROMPT}\n\nThis community only holds these kinds of vote: ${allowed.join(', ')}. Never return any other "kind"; when the intent fits none of them, use "decision".`
     : SYSTEM_PROMPT;
+  // A long paste is a document, not a description: the model reads its
+  // opening to name it and say what kind of vote it is, and the text goes
+  // into the form as it is. Copying 30,000 characters back through the model
+  // took minutes and could change words; this takes seconds and cannot.
+  const pasted = intent.length > PASTE_CHARS;
+  const shown = pasted
+    ? `${intent.slice(0, PASTE_PREVIEW_CHARS)}\n\n[… the pasted document goes on: ${intent.length} characters in all. It is put into the form exactly as pasted — answer with "solution": "" and derive the other fields from what you see.]`
+    : intent;
   let lastErrors = '';
   for (let round = 1; round <= 2; round++) {
     const raw = await withOneRetry(() => chatCompletion({
@@ -153,18 +181,18 @@ export async function compileProposal(
         {
           role: 'user',
           content: round === 1
-            ? intent
-            : `${intent}\n\nYour previous output failed validation with these errors, fix them and return the corrected JSON only:\n${lastErrors}`,
+            ? shown
+            : `${shown}\n\nYour previous output failed validation with these errors, fix them and return the corrected JSON only:\n${lastErrors}`,
         },
       ],
       temperature: 0.4,
       // 64k budget: verbatim pass-through of a long paste must fit in the
       // output (Greek runs ~1 token per character), and reasoning models
       // on this endpoint spend hidden thinking tokens from the same pot.
-      maxTokens: 64000,
+      maxTokens: pasted ? 4000 : 64000,
       // Long verbatim outputs take longer than the 45s default; a whole
       // statute passed through (up to ~38k tokens) takes minutes.
-      timeoutMs: 600_000,
+      timeoutMs: pasted ? 120_000 : 600_000,
       jsonMode: true,
     }));
 
@@ -175,10 +203,27 @@ export async function compileProposal(
       lastErrors = 'Output was not valid JSON.';
       continue;
     }
+    if (pasted && parsed && typeof parsed === 'object') (parsed as Record<string, unknown>).solution = intent;
     const result = compiledProposalSchema.safeParse(parsed);
     if (result.success) {
-      const draft = { ...result.data, solution: restoreVerbatim(intent, result.data.solution) };
-      return allowed.includes(draft.kind) ? draft : { ...draft, kind: 'decision' };
+      const draft = { ...result.data, solution: pasted ? intent : restoreVerbatim(intent, result.data.solution) };
+      const final = allowed.includes(draft.kind) ? draft : { ...draft, kind: 'decision' as const };
+      // A statute is voted article by article, so it has to come back in
+      // articles the platform can read. When the text does not, the model
+      // lays it out (statute-structurer.ts); if that fails, the author still
+      // gets the text, and the form offers to try again.
+      // Not when an article is there twice: that is a choice between versions,
+      // the author's to make (the form says which).
+      if (final.kind === 'statute' && final.solution.trim() && !statuteSections(final.solution)
+        && repeatedArticleRefs(final.solution).length === 0) {
+        try {
+          const { structureStatute } = await import('./statute-structurer');
+          final.solution = await structureStatute(final.solution);
+        } catch (err: any) {
+          console.warn(`[proposal-compiler] could not lay the statute out in articles: ${err?.message ?? err}`);
+        }
+      }
+      return final;
     }
     lastErrors = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
   }

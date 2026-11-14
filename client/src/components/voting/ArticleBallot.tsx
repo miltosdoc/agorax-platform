@@ -28,7 +28,7 @@ const VERSION_NAMES = 'ΑΒΓΔΕΖΗΘΙΚΛΜ';
 export const versionName = (index: number) => VERSION_NAMES[index] ?? String(index + 1);
 
 /** «Άρθρο 5», from the heading «Άρθρο 5 - Αποβολή μέλους». */
-const shortHeading = (heading: string) => heading.split(/\s+[-–—:.]\s*/)[0] || heading;
+const shortHeading = (heading: string) => heading.split(/,\s*|\s+[-–—:.]\s*/)[0] || heading;
 
 /** One line for a ballot: how the whole and the articles were answered. */
 export function describeArticleChoice(t: Translate, choice: ArticleChoice): string {

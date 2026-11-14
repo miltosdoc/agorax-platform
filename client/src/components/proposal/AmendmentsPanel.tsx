@@ -16,7 +16,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { AmendmentTree } from '@/components/proposal/AmendmentTree';
 import { AmendmentComments, type AmendmentComment } from '@/components/proposal/AmendmentComments';
 import { isDebateOpen } from '@shared/proposal-lifecycle';
-import { NEW_ARTICLE_REF, PREAMBLE_REF, type TextSection } from '@shared/statute-articles';
+import { NEW_ARTICLE_REF, PREAMBLE_REF, headingLabel, type TextSection } from '@shared/statute-articles';
 import {
   FileText,
   Plus,
@@ -209,7 +209,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
       : ref === NEW_ARTICLE_REF ? t('workspace.amendments.articleNew')
       : t('workspace.amendments.articleShort', { ref });
   const articleHeading = (ref: string) =>
-    articles?.find(a => a.ref === ref)?.heading ?? articleName(ref);
+    (h => h ? headingLabel(h) : articleName(ref))(articles?.find(a => a.ref === ref)?.heading);
   const articleBadge = (a: Amendment) => a.articleRef ? (
     <Badge variant="outline" className="text-xs" title={articleHeading(a.articleRef)} data-testid={`amendment-article-${a.id}`}>
       {articleName(a.articleRef)}

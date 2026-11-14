@@ -22,7 +22,7 @@ import { DEFAULT_AMENDMENT_INCLUSION_THRESHOLD } from '../../shared/community-se
 import { TEXT_MAX_CHARS, proposalKindOf, type ProposalKind } from '../../shared/proposal-kinds';
 import { buildArticleBallot } from '../../shared/article-ballot';
 import {
-  NEW_ARTICLE_REF, appendArticles, articleSectionsFor, nextArticleNumber, opensWithHeading, replaceSections,
+  NEW_ARTICLE_REF, appendArticles, articleSectionsFor, nextArticleNumber, opensWithHeading, replaceSections, splitHeading,
   sectionText, type TextSection,
 } from '../../shared/statute-articles';
 import { eq } from 'drizzle-orm';
@@ -316,8 +316,13 @@ async function rewriteSection(system: string, prompt: string, chars: number, con
 
 /** The model sometimes drops the heading it was told to keep; put it back. */
 function keepHeading(section: TextSection, rewritten: string): string {
-  if (!section.heading || opensWithHeading(rewritten)) return rewritten;
-  return `${section.heading}\n${rewritten}`;
+  if (!section.heading) return rewritten;
+  if (!opensWithHeading(rewritten)) return `${section.heading}\n${rewritten}`;
+  // The chapter heading above the article goes back too, if it was dropped.
+  // (The rewrite opens on «Άρθρο» itself when the chapter line was dropped.)
+  const { chapter } = splitHeading(section.heading);
+  const opening = rewritten.trimStart();
+  return chapter && splitHeading(opening).chapter === null ? `${chapter}\n\n${opening}` : rewritten;
 }
 
 const SECTION_SYSTEM = 'Είσαι ειδικός στη νομοτεχνική σύνταξη καταστατικών. Αλλάζεις μόνο ό,τι σου ζητείται και αφήνεις κάθε άλλη λέξη ακριβώς όπως είναι.';

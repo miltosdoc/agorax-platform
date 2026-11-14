@@ -43,7 +43,8 @@ import {
 } from '@shared/proposal-kinds';
 import { statuteSections } from '@shared/statute-articles';
 import { isArticleBallot } from '@shared/article-ballot';
-import { ArticlePreview } from '@/components/proposal/ArticlePreview';
+import { ArticlePreview, StatuteStructureHint } from '@/components/proposal/ArticlePreview';
+import { StatuteEditor } from '@/components/proposal/StatuteEditor';
 import { hoursLabel } from '@/lib/governable-setting-labels';
 
 interface ProposalFormProps {
@@ -179,6 +180,9 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
   // kind, so switching to an election can never leave a deliberation track
   // behind that the server would refuse.
   const [deliberate, setDeliberate] = useState(false);
+  // A statute is written as cards (StatuteEditor) or, for pasting and
+  // touch-ups, as one text; both edit the same formData.solution.
+  const [statuteView, setStatuteView] = useState<'cards' | 'text'>('cards');
   const [editTrack, setEditTrack] = useState<'deliberation' | 'vote' | null>(null);
   // Co-drafting means amending a text for a decision or a statute, and
   // collecting candidacies or answers for an election or a poll — the
@@ -876,16 +880,39 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
                   ? <span className="text-red-500"> *</span>
                   : <span className="font-normal text-muted-foreground"> ({t('proposal.form_optional')})</span>}
               </Label>
-              <Textarea
-                id="solution"
-                placeholder={t(`proposal.form_text_${kind}_ph`)}
-                value={formData.solution}
-                onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
-                className={textRequired ? 'min-h-[140px]' : 'min-h-[80px]'}
-                required={textRequired}
-                aria-invalid={textOver || undefined}
-                aria-describedby={textLength > 0 ? 'solution-count' : undefined}
-              />
+              {kind === 'statute' && (
+                <div role="tablist" aria-label={t('statute.view_label')} className="inline-flex rounded-lg border p-0.5 text-sm" data-testid="statute-view">
+                  {(['cards', 'text'] as const).map((view) => (
+                    <button
+                      key={view}
+                      type="button"
+                      role="tab"
+                      aria-selected={statuteView === view}
+                      onClick={() => setStatuteView(view)}
+                      className={`min-h-9 rounded-md px-3 font-medium ${statuteView === view ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {t(view === 'cards' ? 'statute.view_cards' : 'statute.view_text')}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {kind === 'statute' && statuteView === 'cards' ? (
+                <StatuteEditor
+                  text={formData.solution}
+                  onChange={(solution) => setFormData((prev) => ({ ...prev, solution }))}
+                />
+              ) : (
+                <Textarea
+                  id="solution"
+                  placeholder={t(`proposal.form_text_${kind}_ph`)}
+                  value={formData.solution}
+                  onChange={(e) => setFormData({ ...formData, solution: e.target.value })}
+                  className={textRequired ? 'min-h-[140px]' : 'min-h-[80px]'}
+                  required={textRequired}
+                  aria-invalid={textOver || undefined}
+                  aria-describedby={textLength > 0 ? 'solution-count' : undefined}
+                />
+              )}
               {textLength > 0 && (
                 <div id="solution-count" className="flex items-start justify-between gap-3 text-xs">
                   <p className="text-destructive" data-testid="proposal-text-over">
@@ -962,12 +989,18 @@ export function ProposalForm({ communityId, editProposalId, fromPostId, fromArti
                 <span className="text-xs">· {t('media.docSizeLimit')}</span>
               </button>
               {/* The ballot the statute will have, while it can still be fixed. */}
-              {articles && kind === 'statute' && (
+              {articles && kind === 'statute' && statuteView === 'text' && (
                 <ArticlePreview
                   text={formData.solution}
                   onChange={(solution) => setFormData((prev) => ({ ...prev, solution }))}
                   withOptions={!editProposalId && track === 'vote' && useOptions}
                   codrafted={track === 'deliberation'}
+                />
+              )}
+              {!articles && kind === 'statute' && statuteView === 'text' && (
+                <StatuteStructureHint
+                  text={formData.solution}
+                  onChange={(solution) => setFormData((prev) => ({ ...prev, solution }))}
                 />
               )}
             </div>
