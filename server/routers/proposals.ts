@@ -517,7 +517,8 @@ export function registerProposalsRoutes(app: Express): void {
       });
       res.json(draft);
     } catch (err: any) {
-      res.status(502).json({ message: 'AI drafting failed, please try again' });
+      console.warn(`[proposal-compiler] drafting failed (${intent.length} chars): ${err?.message ?? err}`);
+      res.status(502).json({ message: 'Η συμπλήρωση με AI δεν ολοκληρώθηκε: ο πάροχος AI δεν απάντησε. Δοκιμάστε ξανά σε λίγο· το κείμενό σας έμεινε όπως ήταν.' });
     }
   });
 

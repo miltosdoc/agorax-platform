@@ -12,7 +12,7 @@
  * schema failure is retried once with the errors fed back, then rejected.
  */
 import { z } from 'zod';
-import { chatCompletion } from './llm-client';
+import { chatCompletion, LlmUnavailableError } from './llm-client';
 import { PROPOSAL_KINDS, TEXT_MAX_CHARS, kindRequiresText, type ProposalKind } from '../../shared/proposal-kinds';
 
 export const PROPOSAL_CATEGORIES = [
@@ -96,6 +96,44 @@ Safety:
 
 Respond with ONLY a JSON object: {"kind": "decision"|"statute"|"election"|"poll", "question": "...", "solution": "...", "category": "...", "track": "vote"|"deliberation", "votingDurationHours": number|null, "ballotOptions": ["..."]|null}`;
 
+/**
+ * The gateway now and then drops a request or answers empty (seen 2026-11-14:
+ * a tiny prompt hung >120 s, then the same one answered in 6 s). One quiet
+ * retry turns most of those into a draft instead of an error. A timeout is
+ * not retried: the author has already waited the full budget.
+ */
+async function withOneRetry(call: () => Promise<string>): Promise<string> {
+  try {
+    return await call();
+  } catch (err: any) {
+    if (!(err instanceof LlmUnavailableError) || /timed out/.test(err.message)) throw err;
+    console.warn(`[proposal-compiler] LLM call failed, retrying once: ${err.message}`);
+    return call();
+  }
+}
+
+/**
+ * "Verbatim" pass-through is not verbatim in practice: Gemma 4 rewrote
+ * «ούτω καθεξής» as «καθεξώς» in every run on a pasted statute (2026-11-14).
+ * When the model's text is the pasted text (or its tail, after a one-line
+ * instruction) with only a few words changed, the author's own text is
+ * returned instead. A real rewrite (other wording, artifacts stripped, a
+ * different word count) is left as the model wrote it.
+ */
+export function restoreVerbatim(intent: string, solution: string): string {
+  const words = (text: string) => text.trim().split(/\s+/).filter(Boolean);
+  const out = words(solution);
+  if (out.length < 20) return solution;
+  const tokens = intent.trim().split(/(\s+)/); // words at even indices, whitespace between
+  const inWords = tokens.filter((_, i) => i % 2 === 0);
+  if (inWords.length < out.length) return solution;
+  const start = inWords.length - out.length;
+  let same = 0;
+  for (let i = 0; i < out.length; i++) if (inWords[start + i] === out[i]) same++;
+  if (same === out.length || same / out.length < 0.98) return solution;
+  return tokens.slice(start * 2).join('');
+}
+
 export async function compileProposal(
   intent: string,
   opts: { allowedKinds?: readonly ProposalKind[] } = {},
@@ -109,7 +147,7 @@ export async function compileProposal(
     : SYSTEM_PROMPT;
   let lastErrors = '';
   for (let round = 1; round <= 2; round++) {
-    const raw = await chatCompletion({
+    const raw = await withOneRetry(() => chatCompletion({
       messages: [
         { role: 'system', content: system },
         {
@@ -128,7 +166,7 @@ export async function compileProposal(
       // statute passed through (up to ~38k tokens) takes minutes.
       timeoutMs: 600_000,
       jsonMode: true,
-    });
+    }));
 
     let parsed: unknown;
     try {
@@ -139,7 +177,8 @@ export async function compileProposal(
     }
     const result = compiledProposalSchema.safeParse(parsed);
     if (result.success) {
-      return allowed.includes(result.data.kind) ? result.data : { ...result.data, kind: 'decision' };
+      const draft = { ...result.data, solution: restoreVerbatim(intent, result.data.solution) };
+      return allowed.includes(draft.kind) ? draft : { ...draft, kind: 'decision' };
     }
     lastErrors = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
   }
