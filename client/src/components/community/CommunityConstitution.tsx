@@ -13,6 +13,7 @@
  * print-ready HTML (Print → Save as PDF).
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -183,9 +184,9 @@ export function CommunityConstitution({ communityId }: { communityId: number }) 
                     </p>
                   )}
                   {b.note && <p className="text-xs italic text-muted-foreground">{b.note}</p>}
-                  <p className={pi === 0 ? 'text-sm leading-relaxed text-muted-foreground' : 'whitespace-pre-line text-sm leading-relaxed'}>
-                    {b.body}
-                  </p>
+                  {pi === 0
+                    ? <p className="text-sm leading-relaxed text-muted-foreground">{b.body}</p>
+                    : <ReadableText text={b.body} size="sm" idPrefix={`constitution-${pi}-${bi}`} />}
                   {b.result && (
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span><b>{t('constitution.result')}:</b> {b.result}</span>

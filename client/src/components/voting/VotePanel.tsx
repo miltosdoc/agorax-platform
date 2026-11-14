@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -599,13 +600,14 @@ export default function VotePanel({
                         <summary className="cursor-pointer select-none text-xs text-muted-foreground underline-offset-2 hover:underline">
                           {t('vote.option_fullText') || 'Δείτε το πλήρες κείμενο'}
                         </summary>
-                        <div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap border-l-2 pl-3 text-sm text-muted-foreground">
+                        <div className="mt-2 max-h-80 overflow-y-auto border-l-2 pl-3 text-sm text-muted-foreground">
                           {finalReviewLoading
                             ? t('general.loading')
                             : finalReviewError
                             ? t('vote.option_textLoadFailed') || 'Δεν ήταν δυνατή η φόρτωση του κειμένου.'
-                            : optionFullText(opt.id) ??
-                              (t('vote.option_noText') || 'Δεν υπάρχει διαθέσιμο κείμενο.')}
+                            : optionFullText(opt.id)
+                              ? <ReadableText text={optionFullText(opt.id)!} size="sm" idPrefix={`option-${opt.id}`} />
+                              : (t('vote.option_noText') || 'Δεν υπάρχει διαθέσιμο κείμενο.')}
                         </div>
                       </details>
                     )}

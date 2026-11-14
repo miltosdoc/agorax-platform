@@ -7,6 +7,7 @@
  * each article can be corrected in place, and the text follows.
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useState } from 'react';
 import { AlertTriangle, Loader2, Pencil, Sparkles } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -85,8 +86,8 @@ export function ArticlePreview({ text, onChange, withOptions, codrafted }: Artic
                     </>
                   ) : (
                     <>
-                      <div className="whitespace-pre-wrap border-l-2 pl-3 text-sm leading-relaxed text-foreground">
-                        {s.heading ? body.slice(s.heading.length).trim() : body}
+                      <div className="border-l-2 pl-3">
+                        <ReadableText text={s.heading ? body.slice(s.heading.length).trim() : body} size="sm" idPrefix={`preview-${s.ref}`} />
                       </div>
                       <Button
                         type="button"

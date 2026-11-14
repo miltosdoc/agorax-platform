@@ -6,6 +6,7 @@
  * SortitionPanel, VotePanel
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useSearch } from 'wouter';
 import { useCommunityMembership } from '@/hooks/use-community-membership';
@@ -504,7 +505,7 @@ export default function ProposalDetailPage() {
                 />
               </CollapsibleTrigger>
               <CollapsibleContent data-testid="initial-solution-content">
-                <p className="whitespace-pre-wrap pb-4 text-base leading-relaxed">{proposal.solution}</p>
+                <ReadableText text={proposal.solution} outline idPrefix="solution" className="pb-6 pt-2" />
               </CollapsibleContent>
             </Collapsible>
             )}
@@ -520,7 +521,7 @@ export default function ProposalDetailPage() {
                     <div className="text-xs text-muted-foreground">
                       {t('proposal.sortitionRevisionLabel', { n: i + 1 })} · {r.authorName}
                     </div>
-                    <p className="whitespace-pre-wrap">{r.text}</p>
+                    <ReadableText text={r.text} size="sm" idPrefix={`revision-${r.id}`} />
                   </div>
                 ))}
               </div>
@@ -531,9 +532,9 @@ export default function ProposalDetailPage() {
                 This is also what keeps the merged proposal.finalText visible
                 for option-ballot proposals once voting starts. */}
             {proposal.status !== 'final_review' && proposal.status !== 'community_signal' && proposal.finalText && proposal.finalText.trim() !== proposal.solution.trim() && (
-              <div className="mt-4 p-4 bg-muted rounded space-y-2">
+              <div className="mt-6 space-y-4 rounded-2xl border border-line bg-surface p-5 sm:p-8" data-testid="merged-final-text">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-medium">{t('proposal.mergedFinalText') || 'Τελικό κείμενο (μετά τις τροπολογίες)'}</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t('proposal.mergedFinalText') || 'Τελικό κείμενο (μετά τις τροπολογίες)'}</h4>
                   {userIsAuthor && (
                     <Button
                       size="sm"
@@ -549,7 +550,7 @@ export default function ProposalDetailPage() {
                     </Button>
                   )}
                 </div>
-                <p className="whitespace-pre-wrap">{proposal.finalText}</p>
+                <ReadableText text={proposal.finalText} outline idPrefix="final" />
               </div>
             )}
 
@@ -566,16 +567,16 @@ export default function ProposalDetailPage() {
               <h2 className="text-sm font-medium text-muted-foreground mb-2">
                 {t('proposal.final_review_title') || 'Τελικό κείμενο προς ψηφοφορία'}
               </h2>
-              <div className="p-4 bg-muted rounded space-y-3">
+              <div className="space-y-4 rounded-2xl border border-line bg-surface p-5 sm:p-8">
                 <p className="text-xs text-muted-foreground">
                   {t('proposal.final_review_note') || 'Το κείμενο συντέθηκε από το AI ενσωματώνοντας τις αποδεκτές και τις κοινοτικά προωθημένες τροπολογίες.'}
                 </p>
                 {finalReviewLoading ? (
                   <p className="text-sm text-muted-foreground">{t('general.loading')}</p>
                 ) : (
-                  <p className="whitespace-pre-wrap text-base leading-relaxed" data-testid="final-review-text">
-                    {finalReviewText}
-                  </p>
+                  <div data-testid="final-review-text">
+                    <ReadableText text={finalReviewText} outline idPrefix="final-review" />
+                  </div>
                 )}
               </div>
 
@@ -591,7 +592,7 @@ export default function ProposalDetailPage() {
                         <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="px-3 pb-3">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">{alt.text}</p>
+                        <ReadableText text={alt.text} size="sm" idPrefix={`alternative-${alt.id}`} />
                       </CollapsibleContent>
                     </Collapsible>
                   ))}

@@ -8,6 +8,7 @@
  * unanswered counts as an abstention.
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Vote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -150,11 +151,11 @@ export function ArticleBallotForm({ ballot, initial, disabled, onSubmit, onCance
                       </summary>
                       <div className="mt-2 space-y-2">
                         {q.versions.map((text, v) => (
-                          <div key={v} className="max-h-72 overflow-y-auto whitespace-pre-wrap border-l-2 pl-3 text-sm leading-relaxed text-foreground">
+                          <div key={v} className="max-h-80 overflow-y-auto border-l-2 pl-3">
                             {q.versions.length > 1 && (
                               <div className="mb-1 font-medium text-foreground">{t('vote.article_version', { letter: versionName(v) })}</div>
                             )}
-                            {text}
+                            <ReadableText text={text} size="sm" idPrefix={`ballot-${q.ref}-${v}`} />
                           </div>
                         ))}
                       </div>

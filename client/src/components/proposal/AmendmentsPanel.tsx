@@ -3,6 +3,7 @@
  * community signal indicators, and duplicate grouping.
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -392,7 +393,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
                       {new Date(amendment.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap">{amendment.text}</p>
+                  <ReadableText text={amendment.text} size="sm" idPrefix={`amendment-${amendment.id}`} />
                   <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground gap-2 flex-wrap">
                     <span>
                       {amendment.authorName || amendment.authorUsername || t('proposal.userWithId', { id: amendment.authorId })}
@@ -499,7 +500,7 @@ export function AmendmentsPanel({ proposalId, proposalStatus, userIsAuthor, arti
                                 {new Date(child.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-sm whitespace-pre-wrap">{child.text}</p>
+                            <ReadableText text={child.text} size="sm" idPrefix={`amendment-${child.id}`} />
                             <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground gap-2 flex-wrap">
                               <span>{child.authorName || child.authorUsername || t('proposal.userWithId', { id: child.authorId })}</span>
                               <div className="flex items-center gap-1">

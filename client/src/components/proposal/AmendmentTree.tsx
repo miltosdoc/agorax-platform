@@ -12,6 +12,7 @@
  * Inspired by LiquidFeedback and Loomio patterns.
  */
 
+import { ReadableText } from '@/components/proposal/ReadableText';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -137,7 +138,7 @@ function AmendmentNodeItem({
           </div>
 
           {/* Amendment text */}
-          <p className="text-sm whitespace-pre-wrap">{node.text}</p>
+          <ReadableText text={node.text} size="sm" idPrefix={`tree-${node.id}`} />
 
           {/* Actions */}
           {node.status === 'under_review' && onAction && (
@@ -216,7 +217,7 @@ export function AmendmentTree({
               {t('amendment.originalProposal') || 'Original Proposal'}
             </Badge>
           </div>
-          <p className="text-sm whitespace-pre-wrap">{root.text}</p>
+          <ReadableText text={root.text} size="sm" idPrefix={`tree-${root.id}`} />
         </div>
 
         {/* Amendment children */}

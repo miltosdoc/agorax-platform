@@ -2171,6 +2171,7 @@ const en: TranslationDictionary = {
   'proposal.statute_no_articles': 'The platform cannot find articles in this text, so it would be voted only as a whole. Lay it out in articles so each one is voted separately and can be amended on its own.',
   'proposal.statute_repeated': 'The text has more than one version of: {refs} — like a model statute with alternatives. Keep one version of each article and delete the others; then the articles will be voted one by one.',
   "statute.view_label": "How you write the statute",
+  'readable.outline': 'Contents · {n} articles',
   "statute.view_cards": "Articles",
   "statute.view_text": "Whole text",
   "statute.title": "Statute title",
