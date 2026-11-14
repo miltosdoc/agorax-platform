@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export type BookmarkKind = "community" | "proposal" | "survey" | "media" | "post";
 
-const actionButton =
+export const actionButton =
   "inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-sm border border-line bg-surface text-ink-soft transition-colors duration-[120ms] hover:border-line-strong hover:bg-sunken hover:text-ink disabled:opacity-50";
 
 /**

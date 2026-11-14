@@ -348,6 +348,8 @@ export const communityMembers = pgTable("community_members", {
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   role: text("role").default("member"), // 'member' | 'admin' | 'founder'
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  // Set when this member pinned the community to the top of their own lists.
+  pinnedAt: timestamp("pinned_at"),
 }, (table) => ({
   communityMemberUnique: uniqueIndex('community_member_unique').on(table.communityId, table.userId),
 }));

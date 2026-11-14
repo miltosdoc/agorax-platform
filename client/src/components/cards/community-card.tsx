@@ -1,8 +1,9 @@
 import { Link } from 'wouter';
-import { MapPin, Users, MessageSquare, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { MapPin, Users, MessageSquare, ArrowRight, CheckCircle2, Pin } from 'lucide-react';
 import { useTranslation } from '@/hooks/use-translation';
 import { Thumbnail } from '@/components/thumbnails/Thumbnail';
-import { SaveButton, ShareButton } from '@/components/cards/card-actions';
+import { SaveButton, ShareButton, actionButton } from '@/components/cards/card-actions';
+import { usePinCommunity } from '@/hooks/use-community-membership';
 import { CommunityJoinAction } from '@/components/community/CommunityJoinAction';
 import type { CommunityJoinStatus } from '@shared/community-membership';
 
@@ -25,6 +26,7 @@ export interface CommunityCardData {
   savedByViewer?: boolean;
   viewerIsMember?: boolean;
   viewerRole?: string | null;
+  viewerPinnedAt?: string | Date | null;
   viewerJoinStatus?: CommunityJoinStatus;
   joinPolicy?: string | null;
   contentHidden?: boolean;
@@ -33,6 +35,20 @@ export interface CommunityCardData {
 
 export function mediaUrl(path?: string | null): string | undefined {
   return path ? `/media/${path}` : undefined;
+}
+
+/** Members only: keeps this community at the top of the viewer's own lists. */
+function PinButton({ community }: { community: CommunityCardData }) {
+  const { t } = useTranslation();
+  const pin = usePinCommunity(community.id);
+  const pinned = !!community.viewerPinnedAt;
+  const label = t(pinned ? 'communities.unpin' : 'communities.pin');
+  return (
+    <button type="button" onClick={() => pin.mutate(!pinned)} disabled={pin.isPending} aria-pressed={pinned} aria-label={label} title={label}
+      className={`${actionButton} ${pinned ? 'border-kyanos/40 bg-kyanos-wash text-kyanos' : ''}`} data-testid={`button-pin-community-${community.id}`}>
+      <Pin className="h-4 w-4" fill={pinned ? 'currentColor' : 'none'} />
+    </button>
+  );
 }
 
 /** Readable identity and one next step, with joining available in place. */
@@ -48,7 +64,7 @@ export function CommunityCard({ community }: { community: CommunityCardData }) {
         <div className="min-w-0 flex-1">
           <Link href={`/communities/${community.id}`} className="block break-words text-xl font-semibold leading-snug text-ink hover:text-kyanos">{community.name}</Link>
           {community.category && <p className="mt-1 text-sm text-kyanos">{t(`category.${community.category}`)}</p>}
-          {isMember && <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-kyanos"><CheckCircle2 className="h-4 w-4" />{t('membership.member')}</span>}
+          {isMember && <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-kyanos"><CheckCircle2 className="h-4 w-4" />{t('membership.member')}{community.viewerPinnedAt && <span className="inline-flex items-center gap-1 font-normal text-ink-faint">· <Pin className="h-3.5 w-3.5" />{t('communities.pinned')}</span>}</span>}
         </div>
       </div>
       {(community.tagline || community.description) && <p className="mt-4 line-clamp-3 text-base leading-relaxed text-ink-soft">{community.tagline || community.description}</p>}
@@ -63,6 +79,7 @@ export function CommunityCard({ community }: { community: CommunityCardData }) {
         {!isMember && <CommunityJoinAction communityId={community.id} className="w-full" compact />}
         <div className={`flex items-center gap-2 ${!isMember ? 'mt-3' : ''}`}>
           <Link href={`/communities/${community.id}`} className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors ${isMember ? 'bg-kyanos text-white hover:bg-kyanos-deep' : 'border border-line text-ink hover:bg-sunken'}`} data-testid={`link-view-community-${community.id}`}>{t('communities.open')}<ArrowRight className="h-4 w-4" /></Link>
+          {isMember && <PinButton community={community} />}
           <SaveButton entityType="community" entityId={community.id} initialSaved={community.savedByViewer} />
           <ShareButton url={`/communities/${community.id}`} title={community.name} />
         </div>

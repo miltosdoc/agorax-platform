@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { apiRequest } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
-import { useCommunityDirectory } from '@/hooks/use-community-membership';
+import { useCommunityDirectory, pinnedFirst } from '@/hooks/use-community-membership';
 import { EntityCard } from '@/components/cards/entity-card';
 import { Thumbnail } from '@/components/thumbnails/Thumbnail';
 import { mediaUrl } from '@/components/cards/community-card';
@@ -81,7 +81,7 @@ export default function HomePage() {
   const { t, locale } = useTranslation();
   const { user } = useAuth();
   const directory = useCommunityDirectory();
-  const communities = (directory.data ?? []).filter((community) => community.viewerIsMember);
+  const communities = pinnedFirst((directory.data ?? []).filter((community) => community.viewerIsMember));
   const proposalQuery = useQuery<Proposal[]>({ queryKey: ['/api/proposals', { viewerId: user?.id ?? 0 }], queryFn: async () => (await apiRequest('GET', '/api/proposals')).json(), enabled: !!user });
   const activeQuery = useQuery<ActivityPage>({ queryKey: ['/api/activity-feed', { scope: 'mine', type: 'proposal', stage: 'active', limit: 4, viewerId: user?.id ?? 0 }], staleTime: 0, enabled: !!user });
   const bodiesQuery = useQuery<SortitionBody[]>({ queryKey: ['/api/sortition/my-bodies', { viewerId: user?.id ?? 0 }], enabled: !!user });

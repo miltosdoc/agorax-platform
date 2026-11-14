@@ -4,7 +4,7 @@ import { Plus, Search, Users, Compass, ArrowUpDown, X, Clock3 } from 'lucide-rea
 import AppShell from '@/components/layout/AppShell';
 import { useTranslation } from '@/hooks/use-translation';
 import { useAuth } from '@/hooks/use-auth';
-import { useCommunityDirectory } from '@/hooks/use-community-membership';
+import { useCommunityDirectory, pinnedFirst } from '@/hooks/use-community-membership';
 import { CommunityCard, type CommunityCardData } from '@/components/cards/community-card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,7 +33,7 @@ export default function CommunitiesPage() {
     document.getElementById(view === 'mine' ? 'my-communities-heading' : 'discover-communities-heading')?.scrollIntoView({ block: 'start' });
   }, [urlSearch, directory.isLoading]);
   const all = directory.data ?? [];
-  const mine = all.filter((community) => community.viewerIsMember);
+  const mine = pinnedFirst(all.filter((community) => community.viewerIsMember));
   const pending = all.filter((community) => !community.viewerIsMember && community.viewerJoinStatus === 'pending');
   const searchMatches = (community: CommunityCardData) => {
     const query = searchable(search.trim());

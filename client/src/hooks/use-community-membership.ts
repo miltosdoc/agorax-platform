@@ -14,6 +14,35 @@ export function useCommunityDirectory() {
   });
 }
 
+/** Pinned communities first (most recently pinned on top); the rest keep their order. */
+export function pinnedFirst<T extends { viewerPinnedAt?: string | Date | null }>(rows: T[]): T[] {
+  const time = (row: T) => (row.viewerPinnedAt ? new Date(row.viewerPinnedAt).getTime() : 0);
+  return rows.map((row, index) => ({ row, index }))
+    .sort((a, b) => time(b.row) - time(a.row) || a.index - b.index)
+    .map(({ row }) => row);
+}
+
+/** Pin or unpin for the viewer only; the directory updates at once and rolls back on failure. */
+export function usePinCommunity(communityId: number) {
+  const { user } = useAuth();
+  const client = useQueryClient();
+  const key = ['/api/communities', { viewerId: user?.id ?? 0 }];
+  const setPinned = (pinnedAt: string | null) =>
+    client.setQueryData<CommunityCardData[]>(key, (rows) =>
+      Array.isArray(rows) ? rows.map((row) => row.id === communityId ? { ...row, viewerPinnedAt: pinnedAt } : row) : rows);
+  return useMutation({
+    mutationFn: async (pinned: boolean) =>
+      (await apiRequest('PUT', `/api/communities/${communityId}/pin`, { pinned })).json() as Promise<{ pinnedAt: string | null }>,
+    onMutate: (pinned) => {
+      const previous = client.getQueryData<CommunityCardData[]>(key)?.find((row) => row.id === communityId)?.viewerPinnedAt ?? null;
+      setPinned(pinned ? new Date().toISOString() : null);
+      return { previous: previous ? String(previous) : null };
+    },
+    onError: (_error, _pinned, context) => setPinned(context?.previous ?? null),
+    onSuccess: (data) => setPinned(data.pinnedAt),
+  });
+}
+
 export function useCommunityMembership(communityId: number) {
   const { user } = useAuth();
   const client = useQueryClient();

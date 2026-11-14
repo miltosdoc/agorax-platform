@@ -52,6 +52,23 @@ import {
 export function registerCommunitiesRoutes(app: Express): void {
   // Discord sign-in and each community's Discord channel (routers/discord.ts).
   registerDiscordRoutes(app);
+
+  // Pin or unpin a community to the top of the viewer's own lists.
+  app.put('/api/communities/:id/pin', requireAuth, async (req: any, res: Response) => {
+    try {
+      const communityId = parseInt(req.params.id);
+      if (!Number.isInteger(communityId)) return res.status(400).json({ message: 'Invalid community' });
+      const pinned = req.body?.pinned === true;
+      const [row] = await db.update(communityMembers)
+        .set({ pinnedAt: pinned ? new Date() : null })
+        .where(and(eq(communityMembers.communityId, communityId), eq(communityMembers.userId, req.user.id)))
+        .returning({ pinnedAt: communityMembers.pinnedAt });
+      if (!row) return res.status(404).json({ message: 'You are not a member of this community' });
+      res.json({ pinnedAt: row.pinnedAt });
+    } catch {
+      res.status(500).json({ message: 'Failed to pin community' });
+    }
+  });
   app.get("/api/communities", async (req, res) => {
     try {
       const userId = req.user?.id;
@@ -147,7 +164,7 @@ export function registerCommunitiesRoutes(app: Express): void {
       // directory into N queries.
       const viewerMemberRows = userId
         ? await db
-            .select({ communityId: communityMembers.communityId, role: communityMembers.role })
+            .select({ communityId: communityMembers.communityId, role: communityMembers.role, pinnedAt: communityMembers.pinnedAt })
             .from(communityMembers)
             .where(and(
               eq(communityMembers.userId, userId),
@@ -156,6 +173,7 @@ export function registerCommunitiesRoutes(app: Express): void {
         : [];
       const roleOf = new Map(viewerMemberRows.map((r) => [r.communityId, r.role ?? 'member']));
       const memberOf = new Set(viewerMemberRows.map((r) => r.communityId));
+      const pinnedAt = new Map(viewerMemberRows.filter((r) => r.pinnedAt).map((r) => [r.communityId, r.pinnedAt]));
       // Only THIS viewer's pending state is exposed in the public directory.
       // Request messages and other applicants remain in the admin endpoint.
       const pendingRows = userId ? await db
@@ -185,6 +203,7 @@ export function registerCommunitiesRoutes(app: Express): void {
         savedByViewer: savedIds.has(c.id),
         viewerIsMember: memberOf.has(c.id),
         viewerRole: roleOf.get(c.id) ?? null,
+        viewerPinnedAt: pinnedAt.get(c.id) ?? null,
         viewerJoinStatus: getCommunityJoinStatus({
           isMember: memberOf.has(c.id),
           hasPendingRequest: pendingIn.has(c.id),

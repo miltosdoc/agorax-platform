@@ -3,7 +3,7 @@ import { Home, Users, Compass, Vote, BarChart3, Play, Headphones, Bookmark, Plus
 import { useAuth } from '@/hooks/use-auth';
 import { useTranslation } from '@/hooks/use-translation';
 import { cn } from '@/lib/utils';
-import { useCommunityDirectory } from '@/hooks/use-community-membership';
+import { useCommunityDirectory, pinnedFirst } from '@/hooks/use-community-membership';
 import { initials } from '@/lib/initials';
 
 interface MemberCommunity {
@@ -15,7 +15,7 @@ interface MemberCommunity {
 
 function useMemberCommunities() {
   const query = useCommunityDirectory();
-  return { ...query, communities: (query.data ?? []).filter((community) => community.viewerIsMember) };
+  return { ...query, communities: pinnedFirst((query.data ?? []).filter((community) => community.viewerIsMember)) };
 }
 
 function CommunityMark({ community }: { community: MemberCommunity }) {
