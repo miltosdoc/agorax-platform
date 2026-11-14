@@ -74,11 +74,7 @@ export function isLlmConfigured(): boolean {
  * whose `choices[0].message.content` is a non-empty string counts as
  * success; everything else throws.
  */
-export async function chatCompletion(opts: ChatCompletionOptions): Promise<string> {
-  const cfg = readLlmConfig();
-  if (!cfg) {
-    throw new LlmUnavailableError('LLM env not configured (LLM_API_URL, LLM_API_KEY, LLM_MODEL)');
-  }
+async function completeWith(cfg: LlmConfig, opts: ChatCompletionOptions): Promise<string> {
   const url = `${cfg.url}/chat/completions`;
   const timeoutMs = opts.timeoutMs ?? 45_000;
 
@@ -160,3 +156,59 @@ export async function chatCompletion(opts: ChatCompletionOptions): Promise<strin
     throw err;
   }
 }
+
+/**
+ * A second model for when the first does not answer
+ * (LLM_FALLBACK_URL — defaults to LLM_API_URL —, LLM_FALLBACK_KEY,
+ * LLM_FALLBACK_MODEL). On 2026-11-14 Gemma 4 hung for every caller while
+ * the provider's other models answered in under a second; without a second
+ * model every AI feature failed with it.
+ */
+export function readFallbackConfig(): LlmConfig | null {
+  const url = process.env.LLM_FALLBACK_URL || process.env.LLM_API_URL;
+  const apiKey = process.env.LLM_FALLBACK_KEY || process.env.LLM_API_KEY;
+  const model = process.env.LLM_FALLBACK_MODEL;
+  if (!url || !apiKey || !model) return null;
+  return { url: url.replace(/\/$/, ''), apiKey, model };
+}
+
+// With a fallback at hand, a short call does not wait out its whole budget
+// on a model that is not answering; and once the first model has been found
+// down, calls go straight to the fallback for a few minutes instead of each
+// waiting to find out again. Long calls (whole-statute rewrites) keep their
+// budget on the first model unless it is already known to be down.
+const PRIMARY_PATIENCE_MS = 45_000;
+const PRIMARY_DOWN_MS = 5 * 60_000;
+let primaryDownUntil = 0;
+
+/**
+ * Send a chat completion request and return the assistant text. Throws
+ * `LlmUnavailableError` if anything goes wrong — callers should catch
+ * and fall back. We intentionally keep this loose: any 200 response
+ * whose `choices[0].message.content` is a non-empty string counts as
+ * success; everything else throws. When the configured model fails and a
+ * fallback model is configured, the same request goes to the fallback.
+ */
+export async function chatCompletion(opts: ChatCompletionOptions): Promise<string> {
+  const cfg = readLlmConfig();
+  if (!cfg) {
+    throw new LlmUnavailableError('LLM env not configured (LLM_API_URL, LLM_API_KEY, LLM_MODEL)');
+  }
+  const fallback = readFallbackConfig();
+  if (!fallback) return completeWith(cfg, opts);
+  if (Date.now() < primaryDownUntil) return completeWith(fallback, opts);
+  const budget = opts.timeoutMs ?? 45_000;
+  try {
+    return await completeWith(cfg, { ...opts, timeoutMs: budget <= 120_000 ? Math.min(budget, PRIMARY_PATIENCE_MS) : budget });
+  } catch (err: any) {
+    if (!(err instanceof LlmUnavailableError)) throw err;
+    const status = (err as { httpStatus?: number }).httpStatus;
+    // Not answering at all, or a server error: the model is down, not this request.
+    if (/timed out|call failed/.test(err.message) || (status !== undefined && (status >= 500 || status === 429))) {
+      primaryDownUntil = Date.now() + PRIMARY_DOWN_MS;
+    }
+    console.warn(`[llm-client] ${cfg.model} failed (${err.message.slice(0, 120)}); answering with ${fallback.model}`);
+    return completeWith(fallback, opts);
+  }
+}
+
